@@ -1,0 +1,82 @@
+<!-- Этот файл содержит HTML-шаблон для страницы дашборда -->
+<!-- Он загружается динамически функцией renderDashboard() из app.js -->
+
+<h1 class="page-title">Обзор финансов</h1>
+
+<div class="dashboard-summary">
+  <div class="summary-card income">
+    <div class="summary-icon">
+      <i class="fas fa-arrow-down"></i>
+    </div>
+    <div class="summary-data">
+      <h3>Доходы за месяц</h3>
+      <div class="summary-amount">{{monthlyIncome}}</div>
+    </div>
+  </div>
+  
+  <div class="summary-card expense">
+    <div class="summary-icon">
+      <i class="fas fa-arrow-up"></i>
+    </div>
+    <div class="summary-data">
+      <h3>Расходы за месяц</h3>
+      <div class="summary-amount">{{monthlyExpense}}</div>
+    </div>
+  </div>
+  
+  <div class="summary-card balance">
+    <div class="summary-icon">
+      <i class="fas fa-wallet"></i>
+    </div>
+    <div class="summary-data">
+      <h3>Общий баланс</h3>
+      <div class="summary-amount">{{totalBalance}}</div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-content">
+  <div class="dashboard-section">
+    <div class="section-header">
+      <h2>Ваши счета</h2>
+      <button id="add-account-btn" class="btn btn-sm btn-primary">
+        <i class="fas fa-plus"></i> Добавить счет
+      </button>
+    </div>
+    
+    <div class="accounts-list">
+      {{accountsHtml}}
+    </div>
+  </div>
+  
+  <div class="dashboard-section">
+    <div class="section-header">
+      <h2>Последние транзакции</h2>
+      <button id="add-transaction-btn" class="btn btn-sm btn-primary">
+        <i class="fas fa-plus"></i> Добавить транзакцию
+      </button>
+    </div>
+    
+    <div class="transactions-list">
+      {{transactionsHtml}}
+    </div>
+    
+    <div class="section-footer">
+      <a href="#" class="btn btn-sm btn-outline" id="view-all-transactions">
+        Посмотреть все транзакции
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-charts">
+  <div class="chart-container">
+    <h2>Динамика доходов и расходов</h2>
+    <canvas id="income-expense-chart"></canvas>
+  </div>
+  
+  <div class="chart-container">
+    <h2>Расходы по категориям</h2>
+    <canvas id="expense-categories-chart"></canvas>
+  </div>
+</div>
