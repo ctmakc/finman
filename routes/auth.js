@@ -6,16 +6,45 @@ const config = require('../config/config');
 
 const router = express.Router();
 
+// Валидация токена (для frontend)
+router.get('/validate', passport.authenticate('jwt', { session: false }), (req, res) => {
+  res.json({ valid: true, user: { id: req.user.id, username: req.user.username } });
+});
+
 // Регистрация
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body;
-    
+
     // Проверка, что обязательные поля заполнены
     if (!username || !email || !password) {
-      return res.status(400).json({ 
-        error: true, 
-        message: 'Необходимо указать имя пользователя, email и пароль' 
+      return res.status(400).json({
+        error: true,
+        message: 'Необходимо указать имя пользователя, email и пароль'
+      });
+    }
+
+    // Валидация email
+    if (!config.isValidEmail(email)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Некорректный формат email'
+      });
+    }
+
+    // Валидация username (только буквы, цифры, подчёркивания, 3-30 символов)
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Имя пользователя должно содержать 3-30 символов (буквы, цифры, подчёркивания)'
+      });
+    }
+
+    // Валидация пароля (минимум 6 символов)
+    if (password.length < 6) {
+      return res.status(400).json({
+        error: true,
+        message: 'Пароль должен содержать минимум 6 символов'
       });
     }
     

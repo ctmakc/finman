@@ -3,6 +3,13 @@ const crypto = require('crypto');
 const BankConnection = require('../models/bankConnection');
 const bankApiConfig = require('../config/bank-api-config');
 
+// Получить конфигурацию банка (без regions и authTypes)
+function getBankConfig(bankId) {
+  const config = bankApiConfig[bankId];
+  if (!config) return null;
+  return config;
+}
+
 // Тестовые данные для разработки
 const testData = {
   accounts: [
@@ -318,33 +325,75 @@ class BankApiService {
   // Получение счетов из банка
   async getAccounts(bankId, connection) {
     // Проверить конфигурацию банка
-    const bankConfig = bankApiConfig[bankId];
+    const bankConfig = getBankConfig(bankId);
     if (!bankConfig) {
       throw new Error(`Банк ${bankId} не поддерживается`);
     }
-    
+
     // Обновить токены при необходимости
     const updatedConnection = await this.ensureValidTokens(bankId, connection);
-    
+
     // Для тестового банка
     if (bankId === 'test') {
       return testData.accounts;
     }
-    
+
     // Для реальных банков
     try {
       // Формирование заголовков авторизации
-      const headers = {
-        Authorization: `Bearer ${updatedConnection.access_token}`
-      };
-      
-      // Запрос на получение списка счетов
-      const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
-      
-      // Обработка ответа в зависимости от банка
+      const headers = this.getAuthHeaders(bankId, updatedConnection);
+
       let accounts = [];
-      
-      if (bankId === 'tinkoff') {
+
+      // === MONOBANK ===
+      if (bankId === 'monobank') {
+        const response = await axios.get(`${bankConfig.apiUrl}/personal/client-info`, { headers });
+        accounts = response.data.accounts.map(acc => ({
+          id: acc.id,
+          name: acc.maskedPan?.[0] || `Рахунок ${acc.type}`,
+          accountNumber: acc.id,
+          type: mapAccountType(acc.type === 'black' ? 'card' : acc.type),
+          balance: acc.balance / 100, // Monobank возвращает в копейках
+          currency: getCurrencyCode(acc.currencyCode)
+        }));
+      }
+      // === REVOLUT ===
+      else if (bankId === 'revolut') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
+        accounts = response.data.map(acc => ({
+          id: acc.id,
+          name: acc.name || `${acc.currency} Account`,
+          accountNumber: acc.id,
+          type: 'checking',
+          balance: acc.balance,
+          currency: acc.currency
+        }));
+      }
+      // === WISE ===
+      else if (bankId === 'wise') {
+        // Сначала получаем профиль
+        const profilesResponse = await axios.get(`${bankConfig.apiUrl}/v1/profiles`, { headers });
+        const profileId = profilesResponse.data[0]?.id;
+
+        if (profileId) {
+          const response = await axios.get(`${bankConfig.apiUrl}/v1/borderless-accounts?profileId=${profileId}`, { headers });
+          const borderlessAccount = response.data[0];
+
+          if (borderlessAccount?.balances) {
+            accounts = borderlessAccount.balances.map(bal => ({
+              id: `${borderlessAccount.id}-${bal.currency}`,
+              name: `Wise ${bal.currency}`,
+              accountNumber: borderlessAccount.id.toString(),
+              type: 'checking',
+              balance: bal.amount.value,
+              currency: bal.amount.currency
+            }));
+          }
+        }
+      }
+      // === ТИНЬКОФФ ===
+      else if (bankId === 'tinkoff') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
         accounts = response.data.accounts.map(acc => ({
           id: acc.id,
           name: acc.name,
@@ -353,7 +402,10 @@ class BankApiService {
           balance: acc.balance.amount,
           currency: acc.balance.currency
         }));
-      } else if (bankId === 'sberbank') {
+      }
+      // === СБЕРБАНК ===
+      else if (bankId === 'sberbank') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
         accounts = response.data.map(acc => ({
           id: acc.id,
           name: acc.name,
@@ -362,7 +414,10 @@ class BankApiService {
           balance: acc.balance,
           currency: acc.currency
         }));
-      } else if (bankId === 'alfabank') {
+      }
+      // === АЛЬФА-БАНК ===
+      else if (bankId === 'alfabank') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
         accounts = response.data.accounts.map(acc => ({
           id: acc.id,
           name: acc.name || `Счет ${acc.number}`,
@@ -371,7 +426,10 @@ class BankApiService {
           balance: acc.amount.value,
           currency: acc.amount.currency
         }));
-      } else if (bankId === 'vtb') {
+      }
+      // === ВТБ ===
+      else if (bankId === 'vtb') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
         accounts = response.data.map(acc => ({
           id: acc.id,
           name: acc.name,
@@ -380,92 +438,148 @@ class BankApiService {
           balance: acc.balance,
           currency: acc.currency
         }));
-      } else {
-        // Общий случай
-        accounts = response.data.map(acc => ({
+      }
+      // === ОБЩИЙ СЛУЧАЙ ===
+      else {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts`, { headers });
+        accounts = (response.data.accounts || response.data).map(acc => ({
           id: acc.id || acc.accountId,
-          name: acc.name || `Счет ${acc.number || acc.accountNumber}`,
-          accountNumber: acc.number || acc.accountNumber,
-          type: mapAccountType(acc.type),
-          balance: parseFloat(acc.balance || acc.amount),
-          currency: acc.currency
+          name: acc.name || `Account ${acc.number || acc.accountNumber}`,
+          accountNumber: acc.number || acc.accountNumber || acc.id,
+          type: mapAccountType(acc.type || 'checking'),
+          balance: parseFloat(acc.balance || acc.amount || 0),
+          currency: acc.currency || 'USD'
         }));
       }
-      
+
       return accounts;
     } catch (error) {
       console.error('Ошибка при получении счетов:', error.response?.data || error.message);
-      throw new Error(`Не удалось получить список счетов: ${error.message}`);
+      throw new Error(`Не удалось получить список счетов`);
     }
+  }
+
+  // Получение заголовков авторизации в зависимости от банка
+  getAuthHeaders(bankId, connection) {
+    const bankConfig = getBankConfig(bankId);
+
+    if (bankId === 'monobank') {
+      return { 'X-Token': connection.access_token };
+    }
+
+    if (bankId === 'wise' || bankId === 'revolut') {
+      return { Authorization: `Bearer ${connection.access_token}` };
+    }
+
+    // По умолчанию Bearer token
+    return { Authorization: `Bearer ${connection.access_token}` };
   }
   
   // Получение транзакций по счету
   async getTransactions(bankId, connection, accountNumber, options = {}) {
     const { startDate, endDate } = options;
-    
+
     // Проверить конфигурацию банка
-    const bankConfig = bankApiConfig[bankId];
+    const bankConfig = getBankConfig(bankId);
     if (!bankConfig) {
       throw new Error(`Банк ${bankId} не поддерживается`);
     }
-    
+
     // Обновить токены при необходимости
     const updatedConnection = await this.ensureValidTokens(bankId, connection);
-    
+
     // Для тестового банка
     if (bankId === 'test') {
       return testData.transactions;
     }
-    
+
     // Для реальных банков
     try {
-      // Формирование заголовков авторизации
-      const headers = {
-        Authorization: `Bearer ${updatedConnection.access_token}`
-      };
-      
-      // Формирование параметров запроса
-      const params = {};
-      
-      if (startDate) {
-        params.from = startDate;
-      }
-      
-      if (endDate) {
-        params.to = endDate;
-      }
-      
-      // Запрос на получение транзакций
-      let apiUrl = '';
-      if (bankId === 'tinkoff') {
-        apiUrl = `${bankConfig.apiUrl}/operations?accountNumber=${accountNumber}`;
-      } else if (bankId === 'sberbank') {
-        const accounts = await this.getAccounts(bankId, connection);
-        const account = accounts.find(acc => acc.accountNumber === accountNumber);
-        apiUrl = `${bankConfig.apiUrl}/operations?account=${account.id}`;
-      } else if (bankId === 'alfabank') {
-        apiUrl = `${bankConfig.apiUrl}/accounts/${accountNumber}/statement`;
-      } else if (bankId === 'vtb') {
-        apiUrl = `${bankConfig.apiUrl}/accounts/${accountNumber}/transactions`;
-      } else {
-        apiUrl = `${bankConfig.apiUrl}/accounts/${accountNumber}/transactions`;
-      }
-      
-      const response = await axios.get(apiUrl, { headers, params });
-      
-      // Обработка ответа в зависимости от банка
+      const headers = this.getAuthHeaders(bankId, updatedConnection);
       let transactions = [];
-      
-      if (bankId === 'tinkoff') {
+
+      // === MONOBANK ===
+      if (bankId === 'monobank') {
+        // Monobank использует Unix timestamp в секундах
+        const from = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+        const to = endDate ? Math.floor(new Date(endDate).getTime() / 1000) : Math.floor(Date.now() / 1000);
+
+        const response = await axios.get(
+          `${bankConfig.apiUrl}/personal/statement/${accountNumber}/${from}/${to}`,
+          { headers }
+        );
+
+        transactions = response.data.map(op => ({
+          id: op.id,
+          date: formatDate(new Date(op.time * 1000)),
+          description: op.description || op.comment || 'Транзакція',
+          category: op.mcc ? categorizeByMcc(op.mcc) : categorizeTransaction(op.description || ''),
+          amount: op.amount / 100, // Monobank в копійках
+          type: op.amount >= 0 ? 'income' : 'expense'
+        }));
+      }
+      // === REVOLUT ===
+      else if (bankId === 'revolut') {
+        const params = {};
+        if (startDate) params.from = startDate;
+        if (endDate) params.to = endDate;
+
+        const response = await axios.get(`${bankConfig.apiUrl}/transactions`, { headers, params });
+
+        transactions = response.data.map(op => ({
+          id: op.id,
+          date: formatDate(op.created_at || op.completed_at),
+          description: op.reference || op.description || 'Transaction',
+          category: categorizeTransaction(op.reference || op.description || ''),
+          amount: op.legs?.[0]?.amount || op.amount || 0,
+          type: (op.type === 'topup' || op.legs?.[0]?.amount > 0) ? 'income' : 'expense'
+        }));
+      }
+      // === WISE ===
+      else if (bankId === 'wise') {
+        const profilesResponse = await axios.get(`${bankConfig.apiUrl}/v1/profiles`, { headers });
+        const profileId = profilesResponse.data[0]?.id;
+
+        if (profileId) {
+          const params = {
+            currency: accountNumber.split('-')[1] || 'USD',
+            intervalStart: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            intervalEnd: endDate || new Date().toISOString()
+          };
+
+          const accountId = accountNumber.split('-')[0];
+          const response = await axios.get(
+            `${bankConfig.apiUrl}/v3/profiles/${profileId}/borderless-accounts/${accountId}/statement.json`,
+            { headers, params }
+          );
+
+          transactions = (response.data.transactions || []).map(op => ({
+            id: op.referenceNumber,
+            date: formatDate(op.date),
+            description: op.details?.description || op.details?.merchant?.name || 'Transfer',
+            category: categorizeTransaction(op.details?.description || ''),
+            amount: op.amount?.value || 0,
+            type: op.type === 'CREDIT' ? 'income' : 'expense'
+          }));
+        }
+      }
+      // === ТИНЬКОФФ ===
+      else if (bankId === 'tinkoff') {
+        const response = await axios.get(`${bankConfig.apiUrl}/operations?accountNumber=${accountNumber}`, { headers });
         transactions = response.data.operations.map(op => ({
           id: op.id,
           date: formatDate(op.date),
           description: op.description,
-          category: op.category.name,
-          amount: op.amount.value,
+          category: op.category?.name || categorizeTransaction(op.description),
+          amount: op.amount?.value || op.amount,
           type: op.operationType === 'Credit' ? 'income' : 'expense'
         }));
-      } else if (bankId === 'sberbank') {
+      }
+      // === СБЕРБАНК ===
+      else if (bankId === 'sberbank') {
+        const accounts = await this.getAccounts(bankId, connection);
+        const account = accounts.find(acc => acc.accountNumber === accountNumber);
+        const response = await axios.get(`${bankConfig.apiUrl}/operations?account=${account?.id || accountNumber}`, { headers });
         transactions = response.data.map(op => ({
           id: op.id,
           date: formatDate(op.date),
@@ -474,16 +588,22 @@ class BankApiService {
           amount: op.amount,
           type: op.amount >= 0 ? 'income' : 'expense'
         }));
-      } else if (bankId === 'alfabank') {
+      }
+      // === АЛЬФА-БАНК ===
+      else if (bankId === 'alfabank') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts/${accountNumber}/statement`, { headers });
         transactions = response.data.operations.map(op => ({
           id: op.id,
           date: formatDate(op.date),
           description: op.description,
           category: op.category || categorizeTransaction(op.description),
-          amount: op.amount.value,
+          amount: op.amount?.value || op.amount,
           type: op.type === 'debit' ? 'expense' : 'income'
         }));
-      } else if (bankId === 'vtb') {
+      }
+      // === ВТБ ===
+      else if (bankId === 'vtb') {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts/${accountNumber}/transactions`, { headers });
         transactions = response.data.map(op => ({
           id: op.id,
           date: formatDate(op.date),
@@ -492,24 +612,56 @@ class BankApiService {
           amount: op.amount,
           type: op.amount >= 0 ? 'income' : 'expense'
         }));
-      } else {
-        // Общий случай
-        transactions = response.data.map(op => ({
+      }
+      // === ОБЩИЙ СЛУЧАЙ ===
+      else {
+        const response = await axios.get(`${bankConfig.apiUrl}/accounts/${accountNumber}/transactions`, { headers });
+        const data = response.data.transactions || response.data;
+        transactions = data.map(op => ({
           id: op.id || op.transactionId,
           date: formatDate(op.date || op.transactionDate),
-          description: op.description || op.narrative || op.merchant?.name || 'Транзакция',
+          description: op.description || op.narrative || op.merchant?.name || 'Transaction',
           category: op.category || categorizeTransaction(op.description || ''),
-          amount: parseFloat(op.amount || op.transactionAmount?.amount),
-          type: (op.type === 'credit' || op.amount > 0) ? 'income' : 'expense'
+          amount: parseFloat(op.amount || op.transactionAmount?.amount || 0),
+          type: (op.type === 'credit' || (op.amount || 0) > 0) ? 'income' : 'expense'
         }));
       }
-      
+
       return transactions;
     } catch (error) {
       console.error('Ошибка при получении транзакций:', error.response?.data || error.message);
-      throw new Error(`Не удалось получить список транзакций: ${error.message}`);
+      throw new Error(`Не удалось получить список транзакций`);
     }
   }
+}
+
+// Категоризация по MCC коду (для Monobank)
+function categorizeByMcc(mcc) {
+  const mccCategories = {
+    // Продукты
+    5411: 'Продукти', 5422: 'Продукти', 5441: 'Продукти', 5451: 'Продукти',
+    5462: 'Продукти', 5499: 'Продукти',
+    // Рестораны
+    5812: 'Ресторани', 5813: 'Ресторани', 5814: 'Фастфуд',
+    // Транспорт
+    4111: 'Транспорт', 4112: 'Транспорт', 4121: 'Таксі', 4131: 'Транспорт',
+    5541: 'АЗС', 5542: 'АЗС', 5983: 'АЗС',
+    // Развлечения
+    7832: 'Розваги', 7841: 'Розваги', 7911: 'Розваги', 7922: 'Розваги',
+    7929: 'Розваги', 7932: 'Розваги', 7933: 'Розваги', 7941: 'Спорт',
+    // Здоровье
+    5912: "Аптека", 8011: "Медицина", 8021: "Медицина", 8031: "Медицина",
+    8041: "Медицина", 8042: "Медицина", 8043: "Медицина", 8049: "Медицина",
+    8050: "Медицина", 8062: "Медицина", 8071: "Медицина", 8099: "Медицина",
+    // Одежда
+    5611: 'Одяг', 5621: 'Одяг', 5631: 'Одяг', 5641: 'Одяг', 5651: 'Одяг',
+    5661: 'Одяг', 5681: 'Одяг', 5691: 'Одяг', 5699: 'Одяг',
+    // Комуналка
+    4900: 'Комунальні', 4814: 'Зв\'язок', 4812: 'Зв\'язок',
+    // Переводы
+    6010: 'Переказ', 6011: 'Переказ', 6012: 'Переказ',
+  };
+  return mccCategories[mcc] || 'Інше';
 }
 
 // Вспомогательные функции
@@ -526,17 +678,41 @@ function formatDate(dateStr) {
 
 // Маппинг типов счетов
 function mapAccountType(type) {
+  if (!type) return 'checking';
   const typeMap = {
     'current': 'checking',
     'card': 'checking',
+    'black': 'checking', // Monobank
+    'white': 'credit',   // Monobank
+    'platinum': 'checking',
     'credit': 'credit',
     'deposit': 'savings',
     'saving': 'savings',
+    'savings': 'savings',
     'loan': 'loan',
-    // Другие маппинги...
+    'fop': 'checking', // Monobank ФОП
   };
-  
+
   return typeMap[type.toLowerCase()] || 'checking';
+}
+
+// Получение кода валюты из числового ISO кода (для Monobank)
+function getCurrencyCode(numericCode) {
+  const currencyMap = {
+    980: 'UAH',
+    840: 'USD',
+    978: 'EUR',
+    826: 'GBP',
+    985: 'PLN',
+    203: 'CZK',
+    756: 'CHF',
+    124: 'CAD',
+    392: 'JPY',
+    156: 'CNY',
+    643: 'RUB',
+    949: 'TRY'
+  };
+  return currencyMap[numericCode] || 'UAH';
 }
 
 // Категоризация транзакций

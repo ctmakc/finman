@@ -856,4 +856,197 @@
   .hidden { display: none; }
   .invisible { visibility: hidden; }
   .visible { visibility: visible; }
+
+/* ==================== BANK REGIONS UI ==================== */
+
+.modal-lg {
+  max-width: 700px;
+  max-height: 80vh;
+}
+
+.modal-lg .modal-body {
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.region-section {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.region-section:last-child {
+  border-bottom: none;
+}
+
+.region-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-color);
+}
+
+.banks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.bank-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-color);
+  transition: all 0.2s ease;
+}
+
+.bank-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.bank-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.bank-icon i {
+  font-size: 1.2rem;
+  color: var(--primary-color);
+}
+
+.bank-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bank-info h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bank-auth-type {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.bank-instructions {
+  background: var(--bg-secondary);
+  padding: 0.75rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-left: 3px solid var(--primary-color);
+}
+
+.direct-connection-form h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.direct-connection-form .form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+/* Bank connection cards */
+.bank-connection-card {
+  margin-bottom: 1rem;
+}
+
+.bank-connection-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.bank-connection-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+}
+
+.bank-connection-icon i {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.bank-connection-name {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.bank-connection-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-indicator.active {
+  background: var(--success-color);
+}
+
+.status-indicator.inactive {
+  background: var(--error-color);
+}
+
+.bank-connection-info {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.bank-connection-info p {
+  margin: 0.25rem 0;
+}
+
+.bank-connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .banks-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bank-connection-actions {
+    flex-direction: column;
+  }
+
+  .bank-connection-actions .btn {
+    width: 100%;
+  }
+}
   

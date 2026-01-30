@@ -11,24 +11,80 @@ const router = express.Router();
 // Middleware для проверки аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
 
-// Получение списка поддерживаемых банков
+// Получение списка поддерживаемых банков (плоский список)
 router.get('/supported-banks', authenticate, (req, res) => {
   try {
-    const supportedBanks = Object.keys(bankApiConfig).map(bankId => ({
+    const { region } = req.query;
+
+    // Фильтрация по региону если указан
+    const bankIds = Object.keys(bankApiConfig).filter(key =>
+      key !== 'regions' && key !== 'authTypes' &&
+      (!region || bankApiConfig[key]?.region === region)
+    );
+
+    const supportedBanks = bankIds.map(bankId => ({
       id: bankId,
       name: bankApiConfig[bankId].name,
+      country: bankApiConfig[bankId].country,
+      region: bankApiConfig[bankId].region,
       icon: bankApiConfig[bankId].icon,
       authType: bankApiConfig[bankId].authType,
-      requiresRedirect: bankApiConfig[bankId].requiresRedirect
+      requiresRedirect: bankApiConfig[bankId].requiresRedirect,
+      tokenInstructions: bankApiConfig[bankId].tokenInstructions || null
     }));
-    
+
     res.json(supportedBanks);
   } catch (error) {
     console.error('Ошибка при получении списка банков:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при получении списка банков' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при получении списка банков'
     });
+  }
+});
+
+// Получение банков сгруппированных по регионам
+router.get('/banks-by-region', authenticate, (req, res) => {
+  try {
+    const regions = bankApiConfig.regions || {};
+    const result = {};
+
+    for (const [regionId, regionData] of Object.entries(regions)) {
+      result[regionId] = {
+        name: regionData.name,
+        flag: regionData.flag,
+        banks: regionData.banks.map(bankId => {
+          const bank = bankApiConfig[bankId];
+          if (!bank) return null;
+          return {
+            id: bankId,
+            name: bank.name,
+            country: bank.country,
+            icon: bank.icon,
+            authType: bank.authType,
+            requiresRedirect: bank.requiresRedirect,
+            tokenInstructions: bank.tokenInstructions || null
+          };
+        }).filter(Boolean)
+      };
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка при получении банков по регионам:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при получении списка банков'
+    });
+  }
+});
+
+// Получение типов авторизации
+router.get('/auth-types', authenticate, (req, res) => {
+  try {
+    res.json(bankApiConfig.authTypes || {});
+  } catch (error) {
+    res.status(500).json({ error: true, message: 'Ошибка получения типов авторизации' });
   }
 });
 
@@ -113,9 +169,9 @@ router.post('/connect/:bankId/callback', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Ошибка при завершении подключения к банку:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при завершении подключения к банку: ' + error.message 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при завершении подключения к банку'
     });
   }
 });
@@ -222,16 +278,19 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
     
     // Получение счетов из банка
     const bankAccounts = await bankApiService.getAccounts(connection.bank_id, connection);
-    
+
+    // Получение существующих счетов ОДИН раз перед циклом (исправление N+1)
+    const existingAccounts = await Account.findByUserId(req.user.id);
+    const existingAccountsMap = new Map(
+      existingAccounts.map(acc => [acc.account_number, acc])
+    );
+
     // Создание счетов в системе
     const createdAccounts = [];
-    
+
     for (const bankAccount of bankAccounts) {
       // Проверка, существует ли счет с таким номером
-      const existingAccounts = await Account.findByUserId(req.user.id);
-      const existingAccount = existingAccounts.find(acc => 
-        acc.account_number === bankAccount.accountNumber
-      );
+      const existingAccount = existingAccountsMap.get(bankAccount.accountNumber);
       
       if (existingAccount) {
         // Обновить существующий счет
@@ -280,9 +339,9 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Ошибка при синхронизации счетов:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при синхронизации счетов: ' + error.message 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при синхронизации счетов'
     });
   }
 });
@@ -347,9 +406,9 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Ошибка при синхронизации транзакций:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при синхронизации транзакций: ' + error.message 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при синхронизации транзакций'
     });
   }
 });

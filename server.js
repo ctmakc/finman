@@ -5,7 +5,10 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
-const { initDatabase } = require('./db/database');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { initDatabase, closeDatabase } = require('./db/database');
+const config = require('./config/config');
 const dotenv = require('dotenv');
 
 // Загрузка переменных окружения
@@ -19,22 +22,60 @@ const bankApiRoutes = require('./routes/bank-api');
 
 // Настройка Express
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.port;
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// Rate limiting - общий
+const generalLimiter = rateLimit({
+  windowMs: config.apiRateLimits.windowMs,
+  max: config.apiRateLimits.max,
+  message: { error: true, message: 'Слишком много запросов, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting - для аутентификации (более строгий)
+const authLimiter = rateLimit({
+  windowMs: config.authRateLimits.windowMs,
+  max: config.authRateLimits.max,
+  message: { error: true, message: 'Слишком много попыток входа, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Настройка middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors(config.corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'finance-manager-secret-key',
+  secret: config.sessionSecret,
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === 'production',
+  cookie: {
+    secure: config.environment === 'production',
+    httpOnly: true,
+    sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000 // 24 часа
   }
 }));
+
+// Применение rate limiting
+app.use('/api/', generalLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // Инициализация Passport.js
 app.use(passport.initialize());
@@ -87,7 +128,30 @@ app.use((err, req, res, next) => {
 });
 
 // Запуск сервера
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
   console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
+});
+
+// Graceful shutdown - закрытие БД при завершении процесса
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    closeDatabase();
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    closeDatabase();
+    process.exit(0);
+  });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  closeDatabase();
+  process.exit(1);
 });

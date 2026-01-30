@@ -1,5 +1,23 @@
 // Функции для работы с банковскими API
 
+// Получение банков по регионам
+async function fetchBanksByRegion() {
+  try {
+    const response = await fetchWithAuth('/api/bank-api/banks-by-region');
+
+    if (!response.ok) {
+      throw new Error('Не удалось получить список банков');
+    }
+
+    const data = await response.json();
+    appState.banksByRegion = data;
+    return data;
+  } catch (error) {
+    console.error('Ошибка получения списка банков:', error);
+    return {};
+  }
+}
+
 // Получение банковских подключений
 async function fetchBankConnections() {
     try {
@@ -162,51 +180,77 @@ async function fetchBankConnections() {
   }
   
   // Модальное окно подключения к банку
-  function showBankConnectionModal() {
+  async function showBankConnectionModal() {
+    // Загружаем банки по регионам если ещё не загружены
+    if (!appState.banksByRegion || Object.keys(appState.banksByRegion).length === 0) {
+      await fetchBanksByRegion();
+    }
+
     // Создание модального окна
     const modalId = 'bank-connection-modal';
-    
-    const modalHtml = `
-      <div class="modal-backdrop" id="${modalId}-backdrop">
-        <div class="modal" id="${modalId}">
-          <div class="modal-header">
-            <h2 class="modal-title">Подключение банка</h2>
-            <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
-          </div>
-          
-          <div class="modal-body">
-            <div class="banks-list">
-              ${appState.supportedBanks.map(bank => `
+
+    // Генерация HTML для банков по регионам
+    const renderBanksByRegion = () => {
+      const regions = appState.banksByRegion || {};
+      let html = '';
+
+      for (const [regionId, regionData] of Object.entries(regions)) {
+        if (regionId === 'test' && window.location.hostname !== 'localhost') continue;
+
+        html += `
+          <div class="region-section" data-region="${regionId}">
+            <h3 class="region-title">${regionData.flag} ${regionData.name}</h3>
+            <div class="banks-grid">
+              ${regionData.banks.map(bank => `
                 <div class="bank-item" data-bank-id="${bank.id}">
                   <div class="bank-icon">
                     <i class="fas fa-university"></i>
                   </div>
                   <div class="bank-info">
-                    <h3>${bank.name}</h3>
-                    <p>${bank.requiresRedirect ? 'Требуется авторизация' : 'Прямое подключение'}</p>
+                    <h4>${bank.name}</h4>
+                    <p class="bank-auth-type">${bank.authType === 'api_key' ? '🔑 API Key' : bank.authType === 'oauth2' ? '🔐 OAuth2' : '🔒 ' + bank.authType}</p>
                   </div>
-                  <button class="btn btn-sm btn-primary connect-bank-btn" data-bank-id="${bank.id}">
-                    Подключить
+                  <button class="btn btn-sm btn-primary connect-bank-btn" data-bank-id="${bank.id}" data-auth-type="${bank.authType}" data-requires-redirect="${bank.requiresRedirect}">
+                    Підключити
                   </button>
                 </div>
               `).join('')}
             </div>
-            
-            <!-- Форма для прямого подключения (будет показана при выборе соответствующего банка) -->
+          </div>
+        `;
+      }
+      return html;
+    };
+
+    const modalHtml = `
+      <div class="modal-backdrop" id="${modalId}-backdrop">
+        <div class="modal modal-lg" id="${modalId}">
+          <div class="modal-header">
+            <h2 class="modal-title">Підключення банку / Connect Bank</h2>
+            <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <div class="banks-list" id="${modalId}-banks-list">
+              ${renderBanksByRegion()}
+            </div>
+
+            <!-- Форма для прямого подключения (API key) -->
             <div id="${modalId}-direct-form" class="direct-connection-form hidden">
               <h3 id="${modalId}-bank-name"></h3>
-              
+              <p id="${modalId}-instructions" class="bank-instructions"></p>
+
               <div class="form-group">
-                <label for="${modalId}-api-key" class="form-label">API-ключ</label>
-                <input type="text" id="${modalId}-api-key" class="form-control" required>
+                <label for="${modalId}-api-key" class="form-label">API Token / Токен</label>
+                <input type="text" id="${modalId}-api-key" class="form-control" placeholder="Вставте ваш токен..." required>
               </div>
-              
+
               <div class="form-actions">
                 <button type="button" class="btn btn-outline" id="${modalId}-back-btn">
-                  Назад
+                  ← Назад / Back
                 </button>
                 <button type="button" class="btn btn-primary" id="${modalId}-connect-btn">
-                  Подключить
+                  Підключити / Connect
                 </button>
               </div>
             </div>
@@ -224,6 +268,7 @@ async function fetchBankConnections() {
     const modalClose = document.getElementById(`${modalId}-close`);
     const directForm = document.getElementById(`${modalId}-direct-form`);
     const bankNameElement = document.getElementById(`${modalId}-bank-name`);
+    const instructionsElement = document.getElementById(`${modalId}-instructions`);
     const apiKeyInput = document.getElementById(`${modalId}-api-key`);
     const backBtn = document.getElementById(`${modalId}-back-btn`);
     const connectBtn = document.getElementById(`${modalId}-connect-btn`);
@@ -246,39 +291,52 @@ async function fetchBankConnections() {
       }
     });
     
+    // Находим банк по ID из всех регионов
+    const findBank = (bankId) => {
+      for (const regionData of Object.values(appState.banksByRegion || {})) {
+        const bank = regionData.banks.find(b => b.id === bankId);
+        if (bank) return bank;
+      }
+      return appState.supportedBanks?.find(b => b.id === bankId);
+    };
+
     // Обработчик для кнопок подключения
     const connectBankButtons = document.querySelectorAll('.connect-bank-btn');
     connectBankButtons.forEach(button => {
       button.addEventListener('click', async () => {
         const bankId = button.dataset.bankId;
-        const bank = appState.supportedBanks.find(b => b.id === bankId);
-        
+        const requiresRedirect = button.dataset.requiresRedirect === 'true';
+        const authType = button.dataset.authType;
+        const bank = findBank(bankId);
+
         if (!bank) return;
-        
-        if (bank.requiresRedirect) {
-          // Банк требует авторизацию - получаем URL для редиректа
+
+        if (requiresRedirect && authType === 'oauth2') {
+          // Банк требует OAuth2 авторизацию
           const authData = await connectToBank(bankId);
-          
+
           if (authData && authData.url) {
-            // Открытие URL авторизации
             window.open(authData.url, '_blank');
-            
-            // Сохранение данных для последующей обработки
             localStorage.setItem('bank_auth_state', authData.state);
             localStorage.setItem('bank_auth_id', bankId);
-            
             closeModal();
-            
-            // Показ инструкций
             showBankAuthInstructionsModal(bank.name);
+          } else if (authData && authData.directAuth) {
+            // Банк поддерживает прямую авторизацию несмотря на requiresRedirect
+            bankNameElement.textContent = bank.name;
+            instructionsElement.textContent = bank.tokenInstructions || '';
+            instructionsElement.style.display = bank.tokenInstructions ? 'block' : 'none';
+            directForm.classList.remove('hidden');
+            modal.querySelector('.banks-list').classList.add('hidden');
+            directForm.dataset.bankId = bankId;
           }
         } else {
-          // Прямое подключение через API-ключ
+          // Прямое подключение через API-ключ/токен
           bankNameElement.textContent = bank.name;
+          instructionsElement.textContent = bank.tokenInstructions || '';
+          instructionsElement.style.display = bank.tokenInstructions ? 'block' : 'none';
           directForm.classList.remove('hidden');
           modal.querySelector('.banks-list').classList.add('hidden');
-          
-          // Сохранение выбранного банка для последующего подключения
           directForm.dataset.bankId = bankId;
         }
       });

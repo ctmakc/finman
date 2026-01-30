@@ -12,20 +12,43 @@ const router = express.Router();
 // Middleware для проверки аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
 
-// Настройка загрузки файлов
+// Настройка загрузки файлов с валидацией
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadsDir = path.join(__dirname, '..', 'uploads');
     if (!fs.existsSync(uploadsDir)){
-      fs.mkdirSync(uploadsDir);
+      fs.mkdirSync(uploadsDir, { recursive: true });
     }
     cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
+    // Безопасное имя файла - только timestamp и расширение
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`);
   }
 });
-const upload = multer({ storage: storage });
+
+// Фильтр файлов - только CSV
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = ['text/csv', 'application/csv', 'text/plain', 'application/vnd.ms-excel'];
+  const allowedExts = ['.csv', '.txt'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Только CSV файлы разрешены'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Максимум 5MB
+    files: 1 // Только 1 файл за раз
+  }
+});
 
 // Получение всех транзакций пользователя (с фильтрацией и пагинацией)
 router.get('/', authenticate, async (req, res) => {
@@ -46,6 +69,10 @@ router.get('/', authenticate, async (req, res) => {
       sortOrder
     } = req.query;
     
+    // Ограничение лимита пагинации
+    const parsedLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 500);
+    const parsedPage = Math.max(parseInt(page) || 1, 1);
+
     // Получение транзакций
     const transactions = await Transaction.findByUserId(req.user.id, {
       accountId,
@@ -56,8 +83,8 @@ router.get('/', authenticate, async (req, res) => {
       minAmount,
       maxAmount,
       search,
-      page: parseInt(page) || 1,
-      limit: parseInt(limit) || 100,
+      page: parsedPage,
+      limit: parsedLimit,
       sortBy,
       sortOrder
     });
@@ -260,9 +287,9 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
       fs.unlink(req.file.path, () => {});
     }
     
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при импорте транзакций: ' + error.message 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при импорте транзакций'
     });
   }
 });

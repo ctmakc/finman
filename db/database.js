@@ -172,8 +172,24 @@ function run(sql, params = []) {
   });
 }
 
+// Закрытие подключения к базе данных
+function closeDatabase() {
+  return new Promise((resolve, reject) => {
+    db.close((err) => {
+      if (err) {
+        console.error('Ошибка при закрытии базы данных:', err);
+        reject(err);
+      } else {
+        console.log('База данных закрыта');
+        resolve();
+      }
+    });
+  });
+}
+
 module.exports = {
   initDatabase,
+  closeDatabase,
   query,
   get,
   run,
