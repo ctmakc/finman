@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     accounts: [],
     transactions: [],
     categories: [],
+    budgets: [],
     bankConnections: [],
     supportedBanks: [],
     filters: {
@@ -50,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('accounts');
           } else if (path.includes('/transactions')) {
             navigateTo('transactions');
+          } else if (path.includes('/budgets')) {
+            navigateTo('budgets');
           } else if (path.includes('/settings')) {
             navigateTo('settings');
           } else if (path.includes('/bank-connections')) {
@@ -105,6 +108,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="transactions">
                 <i class="fas fa-exchange-alt"></i> Транзакции
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="budgets">
+                <i class="fas fa-piggy-bank"></i> Бюджеты
               </a>
             </li>
             <li class="nav-item">
@@ -194,6 +202,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'transactions':
         renderTransactionsPage();
+        break;
+      case 'budgets':
+        renderBudgetsPage();
         break;
       case 'bank-connections':
         renderBankConnectionsPage();
@@ -1196,6 +1207,8 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('accounts');
       } else if (path.includes('/transactions')) {
         navigateTo('transactions');
+      } else if (path.includes('/budgets')) {
+        navigateTo('budgets');
       } else if (path.includes('/settings')) {
         navigateTo('settings');
       } else if (path.includes('/bank-connections')) {

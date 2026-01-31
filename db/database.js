@@ -147,6 +147,32 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы custom_banks:', err);
           reject(err);
+        }
+      });
+
+      // Таблица бюджетов
+      db.run(`
+        CREATE TABLE IF NOT EXISTS budgets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          category TEXT,
+          amount REAL NOT NULL,
+          spent REAL DEFAULT 0,
+          period TEXT NOT NULL DEFAULT 'monthly',
+          start_date TEXT NOT NULL,
+          end_date TEXT,
+          currency TEXT DEFAULT 'UAH',
+          notify_at_percent INTEGER DEFAULT 80,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы budgets:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();

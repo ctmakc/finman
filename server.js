@@ -19,6 +19,7 @@ const authRoutes = require('./routes/auth');
 const accountsRoutes = require('./routes/accounts');
 const transactionsRoutes = require('./routes/transactions');
 const bankApiRoutes = require('./routes/bank-api');
+const budgetsRoutes = require('./routes/budgets');
 
 // Настройка Express
 const app = express();
@@ -95,6 +96,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/bank-api', bankApiRoutes);
+app.use('/api/budgets', budgetsRoutes);
 
 // Middleware для проверки аутентификации API
 function apiAuthMiddleware(req, res, next) {
