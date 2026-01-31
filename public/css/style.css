@@ -965,6 +965,24 @@
   margin-top: 1.5rem;
 }
 
+/* Add custom bank section */
+.add-custom-bank-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.add-custom-bank-section .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.add-custom-bank-section.hidden {
+  display: none;
+}
+
 /* Bank connection cards */
 .bank-connection-card {
   margin-bottom: 1rem;

@@ -121,6 +121,32 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы bank_connections:', err);
           reject(err);
+        }
+      });
+
+      // Таблица кастомных банков пользователей
+      db.run(`
+        CREATE TABLE IF NOT EXISTS custom_banks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          bank_key TEXT NOT NULL,
+          name TEXT NOT NULL,
+          country TEXT NOT NULL,
+          api_url TEXT NOT NULL,
+          auth_type TEXT NOT NULL DEFAULT 'api_key',
+          scopes TEXT,
+          endpoints TEXT,
+          token_instructions TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          UNIQUE(user_id, bank_key)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы custom_banks:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();

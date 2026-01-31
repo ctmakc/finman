@@ -3,10 +3,27 @@ const passport = require('passport');
 const BankConnection = require('../models/bankConnection');
 const Account = require('../models/account');
 const Transaction = require('../models/transaction');
+const CustomBank = require('../models/customBank');
 const bankApiConfig = require('../config/bank-api-config');
 const bankApiService = require('../services/bankApiService');
 
 const router = express.Router();
+
+// Хелпер для получения конфига банка (с учетом кастомных)
+async function getBankConfig(bankId, userId) {
+  // Сначала проверяем стандартные банки
+  if (bankApiConfig[bankId] && bankId !== 'regions' && bankId !== 'authTypes') {
+    return bankApiConfig[bankId];
+  }
+  // Затем проверяем кастомные банки пользователя
+  if (userId && bankId.startsWith('custom_')) {
+    const customBank = await CustomBank.findByKey(bankId, userId);
+    if (customBank) {
+      return CustomBank.toConfigFormat(customBank);
+    }
+  }
+  return null;
+}
 
 // Middleware для проверки аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -44,7 +61,7 @@ router.get('/supported-banks', authenticate, (req, res) => {
 });
 
 // Получение банков сгруппированных по регионам
-router.get('/banks-by-region', authenticate, (req, res) => {
+router.get('/banks-by-region', authenticate, async (req, res) => {
   try {
     const regions = bankApiConfig.regions || {};
     const result = {};
@@ -66,6 +83,25 @@ router.get('/banks-by-region', authenticate, (req, res) => {
             tokenInstructions: bank.tokenInstructions || null
           };
         }).filter(Boolean)
+      };
+    }
+
+    // Добавление кастомных банков пользователя
+    const customBanks = await CustomBank.findByUserId(req.user.id);
+    if (customBanks.length > 0) {
+      result.custom = {
+        name: 'Мои банки',
+        flag: '⚙️',
+        banks: customBanks.map(bank => ({
+          id: bank.bankKey,
+          name: bank.name,
+          country: bank.country,
+          icon: null,
+          authType: bank.authType,
+          requiresRedirect: bank.authType === 'oauth2',
+          tokenInstructions: bank.tokenInstructions || null,
+          isCustom: true
+        }))
       };
     }
 
@@ -409,6 +445,189 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при синхронизации транзакций'
+    });
+  }
+});
+
+// ==================== КАСТОМНЫЕ БАНКИ ====================
+
+// Получение всех кастомных банков пользователя
+router.get('/custom-banks', authenticate, async (req, res) => {
+  try {
+    const customBanks = await CustomBank.findByUserId(req.user.id);
+    res.json(customBanks);
+  } catch (error) {
+    console.error('Ошибка при получении кастомных банков:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при получении кастомных банков'
+    });
+  }
+});
+
+// Создание кастомного банка
+router.post('/custom-banks', authenticate, async (req, res) => {
+  try {
+    const { name, country, apiUrl, authType, scopes, endpoints, tokenInstructions } = req.body;
+
+    // Валидация обязательных полей
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: true, message: 'Название банка обязательно' });
+    }
+    if (!country || !country.trim()) {
+      return res.status(400).json({ error: true, message: 'Страна обязательна' });
+    }
+    if (!apiUrl || !apiUrl.trim()) {
+      return res.status(400).json({ error: true, message: 'URL API обязателен' });
+    }
+
+    // Валидация URL
+    try {
+      new URL(apiUrl);
+    } catch {
+      return res.status(400).json({ error: true, message: 'Некорректный URL API' });
+    }
+
+    // Валидация типа авторизации
+    const validAuthTypes = ['api_key', 'oauth2', 'merchant', 'bearer'];
+    if (authType && !validAuthTypes.includes(authType)) {
+      return res.status(400).json({ error: true, message: 'Некорректный тип авторизации' });
+    }
+
+    const customBank = await CustomBank.create({
+      userId: req.user.id,
+      name: name.trim(),
+      country: country.trim().toUpperCase(),
+      apiUrl: apiUrl.trim(),
+      authType: authType || 'api_key',
+      scopes: scopes || ['accounts', 'transactions'],
+      endpoints: endpoints || {},
+      tokenInstructions: tokenInstructions || ''
+    });
+
+    res.status(201).json({
+      success: true,
+      bank: customBank
+    });
+  } catch (error) {
+    console.error('Ошибка при создании кастомного банка:', error);
+    if (error.message.includes('уже существует')) {
+      return res.status(400).json({ error: true, message: error.message });
+    }
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при создании кастомного банка'
+    });
+  }
+});
+
+// Обновление кастомного банка
+router.put('/custom-banks/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, country, apiUrl, authType, scopes, endpoints, tokenInstructions } = req.body;
+
+    // Проверка существования
+    const existingBank = await CustomBank.findById(id, req.user.id);
+    if (!existingBank) {
+      return res.status(404).json({ error: true, message: 'Кастомный банк не найден' });
+    }
+
+    // Валидация URL если передан
+    if (apiUrl) {
+      try {
+        new URL(apiUrl);
+      } catch {
+        return res.status(400).json({ error: true, message: 'Некорректный URL API' });
+      }
+    }
+
+    const updated = await CustomBank.update(id, req.user.id, {
+      name: name?.trim(),
+      country: country?.trim().toUpperCase(),
+      apiUrl: apiUrl?.trim(),
+      authType,
+      scopes,
+      endpoints,
+      tokenInstructions
+    });
+
+    if (updated) {
+      const bank = await CustomBank.findById(id, req.user.id);
+      res.json({ success: true, bank });
+    } else {
+      res.status(400).json({ error: true, message: 'Не удалось обновить банк' });
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении кастомного банка:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при обновлении кастомного банка'
+    });
+  }
+});
+
+// Удаление кастомного банка
+router.delete('/custom-banks/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Проверка существования
+    const existingBank = await CustomBank.findById(id, req.user.id);
+    if (!existingBank) {
+      return res.status(404).json({ error: true, message: 'Кастомный банк не найден' });
+    }
+
+    const deleted = await CustomBank.delete(id, req.user.id);
+
+    if (deleted) {
+      res.json({ success: true, message: 'Кастомный банк удален' });
+    } else {
+      res.status(400).json({ error: true, message: 'Не удалось удалить банк' });
+    }
+  } catch (error) {
+    console.error('Ошибка при удалении кастомного банка:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при удалении кастомного банка'
+    });
+  }
+});
+
+// Прямое подключение к кастомному банку
+router.post('/connect-custom/:bankKey/direct', authenticate, async (req, res) => {
+  try {
+    const { bankKey } = req.params;
+    const { apiKey } = req.body;
+
+    // Получение кастомного банка
+    const customBank = await CustomBank.findByKey(bankKey, req.user.id);
+    if (!customBank) {
+      return res.status(404).json({ error: true, message: 'Кастомный банк не найден' });
+    }
+
+    // Проверка API-ключа
+    if (!apiKey) {
+      return res.status(400).json({ error: true, message: 'Необходимо указать API-ключ' });
+    }
+
+    // Сохранение подключения
+    const connectionData = await BankConnection.createOrUpdate({
+      userId: req.user.id,
+      bankId: bankKey,
+      accessToken: apiKey
+    });
+
+    res.json({
+      success: true,
+      connectionId: connectionData.id,
+      bankName: customBank.name
+    });
+  } catch (error) {
+    console.error('Ошибка при подключении к кастомному банку:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при подключении к кастомному банку'
     });
   }
 });

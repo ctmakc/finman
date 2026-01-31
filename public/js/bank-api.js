@@ -1,5 +1,193 @@
 // Функции для работы с банковскими API
 
+// ==================== КАСТОМНЫЕ БАНКИ ====================
+
+// Получение кастомных банков пользователя
+async function fetchCustomBanks() {
+  try {
+    const response = await fetchWithAuth('/api/bank-api/custom-banks');
+    if (!response.ok) {
+      throw new Error('Не удалось получить список кастомных банков');
+    }
+    const data = await response.json();
+    appState.customBanks = data;
+    return data;
+  } catch (error) {
+    console.error('Ошибка получения кастомных банков:', error);
+    return [];
+  }
+}
+
+// Создание кастомного банка
+async function createCustomBank(bankData) {
+  try {
+    const response = await fetchWithAuth('/api/bank-api/custom-banks', {
+      method: 'POST',
+      body: JSON.stringify(bankData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showNotification(data.message || 'Ошибка создания банка', 'error');
+      return null;
+    }
+
+    showNotification('Кастомный банк успешно создан', 'success');
+    return data.bank;
+  } catch (error) {
+    console.error('Ошибка создания кастомного банка:', error);
+    showNotification('Произошла ошибка при создании банка', 'error');
+    return null;
+  }
+}
+
+// Удаление кастомного банка
+async function deleteCustomBank(bankId) {
+  try {
+    const response = await fetchWithAuth(`/api/bank-api/custom-banks/${bankId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      showNotification(data.message || 'Ошибка удаления банка', 'error');
+      return false;
+    }
+
+    showNotification('Кастомный банк удален', 'success');
+    return true;
+  } catch (error) {
+    console.error('Ошибка удаления кастомного банка:', error);
+    showNotification('Произошла ошибка при удалении банка', 'error');
+    return false;
+  }
+}
+
+// Подключение к кастомному банку
+async function connectToCustomBank(bankKey, apiKey) {
+  try {
+    const response = await fetchWithAuth(`/api/bank-api/connect-custom/${bankKey}/direct`, {
+      method: 'POST',
+      body: JSON.stringify({ apiKey })
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      showNotification(data.message || 'Ошибка подключения к банку', 'error');
+      return false;
+    }
+
+    showNotification('Банк успешно подключен', 'success');
+    return true;
+  } catch (error) {
+    console.error('Ошибка подключения к кастомному банку:', error);
+    showNotification('Произошла ошибка при подключении', 'error');
+    return false;
+  }
+}
+
+// Модальное окно создания кастомного банка
+function showCreateCustomBankModal() {
+  const modalId = 'create-custom-bank-modal';
+
+  const modalHtml = `
+    <div class="modal-backdrop" id="${modalId}-backdrop">
+      <div class="modal" id="${modalId}">
+        <div class="modal-header">
+          <h2 class="modal-title">Добавить свой банк</h2>
+          <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
+        </div>
+
+        <form id="${modalId}-form" class="modal-body">
+          <div class="form-group">
+            <label for="${modalId}-name" class="form-label">Название банка *</label>
+            <input type="text" id="${modalId}-name" class="form-control" placeholder="Например: My Bank" required>
+          </div>
+
+          <div class="form-group">
+            <label for="${modalId}-country" class="form-label">Код страны *</label>
+            <input type="text" id="${modalId}-country" class="form-control" placeholder="UA, CA, US, etc." maxlength="3" required>
+          </div>
+
+          <div class="form-group">
+            <label for="${modalId}-api-url" class="form-label">URL API *</label>
+            <input type="url" id="${modalId}-api-url" class="form-control" placeholder="https://api.mybank.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="${modalId}-auth-type" class="form-label">Тип авторизации</label>
+            <select id="${modalId}-auth-type" class="form-control">
+              <option value="api_key">API Key / Token</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="oauth2">OAuth 2.0</option>
+              <option value="merchant">Merchant ID + Password</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="${modalId}-instructions" class="form-label">Инструкции получения токена</label>
+            <textarea id="${modalId}-instructions" class="form-control" rows="2" placeholder="Как получить API ключ..."></textarea>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
+            <button type="submit" class="btn btn-primary">Создать банк</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
+  const modalClose = document.getElementById(`${modalId}-close`);
+  const modalCancel = document.getElementById(`${modalId}-cancel`);
+  const modalForm = document.getElementById(`${modalId}-form`);
+
+  const closeModal = () => {
+    modalBackdrop.classList.add('closing');
+    setTimeout(() => {
+      document.body.removeChild(modalBackdrop);
+    }, 300);
+  };
+
+  modalClose.addEventListener('click', closeModal);
+  modalCancel.addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', (e) => {
+    if (e.target === modalBackdrop) closeModal();
+  });
+
+  modalForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const bankData = {
+      name: document.getElementById(`${modalId}-name`).value.trim(),
+      country: document.getElementById(`${modalId}-country`).value.trim().toUpperCase(),
+      apiUrl: document.getElementById(`${modalId}-api-url`).value.trim(),
+      authType: document.getElementById(`${modalId}-auth-type`).value,
+      tokenInstructions: document.getElementById(`${modalId}-instructions`).value.trim()
+    };
+
+    const result = await createCustomBank(bankData);
+
+    if (result) {
+      closeModal();
+      // Обновляем список банков
+      await fetchBanksByRegion();
+      // Если открыто модальное окно подключения банков - обновляем его
+      const bankConnectionModal = document.getElementById('bank-connection-modal-backdrop');
+      if (bankConnectionModal) {
+        bankConnectionModal.remove();
+        showBankConnectionModal();
+      }
+    }
+  });
+}
+
+// ==================== ОСНОВНЫЕ ФУНКЦИИ ====================
+
 // Получение банков по регионам
 async function fetchBanksByRegion() {
   try {
@@ -231,6 +419,12 @@ async function fetchBankConnections() {
           </div>
 
           <div class="modal-body">
+            <div class="add-custom-bank-section">
+              <button type="button" class="btn btn-outline" id="${modalId}-add-custom">
+                <i class="fas fa-plus"></i> Добавить свой банк
+              </button>
+            </div>
+
             <div class="banks-list" id="${modalId}-banks-list">
               ${renderBanksByRegion()}
             </div>
@@ -290,7 +484,16 @@ async function fetchBankConnections() {
         closeModal();
       }
     });
-    
+
+    // Кнопка добавления кастомного банка
+    const addCustomBtn = document.getElementById(`${modalId}-add-custom`);
+    if (addCustomBtn) {
+      addCustomBtn.addEventListener('click', () => {
+        closeModal();
+        showCreateCustomBankModal();
+      });
+    }
+
     // Находим банк по ID из всех регионов
     const findBank = (bankId) => {
       for (const regionData of Object.values(appState.banksByRegion || {})) {
@@ -337,7 +540,9 @@ async function fetchBankConnections() {
           instructionsElement.style.display = bank.tokenInstructions ? 'block' : 'none';
           directForm.classList.remove('hidden');
           modal.querySelector('.banks-list').classList.add('hidden');
+          modal.querySelector('.add-custom-bank-section').classList.add('hidden');
           directForm.dataset.bankId = bankId;
+          directForm.dataset.isCustom = bank.isCustom ? 'true' : 'false';
         }
       });
     });
@@ -346,26 +551,31 @@ async function fetchBankConnections() {
     backBtn.addEventListener('click', () => {
       directForm.classList.add('hidden');
       modal.querySelector('.banks-list').classList.remove('hidden');
+      modal.querySelector('.add-custom-bank-section').classList.remove('hidden');
     });
     
     // Обработчик для кнопки "Подключить" в форме прямого подключения
     connectBtn.addEventListener('click', async () => {
       const bankId = directForm.dataset.bankId;
+      const isCustomBank = directForm.dataset.isCustom === 'true';
       const apiKey = apiKeyInput.value.trim();
-      
+
       if (!apiKey) {
         showNotification('Пожалуйста, введите API-ключ', 'error');
         return;
       }
-      
-      const success = await directConnectToBank(bankId, apiKey);
-      
+
+      // Используем разные функции для кастомных и обычных банков
+      const success = isCustomBank
+        ? await connectToCustomBank(bankId, apiKey)
+        : await directConnectToBank(bankId, apiKey);
+
       if (success) {
         closeModal();
-        
+
         // Обновление списка подключений
         await fetchBankConnections();
-        
+
         // Обновление интерфейса
         if (appState.currentPage === 'bank-connections') {
           renderBankConnectionsPage();
