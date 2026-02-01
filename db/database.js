@@ -173,6 +173,115 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы budgets:', err);
           reject(err);
+        }
+      });
+
+      // Таблица семей/групп
+      db.run(`
+        CREATE TABLE IF NOT EXISTS families (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          owner_id INTEGER NOT NULL,
+          invite_code TEXT UNIQUE,
+          description TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (owner_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы families:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица участников семьи
+      db.run(`
+        CREATE TABLE IF NOT EXISTS family_members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          family_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          role TEXT NOT NULL DEFAULT 'member',
+          nickname TEXT,
+          joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (family_id) REFERENCES families (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          UNIQUE(family_id, user_id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы family_members:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица прав доступа к счетам
+      db.run(`
+        CREATE TABLE IF NOT EXISTS account_permissions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          can_view BOOLEAN DEFAULT 1,
+          can_edit BOOLEAN DEFAULT 0,
+          can_delete BOOLEAN DEFAULT 0,
+          can_add_transactions BOOLEAN DEFAULT 0,
+          granted_by INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (granted_by) REFERENCES users (id),
+          UNIQUE(account_id, user_id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы account_permissions:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица прав доступа к бюджетам
+      db.run(`
+        CREATE TABLE IF NOT EXISTS budget_permissions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          budget_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          can_view BOOLEAN DEFAULT 1,
+          can_edit BOOLEAN DEFAULT 0,
+          granted_by INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (budget_id) REFERENCES budgets (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (granted_by) REFERENCES users (id),
+          UNIQUE(budget_id, user_id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы budget_permissions:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица приглашений в семью
+      db.run(`
+        CREATE TABLE IF NOT EXISTS family_invites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          family_id INTEGER NOT NULL,
+          email TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'member',
+          invite_token TEXT UNIQUE NOT NULL,
+          expires_at DATETIME NOT NULL,
+          used_at DATETIME,
+          created_by INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (family_id) REFERENCES families (id) ON DELETE CASCADE,
+          FOREIGN KEY (created_by) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы family_invites:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();

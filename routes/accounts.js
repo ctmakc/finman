@@ -2,22 +2,30 @@ const express = require('express');
 const passport = require('passport');
 const Account = require('../models/account');
 const Transaction = require('../models/transaction');
+const { AccountPermission } = require('../models/permission');
 
 const router = express.Router();
 
 // Middleware для проверки аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
 
-// Получение всех счетов пользователя
+// Получение всех счетов пользователя (свои + расшаренные)
 router.get('/', authenticate, async (req, res) => {
   try {
-    const accounts = await Account.findByUserId(req.user.id);
-    res.json(accounts);
+    const includeShared = req.query.includeShared !== 'false';
+
+    if (includeShared) {
+      const accounts = await AccountPermission.getAccessibleAccounts(req.user.id);
+      res.json(accounts);
+    } else {
+      const accounts = await Account.findByUserId(req.user.id);
+      res.json({ own: accounts, shared: [], all: accounts });
+    }
   } catch (error) {
     console.error('Ошибка при получении счетов:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при получении счетов' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при получении счетов'
     });
   }
 });
@@ -76,111 +84,180 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// Получение счета по ID
+// Получение счета по ID (с проверкой прав доступа)
 router.get('/:id', authenticate, async (req, res) => {
   try {
-    const account = await Account.findById(req.params.id, req.user.id);
-    
-    if (!account) {
-      return res.status(404).json({ 
-        error: true, 
-        message: 'Счет не найден' 
+    // Сначала проверяем права
+    const permissions = await AccountPermission.getPermissions(
+      parseInt(req.params.id),
+      req.user.id
+    );
+
+    if (!permissions || !permissions.canView) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
       });
     }
-    
-    res.json(account);
+
+    // Если есть права, получаем счет без проверки владельца
+    const { get } = require('../db/database');
+    const account = await get(
+      `SELECT * FROM accounts WHERE id = ? AND is_active = 1`,
+      [req.params.id]
+    );
+
+    if (!account) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
+      });
+    }
+
+    res.json({ ...account, permissions });
   } catch (error) {
     console.error('Ошибка при получении счета:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при получении счета' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при получении счета'
     });
   }
 });
 
-// Обновление счета
+// Обновление счета (с проверкой прав)
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { 
-      name, 
-      accountNumber, 
-      bankName, 
+    // Проверяем права на редактирование
+    const permissions = await AccountPermission.getPermissions(
+      parseInt(req.params.id),
+      req.user.id
+    );
+
+    if (!permissions || !permissions.canEdit) {
+      return res.status(403).json({
+        error: true,
+        message: 'Недостаточно прав для редактирования счета'
+      });
+    }
+
+    const {
+      name,
+      accountNumber,
+      bankName,
       currency,
       accountType
     } = req.body;
-    
-    // Обновление счета
-    const success = await Account.update(req.params.id, req.user.id, {
+
+    // Получаем владельца счета для обновления
+    const { get } = require('../db/database');
+    const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [req.params.id]);
+
+    if (!account) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
+      });
+    }
+
+    // Обновление счета от имени владельца
+    const success = await Account.update(req.params.id, account.user_id, {
       name,
       accountNumber,
       bankName,
       currency,
       accountType
     });
-    
+
     if (success) {
-      const updatedAccount = await Account.findById(req.params.id, req.user.id);
+      const updatedAccount = await Account.findById(req.params.id, account.user_id);
       res.json(updatedAccount);
     } else {
-      res.status(404).json({ 
-        error: true, 
-        message: 'Счет не найден или не обновлен' 
+      res.status(404).json({
+        error: true,
+        message: 'Счет не найден или не обновлен'
       });
     }
   } catch (error) {
     console.error('Ошибка при обновлении счета:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при обновлении счета' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при обновлении счета'
     });
   }
 });
 
-// Удаление счета
+// Удаление счета (с проверкой прав)
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const success = await Account.delete(req.params.id, req.user.id);
-    
+    // Проверяем права на удаление
+    const permissions = await AccountPermission.getPermissions(
+      parseInt(req.params.id),
+      req.user.id
+    );
+
+    if (!permissions || !permissions.canDelete) {
+      return res.status(403).json({
+        error: true,
+        message: 'Недостаточно прав для удаления счета'
+      });
+    }
+
+    // Получаем владельца счета для удаления
+    const { get } = require('../db/database');
+    const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [req.params.id]);
+
+    if (!account) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
+      });
+    }
+
+    const success = await Account.delete(req.params.id, account.user_id);
+
     if (success) {
-      res.json({ 
-        success: true, 
-        message: 'Счет успешно удален' 
+      res.json({
+        success: true,
+        message: 'Счет успешно удален'
       });
     } else {
-      res.status(404).json({ 
-        error: true, 
-        message: 'Счет не найден или не удален' 
+      res.status(404).json({
+        error: true,
+        message: 'Счет не найден или не удален'
       });
     }
   } catch (error) {
     console.error('Ошибка при удалении счета:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при удалении счета' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при удалении счета'
     });
   }
 });
 
-// Получение транзакций по счету
+// Получение транзакций по счету (с проверкой прав)
 router.get('/:id/transactions', authenticate, async (req, res) => {
   try {
-    // Проверка, существует ли счет
-    const account = await Account.findById(req.params.id, req.user.id);
-    
-    if (!account) {
-      return res.status(404).json({ 
-        error: true, 
-        message: 'Счет не найден' 
+    // Проверяем права на просмотр
+    const permissions = await AccountPermission.getPermissions(
+      parseInt(req.params.id),
+      req.user.id
+    );
+
+    if (!permissions || !permissions.canView) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
       });
     }
-    
+
     // Получение параметров запроса
-    const { 
-      startDate, 
-      endDate, 
-      category, 
-      type, 
-      minAmount, 
+    const {
+      startDate,
+      endDate,
+      category,
+      type,
+      minAmount,
       maxAmount,
       search,
       page,
@@ -188,9 +265,13 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
       sortBy,
       sortOrder
     } = req.query;
-    
+
+    // Получаем владельца счета
+    const { get } = require('../db/database');
+    const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [req.params.id]);
+
     // Получение транзакций
-    const transactions = await Transaction.findByUserId(req.user.id, {
+    const transactions = await Transaction.findByUserId(account.user_id, {
       accountId: req.params.id,
       startDate,
       endDate,
@@ -204,13 +285,13 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
       sortBy,
       sortOrder
     });
-    
+
     res.json(transactions);
   } catch (error) {
     console.error('Ошибка при получении транзакций по счету:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при получении транзакций по счету' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при получении транзакций по счету'
     });
   }
 });

@@ -6,6 +6,7 @@ const path = require('path');
 const Transaction = require('../models/transaction');
 const Account = require('../models/account');
 const csvImportService = require('../services/csvImportService');
+const { AccountPermission } = require('../models/permission');
 
 const router = express.Router();
 
@@ -99,53 +100,67 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Создание новой транзакции
+// Создание новой транзакции (с проверкой прав для расшаренных счетов)
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { 
-      accountId, 
-      date, 
-      description, 
-      category, 
-      amount, 
-      type 
+    const {
+      accountId,
+      date,
+      description,
+      category,
+      amount,
+      type
     } = req.body;
-    
+
     // Проверка обязательных полей
     if (!accountId || !date || amount === undefined) {
-      return res.status(400).json({ 
-        error: true, 
-        message: 'Необходимо указать счет, дату и сумму' 
+      return res.status(400).json({
+        error: true,
+        message: 'Необходимо указать счет, дату и сумму'
       });
     }
-    
-    // Проверка, существует ли счет
-    const account = await Account.findById(accountId, req.user.id);
-    
-    if (!account) {
-      return res.status(404).json({ 
-        error: true, 
-        message: 'Счет не найден' 
+
+    // Проверяем права на добавление транзакций
+    const permissions = await AccountPermission.getPermissions(
+      parseInt(accountId),
+      req.user.id
+    );
+
+    if (!permissions) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
       });
     }
-    
-    // Создание транзакции
+
+    if (!permissions.isOwner && !permissions.canAddTransactions) {
+      return res.status(403).json({
+        error: true,
+        message: 'Недостаточно прав для добавления транзакций'
+      });
+    }
+
+    // Получаем владельца счета
+    const { get } = require('../db/database');
+    const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [accountId]);
+
+    // Создание транзакции (от имени владельца счета)
     const newTransaction = await Transaction.create({
       accountId,
-      userId: req.user.id,
+      userId: account.user_id,
       date,
       description,
       category,
       amount,
       type: type || (amount >= 0 ? 'income' : 'expense')
     });
-    
+
     res.status(201).json(newTransaction);
   } catch (error) {
     console.error('Ошибка при создании транзакции:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Произошла ошибка при создании транзакции' 
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при создании транзакции'
     });
   }
 });

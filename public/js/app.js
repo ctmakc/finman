@@ -8,11 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const appState = {
     isAuthenticated: false,
     user: null,
+    token: null,
     currentPage: 'dashboard',
     accounts: [],
     transactions: [],
     categories: [],
     budgets: [],
+    families: [],
+    currentFamily: null,
     bankConnections: [],
     supportedBanks: [],
     filters: {
@@ -30,7 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function initApp() {
     // Проверка аутентификации
     const token = localStorage.getItem('token');
-    
+    appState.token = token;
+
     if (token) {
       try {
         // Получение данных пользователя
@@ -53,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('transactions');
           } else if (path.includes('/budgets')) {
             navigateTo('budgets');
+          } else if (path.includes('/family')) {
+            navigateTo('family');
           } else if (path.includes('/settings')) {
             navigateTo('settings');
           } else if (path.includes('/bank-connections')) {
@@ -118,6 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="bank-connections">
                 <i class="fas fa-university"></i> Банки
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="family">
+                <i class="fas fa-users"></i> Семья
               </a>
             </li>
             <li class="nav-item">
@@ -205,6 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'budgets':
         renderBudgetsPage();
+        break;
+      case 'family':
+        renderFamilyPage();
         break;
       case 'bank-connections':
         renderBankConnectionsPage();
@@ -1209,6 +1223,8 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('transactions');
       } else if (path.includes('/budgets')) {
         navigateTo('budgets');
+      } else if (path.includes('/family')) {
+        navigateTo('family');
       } else if (path.includes('/settings')) {
         navigateTo('settings');
       } else if (path.includes('/bank-connections')) {

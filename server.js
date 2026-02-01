@@ -20,6 +20,7 @@ const accountsRoutes = require('./routes/accounts');
 const transactionsRoutes = require('./routes/transactions');
 const bankApiRoutes = require('./routes/bank-api');
 const budgetsRoutes = require('./routes/budgets');
+const familyRoutes = require('./routes/family');
 
 // Настройка Express
 const app = express();
@@ -97,6 +98,7 @@ app.use('/api/accounts', accountsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/bank-api', bankApiRoutes);
 app.use('/api/budgets', budgetsRoutes);
+app.use('/api/family', familyRoutes);
 
 // Middleware для проверки аутентификации API
 function apiAuthMiddleware(req, res, next) {
