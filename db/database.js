@@ -282,6 +282,39 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы family_invites:', err);
           reject(err);
+        }
+      });
+
+      // Таблица регулярных платежей
+      db.run(`
+        CREATE TABLE IF NOT EXISTS recurring_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          amount REAL NOT NULL,
+          type TEXT NOT NULL DEFAULT 'expense',
+          category TEXT,
+          frequency TEXT NOT NULL DEFAULT 'monthly',
+          day_of_month INTEGER,
+          day_of_week INTEGER,
+          start_date TEXT NOT NULL,
+          end_date TEXT,
+          next_payment_date TEXT NOT NULL,
+          last_payment_date TEXT,
+          auto_create BOOLEAN DEFAULT 0,
+          notify_before INTEGER DEFAULT 3,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (account_id) REFERENCES accounts (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы recurring_payments:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();

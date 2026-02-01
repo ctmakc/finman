@@ -1753,3 +1753,288 @@
     align-items: flex-start;
   }
 }
+
+/* ==================== РЕГУЛЯРНЫЕ ПЛАТЕЖИ ==================== */
+
+.recurring-page {
+  padding: 1rem;
+}
+
+.recurring-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.recurring-stats {
+  margin-bottom: 2rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--card-color);
+  border-radius: var(--border-radius);
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+.stat-card.expense {
+  border-left: 4px solid var(--error-color);
+}
+
+.stat-card.income {
+  border-left: 4px solid var(--success-color);
+}
+
+.stat-card.warning {
+  border-left: 4px solid var(--warning-color);
+  background: rgba(249, 168, 38, 0.1);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--surface-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: var(--primary-color);
+}
+
+.stat-card.expense .stat-icon {
+  color: var(--error-color);
+}
+
+.stat-card.income .stat-icon {
+  color: var(--success-color);
+}
+
+.stat-data .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-data .stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.recurring-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.recurring-section {
+  background: var(--card-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.recurring-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-row {
+  margin-bottom: 1rem;
+}
+
+.filter-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.payment-card {
+  background: var(--surface-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-speed);
+}
+
+.payment-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.payment-card.overdue {
+  border-left: 4px solid var(--error-color);
+  background: rgba(227, 52, 47, 0.05);
+}
+
+.payment-card.soon {
+  border-left: 4px solid var(--warning-color);
+}
+
+.payment-card.inactive {
+  opacity: 0.6;
+}
+
+.payment-main {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.payment-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.payment-icon.expense {
+  background: rgba(227, 52, 47, 0.1);
+  color: var(--error-color);
+}
+
+.payment-icon.income {
+  background: rgba(56, 193, 114, 0.1);
+  color: var(--success-color);
+}
+
+.payment-info {
+  flex: 1;
+}
+
+.payment-info h4 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.payment-account,
+.payment-category {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-right: 0.5rem;
+}
+
+.payment-amount {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.payment-amount.expense {
+  color: var(--error-color);
+}
+
+.payment-amount.income {
+  color: var(--success-color);
+}
+
+.payment-schedule {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-color);
+  margin-bottom: 0.5rem;
+}
+
+.next-date.overdue {
+  color: var(--error-color);
+  font-weight: 600;
+}
+
+.next-date.soon {
+  color: var(--warning-color);
+}
+
+.payment-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.payment-actions .btn {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.text-danger {
+  color: var(--error-color);
+}
+
+.empty-text {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Responsive для регулярных платежей */
+@media (max-width: 768px) {
+  .payment-main {
+    flex-wrap: wrap;
+  }
+
+  .payment-amount {
+    width: 100%;
+    text-align: right;
+    margin-top: 0.5rem;
+  }
+
+  .payment-schedule {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .payment-actions {
+    justify-content: flex-end;
+    width: 100%;
+  }
+}
+
+/* Форма редактирования платежа */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
