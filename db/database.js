@@ -315,6 +315,78 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы recurring_payments:', err);
           reject(err);
+        }
+      });
+
+      // Таблица курсов валют
+      db.run(`
+        CREATE TABLE IF NOT EXISTS currency_rates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          from_currency TEXT NOT NULL,
+          to_currency TEXT NOT NULL,
+          rate REAL NOT NULL,
+          source TEXT DEFAULT 'manual',
+          date TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(from_currency, to_currency, date)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы currency_rates:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица пользовательских настроек валют
+      db.run(`
+        CREATE TABLE IF NOT EXISTS user_currency_settings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL UNIQUE,
+          base_currency TEXT NOT NULL DEFAULT 'UAH',
+          display_currencies TEXT DEFAULT '["UAH","USD","EUR"]',
+          auto_convert BOOLEAN DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы user_currency_settings:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица тегов
+      db.run(`
+        CREATE TABLE IF NOT EXISTS tags (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          color TEXT DEFAULT '#5D5CDE',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          UNIQUE(user_id, name)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы tags:', err);
+          reject(err);
+        }
+      });
+
+      // Связь транзакций и тегов
+      db.run(`
+        CREATE TABLE IF NOT EXISTS transaction_tags (
+          transaction_id INTEGER NOT NULL,
+          tag_id INTEGER NOT NULL,
+          PRIMARY KEY (transaction_id, tag_id),
+          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE,
+          FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы transaction_tags:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();

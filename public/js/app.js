@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('family');
           } else if (path.includes('/recurring')) {
             navigateTo('recurring');
+          } else if (path.includes('/currency')) {
+            navigateTo('currency');
           } else if (path.includes('/settings')) {
             navigateTo('settings');
           } else if (path.includes('/bank-connections')) {
@@ -136,6 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="recurring">
                 <i class="fas fa-sync-alt"></i> Платежи
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="currency">
+                <i class="fas fa-coins"></i> Валюты
               </a>
             </li>
             <li class="nav-item">
@@ -229,6 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'recurring':
         renderRecurringPage();
+        break;
+      case 'currency':
+        renderCurrencyPage();
         break;
       case 'bank-connections':
         renderBankConnectionsPage();
@@ -1237,6 +1247,8 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('family');
       } else if (path.includes('/recurring')) {
         navigateTo('recurring');
+      } else if (path.includes('/currency')) {
+        navigateTo('currency');
       } else if (path.includes('/settings')) {
         navigateTo('settings');
       } else if (path.includes('/bank-connections')) {
