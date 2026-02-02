@@ -387,6 +387,337 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы transaction_tags:', err);
           reject(err);
+        }
+      });
+
+      // ==================== ЦЕЛИ НАКОПЛЕНИЯ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS savings_goals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          target_amount REAL NOT NULL,
+          current_amount REAL DEFAULT 0,
+          currency TEXT DEFAULT 'UAH',
+          target_date TEXT,
+          category TEXT,
+          icon TEXT DEFAULT 'piggy-bank',
+          color TEXT DEFAULT '#5D5CDE',
+          is_completed BOOLEAN DEFAULT 0,
+          completed_at DATETIME,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы savings_goals:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица пополнений целей
+      db.run(`
+        CREATE TABLE IF NOT EXISTS goal_contributions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          goal_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          note TEXT,
+          transaction_id INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (goal_id) REFERENCES savings_goals (id) ON DELETE CASCADE,
+          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE SET NULL
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы goal_contributions:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== ДОЛГИ И КРЕДИТЫ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS debts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          type TEXT NOT NULL,
+          amount REAL NOT NULL,
+          paid_amount REAL DEFAULT 0,
+          interest_rate REAL DEFAULT 0,
+          currency TEXT DEFAULT 'UAH',
+          counterparty TEXT,
+          start_date TEXT NOT NULL,
+          due_date TEXT,
+          is_paid BOOLEAN DEFAULT 0,
+          paid_at DATETIME,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы debts:', err);
+          reject(err);
+        }
+      });
+
+      // Таблица платежей по долгам
+      db.run(`
+        CREATE TABLE IF NOT EXISTS debt_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          debt_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          payment_type TEXT DEFAULT 'principal',
+          note TEXT,
+          transaction_id INTEGER,
+          payment_date TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (debt_id) REFERENCES debts (id) ON DELETE CASCADE,
+          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE SET NULL
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы debt_payments:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== СПЛИТ РАСХОДОВ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS split_groups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          currency TEXT DEFAULT 'UAH',
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы split_groups:', err);
+          reject(err);
+        }
+      });
+
+      // Участники группы сплита
+      db.run(`
+        CREATE TABLE IF NOT EXISTS split_members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id INTEGER NOT NULL,
+          user_id INTEGER,
+          name TEXT NOT NULL,
+          email TEXT,
+          is_registered BOOLEAN DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (group_id) REFERENCES split_groups (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы split_members:', err);
+          reject(err);
+        }
+      });
+
+      // Расходы для сплита
+      db.run(`
+        CREATE TABLE IF NOT EXISTS split_expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id INTEGER NOT NULL,
+          paid_by INTEGER NOT NULL,
+          description TEXT NOT NULL,
+          amount REAL NOT NULL,
+          split_type TEXT DEFAULT 'equal',
+          date TEXT NOT NULL,
+          category TEXT,
+          is_settled BOOLEAN DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (group_id) REFERENCES split_groups (id) ON DELETE CASCADE,
+          FOREIGN KEY (paid_by) REFERENCES split_members (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы split_expenses:', err);
+          reject(err);
+        }
+      });
+
+      // Доли участников в расходе
+      db.run(`
+        CREATE TABLE IF NOT EXISTS split_shares (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          expense_id INTEGER NOT NULL,
+          member_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          is_paid BOOLEAN DEFAULT 0,
+          paid_at DATETIME,
+          FOREIGN KEY (expense_id) REFERENCES split_expenses (id) ON DELETE CASCADE,
+          FOREIGN KEY (member_id) REFERENCES split_members (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы split_shares:', err);
+          reject(err);
+        }
+      });
+
+      // Расчёты между участниками
+      db.run(`
+        CREATE TABLE IF NOT EXISTS split_settlements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id INTEGER NOT NULL,
+          from_member INTEGER NOT NULL,
+          to_member INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          date TEXT NOT NULL,
+          note TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (group_id) REFERENCES split_groups (id) ON DELETE CASCADE,
+          FOREIGN KEY (from_member) REFERENCES split_members (id),
+          FOREIGN KEY (to_member) REFERENCES split_members (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы split_settlements:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== УВЕДОМЛЕНИЯ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          message TEXT,
+          data TEXT,
+          is_read BOOLEAN DEFAULT 0,
+          read_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы notifications:', err);
+          reject(err);
+        }
+      });
+
+      // Настройки уведомлений пользователя
+      db.run(`
+        CREATE TABLE IF NOT EXISTS notification_settings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL UNIQUE,
+          budget_alerts BOOLEAN DEFAULT 1,
+          recurring_reminders BOOLEAN DEFAULT 1,
+          goal_milestones BOOLEAN DEFAULT 1,
+          debt_reminders BOOLEAN DEFAULT 1,
+          weekly_summary BOOLEAN DEFAULT 1,
+          push_enabled BOOLEAN DEFAULT 0,
+          email_enabled BOOLEAN DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы notification_settings:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== ИНВЕСТИЦИИ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS investment_portfolios (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          currency TEXT DEFAULT 'USD',
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы investment_portfolios:', err);
+          reject(err);
+        }
+      });
+
+      // Активы (акции, крипто и т.д.)
+      db.run(`
+        CREATE TABLE IF NOT EXISTS investments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          portfolio_id INTEGER NOT NULL,
+          symbol TEXT NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          buy_price REAL NOT NULL,
+          current_price REAL,
+          currency TEXT DEFAULT 'USD',
+          buy_date TEXT NOT NULL,
+          notes TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (portfolio_id) REFERENCES investment_portfolios (id) ON DELETE CASCADE
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы investments:', err);
+          reject(err);
+        }
+      });
+
+      // История цен активов
+      db.run(`
+        CREATE TABLE IF NOT EXISTS investment_prices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          price REAL NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          date TEXT NOT NULL,
+          source TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(symbol, date)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы investment_prices:', err);
+          reject(err);
+        }
+      });
+
+      // Транзакции с инвестициями (покупка/продажа/дивиденды)
+      db.run(`
+        CREATE TABLE IF NOT EXISTS investment_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          investment_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          price REAL NOT NULL,
+          fee REAL DEFAULT 0,
+          date TEXT NOT NULL,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (investment_id) REFERENCES investments (id) ON DELETE CASCADE
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы investment_transactions:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();
