@@ -73,6 +73,16 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('investments');
           } else if (path.includes('/analytics')) {
             navigateTo('analytics');
+          } else if (path.includes('/subscriptions')) {
+            navigateTo('subscriptions');
+          } else if (path.includes('/networth')) {
+            navigateTo('networth');
+          } else if (path.includes('/receipts')) {
+            navigateTo('receipts');
+          } else if (path.includes('/calendar')) {
+            navigateTo('calendar');
+          } else if (path.includes('/reports')) {
+            navigateTo('reports');
           } else if (path.includes('/settings')) {
             navigateTo('settings');
           } else if (path.includes('/bank-connections')) {
@@ -178,6 +188,31 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="analytics">
                 <i class="fas fa-chart-bar"></i> Аналитика
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="subscriptions">
+                <i class="fas fa-box"></i> Подписки
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="networth">
+                <i class="fas fa-gem"></i> Net Worth
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="receipts">
+                <i class="fas fa-receipt"></i> Чеки
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="calendar">
+                <i class="fas fa-calendar"></i> Календарь
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="reports">
+                <i class="fas fa-file-alt"></i> Отчёты
               </a>
             </li>
             <li class="nav-item">
@@ -289,6 +324,21 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'analytics':
         renderAnalyticsPage();
+        break;
+      case 'subscriptions':
+        renderSubscriptionsPage();
+        break;
+      case 'networth':
+        renderNetWorthPage();
+        break;
+      case 'receipts':
+        renderReceiptsPage();
+        break;
+      case 'calendar':
+        renderCalendarPage();
+        break;
+      case 'reports':
+        renderReportsPage();
         break;
       case 'bank-connections':
         renderBankConnectionsPage();
@@ -1309,6 +1359,16 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('investments');
       } else if (path.includes('/analytics')) {
         navigateTo('analytics');
+      } else if (path.includes('/subscriptions')) {
+        navigateTo('subscriptions');
+      } else if (path.includes('/networth')) {
+        navigateTo('networth');
+      } else if (path.includes('/receipts')) {
+        navigateTo('receipts');
+      } else if (path.includes('/calendar')) {
+        navigateTo('calendar');
+      } else if (path.includes('/reports')) {
+        navigateTo('reports');
       } else if (path.includes('/settings')) {
         navigateTo('settings');
       } else if (path.includes('/bank-connections')) {
@@ -1318,3 +1378,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // Render wrapper functions for new modules
+  function renderSubscriptionsPage() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = SubscriptionsModule.getPage();
+    SubscriptionsModule.init();
+  }
+
+  function renderNetWorthPage() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = NetWorthModule.getPage();
+    NetWorthModule.init();
+  }
+
+  function renderReceiptsPage() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = ReceiptsModule.getPage();
+    ReceiptsModule.init();
+  }
+
+  function renderCalendarPage() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = CalendarModule.getPage();
+    CalendarModule.init();
+  }
+
+  function renderReportsPage() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = ReportsModule.getPage();
+    ReportsModule.init();
+  }

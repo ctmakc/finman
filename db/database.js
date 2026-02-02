@@ -718,6 +718,212 @@ function initDatabase() {
         if (err) {
           console.error('Ошибка при создании таблицы investment_transactions:', err);
           reject(err);
+        }
+      });
+
+      // ==================== ПОДПИСКИ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          amount REAL NOT NULL,
+          currency TEXT DEFAULT 'UAH',
+          billing_cycle TEXT DEFAULT 'monthly',
+          category TEXT,
+          icon TEXT,
+          color TEXT DEFAULT '#5D5CDE',
+          start_date TEXT NOT NULL,
+          next_billing_date TEXT,
+          reminder_days INTEGER DEFAULT 3,
+          is_active BOOLEAN DEFAULT 1,
+          auto_renew BOOLEAN DEFAULT 1,
+          account_id INTEGER,
+          url TEXT,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (account_id) REFERENCES accounts (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы subscriptions:', err);
+          reject(err);
+        }
+      });
+
+      // История платежей подписок
+      db.run(`
+        CREATE TABLE IF NOT EXISTS subscription_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          subscription_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          payment_date TEXT NOT NULL,
+          transaction_id INTEGER,
+          status TEXT DEFAULT 'paid',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE CASCADE,
+          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE SET NULL
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы subscription_payments:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== СКАНЕР ЧЕКОВ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS receipts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          image_path TEXT,
+          image_data TEXT,
+          merchant TEXT,
+          total_amount REAL,
+          currency TEXT DEFAULT 'UAH',
+          receipt_date TEXT,
+          category TEXT,
+          items TEXT,
+          ocr_raw TEXT,
+          ocr_status TEXT DEFAULT 'pending',
+          transaction_id INTEGER,
+          is_processed BOOLEAN DEFAULT 0,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE SET NULL
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы receipts:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== NET WORTH ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS networth_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          total_assets REAL NOT NULL,
+          total_liabilities REAL NOT NULL,
+          net_worth REAL NOT NULL,
+          assets_breakdown TEXT,
+          liabilities_breakdown TEXT,
+          snapshot_date TEXT NOT NULL,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы networth_snapshots:', err);
+          reject(err);
+        }
+      });
+
+      // Ручные активы (недвижимость, авто и т.д.)
+      db.run(`
+        CREATE TABLE IF NOT EXISTS manual_assets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          value REAL NOT NULL,
+          currency TEXT DEFAULT 'UAH',
+          purchase_date TEXT,
+          purchase_price REAL,
+          description TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы manual_assets:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== ВИДЖЕТЫ ДАШБОРДА ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS dashboard_widgets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          widget_type TEXT NOT NULL,
+          title TEXT,
+          position INTEGER DEFAULT 0,
+          size TEXT DEFAULT 'medium',
+          settings TEXT,
+          is_visible BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы dashboard_widgets:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== ФИНАНСОВЫЙ КАЛЕНДАРЬ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS calendar_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          event_type TEXT NOT NULL,
+          amount REAL,
+          currency TEXT DEFAULT 'UAH',
+          event_date TEXT NOT NULL,
+          end_date TEXT,
+          is_recurring BOOLEAN DEFAULT 0,
+          recurrence_rule TEXT,
+          reminder_enabled BOOLEAN DEFAULT 1,
+          reminder_days INTEGER DEFAULT 1,
+          color TEXT DEFAULT '#5D5CDE',
+          related_id INTEGER,
+          related_type TEXT,
+          is_completed BOOLEAN DEFAULT 0,
+          completed_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы calendar_events:', err);
+          reject(err);
+        }
+      });
+
+      // ==================== PDF ОТЧЁТЫ ====================
+      db.run(`
+        CREATE TABLE IF NOT EXISTS reports (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          report_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          period_start TEXT,
+          period_end TEXT,
+          file_path TEXT,
+          file_data TEXT,
+          format TEXT DEFAULT 'pdf',
+          parameters TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Ошибка при создании таблицы reports:', err);
+          reject(err);
         } else {
           console.log('База данных инициализирована успешно');
           resolve();

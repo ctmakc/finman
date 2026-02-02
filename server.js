@@ -30,6 +30,12 @@ const notificationsRoutes = require('./routes/notifications');
 const investmentsRoutes = require('./routes/investments');
 const analyticsRoutes = require('./routes/analytics');
 const exportRoutes = require('./routes/export');
+const subscriptionsRoutes = require('./routes/subscriptions');
+const networthRoutes = require('./routes/networth');
+const receiptsRoutes = require('./routes/receipts');
+const reportsRoutes = require('./routes/reports');
+const calendarRoutes = require('./routes/calendar');
+const widgetsRoutes = require('./routes/widgets');
 
 // Настройка Express
 const app = express();
@@ -117,6 +123,12 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/investments', investmentsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
+app.use('/api/networth', networthRoutes);
+app.use('/api/receipts', receiptsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/widgets', widgetsRoutes);
 
 // Middleware для проверки аутентификации API
 function apiAuthMiddleware(req, res, next) {

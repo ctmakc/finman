@@ -1,0 +1,208 @@
+// Net Worth Module
+const NetWorthModule = {
+  current: null,
+  history: [],
+  assets: [],
+
+  async init() {
+    await Promise.all([this.loadCurrent(), this.loadHistory(), this.loadAssets()]);
+  },
+
+  async loadCurrent() {
+    try {
+      const response = await fetch('/api/networth/current', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      this.current = await response.json();
+      this.renderCurrent();
+    } catch (error) {
+      console.error('Error loading net worth:', error);
+    }
+  },
+
+  async loadHistory() {
+    try {
+      const response = await fetch('/api/networth/history?period=year', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      this.history = await response.json();
+      this.renderChart();
+    } catch (error) {
+      console.error('Error loading history:', error);
+    }
+  },
+
+  async loadAssets() {
+    try {
+      const response = await fetch('/api/networth/assets', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      this.assets = await response.json();
+      this.renderAssets();
+    } catch (error) {
+      console.error('Error loading assets:', error);
+    }
+  },
+
+  renderCurrent() {
+    const container = document.getElementById('networth-summary');
+    if (!container || !this.current) return;
+
+    const change = this.history.length > 1 ? this.current.netWorth - this.history[0].net_worth : 0;
+    const changePercent = this.history.length > 1 && this.history[0].net_worth ? (change / Math.abs(this.history[0].net_worth) * 100).toFixed(1) : 0;
+
+    container.innerHTML = `
+      <div class="networth-main">
+        <div class="networth-value">
+          <span class="label">Чистая стоимость</span>
+          <span class="value ${this.current.netWorth >= 0 ? 'positive' : 'negative'}">${this.current.netWorth.toLocaleString()} ₴</span>
+          ${change !== 0 ? `<span class="change ${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${change.toLocaleString()} ₴ (${changePercent}%)</span>` : ''}
+        </div>
+      </div>
+      <div class="networth-breakdown">
+        <div class="breakdown-item positive"><span class="label">Активы</span><span class="value">${this.current.totalAssets.toLocaleString()} ₴</span></div>
+        <div class="breakdown-item negative"><span class="label">Обязательства</span><span class="value">${this.current.totalLiabilities.toLocaleString()} ₴</span></div>
+      </div>
+    `;
+
+    this.renderBreakdown();
+  },
+
+  renderBreakdown() {
+    const container = document.getElementById('networth-details');
+    if (!container || !this.current) return;
+
+    const ab = this.current.assetsBreakdown;
+    container.innerHTML = `
+      <div class="card"><h3>📊 Разбивка активов</h3>
+        <div class="breakdown-list">
+          <div class="breakdown-row"><span>Счета</span><span>${(ab.accounts?.total || 0).toLocaleString()} ₴</span></div>
+          <div class="breakdown-row"><span>Инвестиции</span><span>${(ab.investments?.total || 0).toLocaleString()} ₴</span></div>
+          <div class="breakdown-row"><span>Ручные активы</span><span>${(ab.manualAssets?.total || 0).toLocaleString()} ₴</span></div>
+          <div class="breakdown-row"><span>Вам должны</span><span>${(ab.receivables?.total || 0).toLocaleString()} ₴</span></div>
+        </div>
+      </div>
+    `;
+  },
+
+  renderAssets() {
+    const container = document.getElementById('manual-assets');
+    if (!container) return;
+
+    if (this.assets.length === 0) {
+      container.innerHTML = '<p class="text-secondary">Нет добавленных активов</p>';
+      return;
+    }
+
+    const assetIcons = { real_estate: '🏠', vehicle: '🚗', crypto: '₿', precious_metals: '🥇', collectibles: '🎨', business: '🏢', other: '📦' };
+
+    container.innerHTML = this.assets.filter(a => a.is_active).map(asset => `
+      <div class="asset-item">
+        <span class="asset-icon">${assetIcons[asset.type] || '📦'}</span>
+        <div class="asset-info"><strong>${asset.name}</strong><small>${asset.type}</small></div>
+        <span class="asset-value">${asset.value.toLocaleString()} ${asset.currency}</span>
+        <button class="btn btn-sm btn-icon" onclick="NetWorthModule.editAsset(${asset.id})">✏️</button>
+        <button class="btn btn-sm btn-icon btn-danger" onclick="NetWorthModule.deleteAsset(${asset.id})">🗑</button>
+      </div>
+    `).join('');
+  },
+
+  renderChart() {
+    const container = document.getElementById('networth-chart');
+    if (!container || this.history.length < 2) {
+      if (container) container.innerHTML = '<p class="text-secondary">Недостаточно данных для графика</p>';
+      return;
+    }
+    container.innerHTML = '<canvas id="nw-chart"></canvas>';
+    // Chart would be rendered here with Chart.js
+  },
+
+  async saveSnapshot() {
+    try {
+      await fetch('/api/networth/snapshot', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      alert('Снимок сохранён');
+      await this.loadHistory();
+    } catch (error) {
+      alert('Ошибка сохранения');
+    }
+  },
+
+  showAddAssetModal() {
+    document.getElementById('asset-form').reset();
+    document.getElementById('asset-id').value = '';
+    document.getElementById('asset-modal-title').textContent = 'Добавить актив';
+    document.getElementById('asset-modal').classList.add('active');
+  },
+
+  async editAsset(id) {
+    const asset = this.assets.find(a => a.id === id);
+    if (!asset) return;
+    document.getElementById('asset-id').value = asset.id;
+    document.getElementById('asset-name').value = asset.name;
+    document.getElementById('asset-type').value = asset.type;
+    document.getElementById('asset-value').value = asset.value;
+    document.getElementById('asset-modal-title').textContent = 'Редактировать актив';
+    document.getElementById('asset-modal').classList.add('active');
+  },
+
+  async saveAsset() {
+    const id = document.getElementById('asset-id').value;
+    const data = {
+      name: document.getElementById('asset-name').value,
+      type: document.getElementById('asset-type').value,
+      value: parseFloat(document.getElementById('asset-value').value)
+    };
+    try {
+      const url = id ? `/api/networth/assets/${id}` : '/api/networth/assets';
+      const method = id ? 'PUT' : 'POST';
+      await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(data) });
+      document.getElementById('asset-modal').classList.remove('active');
+      await this.loadAssets();
+      await this.loadCurrent();
+    } catch (error) {
+      alert('Ошибка');
+    }
+  },
+
+  async deleteAsset(id) {
+    if (!confirm('Удалить актив?')) return;
+    try {
+      await fetch(`/api/networth/assets/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+      await this.loadAssets();
+      await this.loadCurrent();
+    } catch (error) {
+      alert('Ошибка');
+    }
+  },
+
+  getPage() {
+    return `
+      <div class="networth-page">
+        <div class="page-header"><h1>💰 Net Worth</h1>
+          <button class="btn btn-primary" onclick="NetWorthModule.saveSnapshot()">📷 Сохранить снимок</button>
+        </div>
+        <div id="networth-summary" class="card networth-summary"></div>
+        <div class="grid-2">
+          <div id="networth-details"></div>
+          <div class="card"><h3>📈 История</h3><div id="networth-chart"></div></div>
+        </div>
+        <div class="card"><div class="card-header"><h3>🏠 Ручные активы</h3><button class="btn btn-sm" onclick="NetWorthModule.showAddAssetModal()">+ Добавить</button></div><div id="manual-assets"></div></div>
+      </div>
+      <div class="modal" id="asset-modal">
+        <div class="modal-content">
+          <div class="modal-header"><h2 id="asset-modal-title">Добавить актив</h2><button class="modal-close" onclick="document.getElementById('asset-modal').classList.remove('active')">&times;</button></div>
+          <form id="asset-form" onsubmit="event.preventDefault(); NetWorthModule.saveAsset()">
+            <input type="hidden" id="asset-id">
+            <div class="form-group"><label>Название</label><input type="text" id="asset-name" class="form-control" required></div>
+            <div class="form-group"><label>Тип</label><select id="asset-type" class="form-control"><option value="real_estate">Недвижимость</option><option value="vehicle">Транспорт</option><option value="crypto">Криптовалюта</option><option value="precious_metals">Драгметаллы</option><option value="collectibles">Коллекции</option><option value="business">Бизнес</option><option value="other">Другое</option></select></div>
+            <div class="form-group"><label>Стоимость (₴)</label><input type="number" id="asset-value" class="form-control" step="0.01" required></div>
+            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('asset-modal').classList.remove('active')">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+};
