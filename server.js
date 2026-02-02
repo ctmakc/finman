@@ -36,6 +36,7 @@ const receiptsRoutes = require('./routes/receipts');
 const reportsRoutes = require('./routes/reports');
 const calendarRoutes = require('./routes/calendar');
 const widgetsRoutes = require('./routes/widgets');
+const forecastRoutes = require('./routes/forecast');
 
 // Настройка Express
 const app = express();
@@ -129,6 +130,7 @@ app.use('/api/receipts', receiptsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/widgets', widgetsRoutes);
+app.use('/api/forecast', forecastRoutes);
 
 // Middleware для проверки аутентификации API
 function apiAuthMiddleware(req, res, next) {

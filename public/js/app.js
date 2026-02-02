@@ -83,6 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('calendar');
           } else if (path.includes('/reports')) {
             navigateTo('reports');
+          } else if (path.includes('/forecast')) {
+            navigateTo('forecast');
           } else if (path.includes('/settings')) {
             navigateTo('settings');
           } else if (path.includes('/bank-connections')) {
@@ -216,6 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
               </a>
             </li>
             <li class="nav-item">
+              <a href="#" class="nav-link" data-page="forecast">
+                <i class="fas fa-crystal-ball"></i> Прогноз
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="#" class="nav-link" data-page="settings">
                 <i class="fas fa-cog"></i> Настройки
               </a>
@@ -340,6 +347,9 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'reports':
         renderReportsPage();
         break;
+      case 'forecast':
+        renderForecastPage();
+        break;
       case 'bank-connections':
         renderBankConnectionsPage();
         break;
@@ -347,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSettingsPage();
         break;
       default:
-        renderDashboard();
+        renderSmartDashboard();
     }
   }
   
@@ -1369,6 +1379,8 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('calendar');
       } else if (path.includes('/reports')) {
         navigateTo('reports');
+      } else if (path.includes('/forecast')) {
+        navigateTo('forecast');
       } else if (path.includes('/settings')) {
         navigateTo('settings');
       } else if (path.includes('/bank-connections')) {
@@ -1408,4 +1420,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('main-content');
     mainContent.innerHTML = ReportsModule.getPage();
     ReportsModule.init();
+  }
+
+  function renderForecastPage() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = ForecastModule.getPage();
+    ForecastModule.init();
   }
