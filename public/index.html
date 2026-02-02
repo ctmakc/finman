@@ -2,8 +2,19 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Финансовый менеджер</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#5D5CDE">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ФинМенеджер">
+  <meta name="description" content="Персональный финансовый менеджер - учёт расходов, бюджеты, инвестиции">
+
+  <title>ФинМенеджер</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -38,5 +49,38 @@
   <script src="/js/dashboard.js"></script>
   <script src="/js/bank-api.js"></script>
   <script src="/js/charts.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.log('SW registration failed:', err));
+      });
+    }
+
+    // Install prompt for PWA
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Show install button if needed
+      const installBtn = document.getElementById('install-btn');
+      if (installBtn) installBtn.style.display = 'block';
+    });
+
+    function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+          if (choice.outcome === 'accepted') {
+            console.log('App installed');
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+  </script>
 </body>
 </html>

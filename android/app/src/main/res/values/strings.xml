@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ФинМенеджер</string>
+    <string name="title_activity_main">ФинМенеджер</string>
+    <string name="package_name">com.finman.app</string>
+    <string name="custom_url_scheme">com.finman.app</string>
+</resources>
