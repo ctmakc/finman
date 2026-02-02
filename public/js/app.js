@@ -63,6 +63,16 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('recurring');
           } else if (path.includes('/currency')) {
             navigateTo('currency');
+          } else if (path.includes('/goals')) {
+            navigateTo('goals');
+          } else if (path.includes('/debts')) {
+            navigateTo('debts');
+          } else if (path.includes('/split')) {
+            navigateTo('split');
+          } else if (path.includes('/investments')) {
+            navigateTo('investments');
+          } else if (path.includes('/analytics')) {
+            navigateTo('analytics');
           } else if (path.includes('/settings')) {
             navigateTo('settings');
           } else if (path.includes('/bank-connections')) {
@@ -143,6 +153,31 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="currency">
                 <i class="fas fa-coins"></i> Валюты
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="goals">
+                <i class="fas fa-bullseye"></i> Цели
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="debts">
+                <i class="fas fa-hand-holding-usd"></i> Долги
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="split">
+                <i class="fas fa-user-friends"></i> Сплит
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="investments">
+                <i class="fas fa-chart-line"></i> Инвестиции
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-page="analytics">
+                <i class="fas fa-chart-bar"></i> Аналитика
               </a>
             </li>
             <li class="nav-item">
@@ -239,6 +274,21 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'currency':
         renderCurrencyPage();
+        break;
+      case 'goals':
+        renderGoalsPage();
+        break;
+      case 'debts':
+        renderDebtsPage();
+        break;
+      case 'split':
+        renderSplitPage();
+        break;
+      case 'investments':
+        renderInvestmentsPage();
+        break;
+      case 'analytics':
+        renderAnalyticsPage();
         break;
       case 'bank-connections':
         renderBankConnectionsPage();
@@ -1249,6 +1299,16 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('recurring');
       } else if (path.includes('/currency')) {
         navigateTo('currency');
+      } else if (path.includes('/goals')) {
+        navigateTo('goals');
+      } else if (path.includes('/debts')) {
+        navigateTo('debts');
+      } else if (path.includes('/split')) {
+        navigateTo('split');
+      } else if (path.includes('/investments')) {
+        navigateTo('investments');
+      } else if (path.includes('/analytics')) {
+        navigateTo('analytics');
       } else if (path.includes('/settings')) {
         navigateTo('settings');
       } else if (path.includes('/bank-connections')) {

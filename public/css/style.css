@@ -2495,3 +2495,259 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==================== ЦЕЛИ НАКОПЛЕНИЯ ==================== */
+
+.goals-page,
+.debts-page,
+.split-page,
+.investments-page,
+.analytics-page {
+  padding: 1rem;
+}
+
+.goals-page .page-header,
+.debts-page .page-header,
+.split-page .page-header,
+.investments-page .page-header,
+.analytics-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.page-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* ==================== ДОЛГИ И КРЕДИТЫ ==================== */
+
+.debt-card {
+  background: var(--card-color);
+  border-radius: var(--border-radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--success-color);
+}
+
+.debt-card.debt-overdue {
+  border-left-color: var(--error-color);
+  background: rgba(227, 52, 47, 0.05);
+}
+
+/* ==================== СПЛИТ РАСХОДОВ ==================== */
+
+.split-page .list-item {
+  justify-content: space-between;
+}
+
+.split-page .list-item span:last-child {
+  font-weight: 600;
+}
+
+/* ==================== ИНВЕСТИЦИИ ==================== */
+
+.investments-page .stat-card {
+  min-width: 0;
+}
+
+.portfolio-holdings .table td {
+  vertical-align: middle;
+}
+
+.portfolio-holdings .table td small {
+  display: block;
+  color: var(--text-secondary);
+}
+
+/* ==================== АНАЛИТИКА ==================== */
+
+.analytics-page .chart-container {
+  height: 350px;
+  margin-bottom: 1.5rem;
+}
+
+.analytics-filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.analytics-filters .form-control {
+  width: auto;
+  min-width: 150px;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.comparison-card {
+  background: var(--card-color);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  text-align: center;
+  border: 1px solid var(--border-color);
+}
+
+.comparison-card .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.comparison-card .label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.comparison-card .change {
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.comparison-card .change.positive {
+  color: var(--success-color);
+}
+
+.comparison-card .change.negative {
+  color: var(--error-color);
+}
+
+/* Категории расходов */
+.categories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--surface-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.category-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+}
+
+.category-info {
+  flex: 1;
+}
+
+.category-info h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.category-bar {
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.category-bar-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 3px;
+}
+
+.category-amount {
+  font-weight: 600;
+  min-width: 100px;
+  text-align: right;
+}
+
+.category-percent {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Тренды */
+.trend-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.trend-item {
+  background: var(--surface-color);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.trend-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--card-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.trend-icon.up {
+  color: var(--success-color);
+}
+
+.trend-icon.down {
+  color: var(--error-color);
+}
+
+.trend-data .value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.trend-data .label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .analytics-filters {
+    flex-direction: column;
+  }
+
+  .analytics-filters .form-control {
+    width: 100%;
+  }
+
+  .category-row {
+    flex-wrap: wrap;
+  }
+
+  .category-amount,
+  .category-percent {
+    min-width: auto;
+  }
+}
