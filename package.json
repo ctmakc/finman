@@ -10,7 +10,10 @@
         "android:sync": "npx cap sync android",
         "android:open": "npx cap open android",
         "android:build": "npx cap sync android && cd android && ./gradlew assembleDebug",
-        "android:release": "npx cap sync android && cd android && ./gradlew assembleRelease"
+        "android:release": "npx cap sync android && cd android && ./gradlew assembleRelease",
+        "ios:sync": "npx cap sync ios",
+        "ios:open": "npx cap open ios",
+        "cap:sync": "npx cap sync"
     },
     "keywords": [
         "finance",
@@ -24,6 +27,7 @@
         "@capacitor/android": "^8.0.2",
         "@capacitor/cli": "^8.0.2",
         "@capacitor/core": "^8.0.2",
+        "@capacitor/ios": "^8.0.2",
         "axios": "^1.4.0",
         "bcrypt": "^5.1.0",
         "cookie-parser": "^1.4.6",

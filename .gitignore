@@ -39,3 +39,9 @@ android/.gradle/
 android/local.properties
 *.apk
 *.aab
+
+# iOS
+ios/App/build/
+ios/App/Pods/
+*.xcworkspace
+*.ipa
