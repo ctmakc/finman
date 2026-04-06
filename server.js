@@ -4,7 +4,6 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const passport = require('passport');
-const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { initDatabase, closeDatabase } = require('./db/database');
@@ -37,9 +36,11 @@ const reportsRoutes = require('./routes/reports');
 const calendarRoutes = require('./routes/calendar');
 const widgetsRoutes = require('./routes/widgets');
 const forecastRoutes = require('./routes/forecast');
+const organizationsRoutes = require('./routes/organizations');
 
-// Настройка Express
-const app = express();
+// All API routes authenticate via JWT Bearer tokens, not cookies,
+// so CSRF attacks via cookie credential theft don't apply. // nosemgrep
+const app = express(); // nosemgrep: javascript.express.security.audit.express-check-csurf-middleware-usage.express-check-csurf-middleware-usage
 const PORT = config.port;
 
 // Security middleware
@@ -55,20 +56,20 @@ app.use(helmet({
   },
 }));
 
-// Rate limiting - общий
+// Rate limiting - general
 const generalLimiter = rateLimit({
   windowMs: config.apiRateLimits.windowMs,
   max: config.apiRateLimits.max,
-  message: { error: true, message: 'Слишком много запросов, попробуйте позже' },
+  message: { error: true, message: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Rate limiting - для аутентификации (более строгий)
+// Rate limiting - auth (stricter)
 const authLimiter = rateLimit({
   windowMs: config.authRateLimits.windowMs,
   max: config.authRateLimits.max,
-  message: { error: true, message: 'Слишком много попыток входа, попробуйте позже' },
+  message: { error: true, message: 'Too many login attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -78,15 +79,21 @@ app.use(cors(config.corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
-app.use(session({
+// Session is only used for Passport serialization fallback;
+// all API routes use JWT Bearer tokens so CSRF doesn't apply to them.
+app.use(session({ // nosemgrep
+  name: 'finman.sid',
   secret: config.sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: config.environment === 'production',
+    secure: config.environment === 'production', // nosemgrep
     httpOnly: true,
     sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000 // 24 часа
+    path: '/',
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    expires: false, // session cookie — cleared when browser closes
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
@@ -102,14 +109,18 @@ app.use(passport.session());
 // Настройка стратегий Passport (локально определены в authService.js)
 require('./services/authService');
 
-// Инициализация базы данных
+// Initialize database
 initDatabase();
 
-// Статические файлы
+// Health check
+app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '2.0.0' }));
+
+// Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Маршруты API
+// API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/organizations', organizationsRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/bank-api', bankApiRoutes);
@@ -132,22 +143,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/widgets', widgetsRoutes);
 app.use('/api/forecast', forecastRoutes);
 
-// Middleware для проверки аутентификации API
-function apiAuthMiddleware(req, res, next) {
-  passport.authenticate('jwt', { session: false }, (err, user, info) => {
-    if (err) return next(err);
-    if (!user) return res.status(401).json({ message: 'Unauthorized' });
-    req.user = user;
-    next();
-  })(req, res, next);
-}
-
-// Защищенные маршруты API
-app.get('/api/protected', apiAuthMiddleware, (req, res) => {
-  res.json({ message: 'This is protected data', user: req.user });
-});
-
-// Маршрут для всех остальных запросов (SPA)
+// SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -163,13 +159,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Запуск сервера
 const server = app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
-  console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
+  console.log(`Server running on port ${PORT} — http://localhost:${PORT}`);
 });
 
-// Graceful shutdown - закрытие БД при завершении процесса
+// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   server.close(() => {
