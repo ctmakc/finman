@@ -37,6 +37,7 @@ const calendarRoutes = require('./routes/calendar');
 const widgetsRoutes = require('./routes/widgets');
 const forecastRoutes = require('./routes/forecast');
 const organizationsRoutes = require('./routes/organizations');
+const aiRoutes = require('./routes/ai');
 
 // All API routes authenticate via JWT Bearer tokens, not cookies,
 // so CSRF attacks via cookie credential theft don't apply. // nosemgrep
@@ -121,6 +122,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/organizations', organizationsRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/bank-api', bankApiRoutes);
