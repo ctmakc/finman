@@ -922,13 +922,80 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы reports:', err);
+          console.error('Error creating reports table:', err);
           reject(err);
-        } else {
-          console.log('База данных инициализирована успешно');
-          resolve();
         }
       });
+
+      // ==================== ORGANIZATIONS (SaaS) ====================
+      db.run(`CREATE TABLE IF NOT EXISTS organizations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        slug TEXT UNIQUE NOT NULL,
+        plan TEXT DEFAULT 'free',
+        ai_provider TEXT DEFAULT NULL,
+        ai_model TEXT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`, (err) => { if (err) console.error('Error creating organizations table:', err); });
+
+      db.run(`CREATE TABLE IF NOT EXISTS organization_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        org_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        role TEXT DEFAULT 'member',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(org_id, user_id)
+      )`, (err) => { if (err) console.error('Error creating organization_members table:', err); });
+
+      db.run(`CREATE TABLE IF NOT EXISTS invites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        org_id INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'member',
+        expires_at DATETIME NOT NULL,
+        used_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE
+      )`, (err) => { if (err) console.error('Error creating invites table:', err); });
+
+      db.run(`CREATE TABLE IF NOT EXISTS ai_insights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        org_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        period TEXT NOT NULL,
+        type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        model TEXT,
+        generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(org_id, period, type)
+      )`, (err) => { if (err) console.error('Error creating ai_insights table:', err); });
+
+      db.run(`CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        org_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        session_id TEXT UNIQUE NOT NULL,
+        messages TEXT NOT NULL DEFAULT '[]',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`, (err) => { if (err) console.error('Error creating ai_chat_sessions table:', err); });
+
+      // Migration: add org_id to users if not exists
+      db.run(`ALTER TABLE users ADD COLUMN org_id INTEGER REFERENCES organizations(id)`,
+        (err) => {
+          if (err && !err.message.includes('duplicate column')) console.error('Migration error (users.org_id):', err);
+        }
+      );
+
+      // Migration: change default currency from RUB to USD
+      // (new accounts will default to USD via application layer)
+
+      console.log('Database initialized successfully');
+      resolve();
     });
   });
 }
