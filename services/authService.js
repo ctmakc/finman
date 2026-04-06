@@ -19,17 +19,17 @@ passport.use(new LocalStrategy(
       const user = await User.findByUsername(username);
       
       if (!user) {
-        return done(null, false, { message: 'Неверное имя пользователя или пароль' });
+        return done(null, false, { message: 'Invalid username or password' });
       }
       
       // Проверка пароля
       const isPasswordValid = await User.verifyPassword(user, password);
       
       if (!isPasswordValid) {
-        return done(null, false, { message: 'Неверное имя пользователя или пароль' });
+        return done(null, false, { message: 'Invalid username or password' });
       }
       
-      // Пользователь успешно аутентифицирован
+      // User authenticated successfully
       return done(null, user);
     } catch (error) {
       return done(error);
@@ -37,17 +37,14 @@ passport.use(new LocalStrategy(
   }
 ));
 
-// JWT-стратегия (для защищенных API-маршрутов)
+// JWT strategy
 passport.use(new JwtStrategy(jwtOptions, async function(jwtPayload, done) {
   try {
-    // Поиск пользователя по ID из токена
     const user = await User.findById(jwtPayload.id);
-    
-    if (!user) {
-      return done(null, false);
-    }
-    
-    // Пользователь найден
+    if (!user) return done(null, false);
+    // Attach orgId and role from JWT payload
+    user.orgId = jwtPayload.orgId || user.org_id;
+    user.role = jwtPayload.role || 'member';
     return done(null, user);
   } catch (error) {
     return done(error, false);
