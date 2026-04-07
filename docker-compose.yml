@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  finman:
+    build: .
+    container_name: finman
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - finman-data:/app/data
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_PATH: /app/data/finman.db
+      SESSION_SECRET: ${SESSION_SECRET:-changeme-use-a-real-secret}
+      JWT_SECRET: ${JWT_SECRET:-changeme-jwt-secret}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-2048}
+
+volumes:
+  finman-data:

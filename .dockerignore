@@ -1,0 +1,10 @@
+node_modules
+.env
+*.db
+*.sqlite
+data/
+.git
+docs/superpowers
+android/
+ios/
+*.log
