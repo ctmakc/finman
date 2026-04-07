@@ -42,32 +42,32 @@ const ForecastModule = {
     container.innerHTML = `
       <div class="forecast-main">
         <div class="forecast-current">
-          <span class="label">Текущий баланс</span>
-          <span class="value">${s.currentBalance.toLocaleString()} ₴</span>
+          <span class="label">Current balance</span>
+          <span class="value">${s.currentBalance.toLocaleString()} $</span>
         </div>
         <div class="forecast-arrow ${isPositive ? 'up' : 'down'}">${isPositive ? '↗' : '↘'}</div>
         <div class="forecast-projected">
-          <span class="label">Через 30 дней</span>
-          <span class="value ${isPositive ? 'positive' : 'negative'}">${s.projectedBalance.toLocaleString()} ₴</span>
+          <span class="label">Через 30 days</span>
+          <span class="value ${isPositive ? 'positive' : 'negative'}">${s.projectedBalance.toLocaleString()} $</span>
         </div>
       </div>
       <div class="forecast-details">
         <div class="detail-item">
           <span class="label">Изменение</span>
-          <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${s.change.toLocaleString()} ₴ (${s.changePercent}%)</span>
+          <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${s.change.toLocaleString()} $ (${s.changePercent}%)</span>
         </div>
         <div class="detail-item warning">
-          <span class="label">Минимум баланса</span>
-          <span class="value">${s.lowestPoint.toLocaleString()} ₴</span>
+          <span class="label">Минимум balance</span>
+          <span class="value">${s.lowestPoint.toLocaleString()} $</span>
           <small>${s.lowestDate}</small>
         </div>
         <div class="detail-item">
-          <span class="label">Ср. расход/день</span>
-          <span class="value negative">${s.avgDailyExpense.toLocaleString()} ₴</span>
+          <span class="label">Avg. expense/day</span>
+          <span class="value negative">${s.avgDailyExpense.toLocaleString()} $</span>
         </div>
         <div class="detail-item">
-          <span class="label">Ср. доход/день</span>
-          <span class="value positive">${s.avgDailyIncome.toLocaleString()} ₴</span>
+          <span class="label">Avg. income/day</span>
+          <span class="value positive">${s.avgDailyIncome.toLocaleString()} $</span>
         </div>
       </div>
     `;
@@ -89,7 +89,7 @@ const ForecastModule = {
       data: {
         labels: data.map(d => d.date.substring(5)),
         datasets: [{
-          label: 'Баланс',
+          label: 'Balance',
           data: data.map(d => d.balance),
           borderColor: '#5D5CDE',
           backgroundColor: 'rgba(93, 92, 222, 0.1)',
@@ -119,16 +119,16 @@ const ForecastModule = {
     container.innerHTML = `
       <div class="trends-grid">
         <div class="trend-card">
-          <div class="trend-header"><span>📈 Доходы</span><span class="${t.income.direction === 'up' ? 'positive' : 'negative'}">${t.income.direction === 'up' ? '↑' : '↓'} ${t.income.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong>${p.nextMonthIncome.toLocaleString()} ₴</strong></div>
+          <div class="trend-header"><span>📈 Income</span><span class="${t.income.direction === 'up' ? 'positive' : 'negative'}">${t.income.direction === 'up' ? '↑' : '↓'} ${t.income.percent}%</span></div>
+          <div class="trend-prediction">Forecast: <strong>${p.nextMonthIncome.toLocaleString()} $</strong></div>
         </div>
         <div class="trend-card">
-          <div class="trend-header"><span>📉 Расходы</span><span class="${t.expense.direction === 'down' ? 'positive' : 'negative'}">${t.expense.direction === 'up' ? '↑' : '↓'} ${t.expense.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong>${p.nextMonthExpense.toLocaleString()} ₴</strong></div>
+          <div class="trend-header"><span>📉 Expenses</span><span class="${t.expense.direction === 'down' ? 'positive' : 'negative'}">${t.expense.direction === 'up' ? '↑' : '↓'} ${t.expense.percent}%</span></div>
+          <div class="trend-prediction">Forecast: <strong>${p.nextMonthExpense.toLocaleString()} $</strong></div>
         </div>
         <div class="trend-card">
           <div class="trend-header"><span>💰 Сбережения</span><span class="${t.savings.direction === 'up' ? 'positive' : 'negative'}">${t.savings.direction === 'up' ? '↑' : '↓'} ${t.savings.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${p.nextMonthSavings.toLocaleString()} ₴</strong></div>
+          <div class="trend-prediction">Forecast: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${p.nextMonthSavings.toLocaleString()} $</strong></div>
         </div>
       </div>
     `;
@@ -152,8 +152,8 @@ const ForecastModule = {
       data: {
         labels: months.map(m => m.month),
         datasets: [
-          { label: 'Доходы', data: months.map(m => m.income), backgroundColor: 'rgba(56, 193, 114, 0.7)' },
-          { label: 'Расходы', data: months.map(m => m.expense), backgroundColor: 'rgba(227, 52, 47, 0.7)' }
+          { label: 'Income', data: months.map(m => m.income), backgroundColor: 'rgba(56, 193, 114, 0.7)' },
+          { label: 'Expenses', data: months.map(m => m.expense), backgroundColor: 'rgba(227, 52, 47, 0.7)' }
         ]
       },
       options: {
@@ -174,23 +174,23 @@ const ForecastModule = {
     return ` + "`" + `
       <div class="forecast-page">
         <div class="page-header">
-          <h1>🔮 Прогнозирование</h1>
+          <h1>🔮 Forecastирование</h1>
           <div class="period-buttons">
-            <button class="btn period-btn" onclick="ForecastModule.changePeriod(7)">7 дней</button>
-            <button class="btn period-btn active" onclick="ForecastModule.changePeriod(30)">30 дней</button>
-            <button class="btn period-btn" onclick="ForecastModule.changePeriod(90)">90 дней</button>
+            <button class="btn period-btn" onclick="ForecastModule.changePeriod(7)">7 days</button>
+            <button class="btn period-btn active" onclick="ForecastModule.changePeriod(30)">30 days</button>
+            <button class="btn period-btn" onclick="ForecastModule.changePeriod(90)">90 days</button>
           </div>
         </div>
 
         <div class="card" id="forecast-summary"></div>
 
         <div class="card">
-          <h3>📊 Прогноз баланса</h3>
+          <h3>📊 Forecast balance</h3>
           <div class="chart-container" style="height:300px"><canvas id="forecast-chart"></canvas></div>
         </div>
 
         <div class="card">
-          <h3>📈 Тренды и прогнозы на следующий месяц</h3>
+          <h3>📈 Тренды и forecastы на следующий month</h3>
           <div id="trends-summary"></div>
           <div class="chart-container" style="height:250px;margin-top:1rem"><canvas id="trends-chart"></canvas></div>
         </div>

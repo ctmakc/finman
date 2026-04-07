@@ -37,7 +37,7 @@ const SubscriptionsModule = {
     if (!container) return;
 
     if (this.subscriptions.length === 0) {
-      container.innerHTML = `<div class="empty-state"><p>Нет активных подписок</p></div>`;
+      container.innerHTML = `<div class="empty-state"><p>No active subscriptions</p></div>`;
       return;
     }
 
@@ -48,7 +48,7 @@ const SubscriptionsModule = {
             <span class="subscription-icon">${sub.icon || '📦'}</span>
             <div>
               <h3>${sub.name}</h3>
-              <small>${sub.category || 'Без категории'}</small>
+              <small>${sub.category || 'Uncategorized'}</small>
             </div>
           </div>
           <div class="subscription-amount">
@@ -57,11 +57,11 @@ const SubscriptionsModule = {
           </div>
         </div>
         <div class="subscription-details">
-          <span>Следующий платёж: <strong>${sub.next_billing_date || 'Не указан'}</strong></span>
-          <span>${sub.daysUntilBilling !== null ? (sub.daysUntilBilling <= 0 ? '⚠️ Сегодня/Просрочен' : sub.daysUntilBilling + ' дн.') : ''}</span>
+          <span>Next payment: <strong>${sub.next_billing_date || 'Not set'}</strong></span>
+          <span>${sub.daysUntilBilling !== null ? (sub.daysUntilBilling <= 0 ? '⚠️ Today/Overdue' : sub.daysUntilBilling + ' days') : ''}</span>
         </div>
         <div class="subscription-actions">
-          <button class="btn btn-sm" onclick="SubscriptionsModule.markPaid(${sub.id})">✓ Оплачено</button>
+          <button class="btn btn-sm" onclick="SubscriptionsModule.markPaid(${sub.id})">✓ Mark paid</button>
           <button class="btn btn-sm btn-secondary" onclick="SubscriptionsModule.edit(${sub.id})">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="SubscriptionsModule.cancel(${sub.id})">✕</button>
         </div>
@@ -74,14 +74,14 @@ const SubscriptionsModule = {
     if (!container || !this.stats) return;
 
     container.innerHTML = `
-      <div class="stat-card"><div class="stat-value">${this.stats.activeCount}</div><div class="stat-label">Активных</div></div>
-      <div class="stat-card"><div class="stat-value">${this.stats.monthlyTotal.toLocaleString()} ₴</div><div class="stat-label">В месяц</div></div>
-      <div class="stat-card"><div class="stat-value">${this.stats.yearlyTotal.toLocaleString()} ₴</div><div class="stat-label">В год</div></div>
+      <div class="stat-card"><div class="stat-value">${this.stats.activeCount}</div><div class="stat-label">Active</div></div>
+      <div class="stat-card"><div class="stat-value">${this.stats.monthlyTotal.toLocaleString()} $</div><div class="stat-label">Per month</div></div>
+      <div class="stat-card"><div class="stat-value">${this.stats.yearlyTotal.toLocaleString()} $</div><div class="stat-label">Per year</div></div>
     `;
   },
 
   getCycleLabel(cycle) {
-    const labels = { weekly: 'нед', monthly: 'мес', quarterly: 'квартал', yearly: 'год' };
+    const labels = { weekly: 'wk', monthly: 'mo', quarterly: 'qtr', yearly: 'year' };
     return labels[cycle] || cycle;
   },
 
@@ -89,7 +89,7 @@ const SubscriptionsModule = {
     const modal = document.getElementById('subscription-modal');
     document.getElementById('subscription-form').reset();
     document.getElementById('subscription-id').value = '';
-    document.getElementById('subscription-modal-title').textContent = 'Новая подписка';
+    document.getElementById('subscription-modal-title').textContent = 'New subscription';
     modal.classList.add('active');
   },
 
@@ -104,7 +104,7 @@ const SubscriptionsModule = {
     document.getElementById('sub-category').value = sub.category || '';
     document.getElementById('sub-start-date').value = sub.start_date;
     document.getElementById('sub-color').value = sub.color || '#5D5CDE';
-    document.getElementById('subscription-modal-title').textContent = 'Редактировать подписку';
+    document.getElementById('subscription-modal-title').textContent = 'Edit subscription';
     document.getElementById('subscription-modal').classList.add('active');
   },
 
@@ -131,12 +131,12 @@ const SubscriptionsModule = {
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert('Ошибка сохранения');
+      alert('Failed to save');
     }
   },
 
   async markPaid(id) {
-    if (!confirm('Отметить как оплаченную?')) return;
+    if (!confirm('Mark as paid?')) return;
     try {
       await fetch(`/api/subscriptions/${id}/pay`, {
         method: 'POST',
@@ -145,12 +145,12 @@ const SubscriptionsModule = {
       });
       await this.loadSubscriptions();
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
   async cancel(id) {
-    if (!confirm('Отменить подписку?')) return;
+    if (!confirm('Cancel subscription?')) return;
     try {
       await fetch(`/api/subscriptions/${id}/cancel`, {
         method: 'POST',
@@ -159,7 +159,7 @@ const SubscriptionsModule = {
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
@@ -167,28 +167,28 @@ const SubscriptionsModule = {
     return `
       <div class="subscriptions-page">
         <div class="page-header">
-          <h1>📦 Подписки</h1>
-          <button class="btn btn-primary" onclick="SubscriptionsModule.showAddModal()">+ Добавить</button>
+          <h1>📦 Subscriptions</h1>
+          <button class="btn btn-primary" onclick="SubscriptionsModule.showAddModal()">+ Add</button>
         </div>
         <div class="stats-grid" id="subscriptions-stats"></div>
         <div id="subscriptions-list"></div>
       </div>
       <div class="modal" id="subscription-modal">
         <div class="modal-content">
-          <div class="modal-header"><h2 id="subscription-modal-title">Новая подписка</h2><button class="modal-close" onclick="document.getElementById('subscription-modal').classList.remove('active')">&times;</button></div>
+          <div class="modal-header"><h2 id="subscription-modal-title">New subscription</h2><button class="modal-close" onclick="document.getElementById('subscription-modal').classList.remove('active')">&times;</button></div>
           <form id="subscription-form" onsubmit="event.preventDefault(); SubscriptionsModule.save()">
             <input type="hidden" id="subscription-id">
-            <div class="form-group"><label>Название</label><input type="text" id="sub-name" class="form-control" required></div>
+            <div class="form-group"><label>Name</label><input type="text" id="sub-name" class="form-control" required></div>
             <div class="form-row">
-              <div class="form-group"><label>Сумма</label><input type="number" id="sub-amount" class="form-control" step="0.01" required></div>
-              <div class="form-group"><label>Период</label><select id="sub-cycle" class="form-control"><option value="monthly">Ежемесячно</option><option value="yearly">Ежегодно</option><option value="weekly">Еженедельно</option><option value="quarterly">Ежеквартально</option></select></div>
+              <div class="form-group"><label>Amount</label><input type="number" id="sub-amount" class="form-control" step="0.01" required></div>
+              <div class="form-group"><label>Period</label><select id="sub-cycle" class="form-control"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="weekly">Weekly</option><option value="quarterly">Quarterly</option></select></div>
             </div>
             <div class="form-row">
-              <div class="form-group"><label>Категория</label><select id="sub-category" class="form-control"><option value="">Выберите...</option><option>Стриминг</option><option>Музыка</option><option>Облако</option><option>Софт</option><option>Игры</option><option>Другое</option></select></div>
-              <div class="form-group"><label>Дата начала</label><input type="date" id="sub-start-date" class="form-control" required></div>
+              <div class="form-group"><label>Category</label><select id="sub-category" class="form-control"><option value="">Select...</option><option>Streaming</option><option>Music</option><option>Cloud</option><option>Software</option><option>Gaming</option><option>Other</option></select></div>
+              <div class="form-group"><label>Date start</label><input type="date" id="sub-start-date" class="form-control" required></div>
             </div>
-            <div class="form-group"><label>Цвет</label><input type="color" id="sub-color" class="form-control" value="#5D5CDE"></div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('subscription-modal').classList.remove('active')">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+            <div class="form-group"><label>Color</label><input type="color" id="sub-color" class="form-control" value="#5D5CDE"></div>
+            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('subscription-modal').classList.remove('active')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
           </form>
         </div>
       </div>

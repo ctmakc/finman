@@ -1,193 +1,193 @@
-// Функции для работы со счетами
+// Functions for working with accounts
 
-// Получение счета по ID
+// Fetch account by ID
 async function fetchAccount(accountId) {
     try {
       const response = await fetchWithAuth(`/api/accounts/${accountId}`);
-      
+
       if (!response.ok) {
-        throw new Error('Не удалось получить данные счета');
+        throw new Error('Failed to retrieve account data');
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error('Ошибка получения счета:', error);
-      showNotification('Ошибка получения счета', 'error');
+      console.error('Error fetching account:', error);
+      showNotification('Error fetching account', 'error');
       return null;
     }
   }
-  
-  // Создание нового счета
+
+  // Create a new account
   async function createAccount(accountData) {
     try {
       const response = await fetchWithAuth('/api/accounts', {
         method: 'POST',
         body: JSON.stringify(accountData)
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка создания счета', 'error');
+        showNotification(data.message || 'Error creating account', 'error');
         return null;
       }
-      
+
       const newAccount = await response.json();
-      
-      // Обновление списка счетов
+
+      // Update accounts list
       appState.accounts.push(newAccount);
-      
-      showNotification('Счет успешно создан', 'success');
+
+      showNotification('Account created successfully', 'success');
       return newAccount;
     } catch (error) {
-      console.error('Ошибка создания счета:', error);
-      showNotification('Произошла ошибка при создании счета', 'error');
+      console.error('Error creating account:', error);
+      showNotification('An error occurred while creating the account', 'error');
       return null;
     }
   }
-  
-  // Обновление счета
+
+  // Update account
   async function updateAccount(accountId, accountData) {
     try {
       const response = await fetchWithAuth(`/api/accounts/${accountId}`, {
         method: 'PUT',
         body: JSON.stringify(accountData)
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления счета', 'error');
+        showNotification(data.message || 'Error updating account', 'error');
         return false;
       }
-      
+
       const updatedAccount = await response.json();
-      
-      // Обновление списка счетов
+
+      // Update accounts list
       const index = appState.accounts.findIndex(acc => acc.id === accountId);
       if (index !== -1) {
         appState.accounts[index] = updatedAccount;
       }
-      
-      showNotification('Счет успешно обновлен', 'success');
+
+      showNotification('Account updated successfully', 'success');
       return true;
     } catch (error) {
-      console.error('Ошибка обновления счета:', error);
-      showNotification('Произошла ошибка при обновлении счета', 'error');
+      console.error('Error updating account:', error);
+      showNotification('An error occurred while updating the account', 'error');
       return false;
     }
   }
-  
-  // Удаление счета
+
+  // Delete account
   async function deleteAccount(accountId) {
     try {
       const response = await fetchWithAuth(`/api/accounts/${accountId}`, {
         method: 'DELETE'
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка удаления счета', 'error');
+        showNotification(data.message || 'Error deleting account', 'error');
         return false;
       }
-      
-      // Обновление списка счетов
+
+      // Update accounts list
       appState.accounts = appState.accounts.filter(acc => acc.id !== accountId);
-      
-      showNotification('Счет успешно удален', 'success');
+
+      showNotification('Account deleted successfully', 'success');
       return true;
     } catch (error) {
-      console.error('Ошибка удаления счета:', error);
-      showNotification('Произошла ошибка при удалении счета', 'error');
+      console.error('Error deleting account:', error);
+      showNotification('An error occurred while deleting the account', 'error');
       return false;
     }
   }
-  
-  // Модальное окно создания/редактирования счета
+
+  // Create/edit account modal
   function showAddAccountModal(accountData = null) {
-    // Создание модального окна
+    // Create modal
     const modalId = 'account-modal';
     const isEditing = !!accountData;
-    
+
     const modalHtml = `
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">${isEditing ? 'Редактирование счета' : 'Создание счета'}</h2>
+            <h2 class="modal-title">${isEditing ? 'Edit Account' : 'Create Account'}</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
-          
+
           <form id="${modalId}-form" class="modal-body">
             <div class="form-group">
-              <label for="${modalId}-name" class="form-label">Название счета</label>
+              <label for="${modalId}-name" class="form-label">Account Name</label>
               <input type="text" id="${modalId}-name" class="form-control" value="${isEditing ? accountData.name : ''}" required>
             </div>
-            
+
             <div class="form-group">
-              <label for="${modalId}-type" class="form-label">Тип счета</label>
+              <label for="${modalId}-type" class="form-label">Account Type</label>
               <select id="${modalId}-type" class="form-control">
-                <option value="checking" ${isEditing && accountData.account_type === 'checking' ? 'selected' : ''}>Текущий счет</option>
-                <option value="savings" ${isEditing && accountData.account_type === 'savings' ? 'selected' : ''}>Сберегательный счет</option>
-                <option value="credit" ${isEditing && accountData.account_type === 'credit' ? 'selected' : ''}>Кредитная карта</option>
-                <option value="loan" ${isEditing && accountData.account_type === 'loan' ? 'selected' : ''}>Кредит</option>
+                <option value="checking" ${isEditing && accountData.account_type === 'checking' ? 'selected' : ''}>Checking Account</option>
+                <option value="savings" ${isEditing && accountData.account_type === 'savings' ? 'selected' : ''}>Savings Account</option>
+                <option value="credit" ${isEditing && accountData.account_type === 'credit' ? 'selected' : ''}>Credit Card</option>
+                <option value="loan" ${isEditing && accountData.account_type === 'loan' ? 'selected' : ''}>Loan</option>
               </select>
             </div>
-            
+
             <div class="form-group">
-              <label for="${modalId}-bank" class="form-label">Банк</label>
+              <label for="${modalId}-bank" class="form-label">Bank</label>
               <input type="text" id="${modalId}-bank" class="form-control" value="${isEditing ? accountData.bank_name || '' : ''}">
             </div>
-            
+
             <div class="form-group">
-              <label for="${modalId}-number" class="form-label">Номер счета</label>
+              <label for="${modalId}-number" class="form-label">Account Number</label>
               <input type="text" id="${modalId}-number" class="form-control" value="${isEditing ? accountData.account_number || '' : ''}">
             </div>
-            
+
             <div class="form-group">
-              <label for="${modalId}-currency" class="form-label">Валюта</label>
+              <label for="${modalId}-currency" class="form-label">Currency</label>
               <select id="${modalId}-currency" class="form-control">
-                <option value="RUB" ${isEditing && accountData.currency === 'RUB' ? 'selected' : ''}>Российский рубль (RUB)</option>
-                <option value="USD" ${isEditing && accountData.currency === 'USD' ? 'selected' : ''}>Доллар США (USD)</option>
-                <option value="EUR" ${isEditing && accountData.currency === 'EUR' ? 'selected' : ''}>Евро (EUR)</option>
-                <option value="GBP" ${isEditing && accountData.currency === 'GBP' ? 'selected' : ''}>Фунт стерлингов (GBP)</option>
+                <option value="RUB" ${isEditing && accountData.currency === 'RUB' ? 'selected' : ''}>Russian Ruble (RUB)</option>
+                <option value="USD" ${isEditing && accountData.currency === 'USD' ? 'selected' : ''}>US Dollar (USD)</option>
+                <option value="EUR" ${isEditing && accountData.currency === 'EUR' ? 'selected' : ''}>Euro (EUR)</option>
+                <option value="GBP" ${isEditing && accountData.currency === 'GBP' ? 'selected' : ''}>British Pound (GBP)</option>
               </select>
             </div>
-            
+
             ${!isEditing ? `
               <div class="form-group">
-                <label for="${modalId}-balance" class="form-label">Начальный баланс</label>
+                <label for="${modalId}-balance" class="form-label">Opening Balance</label>
                 <input type="number" id="${modalId}-balance" class="form-control" step="0.01" value="0">
               </div>
             ` : ''}
-            
+
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-              <button type="submit" class="btn btn-primary">${isEditing ? 'Сохранить' : 'Создать'}</button>
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
+              <button type="submit" class="btn btn-primary">${isEditing ? 'Save' : 'Create'}</button>
             </div>
           </form>
         </div>
       </div>
     `;
-    
-    // Добавление модального окна на страницу
+
+    // Add modal to page
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Получение ссылок на элементы
+
+    // Get element references
     const modal = document.getElementById(modalId);
     const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
     const modalClose = document.getElementById(`${modalId}-close`);
     const modalCancel = document.getElementById(`${modalId}-cancel`);
     const modalForm = document.getElementById(`${modalId}-form`);
-    
-    // Функция закрытия модального окна
+
+    // Close modal function
     const closeModal = () => {
       modalBackdrop.classList.add('closing');
-      
-      // Удаление модального окна после завершения анимации
+
+      // Remove modal after animation
       setTimeout(() => {
         document.body.removeChild(modalBackdrop);
       }, 300);
     };
-    
-    // Обработчики событий
+
+    // Event handlers
     modalClose.addEventListener('click', closeModal);
     modalCancel.addEventListener('click', closeModal);
     modalBackdrop.addEventListener('click', (e) => {
@@ -195,11 +195,11 @@ async function fetchAccount(accountId) {
         closeModal();
       }
     });
-    
-    // Обработчик отправки формы
+
+    // Form submit handler
     modalForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const accountFormData = {
         name: document.getElementById(`${modalId}-name`).value,
         accountType: document.getElementById(`${modalId}-type`).value,
@@ -207,25 +207,25 @@ async function fetchAccount(accountId) {
         accountNumber: document.getElementById(`${modalId}-number`).value,
         currency: document.getElementById(`${modalId}-currency`).value
       };
-      
+
       if (!isEditing) {
         accountFormData.balance = parseFloat(document.getElementById(`${modalId}-balance`).value) || 0;
       }
-      
-      // Создание или обновление счета
+
+      // Create or update account
       let success = false;
-      
+
       if (isEditing) {
         success = await updateAccount(accountData.id, accountFormData);
       } else {
         const newAccount = await createAccount(accountFormData);
         success = !!newAccount;
       }
-      
+
       if (success) {
         closeModal();
-        
-        // Обновление интерфейса в зависимости от текущей страницы
+
+        // Update UI based on current page
         if (appState.currentPage === 'accounts') {
           renderAccountsPage();
         } else if (appState.currentPage === 'dashboard') {
@@ -234,34 +234,34 @@ async function fetchAccount(accountId) {
       }
     });
   }
-  
-  // Обработка действий со счетами
+
+  // Handle account actions
   async function handleAccountAction(e) {
     const button = e.currentTarget;
     const action = button.dataset.accountAction;
     const accountId = button.dataset.accountId;
-    
+
     if (!action || !accountId) return;
-    
+
     switch (action) {
       case 'view':
         navigateTo('transactions');
         appState.filters.accountId = accountId;
         break;
-        
+
       case 'edit':
         const accountData = await fetchAccount(accountId);
         if (accountData) {
           showAddAccountModal(accountData);
         }
         break;
-        
+
       case 'delete':
-        if (confirm('Вы действительно хотите удалить этот счет? Все связанные транзакции также будут удалены.')) {
+        if (confirm('Are you sure you want to delete this account? All associated transactions will also be deleted.')) {
           const success = await deleteAccount(accountId);
-          
+
           if (success) {
-            // Обновление интерфейса
+            // Update UI
             renderAccountsPage();
           }
         }

@@ -1,10 +1,10 @@
-// Основной файл приложения
+// Main application file
 document.addEventListener('DOMContentLoaded', () => {
-    // Инициализация приложения
+    // Initialize application
     initApp();
   });
   
-  // Глобальное состояние приложения
+  // Global application state
   const appState = {
     isAuthenticated: false,
     user: null,
@@ -29,26 +29,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
   
-  // Инициализация приложения
+  // Initialize application
   async function initApp() {
-    // Проверка аутентификации
+    // Check authentication
     const token = localStorage.getItem('token');
     appState.token = token;
 
     if (token) {
       try {
-        // Получение данных пользователя
+        // Fetch user data
         await fetchCurrentUser();
         
-        // Отрисовка интерфейса для аутентифицированного пользователя
+        // Render authenticated user interface
         renderAuthenticatedUI();
         
-        // Загрузка основных данных
+        // Load main data
         Promise.all([
           fetchAccounts(),
           fetchSupportedBanks()
         ]).then(() => {
-          // Отображение страницы на основе URL
+          // Отображение pagesы на основе URL
           const path = window.location.pathname;
           
           if (path.includes('/accounts')) {
@@ -94,17 +94,17 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       } catch (error) {
-        console.error('Ошибка проверки аутентификации:', error);
-        // Если токен невалидный, отображаем страницу входа
+        console.error('Error checking authentication:', error);
+        // Если invalid token, отображаем pagesу login
         renderLoginPage();
       }
     } else {
-      // Если токена нет, отображаем страницу входа
+      // No token — show login page
       renderLoginPage();
     }
   }
   
-  // Отрисовка интерфейса для аутентифицированного пользователя
+  // Render authenticated user interface
   function renderAuthenticatedUI() {
     const app = document.getElementById('app');
     
@@ -112,11 +112,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <header class="header">
         <div class="container header-content">
           <div class="logo">
-            <a href="/">Финансовый менеджер</a>
+            <a href="/">Finance Manager</a>
           </div>
           <div class="user-info">
             <span class="user-name">${appState.user.username}</span>
-            <button id="logout-btn" class="btn btn-sm btn-outline">Выйти</button>
+            <button id="logout-btn" class="btn btn-sm btn-outline">Log out</button>
           </div>
         </div>
       </header>
@@ -129,72 +129,72 @@ document.addEventListener('DOMContentLoaded', () => {
           <ul class="nav-list" id="nav-list">
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="dashboard">
-                <i class="fas fa-chart-line"></i> Дашборд
+                <i class="fas fa-chart-line"></i> Dashboard
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="accounts">
-                <i class="fas fa-wallet"></i> Счета
+                <i class="fas fa-wallet"></i> Accounts
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="transactions">
-                <i class="fas fa-exchange-alt"></i> Транзакции
+                <i class="fas fa-exchange-alt"></i> Transactions
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="budgets">
-                <i class="fas fa-piggy-bank"></i> Бюджеты
+                <i class="fas fa-piggy-bank"></i> Budgets
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="bank-connections">
-                <i class="fas fa-university"></i> Банки
+                <i class="fas fa-university"></i> Banks
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="family">
-                <i class="fas fa-users"></i> Семья
+                <i class="fas fa-users"></i> Family
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="recurring">
-                <i class="fas fa-sync-alt"></i> Платежи
+                <i class="fas fa-sync-alt"></i> Payments
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="currency">
-                <i class="fas fa-coins"></i> Валюты
+                <i class="fas fa-coins"></i> Currencies
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="goals">
-                <i class="fas fa-bullseye"></i> Цели
+                <i class="fas fa-bullseye"></i> Goals
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="debts">
-                <i class="fas fa-hand-holding-usd"></i> Долги
+                <i class="fas fa-hand-holding-usd"></i> Debts
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="split">
-                <i class="fas fa-user-friends"></i> Сплит
+                <i class="fas fa-user-friends"></i> Split
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="investments">
-                <i class="fas fa-chart-line"></i> Инвестиции
+                <i class="fas fa-chart-line"></i> Investments
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="analytics">
-                <i class="fas fa-chart-bar"></i> Аналитика
+                <i class="fas fa-chart-bar"></i> Analytics
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="subscriptions">
-                <i class="fas fa-box"></i> Подписки
+                <i class="fas fa-box"></i> Subscriptions
               </a>
             </li>
             <li class="nav-item">
@@ -204,27 +204,27 @@ document.addEventListener('DOMContentLoaded', () => {
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="receipts">
-                <i class="fas fa-receipt"></i> Чеки
+                <i class="fas fa-receipt"></i> Receipts
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="calendar">
-                <i class="fas fa-calendar"></i> Календарь
+                <i class="fas fa-calendar"></i> Calendar
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="reports">
-                <i class="fas fa-file-alt"></i> Отчёты
+                <i class="fas fa-file-alt"></i> Reports
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="forecast">
-                <i class="fas fa-crystal-ball"></i> Прогноз
+                <i class="fas fa-crystal-ball"></i> Forecast
               </a>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link" data-page="settings">
-                <i class="fas fa-cog"></i> Настройки
+                <i class="fas fa-cog"></i> Settings
               </a>
             </li>
           </ul>
@@ -235,13 +235,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="container" id="main-content">
           <div class="loading">
             <div class="spinner"></div>
-            <p>Загрузка...</p>
+            <p>Loading...</p>
           </div>
         </div>
       </main>
     `;
     
-    // Обработчики событий для навигации
+    // Navigation event handlers
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
       link.addEventListener('click', (e) => {
@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
     
-    // Мобильное меню
+    // Mobile menu
     const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
     const navList = document.getElementById('nav-list');
     
@@ -259,16 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
       navList.classList.toggle('open');
     });
     
-    // Обработчик выхода из системы
+    // Log out handler
     document.getElementById('logout-btn').addEventListener('click', logout);
   }
   
-  // Навигация между страницами
+  // Навигация between pagess
   function navigateTo(page) {
-    // Обновление активной страницы
+    // Update active pagesы
     appState.currentPage = page;
     
-    // Обновление активного пункта меню
+    // Update active пункта меню
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
       if (link.dataset.page === page) {
@@ -278,23 +278,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     
-    // Обновление URL без перезагрузки страницы
+    // Update URL без перезагрузки pagesы
     window.history.pushState({}, '', `/${page}`);
     
-    // Отрисовка соответствующей страницы
+    // Отрисовка соответствующей pagesы
     const mainContent = document.getElementById('main-content');
     mainContent.innerHTML = `
       <div class="loading">
         <div class="spinner"></div>
-        <p>Загрузка...</p>
+        <p>Loading...</p>
       </div>
     `;
     
-    // Закрыть мобильное меню при навигации
+    // Close mobile menu on navigation
     const navList = document.getElementById('nav-list');
     navList.classList.remove('open');
     
-    // Загрузка страницы
+    // Загрузка pagesы
     switch (page) {
       case 'dashboard':
         renderDashboard();
@@ -361,12 +361,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   
-  // HTTP-запрос с авторизацией
+  // HTTP request with authorization
   async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
     
     if (!token) {
-      throw new Error('Не авторизован');
+      throw new Error('Unauthorized');
     }
     
     const defaultOptions = {
@@ -385,22 +385,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const response = await fetch(url, mergedOptions);
     
     if (response.status === 401) {
-      // Неавторизован, перенаправляем на страницу входа
+      // Unauthorized, перенаправляем на pagesу login
       localStorage.removeItem('token');
       renderLoginPage();
-      throw new Error('Не авторизован');
+      throw new Error('Unauthorized');
     }
     
     return response;
   }
   
-  // Получение данных текущего пользователя
+  // Fetch current user data
   async function fetchCurrentUser() {
     try {
       const response = await fetchWithAuth('/api/auth/me');
       
       if (!response.ok) {
-        throw new Error('Не удалось получить данные пользователя');
+        throw new Error('Failed to fetch user data');
       }
       
       const data = await response.json();
@@ -409,20 +409,20 @@ document.addEventListener('DOMContentLoaded', () => {
       
       return data;
     } catch (error) {
-      console.error('Ошибка получения данных пользователя:', error);
+      console.error('Error fetching user data:', error);
       appState.isAuthenticated = false;
       appState.user = null;
       throw error;
     }
   }
   
-  // Получение списка счетов
+  // Fetch list accounts
   async function fetchAccounts() {
     try {
       const response = await fetchWithAuth('/api/accounts');
       
       if (!response.ok) {
-        throw new Error('Не удалось получить список счетов');
+        throw new Error('Failed to fetch list accounts');
       }
       
       const data = await response.json();
@@ -430,19 +430,19 @@ document.addEventListener('DOMContentLoaded', () => {
       
       return data;
     } catch (error) {
-      console.error('Ошибка получения счетов:', error);
-      showNotification('Ошибка получения счетов', 'error');
+      console.error('Error fetching accounts:', error);
+      showNotification('Error fetching accounts', 'error');
       return [];
     }
   }
   
-  // Получение списка поддерживаемых банков
+  // Fetch supported banks list
   async function fetchSupportedBanks() {
     try {
       const response = await fetchWithAuth('/api/bank-api/supported-banks');
       
       if (!response.ok) {
-        throw new Error('Не удалось получить список поддерживаемых банков');
+        throw new Error('Failed to fetch supported banks list');
       }
       
       const data = await response.json();
@@ -450,12 +450,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       return data;
     } catch (error) {
-      console.error('Ошибка получения списка банков:', error);
+      console.error('Error fetching list banks:', error);
       return [];
     }
   }
   
-  // Отрисовка страницы входа
+  // Render login page
   function renderLoginPage() {
     const app = document.getElementById('app');
     
@@ -463,37 +463,37 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="auth-container">
         <div class="auth-card">
           <div class="auth-header">
-            <h1>Финансовый менеджер</h1>
-            <p>Управляйте своими финансами просто и эффективно</p>
+            <h1>Finance Manager</h1>
+            <p>Manage your finances simply and effectively</p>
           </div>
           
           <div class="auth-tabs">
-            <button class="auth-tab active" data-tab="login">Вход</button>
-            <button class="auth-tab" data-tab="register">Регистрация</button>
+            <button class="auth-tab active" data-tab="login">Login</button>
+            <button class="auth-tab" data-tab="register">Sign up</button>
           </div>
           
           <div class="auth-form-container">
-            <!-- Форма входа -->
+            <!-- Login form -->
             <form id="login-form" class="auth-form">
               <div class="form-group">
-                <label for="login-username" class="form-label">Имя пользователя</label>
+                <label for="login-username" class="form-label">Username</label>
                 <input type="text" id="login-username" class="form-control" required>
               </div>
               
               <div class="form-group">
-                <label for="login-password" class="form-label">Пароль</label>
+                <label for="login-password" class="form-label">Password</label>
                 <input type="password" id="login-password" class="form-control" required>
               </div>
               
               <div id="login-error" class="auth-error"></div>
               
-              <button type="submit" class="btn btn-primary w-100">Войти</button>
+              <button type="submit" class="btn btn-primary w-100">Log in</button>
             </form>
             
-            <!-- Форма регистрации -->
+            <!-- Registration form -->
             <form id="register-form" class="auth-form hidden">
               <div class="form-group">
-                <label for="register-username" class="form-label">Имя пользователя</label>
+                <label for="register-username" class="form-label">Username</label>
                 <input type="text" id="register-username" class="form-control" required>
               </div>
               
@@ -503,30 +503,30 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
               
               <div class="form-group">
-                <label for="register-fullname" class="form-label">Полное имя</label>
+                <label for="register-fullname" class="form-label">Full name</label>
                 <input type="text" id="register-fullname" class="form-control">
               </div>
               
               <div class="form-group">
-                <label for="register-password" class="form-label">Пароль</label>
+                <label for="register-password" class="form-label">Password</label>
                 <input type="password" id="register-password" class="form-control" required>
               </div>
               
               <div class="form-group">
-                <label for="register-confirm-password" class="form-label">Подтверждение пароля</label>
+                <label for="register-confirm-password" class="form-label">Confirm password</label>
                 <input type="password" id="register-confirm-password" class="form-control" required>
               </div>
               
               <div id="register-error" class="auth-error"></div>
               
-              <button type="submit" class="btn btn-primary w-100">Зарегистрироваться</button>
+              <button type="submit" class="btn btn-primary w-100">Sign up</button>
             </form>
           </div>
         </div>
       </div>
     `;
     
-    // Обработчики переключения между формами
+    // Обработчики switching between формs
     const authTabs = document.querySelectorAll('.auth-tab');
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
@@ -535,11 +535,11 @@ document.addEventListener('DOMContentLoaded', () => {
       tab.addEventListener('click', () => {
         const tabName = tab.dataset.tab;
         
-        // Обновление активного таба
+        // Update active таба
         authTabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         
-        // Отображение соответствующей формы
+        // Отображение соответствующей forms
         if (tabName === 'login') {
           loginForm.classList.remove('hidden');
           registerForm.classList.add('hidden');
@@ -550,14 +550,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
     
-    // Обработчик формы входа
+    // Handler for forms login
     loginForm.addEventListener('submit', handleLogin);
     
-    // Обработчик формы регистрации
+    // Handler for forms регистрации
     registerForm.addEventListener('submit', handleRegister);
   }
   
-  // Обработка входа
+  // Processing login
   async function handleLogin(e) {
     e.preventDefault();
     
@@ -566,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorElement = document.getElementById('login-error');
     
     if (!username || !password) {
-      errorElement.textContent = 'Пожалуйста, заполните все поля';
+      errorElement.textContent = 'Please fill in all fields';
       return;
     }
     
@@ -582,26 +582,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
       
       if (!response.ok) {
-        errorElement.textContent = data.message || 'Ошибка входа в систему';
+        errorElement.textContent = data.message || 'Login error';
         return;
       }
       
-      // Сохранение токена
+      // Save token
       localStorage.setItem('token', data.token);
       
-      // Обновление состояния
+      // Update state
       appState.isAuthenticated = true;
       appState.user = data.user;
       
-      // Перезагрузка приложения
+      // Reload application
       initApp();
     } catch (error) {
-      console.error('Ошибка входа:', error);
-      errorElement.textContent = 'Произошла ошибка при входе в систему';
+      console.error('Error login:', error);
+      errorElement.textContent = 'An error occurred while logging in';
     }
   }
   
-  // Обработка регистрации
+  // Processing регистрации
   async function handleRegister(e) {
     e.preventDefault();
     
@@ -613,12 +613,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorElement = document.getElementById('register-error');
     
     if (!username || !email || !password || !confirmPassword) {
-      errorElement.textContent = 'Пожалуйста, заполните все обязательные поля';
+      errorElement.textContent = 'Please fill in all required fields';
       return;
     }
     
     if (password !== confirmPassword) {
-      errorElement.textContent = 'Пароли не совпадают';
+      errorElement.textContent = 'Passwords do not match';
       return;
     }
     
@@ -634,36 +634,36 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
       
       if (!response.ok) {
-        errorElement.textContent = data.message || 'Ошибка регистрации';
+        errorElement.textContent = data.message || 'Registration error';
         return;
       }
       
-      // Сохранение токена
+      // Save token
       localStorage.setItem('token', data.token);
       
-      // Обновление состояния
+      // Update state
       appState.isAuthenticated = true;
       appState.user = data.user;
       
-      // Перезагрузка приложения
+      // Reload application
       initApp();
     } catch (error) {
-      console.error('Ошибка регистрации:', error);
-      errorElement.textContent = 'Произошла ошибка при регистрации';
+      console.error('Registration error:', error);
+      errorElement.textContent = 'An error occurred during registration';
     }
   }
   
-  // Отрисовка дашборда
+  // Отрисовка dashboardа
   async function renderDashboard() {
     const mainContent = document.getElementById('main-content');
     
-    // Получение последних транзакций
+    // Fetch последних transactions
     const recentTransactions = await fetchTransactions({ limit: 5 });
     
-    // Получение статистики
+    // Fetch statistics
     const statsData = await fetchTransactionStats();
     
-    // Формирование списка счетов
+    // Build list accounts
     const accountsHtml = appState.accounts.map(account => `
       <div class="account-summary">
         <div class="account-info">
@@ -677,9 +677,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="account-balance">${formatCurrency(account.balance, account.currency)}</div>
       </div>
-    `).join('') || '<p>У вас еще нет счетов. <a href="#" class="add-account-link">Добавить счет</a></p>';
+    `).join('') || '<p>У вас еще нет accounts. <a href="#" class="add-account-link">Add account</a></p>';
     
-    // Формирование списка последних транзакций
+    // Build list последних transactions
     const transactionsHtml = recentTransactions.length > 0 
       ? recentTransactions.map(transaction => `
         <div class="transaction-item">
@@ -693,10 +693,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `).join('')
-      : '<p>У вас еще нет транзакций. <a href="#" class="add-transaction-link">Добавить транзакцию</a></p>';
+      : '<p>У вас еще no transactions. <a href="#" class="add-transaction-link">Add transaction</a></p>';
     
     mainContent.innerHTML = `
-      <h1 class="page-title">Обзор финансов</h1>
+      <h1 class="page-title">Finance Overview</h1>
       
       <div class="dashboard-summary">
         <div class="summary-card income">
@@ -704,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas fa-arrow-down"></i>
           </div>
           <div class="summary-data">
-            <h3>Доходы за месяц</h3>
+            <h3>Income per month</h3>
             <div class="summary-amount">${formatCurrency(statsData.monthlyIncome || 0)}</div>
           </div>
         </div>
@@ -714,7 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas fa-arrow-up"></i>
           </div>
           <div class="summary-data">
-            <h3>Расходы за месяц</h3>
+            <h3>Expenses per month</h3>
             <div class="summary-amount">${formatCurrency(statsData.monthlyExpense || 0)}</div>
           </div>
         </div>
@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas fa-wallet"></i>
           </div>
           <div class="summary-data">
-            <h3>Общий баланс</h3>
+            <h3>Total balance</h3>
             <div class="summary-amount">${formatCurrency(statsData.totalBalance || 0)}</div>
           </div>
         </div>
@@ -733,9 +733,9 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="dashboard-content">
         <div class="dashboard-section">
           <div class="section-header">
-            <h2>Ваши счета</h2>
+            <h2>Your accounts</h2>
             <button id="add-account-btn" class="btn btn-sm btn-primary">
-              <i class="fas fa-plus"></i> Добавить счет
+              <i class="fas fa-plus"></i> Add account
             </button>
           </div>
           
@@ -746,9 +746,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         <div class="dashboard-section">
           <div class="section-header">
-            <h2>Последние транзакции</h2>
+            <h2>Recent transactions</h2>
             <button id="add-transaction-btn" class="btn btn-sm btn-primary">
-              <i class="fas fa-plus"></i> Добавить транзакцию
+              <i class="fas fa-plus"></i> Add transaction
             </button>
           </div>
           
@@ -758,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           <div class="section-footer">
             <a href="#" class="btn btn-sm btn-outline" id="view-all-transactions">
-              Посмотреть все транзакции
+              Посмотреть all transactions
             </a>
           </div>
         </div>
@@ -766,21 +766,21 @@ document.addEventListener('DOMContentLoaded', () => {
       
       <div class="dashboard-charts">
         <div class="chart-container">
-          <h2>Динамика доходов и расходов</h2>
+          <h2>Income and expenses trend</h2>
           <canvas id="income-expense-chart"></canvas>
         </div>
         
         <div class="chart-container">
-          <h2>Расходы по категориям</h2>
+          <h2>Expenses by category</h2>
           <canvas id="expense-categories-chart"></canvas>
         </div>
       </div>
     `;
     
-    // Инициализация графиков
+    // Initialize графиков
     initCharts(statsData);
     
-    // Обработчики событий
+    // Event handlers
     document.getElementById('add-account-btn').addEventListener('click', () => {
       showAddAccountModal();
     });
@@ -811,18 +811,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // Отрисовка страницы счетов
+  // Отрисовка pagesы accounts
   async function renderAccountsPage() {
     const mainContent = document.getElementById('main-content');
     
-    // Повторное получение счетов для актуальности данных
+    // Повторное fetch accounts для актуальности дан
     await fetchAccounts();
     
     mainContent.innerHTML = `
       <div class="page-header">
-        <h1 class="page-title">Счета</h1>
+        <h1 class="page-title">Accounts</h1>
         <button id="add-account-btn" class="btn btn-primary">
-          <i class="fas fa-plus"></i> Добавить счет
+          <i class="fas fa-plus"></i> Add account
         </button>
       </div>
       
@@ -833,10 +833,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="empty-state-icon">
                 <i class="fas fa-wallet"></i>
               </div>
-              <h2>У вас пока нет счетов</h2>
-              <p>Добавьте свой первый счет, чтобы начать отслеживать финансы</p>
+              <h2>You have no accounts yet</h2>
+              <p>Добавьте свой первый account, to начать отслеживать финансы</p>
               <button id="empty-add-account-btn" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Добавить счет
+                <i class="fas fa-plus"></i> Add account
               </button>
             </div>
           `}
@@ -844,7 +844,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
     
-    // Обработчики событий
+    // Event handlers
     document.getElementById('add-account-btn').addEventListener('click', () => {
       showAddAccountModal();
     });
@@ -856,14 +856,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     
-    // Обработчики для кнопок управления счетами
+    // Обработчики для кнопок управления accountsми
     const accountActionButtons = document.querySelectorAll('[data-account-action]');
     accountActionButtons.forEach(button => {
       button.addEventListener('click', handleAccountAction);
     });
   }
   
-  // Рендеринг списка счетов
+  // Render list accounts
   function renderAccountsList(accounts) {
     return accounts.map(account => `
       <div class="account-card card" data-account-id="${account.id}">
@@ -873,7 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="account-details">
             <h3 class="account-name">${account.name}</h3>
-            <p class="account-number">${account.account_number || 'Без номера'}</p>
+            <p class="account-number">${account.account_number || 'No number'}</p>
           </div>
         </div>
         
@@ -882,7 +882,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         
         <div class="account-info">
-          <p class="account-bank">${account.bank_name || 'Личный счет'}</p>
+          <p class="account-bank">${account.bank_name || 'Personal account'}</p>
           <p class="account-type">${getAccountTypeName(account.account_type)}</p>
         </div>
         
@@ -894,55 +894,55 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas fa-edit"></i> Изменить
           </button>
           <button class="btn btn-sm btn-danger" data-account-action="delete" data-account-id="${account.id}">
-            <i class="fas fa-trash"></i> Удалить
+            <i class="fas fa-trash"></i> Delete
           </button>
         </div>
       </div>
     `).join('');
   }
   
-  // Отрисовка страницы транзакций
+  // Отрисовка transaction pages
   async function renderTransactionsPage() {
     const mainContent = document.getElementById('main-content');
     
-    // Получение транзакций с учетом фильтров
+    // Fetch transactions with filters
     const transactions = await fetchTransactions(appState.filters);
     
-    // Получение категорий для фильтра
+    // Fetch categories для фильтра
     const categories = await fetchCategories();
     
     mainContent.innerHTML = `
       <div class="page-header">
-        <h1 class="page-title">Транзакции</h1>
+        <h1 class="page-title">Transactions</h1>
         <button id="add-transaction-btn" class="btn btn-primary">
-          <i class="fas fa-plus"></i> Добавить транзакцию
+          <i class="fas fa-plus"></i> Add transaction
         </button>
       </div>
       
       <div class="filters-container card">
         <div class="filters-header">
-          <h2>Фильтры</h2>
+          <h2>Filters</h2>
           <button id="toggle-filters-btn" class="btn btn-sm btn-outline">
-            <i class="fas fa-filter"></i> Показать фильтры
+            <i class="fas fa-filter"></i> Show filters
           </button>
         </div>
         
         <div id="filters-form" class="filters-form hidden">
           <div class="filters-row">
             <div class="form-group">
-              <label for="filter-date-start" class="form-label">Начальная дата</label>
+              <label for="filter-date-start" class="form-label">Start date</label>
               <input type="date" id="filter-date-start" class="form-control" value="${appState.filters.startDate || ''}">
             </div>
             
             <div class="form-group">
-              <label for="filter-date-end" class="form-label">Конечная дата</label>
+              <label for="filter-date-end" class="form-label">End date</label>
               <input type="date" id="filter-date-end" class="form-control" value="${appState.filters.endDate || ''}">
             </div>
             
             <div class="form-group">
-              <label for="filter-account" class="form-label">Счет</label>
+              <label for="filter-account" class="form-label">Account</label>
               <select id="filter-account" class="form-control">
-                <option value="">Все счета</option>
+                <option value="">All accounts</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}" ${appState.filters.accountId == account.id ? 'selected' : ''}>
                     ${account.name}
@@ -954,9 +954,9 @@ document.addEventListener('DOMContentLoaded', () => {
           
           <div class="filters-row">
             <div class="form-group">
-              <label for="filter-category" class="form-label">Категория</label>
+              <label for="filter-category" class="form-label">Category</label>
               <select id="filter-category" class="form-control">
-                <option value="">Все категории</option>
+                <option value="">All categories</option>
                 ${categories.map(category => `
                   <option value="${category}" ${appState.filters.category === category ? 'selected' : ''}>
                     ${category}
@@ -966,23 +966,23 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             
             <div class="form-group">
-              <label for="filter-type" class="form-label">Тип</label>
+              <label for="filter-type" class="form-label">Type</label>
               <select id="filter-type" class="form-control">
-                <option value="">Все типы</option>
-                <option value="income" ${appState.filters.type === 'income' ? 'selected' : ''}>Доходы</option>
-                <option value="expense" ${appState.filters.type === 'expense' ? 'selected' : ''}>Расходы</option>
+                <option value="">All types</option>
+                <option value="income" ${appState.filters.type === 'income' ? 'selected' : ''}>Income</option>
+                <option value="expense" ${appState.filters.type === 'expense' ? 'selected' : ''}>Expenses</option>
               </select>
             </div>
             
             <div class="form-group">
-              <label for="filter-search" class="form-label">Поиск</label>
-              <input type="text" id="filter-search" class="form-control" placeholder="Поиск по описанию" value="${appState.filters.search || ''}">
+              <label for="filter-search" class="form-label">Search</label>
+              <input type="text" id="filter-search" class="form-control" placeholder="Search by description" value="${appState.filters.search || ''}">
             </div>
           </div>
           
           <div class="filters-actions">
-            <button id="apply-filters-btn" class="btn btn-primary">Применить</button>
-            <button id="reset-filters-btn" class="btn btn-outline">Сбросить</button>
+            <button id="apply-filters-btn" class="btn btn-primary">Apply</button>
+            <button id="reset-filters-btn" class="btn btn-outline">Reset</button>
           </div>
         </div>
       </div>
@@ -990,11 +990,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="transactions-container card">
         <div class="transactions-header">
           <div class="transactions-summary">
-            <span>Найдено транзакций: <strong id="transactions-count">${transactions.length}</strong></span>
+            <span>Transactions found: <strong id="transactions-count">${transactions.length}</strong></span>
           </div>
           <div class="transactions-actions">
             <button id="import-transactions-btn" class="btn btn-sm btn-outline">
-              <i class="fas fa-file-import"></i> Импорт из CSV
+              <i class="fas fa-file-import"></i> Import from CSV
             </button>
           </div>
         </div>
@@ -1003,12 +1003,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <table class="table transactions-table">
             <thead>
               <tr>
-                <th>Дата</th>
-                <th>Описание</th>
-                <th>Категория</th>
-                <th>Счет</th>
-                <th class="text-right">Сумма</th>
-                <th>Действия</th>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Account</th>
+                <th class="text-right">Amount</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="transactions-list">
@@ -1016,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <tr>
                   <td colspan="6" class="text-center">
                     <div class="empty-state-mini">
-                      <p>Транзакции не найдены</p>
+                      <p>No transactions found</p>
                     </div>
                   </td>
                 </tr>
@@ -1031,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
     
-    // Инициализация обработчиков событий
+    // Initialize event handlers
     document.getElementById('add-transaction-btn').addEventListener('click', () => {
       showAddTransactionModal();
     });
@@ -1041,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('reset-filters-btn').addEventListener('click', resetTransactionFilters);
     document.getElementById('import-transactions-btn').addEventListener('click', showImportTransactionsModal);
     
-    // Обработчики для кнопок пагинации
+    // Pagination button handlers
     const paginationButtons = document.querySelectorAll('.pagination-link');
     paginationButtons.forEach(button => {
       button.addEventListener('click', (e) => {
@@ -1054,34 +1054,34 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
     
-    // Обработчики для кнопок управления транзакциями
+    // Transaction management button handlers
     const transactionActionButtons = document.querySelectorAll('[data-transaction-action]');
     transactionActionButtons.forEach(button => {
       button.addEventListener('click', handleTransactionAction);
     });
   }
   
-  // Отрисовка страницы банковских подключений
+  // Render bank connections page
   async function renderBankConnectionsPage() {
     const mainContent = document.getElementById('main-content');
     
-    // Получение банковских подключений
+    // Fetch bank connections
     const bankConnections = await fetchBankConnections();
     
     mainContent.innerHTML = `
       <div class="page-header">
-        <h1 class="page-title">Банковские подключения</h1>
+        <h1 class="page-title">Bank connections</h1>
         <button id="add-connection-btn" class="btn btn-primary">
-          <i class="fas fa-plus"></i> Подключить банк
+          <i class="fas fa-plus"></i> Connect bank
         </button>
       </div>
       
       <div class="bank-connections-container">
         <div class="card bank-info-card">
           <div class="bank-info-content">
-            <h2><i class="fas fa-info-circle"></i> Интеграция с банками</h2>
-            <p>Подключите ваши банковские счета для автоматической синхронизации транзакций и счетов. Данные защищены и обрабатываются безопасно.</p>
-            <p>Поддерживаемые банки: Тинькофф, Сбербанк, ВТБ, Альфа-Банк и другие.</p>
+            <h2><i class="fas fa-info-circle"></i> Bank Integration</h2>
+            <p>Connect your bank accounts for automatic transaction synchronization. Data is protected and processed securely.</p>
+            <p>Supported banks: Tinkoff, Sberbank, VTB, Alfa-Bank and others.</p>
           </div>
         </div>
         
@@ -1091,10 +1091,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="empty-state-icon">
                 <i class="fas fa-university"></i>
               </div>
-              <h2>Нет подключений к банкам</h2>
-              <p>Подключите свой банк для автоматической синхронизации данных</p>
+              <h2>No bank connections</h2>
+              <p>Connect your bank for automatic data sync</p>
               <button id="empty-add-connection-btn" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Подключить банк
+                <i class="fas fa-plus"></i> Connect bank
               </button>
             </div>
           `}
@@ -1102,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
     
-    // Обработчики событий
+    // Event handlers
     document.getElementById('add-connection-btn').addEventListener('click', () => {
       showBankConnectionModal();
     });
@@ -1114,29 +1114,29 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     
-    // Обработчики для кнопок управления подключениями
+    // Connection management button handlers
     const connectionActionButtons = document.querySelectorAll('[data-connection-action]');
     connectionActionButtons.forEach(button => {
       button.addEventListener('click', handleConnectionAction);
     });
   }
   
-  // Отрисовка страницы настроек
+  // Render settings page
   function renderSettingsPage() {
     const mainContent = document.getElementById('main-content');
     
     mainContent.innerHTML = `
       <div class="page-header">
-        <h1 class="page-title">Настройки</h1>
+        <h1 class="page-title">Settings</h1>
       </div>
       
       <div class="settings-container">
         <div class="card">
-          <h2 class="card-title">Личные данные</h2>
+          <h2 class="card-title">Personal info</h2>
           
           <form id="profile-form" class="settings-form">
             <div class="form-group">
-              <label for="settings-username" class="form-label">Имя пользователя</label>
+              <label for="settings-username" class="form-label">Username</label>
               <input type="text" id="settings-username" class="form-control" value="${appState.user.username}" disabled>
             </div>
             
@@ -1146,77 +1146,77 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             
             <div class="form-group">
-              <label for="settings-fullname" class="form-label">Полное имя</label>
+              <label for="settings-fullname" class="form-label">Full name</label>
               <input type="text" id="settings-fullname" class="form-control" value="${appState.user.fullName || ''}">
             </div>
             
-            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="submit" class="btn btn-primary">Save</button>
           </form>
         </div>
         
         <div class="card">
-          <h2 class="card-title">Изменение пароля</h2>
+          <h2 class="card-title">Change password</h2>
           
           <form id="password-form" class="settings-form">
             <div class="form-group">
-              <label for="settings-current-password" class="form-label">Текущий пароль</label>
+              <label for="settings-current-password" class="form-label">Current password</label>
               <input type="password" id="settings-current-password" class="form-control" required>
             </div>
             
             <div class="form-group">
-              <label for="settings-new-password" class="form-label">Новый пароль</label>
+              <label for="settings-new-password" class="form-label">New password</label>
               <input type="password" id="settings-new-password" class="form-control" required>
             </div>
             
             <div class="form-group">
-              <label for="settings-confirm-password" class="form-label">Подтверждение пароля</label>
+              <label for="settings-confirm-password" class="form-label">Confirm password</label>
               <input type="password" id="settings-confirm-password" class="form-control" required>
             </div>
             
-            <button type="submit" class="btn btn-primary">Изменить пароль</button>
+            <button type="submit" class="btn btn-primary">Change password</button>
           </form>
         </div>
         
         <div class="card">
-          <h2 class="card-title">Экспорт данных</h2>
+          <h2 class="card-title">Export data</h2>
           
           <div class="settings-section">
-            <p>Экспортируйте ваши финансовые данные в CSV-формат для использования в других приложениях.</p>
+            <p>Export your financial data to CSV format for use in other applications.</p>
             
             <div class="form-group">
-              <label for="export-period" class="form-label">Период</label>
+              <label for="export-period" class="form-label">Period</label>
               <select id="export-period" class="form-control">
-                <option value="all">Все время</option>
-                <option value="year">Текущий год</option>
-                <option value="month">Текущий месяц</option>
-                <option value="custom">Указать период</option>
+                <option value="all">All time</option>
+                <option value="year">Current year</option>
+                <option value="month">Current month</option>
+                <option value="custom">Custom period</option>
               </select>
             </div>
             
             <div id="custom-period" class="custom-period hidden">
               <div class="form-group">
-                <label for="export-start-date" class="form-label">Начальная дата</label>
+                <label for="export-start-date" class="form-label">Start date</label>
                 <input type="date" id="export-start-date" class="form-control">
               </div>
               
               <div class="form-group">
-                <label for="export-end-date" class="form-label">Конечная дата</label>
+                <label for="export-end-date" class="form-label">End date</label>
                 <input type="date" id="export-end-date" class="form-control">
               </div>
             </div>
             
-            <button id="export-btn" class="btn btn-primary">Экспортировать данные</button>
+            <button id="export-btn" class="btn btn-primary">Export data</button>
           </div>
         </div>
       </div>
     `;
     
-    // Обработчики событий
+    // Event handlers
     document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
     document.getElementById('password-form').addEventListener('submit', handlePasswordUpdate);
     document.getElementById('export-btn').addEventListener('click', handleDataExport);
     
-    // Обработчик изменения периода экспорта
+    // Export period change handler
     const exportPeriod = document.getElementById('export-period');
     const customPeriod = document.getElementById('custom-period');
     
@@ -1229,12 +1229,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // Выход из системы
+  // Log out of system
   function logout() {
-    // Очистка локального хранилища
+    // Clear local storage
     localStorage.removeItem('token');
     
-    // Сброс состояния приложения
+    // Reset app state
     appState.isAuthenticated = false;
     appState.user = null;
     appState.accounts = [];
@@ -1243,13 +1243,13 @@ document.addEventListener('DOMContentLoaded', () => {
     appState.bankConnections = [];
     appState.supportedBanks = [];
     
-    // Отрисовка страницы входа
+    // Render login page
     renderLoginPage();
   }
   
-  // Форматирование валюты
-  function formatCurrency(amount, currency = 'RUB') {
-    const formatter = new Intl.NumberFormat('ru-RU', {
+  // Format currency
+  function formatCurrency(amount, currency = 'USD') {
+    const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2
@@ -1258,13 +1258,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return formatter.format(amount);
   }
   
-  // Форматирование даты
+  // Format date
   function formatDate(dateString) {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU');
+    return date.toLocaleDateString('en-US');
   }
   
-  // Получение иконки для типа счета
+  // Get icon for account type
   function getAccountIcon(accountType) {
     switch (accountType) {
       case 'checking':
@@ -1280,25 +1280,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   
-  // Получение названия типа счета
+  // Fetch названия type accounts
   function getAccountTypeName(accountType) {
     switch (accountType) {
       case 'checking':
-        return 'Текущий счет';
+        return 'Current account';
       case 'savings':
-        return 'Сберегательный счет';
+        return 'Savings account';
       case 'credit':
-        return 'Кредитная карта';
+        return 'Credit card';
       case 'loan':
-        return 'Кредит';
+        return 'Credit';
       default:
-        return 'Счет';
+        return 'Account';
     }
   }
   
-  // Отображение уведомления
+  // Отображение notifications
   function showNotification(message, type = 'info') {
-    // Создание элемента уведомления
+    // Create элемента notifications
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.innerHTML = `
@@ -1308,20 +1308,20 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="notification-close">&times;</button>
     `;
     
-    // Добавление уведомления на страницу
+    // Adding notifications на pagesу
     document.body.appendChild(notification);
     
-    // Показ уведомления с анимацией
+    // Показ notifications с анимацией
     setTimeout(() => {
       notification.classList.add('show');
     }, 10);
     
-    // Автоматическое скрытие уведомления через 5 секунд
+    // Автоматическое скрытие notifications via 5 секунд
     const timeout = setTimeout(() => {
       hideNotification(notification);
     }, 5000);
     
-    // Обработчик закрытия уведомления
+    // Handler for closedия notifications
     const closeButton = notification.querySelector('.notification-close');
     closeButton.addEventListener('click', () => {
       clearTimeout(timeout);
@@ -1329,11 +1329,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // Скрытие уведомления
+  // Скрытие notifications
   function hideNotification(notification) {
     notification.classList.remove('show');
     
-    // Удаление уведомления после завершения анимации
+    // Delete notifications после завершения анимации
     setTimeout(() => {
       if (notification.parentNode) {
         notification.parentNode.removeChild(notification);
@@ -1341,9 +1341,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 300);
   }
   
-  // Инициализация приложения
+  // Initialize application
   window.addEventListener('popstate', () => {
-    // Обработка навигации по кнопкам браузера
+    // Processing навигации по кнопкам браузера
     if (appState.isAuthenticated) {
       const path = window.location.pathname;
       

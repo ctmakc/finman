@@ -1,6 +1,6 @@
-// Функции для работы с аутентификацией и авторизацией
+// Functions for аутентификацией и авторизацией
 
-// Обновление профиля пользователя
+// Update профиля user
 async function handleProfileUpdate(e) {
     e.preventDefault();
     
@@ -15,27 +15,27 @@ async function handleProfileUpdate(e) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления профиля', 'error');
+        showNotification(data.message || 'Failed to update профиля', 'error');
         return;
       }
       
       const userData = await response.json();
       
-      // Обновление данных пользователя в состоянии
+      // Update дан user в состоянии
       appState.user = {
         ...appState.user,
         email: userData.email,
         fullName: userData.fullName
       };
       
-      showNotification('Профиль успешно обновлен', 'success');
+      showNotification('Profile updated successfully', 'success');
     } catch (error) {
-      console.error('Ошибка обновления профиля:', error);
-      showNotification('Произошла ошибка при обновлении профиля', 'error');
+      console.error('Failed to update профиля:', error);
+      showNotification('An error occurred при updatedии профиля', 'error');
     }
   }
   
-  // Обновление пароля пользователя
+  // Update пароля user
   async function handlePasswordUpdate(e) {
     e.preventDefault();
     
@@ -44,7 +44,7 @@ async function handleProfileUpdate(e) {
     const confirmPassword = document.getElementById('settings-confirm-password').value;
     
     if (newPassword !== confirmPassword) {
-      showNotification('Пароли не совпадают', 'error');
+      showNotification('Passwords do not match', 'error');
       return;
     }
     
@@ -59,19 +59,19 @@ async function handleProfileUpdate(e) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления пароля', 'error');
+        showNotification(data.message || 'Failed to update пароля', 'error');
         return;
       }
       
-      // Очистка полей формы
+      // Очистка fieldй forms
       document.getElementById('settings-current-password').value = '';
       document.getElementById('settings-new-password').value = '';
       document.getElementById('settings-confirm-password').value = '';
       
-      showNotification('Пароль успешно обновлен', 'success');
+      showNotification('Password updated successfully', 'success');
     } catch (error) {
-      console.error('Ошибка обновления пароля:', error);
-      showNotification('Произошла ошибка при обновлении пароля', 'error');
+      console.error('Failed to update пароля:', error);
+      showNotification('An error occurred при updatedии пароля', 'error');
     }
   }
   
@@ -92,13 +92,13 @@ async function handleProfileUpdate(e) {
       
       return response.ok;
     } catch (error) {
-      console.error('Ошибка проверки токена:', error);
+      console.error('Error проверки токена:', error);
       return false;
     }
   }
   
-  // Проверка прав доступа
+  // Check permissions
   function hasPermission(permission) {
-    // В будущем можно расширить для проверки прав доступа
+    // Can be extended for permission checking
     return appState.isAuthenticated;
   }

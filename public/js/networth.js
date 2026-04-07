@@ -54,14 +54,14 @@ const NetWorthModule = {
     container.innerHTML = `
       <div class="networth-main">
         <div class="networth-value">
-          <span class="label">Чистая стоимость</span>
-          <span class="value ${this.current.netWorth >= 0 ? 'positive' : 'negative'}">${this.current.netWorth.toLocaleString()} ₴</span>
-          ${change !== 0 ? `<span class="change ${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${change.toLocaleString()} ₴ (${changePercent}%)</span>` : ''}
+          <span class="label">Чистая value</span>
+          <span class="value ${this.current.netWorth >= 0 ? 'positive' : 'negative'}">${this.current.netWorth.toLocaleString()} $</span>
+          ${change !== 0 ? `<span class="change ${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${change.toLocaleString()} $ (${changePercent}%)</span>` : ''}
         </div>
       </div>
       <div class="networth-breakdown">
-        <div class="breakdown-item positive"><span class="label">Активы</span><span class="value">${this.current.totalAssets.toLocaleString()} ₴</span></div>
-        <div class="breakdown-item negative"><span class="label">Обязательства</span><span class="value">${this.current.totalLiabilities.toLocaleString()} ₴</span></div>
+        <div class="breakdown-item positive"><span class="label">Assets</span><span class="value">${this.current.totalAssets.toLocaleString()} $</span></div>
+        <div class="breakdown-item negative"><span class="label">Liabilities</span><span class="value">${this.current.totalLiabilities.toLocaleString()} $</span></div>
       </div>
     `;
 
@@ -74,12 +74,12 @@ const NetWorthModule = {
 
     const ab = this.current.assetsBreakdown;
     container.innerHTML = `
-      <div class="card"><h3>📊 Разбивка активов</h3>
+      <div class="card"><h3>📊 Разбивка assetов</h3>
         <div class="breakdown-list">
-          <div class="breakdown-row"><span>Счета</span><span>${(ab.accounts?.total || 0).toLocaleString()} ₴</span></div>
-          <div class="breakdown-row"><span>Инвестиции</span><span>${(ab.investments?.total || 0).toLocaleString()} ₴</span></div>
-          <div class="breakdown-row"><span>Ручные активы</span><span>${(ab.manualAssets?.total || 0).toLocaleString()} ₴</span></div>
-          <div class="breakdown-row"><span>Вам должны</span><span>${(ab.receivables?.total || 0).toLocaleString()} ₴</span></div>
+          <div class="breakdown-row"><span>Accounts</span><span>${(ab.accounts?.total || 0).toLocaleString()} $</span></div>
+          <div class="breakdown-row"><span>Investments</span><span>${(ab.investments?.total || 0).toLocaleString()} $</span></div>
+          <div class="breakdown-row"><span>Manual assets</span><span>${(ab.manualAssets?.total || 0).toLocaleString()} $</span></div>
+          <div class="breakdown-row"><span>Вам должны</span><span>${(ab.receivables?.total || 0).toLocaleString()} $</span></div>
         </div>
       </div>
     `;
@@ -90,7 +90,7 @@ const NetWorthModule = {
     if (!container) return;
 
     if (this.assets.length === 0) {
-      container.innerHTML = '<p class="text-secondary">Нет добавленных активов</p>';
+      container.innerHTML = '<p class="text-secondary">No assets added</p>';
       return;
     }
 
@@ -110,7 +110,7 @@ const NetWorthModule = {
   renderChart() {
     const container = document.getElementById('networth-chart');
     if (!container || this.history.length < 2) {
-      if (container) container.innerHTML = '<p class="text-secondary">Недостаточно данных для графика</p>';
+      if (container) container.innerHTML = '<p class="text-secondary">Not enough data for chart</p>';
       return;
     }
     container.innerHTML = '<canvas id="nw-chart"></canvas>';
@@ -123,17 +123,17 @@ const NetWorthModule = {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      alert('Снимок сохранён');
+      alert('Snapshot saved');
       await this.loadHistory();
     } catch (error) {
-      alert('Ошибка сохранения');
+      alert('Failed to save');
     }
   },
 
   showAddAssetModal() {
     document.getElementById('asset-form').reset();
     document.getElementById('asset-id').value = '';
-    document.getElementById('asset-modal-title').textContent = 'Добавить актив';
+    document.getElementById('asset-modal-title').textContent = 'Add asset';
     document.getElementById('asset-modal').classList.add('active');
   },
 
@@ -144,7 +144,7 @@ const NetWorthModule = {
     document.getElementById('asset-name').value = asset.name;
     document.getElementById('asset-type').value = asset.type;
     document.getElementById('asset-value').value = asset.value;
-    document.getElementById('asset-modal-title').textContent = 'Редактировать актив';
+    document.getElementById('asset-modal-title').textContent = 'Edit asset';
     document.getElementById('asset-modal').classList.add('active');
   },
 
@@ -163,18 +163,18 @@ const NetWorthModule = {
       await this.loadAssets();
       await this.loadCurrent();
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
   async deleteAsset(id) {
-    if (!confirm('Удалить актив?')) return;
+    if (!confirm('Delete asset?')) return;
     try {
       await fetch(`/api/networth/assets/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
       await this.loadAssets();
       await this.loadCurrent();
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
@@ -182,24 +182,24 @@ const NetWorthModule = {
     return `
       <div class="networth-page">
         <div class="page-header"><h1>💰 Net Worth</h1>
-          <button class="btn btn-primary" onclick="NetWorthModule.saveSnapshot()">📷 Сохранить снимок</button>
+          <button class="btn btn-primary" onclick="NetWorthModule.saveSnapshot()">📷 Save снимок</button>
         </div>
         <div id="networth-summary" class="card networth-summary"></div>
         <div class="grid-2">
           <div id="networth-details"></div>
           <div class="card"><h3>📈 История</h3><div id="networth-chart"></div></div>
         </div>
-        <div class="card"><div class="card-header"><h3>🏠 Ручные активы</h3><button class="btn btn-sm" onclick="NetWorthModule.showAddAssetModal()">+ Добавить</button></div><div id="manual-assets"></div></div>
+        <div class="card"><div class="card-header"><h3>🏠 Manual assets</h3><button class="btn btn-sm" onclick="NetWorthModule.showAddAssetModal()">+ Add</button></div><div id="manual-assets"></div></div>
       </div>
       <div class="modal" id="asset-modal">
         <div class="modal-content">
-          <div class="modal-header"><h2 id="asset-modal-title">Добавить актив</h2><button class="modal-close" onclick="document.getElementById('asset-modal').classList.remove('active')">&times;</button></div>
+          <div class="modal-header"><h2 id="asset-modal-title">Add asset</h2><button class="modal-close" onclick="document.getElementById('asset-modal').classList.remove('active')">&times;</button></div>
           <form id="asset-form" onsubmit="event.preventDefault(); NetWorthModule.saveAsset()">
             <input type="hidden" id="asset-id">
-            <div class="form-group"><label>Название</label><input type="text" id="asset-name" class="form-control" required></div>
-            <div class="form-group"><label>Тип</label><select id="asset-type" class="form-control"><option value="real_estate">Недвижимость</option><option value="vehicle">Транспорт</option><option value="crypto">Криптовалюта</option><option value="precious_metals">Драгметаллы</option><option value="collectibles">Коллекции</option><option value="business">Бизнес</option><option value="other">Другое</option></select></div>
-            <div class="form-group"><label>Стоимость (₴)</label><input type="number" id="asset-value" class="form-control" step="0.01" required></div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('asset-modal').classList.remove('active')">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+            <div class="form-group"><label>Name</label><input type="text" id="asset-name" class="form-control" required></div>
+            <div class="form-group"><label>Type</label><select id="asset-type" class="form-control"><option value="real_estate">Недвижимость</option><option value="vehicle">Транспорт</option><option value="crypto">Криптоcurrency</option><option value="precious_metals">Драгметаллы</option><option value="collectibles">Коллекции</option><option value="business">Бизнес</option><option value="other">Other</option></select></div>
+            <div class="form-group"><label>Value ($)</label><input type="number" id="asset-value" class="form-control" step="0.01" required></div>
+            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('asset-modal').classList.remove('active')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
           </form>
         </div>
       </div>

@@ -38,13 +38,13 @@ const SmartDashboard = {
     const visibleWidgets = this.widgets.filter(w => w.is_visible);
 
     if (visibleWidgets.length === 0) {
-      container.innerHTML = '<div class="empty-state"><p>Нет виджетов. Нажмите "Настроить" чтобы добавить.</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>No widgets. Click "Configure" to add.</p></div>';
       return;
     }
 
     container.innerHTML = visibleWidgets.map(widget => this.renderWidget(widget)).join('');
 
-    // Загружаем данные для каждого виджета
+    // Load data for each widget
     visibleWidgets.forEach(w => this.loadWidgetData(w));
   },
 
@@ -79,29 +79,29 @@ const SmartDashboard = {
       const data = await response.json();
       container.innerHTML = this.renderWidgetContent(widget.widget_type, data);
     } catch (error) {
-      container.innerHTML = '<p class="text-secondary">Ошибка загрузки</p>';
+      container.innerHTML = '<p class="text-secondary">Failed to load</p>';
     }
   },
 
   renderWidgetContent(type, data) {
     switch (type) {
       case 'balance':
-        return ` + "`" + `<div class="widget-value">${(data.total || 0).toLocaleString()} ₴</div>` + "`" + `;
+        return ` + "`" + `<div class="widget-value">${(data.total || 0).toLocaleString()} $</div>` + "`" + `;
 
       case 'networth':
         return ` + "`" + `
-          <div class="widget-value ${data.netWorth >= 0 ? 'positive' : 'negative'}">${data.netWorth.toLocaleString()} ₴</div>
-          <div class="widget-subtitle">Активы: ${data.assets.toLocaleString()} ₴ | Долги: ${data.liabilities.toLocaleString()} ₴</div>
+          <div class="widget-value ${data.netWorth >= 0 ? 'positive' : 'negative'}">${data.netWorth.toLocaleString()} $</div>
+          <div class="widget-subtitle">Assets: ${data.assets.toLocaleString()} $ | Debts: ${data.liabilities.toLocaleString()} $</div>
         ` + "`" + `;
 
       case 'expenses':
-        return ` + "`" + `<div class="widget-value negative">${(data.total || 0).toLocaleString()} ₴</div><div class="widget-subtitle">за ${data.period === 'month' ? 'месяц' : 'год'}</div>` + "`" + `;
+        return ` + "`" + `<div class="widget-value negative">${(data.total || 0).toLocaleString()} $</div><div class="widget-subtitle">per ${data.period === 'month' ? 'month' : 'year'}</div>` + "`" + `;
 
       case 'income':
-        return ` + "`" + `<div class="widget-value positive">${(data.total || 0).toLocaleString()} ₴</div><div class="widget-subtitle">за ${data.period === 'month' ? 'месяц' : 'год'}</div>` + "`" + `;
+        return ` + "`" + `<div class="widget-value positive">${(data.total || 0).toLocaleString()} $</div><div class="widget-subtitle">per ${data.period === 'month' ? 'month' : 'year'}</div>` + "`" + `;
 
       case 'budget':
-        if (!data.budgets || data.budgets.length === 0) return '<p class="text-secondary">Нет бюджетов</p>';
+        if (!data.budgets || data.budgets.length === 0) return '<p class="text-secondary">No budgets</p>';
         return data.budgets.slice(0, 3).map(b => ` + "`" + `
           <div class="mini-budget">
             <div class="mini-budget-header"><span>${b.category}</span><span>${b.spent || 0}/${b.amount}</span></div>
@@ -110,7 +110,7 @@ const SmartDashboard = {
         ` + "`" + `).join('');
 
       case 'goals':
-        if (!data.goals || data.goals.length === 0) return '<p class="text-secondary">Нет целей</p>';
+        if (!data.goals || data.goals.length === 0) return '<p class="text-secondary">No goals</p>';
         return data.goals.slice(0, 3).map(g => ` + "`" + `
           <div class="mini-goal">
             <span>${g.name}</span>
@@ -120,22 +120,22 @@ const SmartDashboard = {
         ` + "`" + `).join('');
 
       case 'upcoming':
-        if (!data.items || data.items.length === 0) return '<p class="text-secondary">Нет предстоящих платежей</p>';
+        if (!data.items || data.items.length === 0) return '<p class="text-secondary">No upcoming payments</p>';
         return ` + "`" + `<div class="mini-list">${data.items.slice(0, 5).map(i => ` + "`" + `
-          <div class="mini-item"><span>${i.title}</span><span>${i.amount.toLocaleString()} ₴</span><small>${i.date}</small></div>
+          <div class="mini-item"><span>${i.title}</span><span>${i.amount.toLocaleString()} $</span><small>${i.date}</small></div>
         ` + "`" + `).join('')}</div>` + "`" + `;
 
       case 'subscriptions':
-        return ` + "`" + `<div class="widget-value">${data.monthlyTotal.toLocaleString()} ₴/мес</div><div class="widget-subtitle">${data.subscriptions.length} подписок</div>` + "`" + `;
+        return ` + "`" + `<div class="widget-value">${data.monthlyTotal.toLocaleString()} $/mo</div><div class="widget-subtitle">${data.subscriptions.length} subscriptions</div>` + "`" + `;
 
       case 'investments':
-        return ` + "`" + `<div class="widget-value">${data.totalValue.toLocaleString()} ₴</div><div class="widget-subtitle">${data.portfolioCount} портфелей</div>` + "`" + `;
+        return ` + "`" + `<div class="widget-value">${data.totalValue.toLocaleString()} $</div><div class="widget-subtitle">${data.portfolioCount} portfolios</div>` + "`" + `;
 
       case 'debts':
-        return ` + "`" + `<div class="widget-value negative">${data.totalOwed.toLocaleString()} ₴</div><div class="widget-subtitle">${data.debts.length} долгов</div>` + "`" + `;
+        return ` + "`" + `<div class="widget-value negative">${data.totalOwed.toLocaleString()} $</div><div class="widget-subtitle">${data.debts.length} debts</div>` + "`" + `;
 
       case 'recent':
-        if (!data.transactions || data.transactions.length === 0) return '<p class="text-secondary">Нет транзакций</p>';
+        if (!data.transactions || data.transactions.length === 0) return '<p class="text-secondary">No transactions</p>';
         return ` + "`" + `<div class="mini-list">${data.transactions.slice(0, 5).map(t => ` + "`" + `
           <div class="mini-item">
             <span>${t.description || t.category}</span>
@@ -145,18 +145,18 @@ const SmartDashboard = {
 
       case 'quick_add':
         return ` + "`" + `
-          <button class="btn btn-success btn-block" onclick="showAddTransactionModal('income')">+ Доход</button>
-          <button class="btn btn-danger btn-block" onclick="showAddTransactionModal('expense')">- Расход</button>
+          <button class="btn btn-success btn-block" onclick="showAddTransactionModal('income')">+ Income</button>
+          <button class="btn btn-danger btn-block" onclick="showAddTransactionModal('expense')">- Expense</button>
         ` + "`" + `;
 
       default:
-        return '<p class="text-secondary">Виджет недоступен</p>';
+        return '<p class="text-secondary">Widget unavailable</p>';
     }
   },
 
   toggleEditMode() {
     this.editMode = !this.editMode;
-    document.getElementById('edit-mode-btn').textContent = this.editMode ? '✓ Готово' : '⚙️ Настроить';
+    document.getElementById('edit-mode-btn').textContent = this.editMode ? '✓ Done' : '⚙️ Configure';
     this.render();
   },
 
@@ -169,11 +169,11 @@ const SmartDashboard = {
     modal.innerHTML = ` + "`" + `
       <div class="modal">
         <div class="modal-header">
-          <h2>Добавить виджет</h2>
+          <h2>Add widget</h2>
           <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button>
         </div>
         <div class="modal-body">
-          ${available.length === 0 ? '<p>Все виджеты уже добавлены</p>' : ` + "`" + `
+          ${available.length === 0 ? '<p>All widgets already added</p>' : ` + "`" + `
             <div class="widget-picker">
               ${available.map(w => ` + "`" + `
                 <div class="widget-option" onclick="SmartDashboard.addWidget('${w.type}', '${w.name}')">
@@ -199,12 +199,12 @@ const SmartDashboard = {
       document.querySelector('.modal-backdrop')?.remove();
       await this.loadWidgets();
     } catch (error) {
-      alert('Ошибка добавления');
+      alert('Failed to add');
     }
   },
 
   async removeWidget(id) {
-    if (!confirm('Удалить виджет?')) return;
+    if (!confirm('Delete widget?')) return;
     try {
       await fetch(`/api/widgets/${id}`, {
         method: 'DELETE',
@@ -212,7 +212,7 @@ const SmartDashboard = {
       });
       await this.loadWidgets();
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
@@ -243,10 +243,10 @@ const SmartDashboard = {
     return ` + "`" + `
       <div class="smart-dashboard">
         <div class="page-header">
-          <h1>📊 Дашборд</h1>
+          <h1>📊 Dashboard</h1>
           <div class="btn-group">
-            <button class="btn" id="edit-mode-btn" onclick="SmartDashboard.toggleEditMode()">⚙️ Настроить</button>
-            <button class="btn btn-primary" onclick="SmartDashboard.showAddWidgetModal()">+ Виджет</button>
+            <button class="btn" id="edit-mode-btn" onclick="SmartDashboard.toggleEditMode()">⚙️ Configure</button>
+            <button class="btn btn-primary" onclick="SmartDashboard.showAddWidgetModal()">+ Widget</button>
           </div>
         </div>
         <div class="dashboard-grid" id="dashboard-widgets"></div>

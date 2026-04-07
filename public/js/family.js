@@ -1,4 +1,4 @@
-// Модуль управления семьей и правами доступа
+// Модуль управления семьей и правs доступа
 
 // ==================== API ====================
 
@@ -8,14 +8,14 @@ async function fetchFamilies() {
       headers: { 'Authorization': `Bearer ${appState.token}` }
     });
 
-    if (!response.ok) throw new Error('Ошибка загрузки семей');
+    if (!response.ok) throw new Error('Failed to load families');
 
     const families = await response.json();
     appState.families = families;
     return families;
   } catch (error) {
-    console.error('Ошибка при получении семей:', error);
-    showNotification('Ошибка загрузки семей', 'error');
+    console.error('Error fetching families:', error);
+    showNotification('Failed to load families', 'error');
     return [];
   }
 }
@@ -34,13 +34,13 @@ async function createFamily(name, description) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка создания семьи');
+      throw new Error(data.message || 'Failed to create family');
     }
 
-    showNotification('Семья создана успешно', 'success');
+    showNotification('Family created successfully', 'success');
     return data.family;
   } catch (error) {
-    console.error('Ошибка при создании семьи:', error);
+    console.error('Error on create family:', error);
     showNotification(error.message, 'error');
     return null;
   }
@@ -60,13 +60,13 @@ async function joinFamily(inviteCode) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка присоединения');
+      throw new Error(data.message || 'Error joining');
     }
 
-    showNotification('Вы присоединились к семье!', 'success');
+    showNotification('You joined the family!', 'success');
     return data.family;
   } catch (error) {
-    console.error('Ошибка при присоединении:', error);
+    console.error('Error joining:', error);
     showNotification(error.message, 'error');
     return null;
   }
@@ -78,12 +78,12 @@ async function fetchFamilyDetails(familyId) {
       headers: { 'Authorization': `Bearer ${appState.token}` }
     });
 
-    if (!response.ok) throw new Error('Ошибка загрузки данных семьи');
+    if (!response.ok) throw new Error('Failed to load data family');
 
     return await response.json();
   } catch (error) {
-    console.error('Ошибка:', error);
-    showNotification('Ошибка загрузки семьи', 'error');
+    console.error('Error:', error);
+    showNotification('Failed to load family', 'error');
     return null;
   }
 }
@@ -98,13 +98,13 @@ async function leaveFamily(familyId) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка');
+      throw new Error(data.message || 'Error');
     }
 
-    showNotification('Вы покинули семью', 'success');
+    showNotification('You left the family', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return false;
   }
@@ -120,13 +120,13 @@ async function deleteFamily(familyId) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка удаления');
+      throw new Error(data.message || 'Failed to delete');
     }
 
-    showNotification('Семья удалена', 'success');
+    showNotification('Family deleted', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return false;
   }
@@ -142,13 +142,13 @@ async function removeMember(familyId, userId) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка');
+      throw new Error(data.message || 'Error');
     }
 
-    showNotification('Участник удален', 'success');
+    showNotification('Member removed', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return false;
   }
@@ -168,13 +168,13 @@ async function changeMemberRole(familyId, userId, role) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка');
+      throw new Error(data.message || 'Error');
     }
 
-    showNotification('Роль изменена', 'success');
+    showNotification('Role updated', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return false;
   }
@@ -190,13 +190,13 @@ async function regenerateInviteCode(familyId) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка');
+      throw new Error(data.message || 'Error');
     }
 
-    showNotification('Код обновлен', 'success');
+    showNotification('Код updated', 'success');
     return data.inviteCode;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return null;
   }
@@ -216,13 +216,13 @@ async function grantAccountPermissions(accountId, userId, permissions) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка');
+      throw new Error(data.message || 'Error');
     }
 
-    showNotification('Права выданы', 'success');
+    showNotification('Permissions granted', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return false;
   }
@@ -238,13 +238,13 @@ async function revokeAccountPermissions(accountId, userId) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Ошибка');
+      throw new Error(data.message || 'Error');
     }
 
-    showNotification('Права отозваны', 'success');
+    showNotification('Permissions revoked', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     showNotification(error.message, 'error');
     return false;
   }
@@ -256,11 +256,11 @@ async function fetchAccountPermissions(accountId) {
       headers: { 'Authorization': `Bearer ${appState.token}` }
     });
 
-    if (!response.ok) throw new Error('Ошибка');
+    if (!response.ok) throw new Error('Error');
 
     return await response.json();
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Error:', error);
     return [];
   }
 }
@@ -273,20 +273,20 @@ function renderFamilyPage() {
   app.innerHTML = `
     <div class="family-page">
       <header class="page-header">
-        <h1><i class="fas fa-users"></i> Семейный доступ</h1>
+        <h1><i class="fas fa-users"></i> Family Access</h1>
         <div class="header-actions">
           <button class="btn btn-primary" onclick="showCreateFamilyModal()">
-            <i class="fas fa-plus"></i> Создать семью
+            <i class="fas fa-plus"></i> Create family
           </button>
           <button class="btn btn-secondary" onclick="showJoinFamilyModal()">
-            <i class="fas fa-sign-in-alt"></i> Присоединиться
+            <i class="fas fa-sign-in-alt"></i> Join
           </button>
         </div>
       </header>
 
       <div class="family-content">
         <div class="families-list" id="families-list">
-          <div class="loading"><i class="fas fa-spinner fa-spin"></i> Загрузка...</div>
+          <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
         </div>
       </div>
     </div>
@@ -303,8 +303,8 @@ async function loadFamilies() {
     container.innerHTML = `
       <div class="empty-state">
         <i class="fas fa-users"></i>
-        <h3>Нет семей</h3>
-        <p>Создайте семью или присоединитесь по коду приглашения</p>
+        <h3>No families</h3>
+        <p>Create a family or join one with an invite code</p>
       </div>
     `;
     return;
@@ -317,8 +317,8 @@ async function loadFamilies() {
         <span class="role-badge role-${family.my_role}">${getRoleName(family.my_role)}</span>
       </div>
       <div class="family-info">
-        <span><i class="fas fa-user"></i> Владелец: ${escapeHtml(family.owner_username)}</span>
-        <span><i class="fas fa-users"></i> ${family.member_count} участник(ов)</span>
+        <span><i class="fas fa-user"></i> Owner: ${escapeHtml(family.owner_username)}</span>
+        <span><i class="fas fa-users"></i> ${family.member_count} member(s)</span>
       </div>
     </div>
   `).join('');
@@ -326,9 +326,9 @@ async function loadFamilies() {
 
 function getRoleName(role) {
   const roles = {
-    'owner': 'Владелец',
-    'admin': 'Админ',
-    'member': 'Участник'
+    'owner': 'Owner',
+    'admin': 'Admin',
+    'member': 'Member'
   };
   return roles[role] || role;
 }
@@ -343,7 +343,7 @@ async function openFamilyDetails(familyId) {
     <div class="family-details-page">
       <header class="page-header">
         <button class="btn-back" onclick="renderFamilyPage()">
-          <i class="fas fa-arrow-left"></i> Назад
+          <i class="fas fa-arrow-left"></i> Back
         </button>
         <h1>${escapeHtml(family.name)}</h1>
         <span class="role-badge role-${family.myRole}">${getRoleName(family.myRole)}</span>
@@ -352,14 +352,14 @@ async function openFamilyDetails(familyId) {
       <div class="family-details-content">
         ${family.myRole === 'owner' || family.myRole === 'admin' ? `
           <div class="invite-section">
-            <h3><i class="fas fa-link"></i> Код приглашения</h3>
+            <h3><i class="fas fa-link"></i> Invite code</h3>
             <div class="invite-code-box">
               <code id="invite-code">${family.invite_code}</code>
-              <button class="btn-icon" onclick="copyInviteCode()" title="Копировать">
+              <button class="btn-icon" onclick="copyInviteCode()" title="Copy">
                 <i class="fas fa-copy"></i>
               </button>
               ${family.myRole === 'owner' ? `
-                <button class="btn-icon" onclick="regenerateCode(${family.id})" title="Обновить код">
+                <button class="btn-icon" onclick="regenerateCode(${family.id})" title="Refresh code">
                   <i class="fas fa-sync"></i>
                 </button>
               ` : ''}
@@ -368,7 +368,7 @@ async function openFamilyDetails(familyId) {
         ` : ''}
 
         <div class="members-section">
-          <h3><i class="fas fa-users"></i> Участники (${family.members.length})</h3>
+          <h3><i class="fas fa-users"></i> Members (${family.members.length})</h3>
           <div class="members-list">
             ${family.members.map(member => `
               <div class="member-card">
@@ -391,7 +391,7 @@ async function openFamilyDetails(familyId) {
                       <div class="dropdown-menu">
                         ${member.role === 'member' ? `
                           <a onclick="promoteMember(${family.id}, ${member.user_id}, 'admin')">
-                            <i class="fas fa-arrow-up"></i> Сделать админом
+                            <i class="fas fa-arrow-up"></i> Make admin
                           </a>
                         ` : `
                           <a onclick="promoteMember(${family.id}, ${member.user_id}, 'member')">
@@ -399,7 +399,7 @@ async function openFamilyDetails(familyId) {
                           </a>
                         `}
                         <a onclick="kickMember(${family.id}, ${member.user_id})" class="danger">
-                          <i class="fas fa-user-minus"></i> Удалить
+                          <i class="fas fa-user-minus"></i> Delete
                         </a>
                         <a onclick="showPermissionsModal(${member.user_id}, '${escapeHtml(member.username)}')">
                           <i class="fas fa-key"></i> Права доступа
@@ -416,11 +416,11 @@ async function openFamilyDetails(familyId) {
         <div class="family-actions">
           ${family.myRole !== 'owner' ? `
             <button class="btn btn-danger" onclick="confirmLeaveFamily(${family.id})">
-              <i class="fas fa-sign-out-alt"></i> Покинуть семью
+              <i class="fas fa-sign-out-alt"></i> Покинуть family
             </button>
           ` : `
             <button class="btn btn-danger" onclick="confirmDeleteFamily(${family.id})">
-              <i class="fas fa-trash"></i> Удалить семью
+              <i class="fas fa-trash"></i> Delete family
             </button>
           `}
         </div>
@@ -438,22 +438,22 @@ function showCreateFamilyModal() {
   modal.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <h3>Создать семью</h3>
+        <h3>Create family</h3>
         <button class="btn-close" onclick="closeModal('create-family-modal')">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Название семьи</label>
-          <input type="text" id="family-name" placeholder="Например: Семья Ивановых" required>
+          <label>Name family</label>
+          <input type="text" id="family-name" placeholder="E.g.: Family Ивановых" required>
         </div>
         <div class="form-group">
-          <label>Описание (необязательно)</label>
-          <textarea id="family-description" placeholder="Краткое описание"></textarea>
+          <label>Description (optional)</label>
+          <textarea id="family-description" placeholder="Краткое description"></textarea>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('create-family-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="submitCreateFamily()">Создать</button>
+        <button class="btn btn-secondary" onclick="closeModal('create-family-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateFamily()">Create</button>
       </div>
     </div>
   `;
@@ -465,7 +465,7 @@ async function submitCreateFamily() {
   const description = document.getElementById('family-description').value.trim();
 
   if (!name) {
-    showNotification('Введите название семьи', 'error');
+    showNotification('Enter name family', 'error');
     return;
   }
 
@@ -483,18 +483,18 @@ function showJoinFamilyModal() {
   modal.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <h3>Присоединиться к семье</h3>
+        <h3>Join к семье</h3>
         <button class="btn-close" onclick="closeModal('join-family-modal')">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Код приглашения</label>
-          <input type="text" id="invite-code-input" placeholder="Введите код" maxlength="12" style="text-transform: uppercase;">
+          <label>Invite code</label>
+          <input type="text" id="invite-code-input" placeholder="Enter code" maxlength="12" style="text-transform: uppercase;">
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('join-family-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="submitJoinFamily()">Присоединиться</button>
+        <button class="btn btn-secondary" onclick="closeModal('join-family-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitJoinFamily()">Join</button>
       </div>
     </div>
   `;
@@ -505,7 +505,7 @@ async function submitJoinFamily() {
   const code = document.getElementById('invite-code-input').value.trim().toUpperCase();
 
   if (!code) {
-    showNotification('Введите код приглашения', 'error');
+    showNotification('Enter code приглашения', 'error');
     return;
   }
 
@@ -524,7 +524,7 @@ function copyInviteCode() {
 }
 
 async function regenerateCode(familyId) {
-  if (!confirm('Старый код перестанет работать. Продолжить?')) return;
+  if (!confirm('Старый code перестанет работать. Продолжить?')) return;
 
   const newCode = await regenerateInviteCode(familyId);
   if (newCode) {
@@ -539,7 +539,7 @@ async function promoteMember(familyId, userId, role) {
 }
 
 async function kickMember(familyId, userId) {
-  if (!confirm('Удалить участника из семьи?')) return;
+  if (!confirm('Delete участника of family?')) return;
 
   if (await removeMember(familyId, userId)) {
     openFamilyDetails(familyId);
@@ -547,7 +547,7 @@ async function kickMember(familyId, userId) {
 }
 
 async function confirmLeaveFamily(familyId) {
-  if (!confirm('Вы уверены, что хотите покинуть семью?')) return;
+  if (!confirm('Are you sure, что do you want to leave family?')) return;
 
   if (await leaveFamily(familyId)) {
     renderFamilyPage();
@@ -555,7 +555,7 @@ async function confirmLeaveFamily(familyId) {
 }
 
 async function confirmDeleteFamily(familyId) {
-  if (!confirm('Удалить семью? Все участники потеряют доступ.')) return;
+  if (!confirm('Delete family? All участники потеряют доступ.')) return;
 
   if (await deleteFamily(familyId)) {
     renderFamilyPage();
@@ -575,9 +575,9 @@ function showPermissionsModal(userId, username) {
         <button class="btn-close" onclick="closeModal('permissions-modal')">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="info-text">Выберите счета и права доступа:</p>
+        <p class="info-text">Select accounts и права доступа:</p>
         <div class="permissions-list">
-          ${accounts.length === 0 ? '<p>Нет счетов</p>' : accounts.map(account => `
+          ${accounts.length === 0 ? '<p>No accounts</p>' : accounts.map(account => `
             <div class="permission-item" data-account-id="${account.id}">
               <div class="permission-account">
                 <strong>${escapeHtml(account.name)}</strong>
@@ -588,10 +588,10 @@ function showPermissionsModal(userId, username) {
                   <input type="checkbox" class="perm-view" checked> Просмотр
                 </label>
                 <label>
-                  <input type="checkbox" class="perm-add"> Добавление
+                  <input type="checkbox" class="perm-add"> Adding
                 </label>
                 <label>
-                  <input type="checkbox" class="perm-edit"> Редактирование
+                  <input type="checkbox" class="perm-edit"> Edit
                 </label>
                 <label>
                   <input type="checkbox" class="perm-delete"> Удаление
@@ -602,8 +602,8 @@ function showPermissionsModal(userId, username) {
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('permissions-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="savePermissions(${userId})">Сохранить</button>
+        <button class="btn btn-secondary" onclick="closeModal('permissions-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="savePermissions(${userId})">Save</button>
       </div>
     </div>
   `;
@@ -638,7 +638,7 @@ function toggleDropdown(btn) {
   const menu = btn.nextElementSibling;
   const isOpen = menu.classList.contains('show');
 
-  // Закрываем все открытые dropdown
+  // Закрываем all открытые dropdown
   document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
 
   if (!isOpen) {

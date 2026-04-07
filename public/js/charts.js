@@ -1,45 +1,45 @@
-// Функции для работы с графиками
+// Functions for графикs
 
-// Инициализация графиков на дашборде
+// Initialize графиков на dashboardе
 function initCharts(statsData) {
-    // Инициализация графика доходов и расходов
+    // Initialize графика incomes and expenses
     initIncomeExpenseChart(statsData.transactionsByMonth);
     
-    // Инициализация графика категорий расходов
+    // Initialize графика categories expenses
     initExpenseCategoriesChart(statsData.transactionsByCategory);
   }
   
-  // График доходов и расходов по месяцам
+  // График incomes and expenses by months
   function initIncomeExpenseChart(transactionsByMonth) {
     const ctx = document.getElementById('income-expense-chart').getContext('2d');
     
-    // Сортировка месяцев
+    // Сортировка monthев
     const sortedMonths = Object.keys(transactionsByMonth).sort();
     
-    // Подготовка данных
+    // Подготовка дан
     const labels = sortedMonths.map(month => {
       const [year, monthNum] = month.split('-');
-      return new Date(year, monthNum - 1).toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' });
+      return new Date(year, monthNum - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     });
     
     const incomeData = sortedMonths.map(month => transactionsByMonth[month].income);
     const expenseData = sortedMonths.map(month => transactionsByMonth[month].expense);
     
-    // Создание графика
+    // Create chart
     const chart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
         datasets: [
           {
-            label: 'Доходы',
+            label: 'Income',
             data: incomeData,
             backgroundColor: 'rgba(56, 193, 114, 0.7)',
             borderColor: 'rgba(56, 193, 114, 1)',
             borderWidth: 1
           },
           {
-            label: 'Расходы',
+            label: 'Expenses',
             data: expenseData,
             backgroundColor: 'rgba(227, 52, 47, 0.7)',
             borderColor: 'rgba(227, 52, 47, 1)',
@@ -55,7 +55,7 @@ function initCharts(statsData) {
             beginAtZero: true,
             ticks: {
               callback: function(value) {
-                return '₽' + value.toLocaleString('ru-RU');
+                return '$' + value.toLocaleString('en-US');
               }
             }
           }
@@ -68,7 +68,7 @@ function initCharts(statsData) {
                 if (label) {
                   label += ': ';
                 }
-                label += '₽' + context.parsed.y.toLocaleString('ru-RU');
+                label += '$' + context.parsed.y.toLocaleString('en-US');
                 return label;
               }
             }
@@ -78,30 +78,30 @@ function initCharts(statsData) {
     });
   }
   
-  // График категорий расходов
+  // График categories expenses
   function initExpenseCategoriesChart(transactionsByCategory) {
     const ctx = document.getElementById('expense-categories-chart').getContext('2d');
     
-    // Фильтрация только расходов и сортировка по сумме
+    // Фильтрация только expenses and сортировка по сумме
     const expenseCategories = Object.entries(transactionsByCategory)
       .filter(([_, values]) => values.expense > 0)
       .sort((a, b) => b[1].expense - a[1].expense);
     
-    // Ограничение до 7 категорий, остальные объединяем в "Другое"
+    // Ограничение до 7 categories, остальные объединяем в "Other"
     const topCategories = expenseCategories.slice(0, 7);
     const otherCategories = expenseCategories.slice(7);
     
     let labels = topCategories.map(([category]) => category);
     let data = topCategories.map(([_, values]) => values.expense);
     
-    // Добавление категории "Другое", если есть
+    // Adding каtagории "Other", если есть
     if (otherCategories.length > 0) {
       const otherSum = otherCategories.reduce((sum, [_, values]) => sum + values.expense, 0);
-      labels.push('Другое');
+      labels.push('Other');
       data.push(otherSum);
     }
     
-    // Генерация цветов
+    // Generate colors
     const backgroundColors = [
       'rgba(227, 52, 47, 0.7)',
       'rgba(246, 153, 63, 0.7)',
@@ -110,10 +110,10 @@ function initCharts(statsData) {
       'rgba(52, 144, 220, 0.7)',
       'rgba(101, 116, 205, 0.7)',
       'rgba(149, 97, 226, 0.7)',
-      'rgba(108, 117, 125, 0.7)' // Для "Другое"
+      'rgba(108, 117, 125, 0.7)' // For "Other"
     ];
     
-    // Создание графика
+    // Create chart
     const chart = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -137,7 +137,7 @@ function initCharts(statsData) {
                 const value = context.parsed;
                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                 const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: ₽${value.toLocaleString('ru-RU')} (${percentage}%)`;
+                return `${context.label}: ₽${value.toLocaleString('en-US')} (${percentage}%)`;
               }
             }
           },

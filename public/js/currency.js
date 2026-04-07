@@ -8,7 +8,7 @@ const currencyState = {
   supportedCurrencies: []
 };
 
-// Инициализация
+// Initialize
 async function initCurrencyModule() {
   try {
     const [settings, currencies] = await Promise.all([
@@ -18,7 +18,7 @@ async function initCurrencyModule() {
     currencyState.settings = settings;
     currencyState.supportedCurrencies = currencies;
   } catch (error) {
-    console.error('Ошибка инициализации модуля валют:', error);
+    console.error('Error инициализации модуля валют:', error);
   }
 }
 
@@ -26,20 +26,20 @@ async function initCurrencyModule() {
 
 async function fetchCurrencySettings() {
   const response = await fetchWithAuth('/api/currency/settings');
-  if (!response.ok) throw new Error('Ошибка получения настроек');
+  if (!response.ok) throw new Error('Error fetching settings');
   return response.json();
 }
 
 async function fetchSupportedCurrencies() {
   const response = await fetchWithAuth('/api/currency/supported');
-  if (!response.ok) throw new Error('Ошибка получения валют');
+  if (!response.ok) throw new Error('Error fetching currencies');
   return response.json();
 }
 
 async function fetchCurrencyRates(base) {
   const url = base ? `/api/currency/rates?base=${base}` : '/api/currency/rates';
   const response = await fetchWithAuth(url);
-  if (!response.ok) throw new Error('Ошибка получения курсов');
+  if (!response.ok) throw new Error('Error fetching rates');
   return response.json();
 }
 
@@ -48,19 +48,19 @@ async function updateCurrencySettings(settings) {
     method: 'PUT',
     body: JSON.stringify(settings)
   });
-  if (!response.ok) throw new Error('Ошибка обновления настроек');
+  if (!response.ok) throw new Error('Failed to update settings');
   return response.json();
 }
 
 async function convertCurrency(amount, from, to) {
   const response = await fetchWithAuth(`/api/currency/convert?amount=${amount}&from=${from}&to=${to}`);
-  if (!response.ok) throw new Error('Ошибка конвертации');
+  if (!response.ok) throw new Error('Error converting');
   return response.json();
 }
 
 async function fetchRatesFromNBU() {
   const response = await fetchWithAuth('/api/currency/fetch-nbu', { method: 'POST' });
-  if (!response.ok) throw new Error('Ошибка обновления курсов');
+  if (!response.ok) throw new Error('Failed to update rates');
   return response.json();
 }
 
@@ -68,7 +68,7 @@ async function fetchRatesFromNBU() {
 
 async function fetchTags() {
   const response = await fetchWithAuth('/api/currency/tags');
-  if (!response.ok) throw new Error('Ошибка получения тегов');
+  if (!response.ok) throw new Error('Error fetching tags');
   const tags = await response.json();
   currencyState.tags = tags;
   return tags;
@@ -81,7 +81,7 @@ async function createTag(name, color) {
   });
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.message || 'Ошибка создания тега');
+    throw new Error(data.message || 'Failed to create tag');
   }
   return response.json();
 }
@@ -91,7 +91,7 @@ async function updateTag(id, data) {
     method: 'PUT',
     body: JSON.stringify(data)
   });
-  if (!response.ok) throw new Error('Ошибка обновления тега');
+  if (!response.ok) throw new Error('Failed to update tag');
   return response.json();
 }
 
@@ -99,13 +99,13 @@ async function deleteTag(id) {
   const response = await fetchWithAuth(`/api/currency/tags/${id}`, {
     method: 'DELETE'
   });
-  if (!response.ok) throw new Error('Ошибка удаления тега');
+  if (!response.ok) throw new Error('Failed to delete tag');
   return response.json();
 }
 
 async function getTagStats(id) {
   const response = await fetchWithAuth(`/api/currency/tags/${id}/stats`);
-  if (!response.ok) throw new Error('Ошибка получения статистики');
+  if (!response.ok) throw new Error('Error fetching statistics');
   return response.json();
 }
 
@@ -114,13 +114,13 @@ async function setTransactionTags(transactionId, tagIds) {
     method: 'PUT',
     body: JSON.stringify({ tagIds })
   });
-  if (!response.ok) throw new Error('Ошибка установки тегов');
+  if (!response.ok) throw new Error('Error setting tags');
   return response.json();
 }
 
 async function getTransactionTags(transactionId) {
   const response = await fetchWithAuth(`/api/currency/transaction/${transactionId}/tags`);
-  if (!response.ok) throw new Error('Ошибка получения тегов');
+  if (!response.ok) throw new Error('Error fetching tags');
   return response.json();
 }
 
@@ -132,34 +132,34 @@ async function renderCurrencyPage() {
   mainContent.innerHTML = `
     <div class="currency-page">
       <div class="page-header">
-        <h1><i class="fas fa-coins"></i> Валюты и теги</h1>
+        <h1><i class="fas fa-coins"></i> Currencies & Tags</h1>
       </div>
 
       <div class="currency-tabs">
         <button class="tab-btn active" data-tab="converter">
-          <i class="fas fa-exchange-alt"></i> Конвертер
+          <i class="fas fa-exchange-alt"></i> Converter
         </button>
         <button class="tab-btn" data-tab="rates">
-          <i class="fas fa-chart-line"></i> Курсы
+          <i class="fas fa-chart-line"></i> Rates
         </button>
         <button class="tab-btn" data-tab="settings">
-          <i class="fas fa-cog"></i> Настройки
+          <i class="fas fa-cog"></i> Settings
         </button>
         <button class="tab-btn" data-tab="tags">
-          <i class="fas fa-tags"></i> Теги
+          <i class="fas fa-tags"></i> Tags
         </button>
       </div>
 
       <div class="tab-content" id="currency-tab-content">
         <div class="loading">
           <div class="spinner"></div>
-          <p>Загрузка...</p>
+          <p>Loading...</p>
         </div>
       </div>
     </div>
   `;
 
-  // Обработчики табов
+  // Tab handlers
   const tabBtns = document.querySelectorAll('.currency-tabs .tab-btn');
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -176,7 +176,7 @@ async function renderCurrencyPage() {
     });
   });
 
-  // Загружаем данные и показываем первый таб
+  // Load data и показываем первый таб
   await initCurrencyModule();
   renderConverterTab();
 }
@@ -190,19 +190,19 @@ async function renderConverterTab() {
   container.innerHTML = `
     <div class="converter-section">
       <div class="card">
-        <h2><i class="fas fa-calculator"></i> Конвертер валют</h2>
+        <h2><i class="fas fa-calculator"></i> Currency Converter</h2>
 
         <div class="converter-form">
           <div class="converter-row">
             <div class="form-group">
-              <label class="form-label">Сумма</label>
+              <label class="form-label">Amount</label>
               <input type="number" id="convert-amount" class="form-control" value="100" min="0" step="0.01">
             </div>
           </div>
 
           <div class="converter-row">
             <div class="form-group">
-              <label class="form-label">Из</label>
+              <label class="form-label">From</label>
               <select id="convert-from" class="form-control">
                 ${currencies.map(c => `
                   <option value="${c.code}" ${c.code === 'USD' ? 'selected' : ''}>
@@ -217,7 +217,7 @@ async function renderConverterTab() {
             </button>
 
             <div class="form-group">
-              <label class="form-label">В</label>
+              <label class="form-label">To</label>
               <select id="convert-to" class="form-control">
                 ${currencies.map(c => `
                   <option value="${c.code}" ${c.code === 'UAH' ? 'selected' : ''}>
@@ -229,7 +229,7 @@ async function renderConverterTab() {
           </div>
 
           <button type="button" id="convert-btn" class="btn btn-primary w-100">
-            <i class="fas fa-sync"></i> Конвертировать
+            <i class="fas fa-sync"></i> Convert
           </button>
         </div>
 
@@ -239,15 +239,15 @@ async function renderConverterTab() {
             <span id="result-currency">UAH</span>
           </div>
           <div class="result-rate" id="result-rate">
-            Курс: 1 USD = 0.00 UAH
+            Rate: 1 USD = 0.00 UAH
           </div>
         </div>
       </div>
 
       <div class="card quick-convert">
-        <h3>Быстрый расчет</h3>
+        <h3>Quick acaccount</h3>
         <div class="quick-amounts" id="quick-amounts">
-          <!-- Заполняется динамически -->
+          <!-- Filled dynamically -->
         </div>
       </div>
     </div>
@@ -268,7 +268,7 @@ async function renderConverterTab() {
     performConversion();
   });
 
-  // Первая конвертация
+  // Initial conversion
   performConversion();
 }
 
@@ -285,9 +285,9 @@ async function performConversion() {
 
     document.getElementById('result-value').textContent = result.result.toFixed(2);
     document.getElementById('result-currency').textContent = to;
-    document.getElementById('result-rate').textContent = `Курс: 1 ${from} = ${result.rate.toFixed(4)} ${to}`;
+    document.getElementById('result-rate').textContent = `Rate: 1 ${from} = ${result.rate.toFixed(4)} ${to}`;
 
-    // Быстрый расчет
+    // Quick acaccount
     const quickAmounts = [10, 50, 100, 500, 1000, 5000];
     const quickContainer = document.getElementById('quick-amounts');
     quickContainer.innerHTML = quickAmounts.map(amt => `
@@ -299,7 +299,7 @@ async function performConversion() {
     `).join('');
 
   } catch (error) {
-    showNotification('Ошибка конвертации: ' + error.message, 'error');
+    showNotification('Error converting: ' + error.message, 'error');
   }
 }
 
@@ -313,7 +313,7 @@ async function renderRatesTab() {
     <div class="rates-section">
       <div class="card">
         <div class="rates-header">
-          <h2><i class="fas fa-chart-line"></i> Текущие курсы</h2>
+          <h2><i class="fas fa-chart-line"></i> Current Rates</h2>
           <div class="rates-actions">
             <select id="rates-base" class="form-control">
               ${currencyState.supportedCurrencies.map(c => `
@@ -323,7 +323,7 @@ async function renderRatesTab() {
               `).join('')}
             </select>
             <button id="refresh-rates" class="btn btn-outline">
-              <i class="fas fa-sync"></i> Обновить с НБУ
+              <i class="fas fa-sync"></i> Refresh from NBU
             </button>
           </div>
         </div>
@@ -341,10 +341,10 @@ async function renderRatesTab() {
   document.getElementById('refresh-rates').addEventListener('click', async () => {
     try {
       const result = await fetchRatesFromNBU();
-      showNotification(`Обновлено ${result.count} курсов`, 'success');
+      showNotification(`Updated ${result.count} rates`, 'success');
       loadRates();
     } catch (error) {
-      showNotification('Ошибка обновления курсов', 'error');
+      showNotification('Failed to update rates', 'error');
     }
   });
 
@@ -372,7 +372,7 @@ async function loadRates() {
                 <span class="rate-code">${c.code}</span>
               </div>
               <div class="rate-value">
-                ${rate ? rate.toFixed(4) : 'Нет данных'}
+                ${rate ? rate.toFixed(4) : 'No data'}
               </div>
               <div class="rate-name">${c.name}</div>
             </div>
@@ -384,7 +384,7 @@ async function loadRates() {
     container.innerHTML = `
       <div class="empty-text">
         <i class="fas fa-exclamation-circle"></i>
-        <p>Ошибка загрузки курсов</p>
+        <p>Failed to load rates</p>
       </div>
     `;
   }
@@ -400,7 +400,7 @@ async function renderCurrencySettingsTab() {
     auto_convert: false
   };
 
-  // Парсим display_currencies если это строка
+  // Parse display_currencies if string
   let displayCurrencies = settings.display_currencies;
   if (typeof displayCurrencies === 'string') {
     try {
@@ -413,11 +413,11 @@ async function renderCurrencySettingsTab() {
   container.innerHTML = `
     <div class="settings-section">
       <div class="card">
-        <h2><i class="fas fa-cog"></i> Настройки валют</h2>
+        <h2><i class="fas fa-cog"></i> Currency Settings</h2>
 
         <form id="currency-settings-form">
           <div class="form-group">
-            <label class="form-label">Базовая валюта</label>
+            <label class="form-label">Base currency</label>
             <select id="base-currency" class="form-control">
               ${currencyState.supportedCurrencies.map(c => `
                 <option value="${c.code}" ${c.code === settings.base_currency ? 'selected' : ''}>
@@ -425,11 +425,11 @@ async function renderCurrencySettingsTab() {
                 </option>
               `).join('')}
             </select>
-            <small class="form-hint">Основная валюта для отображения баланса</small>
+            <small class="form-hint">Main currency for balance display</small>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Отображаемые валюты</label>
+            <label class="form-label">Displayed currencies</label>
             <div class="currency-checkboxes">
               ${currencyState.supportedCurrencies.map(c => `
                 <label class="checkbox-label">
@@ -444,12 +444,12 @@ async function renderCurrencySettingsTab() {
           <div class="form-group">
             <label class="checkbox-label">
               <input type="checkbox" id="auto-convert" ${settings.auto_convert ? 'checked' : ''}>
-              <span>Автоматически конвертировать в базовую валюту</span>
+              <span>Auto-convert to base currency</span>
             </label>
           </div>
 
           <button type="submit" class="btn btn-primary">
-            <i class="fas fa-save"></i> Сохранить настройки
+            <i class="fas fa-save"></i> Save settings
           </button>
         </form>
       </div>
@@ -472,9 +472,9 @@ async function renderCurrencySettingsTab() {
       });
 
       currencyState.settings = result.settings;
-      showNotification('Настройки сохранены', 'success');
+      showNotification('Settings сохранены', 'success');
     } catch (error) {
-      showNotification('Ошибка сохранения настроек', 'error');
+      showNotification('Failed to save settings', 'error');
     }
   });
 }
@@ -488,9 +488,9 @@ async function renderTagsTab() {
     <div class="tags-section">
       <div class="card">
         <div class="tags-header">
-          <h2><i class="fas fa-tags"></i> Теги транзакций</h2>
+          <h2><i class="fas fa-tags"></i> Tags transactions</h2>
           <button id="add-tag-btn" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Создать тег
+            <i class="fas fa-plus"></i> Create tag
           </button>
         </div>
 
@@ -518,8 +518,8 @@ async function loadTags() {
       container.innerHTML = `
         <div class="empty-state">
           <i class="fas fa-tags"></i>
-          <h3>Нет тегов</h3>
-          <p>Создайте теги для категоризации транзакций</p>
+          <h3>No tagов</h3>
+          <p>Create tags для каtagоризации transactions</p>
         </div>
       `;
       return;
@@ -532,7 +532,7 @@ async function loadTags() {
             <div class="tag-color" style="background-color: ${tag.color}"></div>
             <div class="tag-info">
               <h4>${escapeHtml(tag.name)}</h4>
-              <span class="tag-usage">${tag.usage_count || 0} транзакций</span>
+              <span class="tag-usage">${tag.usage_count || 0} transactions</span>
             </div>
             <div class="tag-actions">
               <button class="btn btn-sm btn-outline" onclick="showEditTagModal(${tag.id})">
@@ -553,7 +553,7 @@ async function loadTags() {
     container.innerHTML = `
       <div class="empty-text">
         <i class="fas fa-exclamation-circle"></i>
-        <p>Ошибка загрузки тегов</p>
+        <p>Failed to load tagов</p>
       </div>
     `;
   }
@@ -567,18 +567,18 @@ function showAddTagModal() {
   modal.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <h2 class="modal-title">Создать тег</h2>
+        <h2 class="modal-title">Create tag</h2>
         <button class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
         <form id="add-tag-form">
           <div class="form-group">
-            <label class="form-label">Название тега</label>
-            <input type="text" id="tag-name" class="form-control" required placeholder="Например: Работа">
+            <label class="form-label">Name tag</label>
+            <input type="text" id="tag-name" class="form-control" required placeholder="E.g.: Работа">
           </div>
 
           <div class="form-group">
-            <label class="form-label">Цвет</label>
+            <label class="form-label">Color</label>
             <div class="color-picker">
               ${colors.map((color, i) => `
                 <label class="color-option">
@@ -591,8 +591,8 @@ function showAddTagModal() {
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline" id="cancel-tag">Отмена</button>
-        <button type="submit" form="add-tag-form" class="btn btn-primary">Создать</button>
+        <button type="button" class="btn btn-outline" id="cancel-tag">Cancel</button>
+        <button type="submit" form="add-tag-form" class="btn btn-primary">Create</button>
       </div>
     </div>
   `;
@@ -633,18 +633,18 @@ async function showEditTagModal(tagId) {
   modal.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <h2 class="modal-title">Редактировать тег</h2>
+        <h2 class="modal-title">Edit tag</h2>
         <button class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
         <form id="edit-tag-form">
           <div class="form-group">
-            <label class="form-label">Название тега</label>
+            <label class="form-label">Name tag</label>
             <input type="text" id="tag-name" class="form-control" required value="${escapeHtml(tag.name)}">
           </div>
 
           <div class="form-group">
-            <label class="form-label">Цвет</label>
+            <label class="form-label">Color</label>
             <div class="color-picker">
               ${colors.map(color => `
                 <label class="color-option">
@@ -657,8 +657,8 @@ async function showEditTagModal(tagId) {
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline" id="cancel-edit">Отмена</button>
-        <button type="submit" form="edit-tag-form" class="btn btn-primary">Сохранить</button>
+        <button type="button" class="btn btn-outline" id="cancel-edit">Cancel</button>
+        <button type="submit" form="edit-tag-form" class="btn btn-primary">Save</button>
       </div>
     </div>
   `;
@@ -680,7 +680,7 @@ async function showEditTagModal(tagId) {
     try {
       await updateTag(tagId, { name, color });
       modal.remove();
-      showNotification('Тег обновлен', 'success');
+      showNotification('Тег updated', 'success');
       loadTags();
     } catch (error) {
       showNotification(error.message, 'error');
@@ -702,7 +702,7 @@ async function showTagStats(tagId) {
         <div class="modal-header">
           <h2 class="modal-title">
             <span class="tag-badge" style="background-color: ${tag.color}">${escapeHtml(tag.name)}</span>
-            Статистика
+            Statistics
           </h2>
           <button class="modal-close">&times;</button>
         </div>
@@ -720,7 +720,7 @@ async function showTagStats(tagId) {
               <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
               <div class="stat-data">
                 <div class="stat-value">${formatCurrency(stats.totalIncome)}</div>
-                <div class="stat-label">Доходы</div>
+                <div class="stat-label">Income</div>
               </div>
             </div>
 
@@ -728,13 +728,13 @@ async function showTagStats(tagId) {
               <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
               <div class="stat-data">
                 <div class="stat-value">${formatCurrency(stats.totalExpense)}</div>
-                <div class="stat-label">Расходы</div>
+                <div class="stat-label">Expenses</div>
               </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-primary" id="close-stats">Закрыть</button>
+          <button type="button" class="btn btn-primary" id="close-stats">Close</button>
         </div>
       </div>
     `;
@@ -748,7 +748,7 @@ async function showTagStats(tagId) {
     });
 
   } catch (error) {
-    showNotification('Ошибка загрузки статистики', 'error');
+    showNotification('Failed to load statistics', 'error');
   }
 }
 
@@ -756,14 +756,14 @@ function confirmDeleteTag(tagId) {
   const tag = currencyState.tags.find(t => t.id === tagId);
   if (!tag) return;
 
-  if (confirm(`Удалить тег "${tag.name}"? Он будет удален со всех транзакций.`)) {
+  if (confirm(`Delete tag "${tag.name}"? Он будет удален со all transactions.`)) {
     deleteTag(tagId)
       .then(() => {
         showNotification('Тег удален', 'success');
         loadTags();
       })
       .catch(error => {
-        showNotification('Ошибка удаления тега', 'error');
+        showNotification('Failed to delete tag', 'error');
       });
   }
 }
@@ -780,7 +780,7 @@ async function renderTagSelector(transactionId, containerId) {
 
   container.innerHTML = `
     <div class="tag-selector">
-      <label class="form-label">Теги</label>
+      <label class="form-label">Tags</label>
       <div class="selected-tags" id="selected-tags-${containerId}">
         ${selectedTags.map(t => `
           <span class="tag-badge" style="background-color: ${t.color}" data-tag-id="${t.id}">
@@ -790,7 +790,7 @@ async function renderTagSelector(transactionId, containerId) {
         `).join('')}
       </div>
       <div class="tag-dropdown">
-        <input type="text" class="form-control tag-search" placeholder="Поиск или добавление тегов..."
+        <input type="text" class="form-control tag-search" placeholder="Search или добавление tagов..."
                id="tag-search-${containerId}">
         <div class="tag-options hidden" id="tag-options-${containerId}">
           ${tags.filter(t => !selectedIds.includes(t.id)).map(t => `
@@ -799,14 +799,14 @@ async function renderTagSelector(transactionId, containerId) {
               ${escapeHtml(t.name)}
             </div>
           `).join('')}
-          ${tags.length === 0 ? '<div class="tag-option-empty">Нет тегов</div>' : ''}
+          ${tags.length === 0 ? '<div class="tag-option-empty">No tagов</div>' : ''}
         </div>
       </div>
       <input type="hidden" name="tagIds" id="tag-ids-${containerId}" value="${selectedIds.join(',')}">
     </div>
   `;
 
-  // Поиск тегов
+  // Search tagов
   const searchInput = document.getElementById(`tag-search-${containerId}`);
   const optionsDiv = document.getElementById(`tag-options-${containerId}`);
 
@@ -836,7 +836,7 @@ function addTagToSelector(tagId, containerId) {
   const hiddenInput = document.getElementById(`tag-ids-${containerId}`);
   const optionDiv = document.querySelector(`#tag-options-${containerId} [data-tag-id="${tagId}"]`);
 
-  // Добавляем тег в выбранные
+  // Добавляем tag в выбранные
   const tagBadge = document.createElement('span');
   tagBadge.className = 'tag-badge';
   tagBadge.style.backgroundColor = tag.color;
@@ -847,7 +847,7 @@ function addTagToSelector(tagId, containerId) {
   `;
   selectedContainer.appendChild(tagBadge);
 
-  // Обновляем hidden input
+  // Updating hidden input
   const currentIds = hiddenInput.value ? hiddenInput.value.split(',').map(Number) : [];
   currentIds.push(tagId);
   hiddenInput.value = currentIds.join(',');
@@ -865,7 +865,7 @@ function removeTagFromSelector(tagId, containerId) {
   const badge = selectedContainer.querySelector(`[data-tag-id="${tagId}"]`);
   if (badge) badge.remove();
 
-  // Обновляем hidden input
+  // Updating hidden input
   const currentIds = hiddenInput.value ? hiddenInput.value.split(',').map(Number) : [];
   hiddenInput.value = currentIds.filter(id => id !== tagId).join(',');
 
@@ -899,7 +899,7 @@ function debounce(func, wait) {
   };
 }
 
-// Экспорт функций для глобального доступа
+// Экспорт функций для глобальн доступа
 window.showEditTagModal = showEditTagModal;
 window.showTagStats = showTagStats;
 window.confirmDeleteTag = confirmDeleteTag;

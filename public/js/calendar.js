@@ -35,10 +35,10 @@ const CalendarModule = {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date().toISOString().split('T')[0];
 
-    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     document.getElementById('calendar-title').textContent = `${monthNames[month]} ${year}`;
 
-    let html = '<div class="calendar-header-row"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>';
+    let html = '<div class="calendar-header-row"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>';
     html += '<div class="calendar-days">';
 
     const startDay = firstDay === 0 ? 6 : firstDay - 1;
@@ -75,7 +75,7 @@ const CalendarModule = {
       const upcoming = await response.json();
 
       if (upcoming.length === 0) {
-        container.innerHTML = '<p class="text-secondary">Нет предстоящих событий</p>';
+        container.innerHTML = '<p class="text-secondary">No upcoming events</p>';
         return;
       }
 
@@ -85,7 +85,7 @@ const CalendarModule = {
         <div class="upcoming-item" style="border-left: 3px solid ${e.color || '#5D5CDE'}">
           <span class="event-icon">${typeIcons[e.event_type] || '📅'}</span>
           <div class="event-info"><strong>${e.title}</strong><small>${e.event_date}</small></div>
-          ${e.amount ? `<span class="event-amount">${e.amount.toLocaleString()} ₴</span>` : ''}
+          ${e.amount ? `<span class="event-amount">${e.amount.toLocaleString()} $</span>` : ''}
         </div>
       `).join('');
     } catch (error) {
@@ -114,11 +114,11 @@ const CalendarModule = {
 
     document.getElementById('day-events-date').textContent = dateStr;
     document.getElementById('day-events-list').innerHTML = dayEvents.length === 0 
-      ? '<p>Нет событий</p>'
+      ? '<p>No events</p>'
       : dayEvents.map(e => `
         <div class="day-event-item">
           <span>${typeIcons[e.event_type] || '📅'}</span>
-          <div><strong>${e.title}</strong>${e.amount ? ` - ${e.amount.toLocaleString()} ₴` : ''}<br><small>${e.description || e.event_type}</small></div>
+          <div><strong>${e.title}</strong>${e.amount ? ` - ${e.amount.toLocaleString()} $` : ''}<br><small>${e.description || e.event_type}</small></div>
           ${e.source ? '' : `<button class="btn btn-sm btn-icon" onclick="CalendarModule.completeEvent(${e.id})">✓</button>`}
         </div>
       `).join('');
@@ -151,7 +151,7 @@ const CalendarModule = {
       document.getElementById('event-modal').classList.remove('active');
       await this.loadEvents();
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
@@ -164,48 +164,48 @@ const CalendarModule = {
       await this.loadEvents();
       document.getElementById('day-modal').classList.remove('active');
     } catch (error) {
-      alert('Ошибка');
+      alert('Error');
     }
   },
 
   getPage() {
     return `
       <div class="calendar-page">
-        <div class="page-header"><h1>📅 Финансовый календарь</h1>
-          <button class="btn btn-primary" onclick="CalendarModule.showAddModal()">+ Событие</button>
+        <div class="page-header"><h1>📅 Finance Calendar</h1>
+          <button class="btn btn-primary" onclick="CalendarModule.showAddModal()">+ Event</button>
         </div>
         <div class="calendar-container card">
           <div class="calendar-nav">
             <button class="btn btn-icon" onclick="CalendarModule.prevMonth()">◀</button>
             <h2 id="calendar-title"></h2>
             <button class="btn btn-icon" onclick="CalendarModule.nextMonth()">▶</button>
-            <button class="btn btn-sm" onclick="CalendarModule.goToday()">Сегодня</button>
+            <button class="btn btn-sm" onclick="CalendarModule.goToday()">Today</button>
           </div>
           <div id="calendar-grid"></div>
         </div>
-        <div class="card"><h3>🔔 Предстоящие события</h3><div id="upcoming-events"></div></div>
+        <div class="card"><h3>🔔 Upcoming Events</h3><div id="upcoming-events"></div></div>
       </div>
       <div class="modal" id="day-modal">
         <div class="modal-content">
-          <div class="modal-header"><h2>События <span id="day-events-date"></span></h2><button class="modal-close" onclick="document.getElementById('day-modal').classList.remove('active')">&times;</button></div>
+          <div class="modal-header"><h2>Events <span id="day-events-date"></span></h2><button class="modal-close" onclick="document.getElementById('day-modal').classList.remove('active')">&times;</button></div>
           <div id="day-events-list"></div>
         </div>
       </div>
       <div class="modal" id="event-modal">
         <div class="modal-content">
-          <div class="modal-header"><h2>Новое событие</h2><button class="modal-close" onclick="document.getElementById('event-modal').classList.remove('active')">&times;</button></div>
+          <div class="modal-header"><h2>New Event</h2><button class="modal-close" onclick="document.getElementById('event-modal').classList.remove('active')">&times;</button></div>
           <form id="event-form" onsubmit="event.preventDefault(); CalendarModule.saveEvent()">
-            <div class="form-group"><label>Название</label><input type="text" id="event-title" class="form-control" required></div>
+            <div class="form-group"><label>Name</label><input type="text" id="event-title" class="form-control" required></div>
             <div class="form-row">
-              <div class="form-group"><label>Тип</label><select id="event-type" class="form-control"><option value="payment">Платёж</option><option value="income">Доход</option><option value="reminder">Напоминание</option><option value="other">Другое</option></select></div>
-              <div class="form-group"><label>Дата</label><input type="date" id="event-date" class="form-control" required></div>
+              <div class="form-group"><label>Type</label><select id="event-type" class="form-control"><option value="payment">Payment</option><option value="income">Income</option><option value="reminder">Reminder</option><option value="other">Other</option></select></div>
+              <div class="form-group"><label>Date</label><input type="date" id="event-date" class="form-control" required></div>
             </div>
             <div class="form-row">
-              <div class="form-group"><label>Сумма</label><input type="number" id="event-amount" class="form-control" step="0.01"></div>
-              <div class="form-group"><label>Цвет</label><input type="color" id="event-color" class="form-control" value="#5D5CDE"></div>
+              <div class="form-group"><label>Amount</label><input type="number" id="event-amount" class="form-control" step="0.01"></div>
+              <div class="form-group"><label>Color</label><input type="color" id="event-color" class="form-control" value="#5D5CDE"></div>
             </div>
-            <div class="form-group"><label>Описание</label><textarea id="event-description" class="form-control"></textarea></div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('event-modal').classList.remove('active')">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+            <div class="form-group"><label>Description</label><textarea id="event-description" class="form-control"></textarea></div>
+            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('event-modal').classList.remove('active')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
           </form>
         </div>
       </div>

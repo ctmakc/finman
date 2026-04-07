@@ -1,24 +1,24 @@
-// Функции для работы с банковскими API
+// Functions for banks connections API
 
-// ==================== КАСТОМНЫЕ БАНКИ ====================
+// ==================== CUSTOM BANKS ====================
 
-// Получение кастомных банков пользователя
+// Fetch custom banks user
 async function fetchCustomBanks() {
   try {
     const response = await fetchWithAuth('/api/bank-api/custom-banks');
     if (!response.ok) {
-      throw new Error('Не удалось получить список кастомных банков');
+      throw new Error('Failed to fetch custom banks list');
     }
     const data = await response.json();
     appState.customBanks = data;
     return data;
   } catch (error) {
-    console.error('Ошибка получения кастомных банков:', error);
+    console.error('Error fetching custom banks:', error);
     return [];
   }
 }
 
-// Создание кастомного банка
+// Create custom bank
 async function createCustomBank(bankData) {
   try {
     const response = await fetchWithAuth('/api/bank-api/custom-banks', {
@@ -29,20 +29,20 @@ async function createCustomBank(bankData) {
     const data = await response.json();
 
     if (!response.ok) {
-      showNotification(data.message || 'Ошибка создания банка', 'error');
+      showNotification(data.message || 'Failed to create bank', 'error');
       return null;
     }
 
-    showNotification('Кастомный банк успешно создан', 'success');
+    showNotification('Custom bank created successfully', 'success');
     return data.bank;
   } catch (error) {
-    console.error('Ошибка создания кастомного банка:', error);
-    showNotification('Произошла ошибка при создании банка', 'error');
+    console.error('Failed to create custom bank:', error);
+    showNotification('An error occurred on create bank', 'error');
     return null;
   }
 }
 
-// Удаление кастомного банка
+// Delete custom bank
 async function deleteCustomBank(bankId) {
   try {
     const response = await fetchWithAuth(`/api/bank-api/custom-banks/${bankId}`, {
@@ -51,20 +51,20 @@ async function deleteCustomBank(bankId) {
 
     if (!response.ok) {
       const data = await response.json();
-      showNotification(data.message || 'Ошибка удаления банка', 'error');
+      showNotification(data.message || 'Failed to delete bank', 'error');
       return false;
     }
 
-    showNotification('Кастомный банк удален', 'success');
+    showNotification('Custom bank deleted', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка удаления кастомного банка:', error);
-    showNotification('Произошла ошибка при удалении банка', 'error');
+    console.error('Failed to delete custom bank:', error);
+    showNotification('An error occurred on delete bank', 'error');
     return false;
   }
 }
 
-// Подключение к кастомному банку
+// Connect to custom bank
 async function connectToCustomBank(bankKey, apiKey) {
   try {
     const response = await fetchWithAuth(`/api/bank-api/connect-custom/${bankKey}/direct`, {
@@ -74,20 +74,20 @@ async function connectToCustomBank(bankKey, apiKey) {
 
     if (!response.ok) {
       const data = await response.json();
-      showNotification(data.message || 'Ошибка подключения к банку', 'error');
+      showNotification(data.message || 'Error bank connection', 'error');
       return false;
     }
 
-    showNotification('Банк успешно подключен', 'success');
+    showNotification('Bank successfully connected', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка подключения к кастомному банку:', error);
-    showNotification('Произошла ошибка при подключении', 'error');
+    console.error('Error connection к custom bank:', error);
+    showNotification('An error occurred during connection', 'error');
     return false;
   }
 }
 
-// Модальное окно создания кастомного банка
+// Create modal custom bank
 function showCreateCustomBankModal() {
   const modalId = 'create-custom-bank-modal';
 
@@ -95,18 +95,18 @@ function showCreateCustomBankModal() {
     <div class="modal-backdrop" id="${modalId}-backdrop">
       <div class="modal" id="${modalId}">
         <div class="modal-header">
-          <h2 class="modal-title">Добавить свой банк</h2>
+          <h2 class="modal-title">Add your bank</h2>
           <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
         </div>
 
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
-            <label for="${modalId}-name" class="form-label">Название банка *</label>
-            <input type="text" id="${modalId}-name" class="form-control" placeholder="Например: My Bank" required>
+            <label for="${modalId}-name" class="form-label">Bank name *</label>
+            <input type="text" id="${modalId}-name" class="form-control" placeholder="E.g.: My Bank" required>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-country" class="form-label">Код страны *</label>
+            <label for="${modalId}-country" class="form-label">Country code *</label>
             <input type="text" id="${modalId}-country" class="form-control" placeholder="UA, CA, US, etc." maxlength="3" required>
           </div>
 
@@ -116,7 +116,7 @@ function showCreateCustomBankModal() {
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-auth-type" class="form-label">Тип авторизации</label>
+            <label for="${modalId}-auth-type" class="form-label">Authorization type</label>
             <select id="${modalId}-auth-type" class="form-control">
               <option value="api_key">API Key / Token</option>
               <option value="bearer">Bearer Token</option>
@@ -126,13 +126,13 @@ function showCreateCustomBankModal() {
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-instructions" class="form-label">Инструкции получения токена</label>
-            <textarea id="${modalId}-instructions" class="form-control" rows="2" placeholder="Как получить API ключ..."></textarea>
+            <label for="${modalId}-instructions" class="form-label">Instructions for fetching token</label>
+            <textarea id="${modalId}-instructions" class="form-control" rows="2" placeholder="How to fetch API key..."></textarea>
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-            <button type="submit" class="btn btn-primary">Создать банк</button>
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create bank</button>
           </div>
         </form>
       </div>
@@ -174,9 +174,9 @@ function showCreateCustomBankModal() {
 
     if (result) {
       closeModal();
-      // Обновляем список банков
+      // Updating list banks
       await fetchBanksByRegion();
-      // Если открыто модальное окно подключения банков - обновляем его
+      // Update bank connection modal if open
       const bankConnectionModal = document.getElementById('bank-connection-modal-backdrop');
       if (bankConnectionModal) {
         bankConnectionModal.remove();
@@ -186,33 +186,33 @@ function showCreateCustomBankModal() {
   });
 }
 
-// ==================== ОСНОВНЫЕ ФУНКЦИИ ====================
+// ==================== MAIN FUNCTIONS ====================
 
-// Получение банков по регионам
+// Fetch banks by region
 async function fetchBanksByRegion() {
   try {
     const response = await fetchWithAuth('/api/bank-api/banks-by-region');
 
     if (!response.ok) {
-      throw new Error('Не удалось получить список банков');
+      throw new Error('Failed to fetch list banks');
     }
 
     const data = await response.json();
     appState.banksByRegion = data;
     return data;
   } catch (error) {
-    console.error('Ошибка получения списка банков:', error);
+    console.error('Error fetching list banks:', error);
     return {};
   }
 }
 
-// Получение банковских подключений
+// Fetch bank connections
 async function fetchBankConnections() {
     try {
       const response = await fetchWithAuth('/api/bank-api/connections');
       
       if (!response.ok) {
-        throw new Error('Не удалось получить подключения к банкам');
+        throw new Error('Failed to fetch bank connections');
       }
       
       const data = await response.json();
@@ -220,13 +220,13 @@ async function fetchBankConnections() {
       
       return data;
     } catch (error) {
-      console.error('Ошибка получения банковских подключений:', error);
-      showNotification('Ошибка получения банковских подключений', 'error');
+      console.error('Error fetching banks connections connections:', error);
+      showNotification('Error fetching banks connections connections', 'error');
       return [];
     }
   }
   
-  // Подключение к банку (получение URL авторизации)
+  // Bank connection (fetch OAuth URL)
   async function connectToBank(bankId) {
     try {
       const response = await fetchWithAuth(`/api/bank-api/connect/${bankId}`, {
@@ -235,20 +235,20 @@ async function fetchBankConnections() {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка подключения к банку', 'error');
+        showNotification(data.message || 'Error bank connection', 'error');
         return null;
       }
       
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Ошибка подключения к банку:', error);
-      showNotification('Произошла ошибка при подключении к банку', 'error');
+      console.error('Error bank connection:', error);
+      showNotification('An error occurred connecting to bank', 'error');
       return null;
     }
   }
   
-  // Прямое подключение к банку (через API-ключ)
+  // Direct connection via API key
   async function directConnectToBank(bankId, apiKey) {
     try {
       const response = await fetchWithAuth(`/api/bank-api/connect/${bankId}/direct`, {
@@ -258,20 +258,20 @@ async function fetchBankConnections() {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка подключения к банку', 'error');
+        showNotification(data.message || 'Error bank connection', 'error');
         return false;
       }
       
-      showNotification('Банк успешно подключен', 'success');
+      showNotification('Bank successfully connected', 'success');
       return true;
     } catch (error) {
-      console.error('Ошибка подключения к банку:', error);
-      showNotification('Произошла ошибка при подключении к банку', 'error');
+      console.error('Error bank connection:', error);
+      showNotification('An error occurred connecting to bank', 'error');
       return false;
     }
   }
   
-  // Обработка callback при подключении к банку
+  // Processing callback connecting to bank
   async function handleBankCallback(bankId, code, state) {
     try {
       const response = await fetchWithAuth(`/api/bank-api/connect/${bankId}/callback`, {
@@ -281,20 +281,20 @@ async function fetchBankConnections() {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка завершения подключения к банку', 'error');
+        showNotification(data.message || 'Error completing bank connection', 'error');
         return false;
       }
       
-      showNotification('Банк успешно подключен', 'success');
+      showNotification('Bank successfully connected', 'success');
       return true;
     } catch (error) {
-      console.error('Ошибка обработки callback:', error);
-      showNotification('Произошла ошибка при завершении подключения к банку', 'error');
+      console.error('Error обработки callback:', error);
+      showNotification('An error occurred completing bank connection', 'error');
       return false;
     }
   }
   
-  // Отключение от банка
+  // Disconnect from bank
   async function disconnectBank(connectionId) {
     try {
       const response = await fetchWithAuth(`/api/bank-api/disconnect/${connectionId}`, {
@@ -303,20 +303,20 @@ async function fetchBankConnections() {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка отключения от банка', 'error');
+        showNotification(data.message || 'Error disconnecting from bank', 'error');
         return false;
       }
       
-      showNotification('Подключение к банку успешно удалено', 'success');
+      showNotification('Bank connection deleted successfully', 'success');
       return true;
     } catch (error) {
-      console.error('Ошибка отключения от банка:', error);
-      showNotification('Произошла ошибка при отключении от банка', 'error');
+      console.error('Error disconnecting from bank:', error);
+      showNotification('An error occurred disconnecting from bank', 'error');
       return false;
     }
   }
   
-  // Синхронизация счетов с банком
+  // Sync accounts with bank
   async function syncBankAccounts(connectionId) {
     try {
       const response = await fetchWithAuth(`/api/bank-api/sync-accounts/${connectionId}`, {
@@ -325,25 +325,25 @@ async function fetchBankConnections() {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка синхронизации счетов', 'error');
+        showNotification(data.message || 'Error syncing accounts', 'error');
         return null;
       }
       
       const result = await response.json();
       
-      // Обновление списка счетов
+      // Update list accounts
       await fetchAccounts();
       
-      showNotification(`Синхронизировано ${result.accounts.length} счетов`, 'success');
+      showNotification(`Synced ${result.accounts.length} accounts`, 'success');
       return result;
     } catch (error) {
-      console.error('Ошибка синхронизации счетов:', error);
-      showNotification('Произошла ошибка при синхронизации счетов', 'error');
+      console.error('Error syncing accounts:', error);
+      showNotification('An error occurred syncing accounts', 'error');
       return null;
     }
   }
   
-  // Синхронизация транзакций с банком
+  // Sync transactions with bank
   async function syncBankTransactions(accountId, startDate, endDate) {
     try {
       const response = await fetchWithAuth(`/api/bank-api/sync-transactions/${accountId}`, {
@@ -353,31 +353,31 @@ async function fetchBankConnections() {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка синхронизации транзакций', 'error');
+        showNotification(data.message || 'Error syncing transactions', 'error');
         return null;
       }
       
       const result = await response.json();
-      showNotification(`Синхронизировано ${result.count} транзакций`, 'success');
+      showNotification(`Synced ${result.count} transactions`, 'success');
       return result;
     } catch (error) {
-      console.error('Ошибка синхронизации транзакций:', error);
-      showNotification('Произошла ошибка при синхронизации транзакций', 'error');
+      console.error('Error syncing transactions:', error);
+      showNotification('An error occurred syncing transactions', 'error');
       return null;
     }
   }
   
-  // Модальное окно подключения к банку
+  // Bank connection modal
   async function showBankConnectionModal() {
-    // Загружаем банки по регионам если ещё не загружены
+    // Load banks by region if not yet loaded
     if (!appState.banksByRegion || Object.keys(appState.banksByRegion).length === 0) {
       await fetchBanksByRegion();
     }
 
-    // Создание модального окна
+    // Create modal
     const modalId = 'bank-connection-modal';
 
-    // Генерация HTML для банков по регионам
+    // Generate HTML for banks by region
     const renderBanksByRegion = () => {
       const regions = appState.banksByRegion || {};
       let html = '';
@@ -399,7 +399,7 @@ async function fetchBankConnections() {
                     <p class="bank-auth-type">${bank.authType === 'api_key' ? '🔑 API Key' : bank.authType === 'oauth2' ? '🔐 OAuth2' : '🔒 ' + bank.authType}</p>
                   </div>
                   <button class="btn btn-sm btn-primary connect-bank-btn" data-bank-id="${bank.id}" data-auth-type="${bank.authType}" data-requires-redirect="${bank.requiresRedirect}">
-                    Підключити
+                    Connect
                   </button>
                 </div>
               `).join('')}
@@ -414,14 +414,14 @@ async function fetchBankConnections() {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal modal-lg" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Підключення банку / Connect Bank</h2>
+            <h2 class="modal-title">Connect Bank</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
 
           <div class="modal-body">
             <div class="add-custom-bank-section">
               <button type="button" class="btn btn-outline" id="${modalId}-add-custom">
-                <i class="fas fa-plus"></i> Добавить свой банк
+                <i class="fas fa-plus"></i> Add your bank
               </button>
             </div>
 
@@ -429,22 +429,22 @@ async function fetchBankConnections() {
               ${renderBanksByRegion()}
             </div>
 
-            <!-- Форма для прямого подключения (API key) -->
+            <!-- Direct connection form (API key) -->
             <div id="${modalId}-direct-form" class="direct-connection-form hidden">
               <h3 id="${modalId}-bank-name"></h3>
               <p id="${modalId}-instructions" class="bank-instructions"></p>
 
               <div class="form-group">
-                <label for="${modalId}-api-key" class="form-label">API Token / Токен</label>
-                <input type="text" id="${modalId}-api-key" class="form-control" placeholder="Вставте ваш токен..." required>
+                <label for="${modalId}-api-key" class="form-label">API Token</label>
+                <input type="text" id="${modalId}-api-key" class="form-control" placeholder="Paste your token..." required>
               </div>
 
               <div class="form-actions">
                 <button type="button" class="btn btn-outline" id="${modalId}-back-btn">
-                  ← Назад / Back
+                  ← Back / Back
                 </button>
                 <button type="button" class="btn btn-primary" id="${modalId}-connect-btn">
-                  Підключити / Connect
+                  Connect / Connect
                 </button>
               </div>
             </div>
@@ -453,10 +453,10 @@ async function fetchBankConnections() {
       </div>
     `;
     
-    // Добавление модального окна на страницу
+    // Add modal to page
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Получение ссылок на элементы
+    // Get element references
     const modal = document.getElementById(modalId);
     const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
     const modalClose = document.getElementById(`${modalId}-close`);
@@ -467,17 +467,17 @@ async function fetchBankConnections() {
     const backBtn = document.getElementById(`${modalId}-back-btn`);
     const connectBtn = document.getElementById(`${modalId}-connect-btn`);
     
-    // Функция закрытия модального окна
+    // Modal close function
     const closeModal = () => {
       modalBackdrop.classList.add('closing');
       
-      // Удаление модального окна после завершения анимации
+      // Remove modal after animation
       setTimeout(() => {
         document.body.removeChild(modalBackdrop);
       }, 300);
     };
     
-    // Обработчики событий
+    // Event handlers
     modalClose.addEventListener('click', closeModal);
     modalBackdrop.addEventListener('click', (e) => {
       if (e.target === modalBackdrop) {
@@ -485,7 +485,7 @@ async function fetchBankConnections() {
       }
     });
 
-    // Кнопка добавления кастомного банка
+    // Add custom bank button
     const addCustomBtn = document.getElementById(`${modalId}-add-custom`);
     if (addCustomBtn) {
       addCustomBtn.addEventListener('click', () => {
@@ -494,7 +494,7 @@ async function fetchBankConnections() {
       });
     }
 
-    // Находим банк по ID из всех регионов
+    // Find bank by ID across all regions
     const findBank = (bankId) => {
       for (const regionData of Object.values(appState.banksByRegion || {})) {
         const bank = regionData.banks.find(b => b.id === bankId);
@@ -503,7 +503,7 @@ async function fetchBankConnections() {
       return appState.supportedBanks?.find(b => b.id === bankId);
     };
 
-    // Обработчик для кнопок подключения
+    // Handler for connection buttons
     const connectBankButtons = document.querySelectorAll('.connect-bank-btn');
     connectBankButtons.forEach(button => {
       button.addEventListener('click', async () => {
@@ -515,7 +515,7 @@ async function fetchBankConnections() {
         if (!bank) return;
 
         if (requiresRedirect && authType === 'oauth2') {
-          // Банк требует OAuth2 авторизацию
+          // Bank requires OAuth2
           const authData = await connectToBank(bankId);
 
           if (authData && authData.url) {
@@ -525,7 +525,7 @@ async function fetchBankConnections() {
             closeModal();
             showBankAuthInstructionsModal(bank.name);
           } else if (authData && authData.directAuth) {
-            // Банк поддерживает прямую авторизацию несмотря на requiresRedirect
+            // Bank supports direct auth despite requiresRedirect
             bankNameElement.textContent = bank.name;
             instructionsElement.textContent = bank.tokenInstructions || '';
             instructionsElement.style.display = bank.tokenInstructions ? 'block' : 'none';
@@ -534,7 +534,7 @@ async function fetchBankConnections() {
             directForm.dataset.bankId = bankId;
           }
         } else {
-          // Прямое подключение через API-ключ/токен
+          // Direct connection via API key
           bankNameElement.textContent = bank.name;
           instructionsElement.textContent = bank.tokenInstructions || '';
           instructionsElement.style.display = bank.tokenInstructions ? 'block' : 'none';
@@ -547,25 +547,25 @@ async function fetchBankConnections() {
       });
     });
     
-    // Обработчик для кнопки "Назад"
+    // Handler for Back button
     backBtn.addEventListener('click', () => {
       directForm.classList.add('hidden');
       modal.querySelector('.banks-list').classList.remove('hidden');
       modal.querySelector('.add-custom-bank-section').classList.remove('hidden');
     });
     
-    // Обработчик для кнопки "Подключить" в форме прямого подключения
+    // Handler for для кнопки "Подkeyить" в форме прям connection
     connectBtn.addEventListener('click', async () => {
       const bankId = directForm.dataset.bankId;
       const isCustomBank = directForm.dataset.isCustom === 'true';
       const apiKey = apiKeyInput.value.trim();
 
       if (!apiKey) {
-        showNotification('Пожалуйста, введите API-ключ', 'error');
+        showNotification('Please, enter API-key', 'error');
         return;
       }
 
-      // Используем разные функции для кастомных и обычных банков
+      // Используем разные функции для custom и обыч banks
       const success = isCustomBank
         ? await connectToCustomBank(bankId, apiKey)
         : await directConnectToBank(bankId, apiKey);
@@ -573,10 +573,10 @@ async function fetchBankConnections() {
       if (success) {
         closeModal();
 
-        // Обновление списка подключений
+        // Update list connections
         await fetchBankConnections();
 
-        // Обновление интерфейса
+        // Update UI
         if (appState.currentPage === 'bank-connections') {
           renderBankConnectionsPage();
         }
@@ -586,7 +586,7 @@ async function fetchBankConnections() {
   
   // Модальное окно с инструкциями по авторизации
   function showBankAuthInstructionsModal(bankName) {
-    // Создание модального окна
+    // Create modal
     const modalId = 'bank-auth-instructions-modal';
     
     const modalHtml = `
@@ -603,31 +603,31 @@ async function fetchBankConnections() {
               <ol>
                 <li>В открывшемся окне войдите в свой аккаунт ${bankName}.</li>
                 <li>Предоставьте доступ к запрашиваемым данным.</li>
-                <li>После завершения вернитесь в это окно и нажмите "Я авторизовался".</li>
+                <li>После завершения вернитесь в это окно и нажмите "I signed in".</li>
               </ol>
               
               <div class="auth-code-form">
                 <div class="form-group">
                   <label for="${modalId}-code" class="form-label">Код авторизации</label>
-                  <input type="text" id="${modalId}-code" class="form-control" placeholder="Вставьте код из адресной строки...">
-                  <p class="form-hint">Если вы были перенаправлены на страницу с кодом, скопируйте его и вставьте сюда.</p>
+                  <input type="text" id="${modalId}-code" class="form-control" placeholder="Вставьте code of адресной строки...">
+                  <p class="form-hint">Если вы были перенаправлены на pagesу с codeом, скопируйте его и вставьте сюда.</p>
                 </div>
               </div>
             </div>
           </div>
           
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-            <button type="button" class="btn btn-primary" id="${modalId}-complete">Я авторизовался</button>
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="${modalId}-complete">I signed in</button>
           </div>
         </div>
       </div>
     `;
     
-    // Добавление модального окна на страницу
+    // Add modal to page
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Получение ссылок на элементы
+    // Get element references
     const modal = document.getElementById(modalId);
     const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
     const modalClose = document.getElementById(`${modalId}-close`);
@@ -635,17 +635,17 @@ async function fetchBankConnections() {
     const completeBtn = document.getElementById(`${modalId}-complete`);
     const codeInput = document.getElementById(`${modalId}-code`);
     
-    // Функция закрытия модального окна
+    // Modal close function
     const closeModal = () => {
       modalBackdrop.classList.add('closing');
       
-      // Удаление модального окна после завершения анимации
+      // Remove modal after animation
       setTimeout(() => {
         document.body.removeChild(modalBackdrop);
       }, 300);
     };
     
-    // Обработчики событий
+    // Event handlers
     modalClose.addEventListener('click', closeModal);
     cancelBtn.addEventListener('click', closeModal);
     modalBackdrop.addEventListener('click', (e) => {
@@ -654,35 +654,35 @@ async function fetchBankConnections() {
       }
     });
     
-    // Обработчик завершения авторизации
+    // Handler for завершения авторизации
     completeBtn.addEventListener('click', async () => {
       const code = codeInput.value.trim();
       const state = localStorage.getItem('bank_auth_state');
       const bankId = localStorage.getItem('bank_auth_id');
       
       if (!state || !bankId) {
-        showNotification('Ошибка авторизации: данные не сохранены', 'error');
+        showNotification('Error авторизации: data не сохранены', 'error');
         return;
       }
       
       if (!code) {
-        showNotification('Пожалуйста, введите код авторизации', 'warning');
+        showNotification('Please, enter code авторизации', 'warning');
         return;
       }
       
       const success = await handleBankCallback(bankId, code, state);
       
       if (success) {
-        // Очистка временных данных
+        // Очистка времен дан
         localStorage.removeItem('bank_auth_state');
         localStorage.removeItem('bank_auth_id');
         
         closeModal();
         
-        // Обновление списка подключений
+        // Update list connections
         await fetchBankConnections();
         
-        // Обновление интерфейса
+        // Update UI
         if (appState.currentPage === 'bank-connections') {
           renderBankConnectionsPage();
         }
@@ -690,12 +690,12 @@ async function fetchBankConnections() {
     });
   }
   
-  // Модальное окно синхронизации транзакций
+  // Модальное окно синхронизации transactions
   function showSyncTransactionsModal(account) {
-    // Создание модального окна
+    // Create modal
     const modalId = 'sync-transactions-modal';
     
-    // Получение текущей даты и даты 30 дней назад
+    // Fetch current date и даты 30 days назад
     const today = new Date();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -707,53 +707,53 @@ async function fetchBankConnections() {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Синхронизация транзакций</h2>
+            <h2 class="modal-title">Sync transactions</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <form id="${modalId}-form" class="modal-body">
-            <p>Синхронизация транзакций для счета <strong>${account.name}</strong>.</p>
+            <p>Sync transactions для accounts <strong>${account.name}</strong>.</p>
             
             <div class="form-group">
-              <label for="${modalId}-start-date" class="form-label">Начальная дата</label>
+              <label for="${modalId}-start-date" class="form-label">Start date</label>
               <input type="date" id="${modalId}-start-date" class="form-control" value="${thirtyDaysAgoStr}" required>
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-end-date" class="form-label">Конечная дата</label>
+              <label for="${modalId}-end-date" class="form-label">End date</label>
               <input type="date" id="${modalId}-end-date" class="form-control" value="${todayStr}" required>
             </div>
             
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-              <button type="submit" class="btn btn-primary">Синхронизировать</button>
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
+              <button type="submit" class="btn btn-primary">Sync</button>
             </div>
           </form>
         </div>
       </div>
     `;
     
-    // Добавление модального окна на страницу
+    // Add modal to page
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Получение ссылок на элементы
+    // Get element references
     const modal = document.getElementById(modalId);
     const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
     const modalClose = document.getElementById(`${modalId}-close`);
     const modalCancel = document.getElementById(`${modalId}-cancel`);
     const modalForm = document.getElementById(`${modalId}-form`);
     
-    // Функция закрытия модального окна
+    // Modal close function
     const closeModal = () => {
       modalBackdrop.classList.add('closing');
       
-      // Удаление модального окна после завершения анимации
+      // Remove modal after animation
       setTimeout(() => {
         document.body.removeChild(modalBackdrop);
       }, 300);
     };
     
-    // Обработчики событий
+    // Event handlers
     modalClose.addEventListener('click', closeModal);
     modalCancel.addEventListener('click', closeModal);
     modalBackdrop.addEventListener('click', (e) => {
@@ -762,7 +762,7 @@ async function fetchBankConnections() {
       }
     });
     
-    // Обработчик отправки формы
+    // Form submit handler
     modalForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -770,23 +770,23 @@ async function fetchBankConnections() {
       const endDate = document.getElementById(`${modalId}-end-date`).value;
       
       if (!startDate || !endDate) {
-        showNotification('Пожалуйста, укажите даты', 'error');
+        showNotification('Please, укажите даты', 'error');
         return;
       }
       
       // Проверка корректности дат
       if (new Date(startDate) > new Date(endDate)) {
-        showNotification('Начальная дата не может быть позже конечной', 'error');
+        showNotification('Start date не может быть позже конечной', 'error');
         return;
       }
       
-      // Синхронизация транзакций
+      // Sync transactions
       const result = await syncBankTransactions(account.id, startDate, endDate);
       
       if (result) {
         closeModal();
         
-        // Обновление интерфейса в зависимости от текущей страницы
+        // Update UI depending on current page
         if (appState.currentPage === 'transactions') {
           renderTransactionsPage();
         } else if (appState.currentPage === 'dashboard') {
@@ -796,7 +796,7 @@ async function fetchBankConnections() {
     });
   }
   
-  // Рендеринг списка банковских подключений
+  // Render list banks connections connections
   function renderBankConnectionsList(connections) {
     return connections.map(connection => `
       <div class="bank-connection-card card" data-connection-id="${connection.id}">
@@ -808,32 +808,32 @@ async function fetchBankConnections() {
             <h3 class="bank-connection-name">${connection.bankName}</h3>
             <p class="bank-connection-status">
               <span class="status-indicator ${connection.isActive ? 'active' : 'inactive'}"></span>
-              ${connection.isActive ? 'Активно' : 'Неактивно'}
+              ${connection.isActive ? 'Активно' : 'Неassetно'}
             </p>
           </div>
         </div>
         
         <div class="bank-connection-info">
-          <p class="bank-connection-date">Подключено: ${new Date(connection.createdAt).toLocaleDateString()}</p>
+          <p class="bank-connection-date">Подkeyено: ${new Date(connection.createdAt).toLocaleDateString()}</p>
           ${connection.expiresAt ? `<p class="bank-connection-expires">Действует до: ${new Date(connection.expiresAt).toLocaleDateString()}</p>` : ''}
         </div>
         
         <div class="bank-connection-actions">
           <button class="btn btn-sm btn-primary" data-connection-action="sync-accounts" data-connection-id="${connection.id}">
-            <i class="fas fa-sync"></i> Синхронизировать счета
+            <i class="fas fa-sync"></i> Sync accounts
           </button>
           <button class="btn btn-sm btn-outline" data-connection-action="sync-transactions" data-connection-id="${connection.id}">
-            <i class="fas fa-exchange-alt"></i> Синхронизировать транзакции
+            <i class="fas fa-exchange-alt"></i> Sync transactions
           </button>
           <button class="btn btn-sm btn-danger" data-connection-action="disconnect" data-connection-id="${connection.id}">
-            <i class="fas fa-unlink"></i> Отключить
+            <i class="fas fa-unlink"></i> Отkeyить
           </button>
         </div>
       </div>
     `).join('');
   }
   
-  // Обработка действий с банковскими подключениями
+  // Processing действий с banks connections connectionми
   async function handleConnectionAction(e) {
     const button = e.currentTarget;
     const action = button.dataset.connectionAction;
@@ -843,11 +843,11 @@ async function fetchBankConnections() {
     
     switch (action) {
       case 'sync-accounts':
-        // Синхронизация счетов
+        // Sync accounts
         const result = await syncBankAccounts(connectionId);
         
         if (result) {
-          // Обновление интерфейса
+          // Update UI
           if (appState.currentPage === 'bank-connections') {
             renderBankConnectionsPage();
           } else if (appState.currentPage === 'accounts') {
@@ -857,27 +857,27 @@ async function fetchBankConnections() {
         break;
         
       case 'sync-transactions':
-        // Получение счетов для данного подключения
+        // Fetch accounts для данн connection
         const connection = appState.bankConnections.find(conn => conn.id == connectionId);
         
         if (!connection || !connection.accountIds || connection.accountIds.length === 0) {
-          showNotification('Сначала необходимо синхронизировать счета', 'warning');
+          showNotification('Сstart необходимо синхронизировать accounts', 'warning');
           return;
         }
         
-        // Показ списка счетов для выбора
+        // Показ list accounts для выбора
         showAccountSelectionModal(connection);
         break;
         
       case 'disconnect':
-        if (confirm('Вы действительно хотите отключить этот банк?')) {
+        if (confirm('Вы действительно do you want to отkeyить этот банк?')) {
           const success = await disconnectBank(connectionId);
           
           if (success) {
-            // Обновление списка подключений
+            // Update list connections
             await fetchBankConnections();
             
-            // Обновление интерфейса
+            // Update UI
             renderBankConnectionsPage();
           }
         }
@@ -885,31 +885,31 @@ async function fetchBankConnections() {
     }
   }
   
-  // Модальное окно выбора счета для синхронизации транзакций
+  // Модальное окно выбора accounts для синхронизации transactions
   function showAccountSelectionModal(connection) {
-    // Фильтрация счетов по ID из подключения
+    // Фильтрация accounts by ID of connection
     const accountsForConnection = appState.accounts.filter(account => 
       connection.accountIds.includes(account.id)
     );
     
     if (accountsForConnection.length === 0) {
-      showNotification('Нет доступных счетов для синхронизации', 'warning');
+      showNotification('No доступ accounts для синхронизации', 'warning');
       return;
     }
     
-    // Создание модального окна
+    // Create modal
     const modalId = 'account-selection-modal';
     
     const modalHtml = `
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Выберите счет для синхронизации</h2>
+            <h2 class="modal-title">Select account для синхронизации</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <div class="modal-body">
-            <p>Выберите счет для синхронизации транзакций из банка ${connection.bankName}:</p>
+            <p>Select account для синхронизации transactions of bank ${connection.bankName}:</p>
             
             <div class="accounts-selection-list">
               ${accountsForConnection.map(account => `
@@ -919,13 +919,13 @@ async function fetchBankConnections() {
                   </div>
                   <div class="account-selection-details">
                     <h3 class="account-selection-name">${account.name}</h3>
-                    <p class="account-selection-number">${account.account_number || 'Без номера'}</p>
+                    <p class="account-selection-number">${account.account_number || 'No number'}</p>
                   </div>
                   <div class="account-selection-balance">
                     ${formatCurrency(account.balance, account.currency)}
                   </div>
                   <button class="btn btn-sm btn-primary select-account-btn" data-account-id="${account.id}">
-                    Выбрать
+                    Select
                   </button>
                 </div>
               `).join('')}
@@ -935,25 +935,25 @@ async function fetchBankConnections() {
       </div>
     `;
     
-    // Добавление модального окна на страницу
+    // Add modal to page
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Получение ссылок на элементы
+    // Get element references
     const modal = document.getElementById(modalId);
     const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
     const modalClose = document.getElementById(`${modalId}-close`);
     
-    // Функция закрытия модального окна
+    // Modal close function
     const closeModal = () => {
       modalBackdrop.classList.add('closing');
       
-      // Удаление модального окна после завершения анимации
+      // Remove modal after animation
       setTimeout(() => {
         document.body.removeChild(modalBackdrop);
       }, 300);
     };
     
-    // Обработчики событий
+    // Event handlers
     modalClose.addEventListener('click', closeModal);
     modalBackdrop.addEventListener('click', (e) => {
       if (e.target === modalBackdrop) {
@@ -961,7 +961,7 @@ async function fetchBankConnections() {
       }
     });
     
-    // Обработчик выбора счета
+    // Handler for выбора accounts
     const selectAccountButtons = document.querySelectorAll('.select-account-btn');
     selectAccountButtons.forEach(button => {
       button.addEventListener('click', () => {

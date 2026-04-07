@@ -1,36 +1,36 @@
-// Функции для работы с бюджетами
+// Functions for budgets
 
-// Получение всех бюджетов
+// Fetch all budgets
 async function fetchBudgets() {
   try {
     const response = await fetchWithAuth('/api/budgets');
     if (!response.ok) {
-      throw new Error('Не удалось получить бюджеты');
+      throw new Error('Failed to fetch budgets');
     }
     const data = await response.json();
     appState.budgets = data;
     return data;
   } catch (error) {
-    console.error('Ошибка получения бюджетов:', error);
+    console.error('Error fetching budgets:', error);
     return [];
   }
 }
 
-// Получение статистики по бюджетам
+// Fetch statistics по budgetм
 async function fetchBudgetStats() {
   try {
     const response = await fetchWithAuth('/api/budgets/stats');
     if (!response.ok) {
-      throw new Error('Не удалось получить статистику');
+      throw new Error('Failed to fetch statistics');
     }
     return await response.json();
   } catch (error) {
-    console.error('Ошибка получения статистики:', error);
+    console.error('Error fetching statistics:', error);
     return null;
   }
 }
 
-// Создание бюджета
+// Create budget
 async function createBudget(budgetData) {
   try {
     const response = await fetchWithAuth('/api/budgets', {
@@ -41,20 +41,20 @@ async function createBudget(budgetData) {
     const data = await response.json();
 
     if (!response.ok) {
-      showNotification(data.message || 'Ошибка создания бюджета', 'error');
+      showNotification(data.message || 'Failed to create budget', 'error');
       return null;
     }
 
-    showNotification('Бюджет создан', 'success');
+    showNotification('Budget created', 'success');
     return data.budget;
   } catch (error) {
-    console.error('Ошибка создания бюджета:', error);
-    showNotification('Произошла ошибка', 'error');
+    console.error('Failed to create budget:', error);
+    showNotification('An error occurred', 'error');
     return null;
   }
 }
 
-// Обновление бюджета
+// Update budget
 async function updateBudget(id, budgetData) {
   try {
     const response = await fetchWithAuth(`/api/budgets/${id}`, {
@@ -65,20 +65,20 @@ async function updateBudget(id, budgetData) {
     const data = await response.json();
 
     if (!response.ok) {
-      showNotification(data.message || 'Ошибка обновления', 'error');
+      showNotification(data.message || 'Failed to update', 'error');
       return null;
     }
 
-    showNotification('Бюджет обновлен', 'success');
+    showNotification('Budget updated', 'success');
     return data.budget;
   } catch (error) {
-    console.error('Ошибка обновления бюджета:', error);
-    showNotification('Произошла ошибка', 'error');
+    console.error('Failed to update budget:', error);
+    showNotification('An error occurred', 'error');
     return null;
   }
 }
 
-// Удаление бюджета
+// Delete budget
 async function deleteBudget(id) {
   try {
     const response = await fetchWithAuth(`/api/budgets/${id}`, {
@@ -87,24 +87,24 @@ async function deleteBudget(id) {
 
     if (!response.ok) {
       const data = await response.json();
-      showNotification(data.message || 'Ошибка удаления', 'error');
+      showNotification(data.message || 'Failed to delete', 'error');
       return false;
     }
 
-    showNotification('Бюджет удален', 'success');
+    showNotification('Budget deleted', 'success');
     return true;
   } catch (error) {
-    console.error('Ошибка удаления бюджета:', error);
-    showNotification('Произошла ошибка', 'error');
+    console.error('Failed to delete budget:', error);
+    showNotification('An error occurred', 'error');
     return false;
   }
 }
 
-// Отрисовка страницы бюджетов
+// Render budgets page
 async function renderBudgetsPage() {
   const mainContent = document.getElementById('main-content');
 
-  // Загружаем данные
+  // Load data
   const [budgets, stats] = await Promise.all([
     fetchBudgets(),
     fetchBudgetStats()
@@ -112,9 +112,9 @@ async function renderBudgetsPage() {
 
   mainContent.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">Бюджеты</h1>
+      <h1 class="page-title">Budgets</h1>
       <button class="btn btn-primary" id="add-budget-btn">
-        <i class="fas fa-plus"></i> Новый бюджет
+        <i class="fas fa-plus"></i> New budget
       </button>
     </div>
 
@@ -125,10 +125,10 @@ async function renderBudgetsPage() {
     </div>
   `;
 
-  // Обработчик добавления бюджета
+  // Handler for добавления budget
   document.getElementById('add-budget-btn').addEventListener('click', showCreateBudgetModal);
 
-  // Обработчики действий с бюджетами
+  // Обработчики действий с budgets
   document.querySelectorAll('.budget-edit-btn').forEach(btn => {
     btn.addEventListener('click', () => showEditBudgetModal(btn.dataset.id));
   });
@@ -138,7 +138,7 @@ async function renderBudgetsPage() {
   });
 }
 
-// Рендер статистики
+// Рендер statistics
 function renderBudgetStats(stats) {
   const overallStatus = stats.overallPercentUsed >= 100 ? 'over' :
                         stats.overallPercentUsed >= 80 ? 'warning' : 'ok';
@@ -149,7 +149,7 @@ function renderBudgetStats(stats) {
         <div class="stat-icon"><i class="fas fa-wallet"></i></div>
         <div class="stat-info">
           <div class="stat-value">${formatCurrency(stats.totalBudgetAmount)}</div>
-          <div class="stat-label">Общий бюджет</div>
+          <div class="stat-label">Total budget</div>
         </div>
       </div>
 
@@ -157,7 +157,7 @@ function renderBudgetStats(stats) {
         <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
         <div class="stat-info">
           <div class="stat-value">${formatCurrency(stats.totalSpent)}</div>
-          <div class="stat-label">Потрачено</div>
+          <div class="stat-label">Spent</div>
         </div>
       </div>
 
@@ -165,7 +165,7 @@ function renderBudgetStats(stats) {
         <div class="stat-icon"><i class="fas fa-piggy-bank"></i></div>
         <div class="stat-info">
           <div class="stat-value">${formatCurrency(stats.totalRemaining)}</div>
-          <div class="stat-label">Осталось</div>
+          <div class="stat-label">Remaining</div>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ function renderBudgetStats(stats) {
         <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
         <div class="stat-info">
           <div class="stat-value">${stats.overallPercentUsed}%</div>
-          <div class="stat-label">Использовано</div>
+          <div class="stat-label">Used</div>
         </div>
       </div>
     </div>
@@ -181,20 +181,20 @@ function renderBudgetStats(stats) {
     ${stats.overBudgetCount > 0 ? `
       <div class="alert alert-danger">
         <i class="fas fa-exclamation-triangle"></i>
-        ${stats.overBudgetCount} бюджет(ов) превышено!
+        ${stats.overBudgetCount} budgets over!
       </div>
     ` : ''}
 
     ${stats.nearLimitCount > 0 ? `
       <div class="alert alert-warning">
         <i class="fas fa-exclamation-circle"></i>
-        ${stats.nearLimitCount} бюджет(ов) близки к лимиту
+        ${stats.nearLimitCount} budgets near limit
       </div>
     ` : ''}
   `;
 }
 
-// Рендер карточек бюджетов
+// Рендер карточек budgets
 function renderBudgetCards(budgets) {
   return budgets.map(budget => {
     const statusClass = budget.isOverBudget ? 'over' :
@@ -224,13 +224,13 @@ function renderBudgetCards(budgets) {
           </div>
           <div class="progress-labels">
             <span class="spent">${formatCurrency(budget.spent)}</span>
-            <span class="total">из ${formatCurrency(budget.amount)}</span>
+            <span class="total">of ${formatCurrency(budget.amount)}</span>
           </div>
         </div>
 
         <div class="budget-footer">
           <span class="budget-remaining ${budget.remaining < 0 ? 'negative' : ''}">
-            ${budget.remaining >= 0 ? 'Осталось: ' : 'Превышено на: '}
+            ${budget.remaining >= 0 ? 'Remaining: ' : 'Overо на: '}
             ${formatCurrency(Math.abs(budget.remaining))}
           </span>
           <span class="budget-period">${getPeriodLabel(budget.period)}</span>
@@ -240,33 +240,33 @@ function renderBudgetCards(budgets) {
   }).join('');
 }
 
-// Рендер пустого состояния
+// Рендер пуст state
 function renderEmptyBudgets() {
   return `
     <div class="empty-state">
       <i class="fas fa-piggy-bank"></i>
-      <h3>Нет бюджетов</h3>
-      <p>Создайте первый бюджет, чтобы контролировать свои расходы</p>
+      <h3>No budgets</h3>
+      <p>Create первый budget, to контролировать свои expenses</p>
       <button class="btn btn-primary" onclick="showCreateBudgetModal()">
-        <i class="fas fa-plus"></i> Создать бюджет
+        <i class="fas fa-plus"></i> Create budget
       </button>
     </div>
   `;
 }
 
-// Получение метки периода
+// Fetch метки period
 function getPeriodLabel(period) {
   const labels = {
-    daily: 'Ежедневный',
-    weekly: 'Еженедельный',
-    monthly: 'Ежемесячный',
-    yearly: 'Годовой',
-    custom: 'Произвольный'
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    yearly: 'Annual',
+    custom: 'Custom'
   };
   return labels[period] || period;
 }
 
-// Модальное окно создания бюджета
+// Create modal budget
 function showCreateBudgetModal() {
   const modalId = 'create-budget-modal';
 
@@ -274,30 +274,30 @@ function showCreateBudgetModal() {
     <div class="modal-backdrop" id="${modalId}-backdrop">
       <div class="modal" id="${modalId}">
         <div class="modal-header">
-          <h2 class="modal-title">Новый бюджет</h2>
+          <h2 class="modal-title">New budget</h2>
           <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
         </div>
 
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
-            <label for="${modalId}-name" class="form-label">Название *</label>
-            <input type="text" id="${modalId}-name" class="form-control" placeholder="Например: Продукты" required>
+            <label for="${modalId}-name" class="form-label">Name *</label>
+            <input type="text" id="${modalId}-name" class="form-control" placeholder="E.g.: Groceries" required>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-category" class="form-label">Категория</label>
-            <input type="text" id="${modalId}-category" class="form-control" placeholder="Категория расходов (необязательно)">
-            <small class="form-hint">Оставьте пустым для общего бюджета на все расходы</small>
+            <label for="${modalId}-category" class="form-label">Category</label>
+            <input type="text" id="${modalId}-category" class="form-control" placeholder="Category expenses (optional)">
+            <small class="form-hint">Leave empty для общего budget на all expenses</small>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="${modalId}-amount" class="form-label">Сумма *</label>
+              <label for="${modalId}-amount" class="form-label">Amount *</label>
               <input type="number" id="${modalId}-amount" class="form-control" min="1" step="0.01" required>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-currency" class="form-label">Валюта</label>
+              <label for="${modalId}-currency" class="form-label">Currency</label>
               <select id="${modalId}-currency" class="form-control">
                 <option value="UAH">UAH</option>
                 <option value="USD">USD</option>
@@ -308,23 +308,23 @@ function showCreateBudgetModal() {
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-period" class="form-label">Период</label>
+            <label for="${modalId}-period" class="form-label">Period</label>
             <select id="${modalId}-period" class="form-control">
-              <option value="monthly">Ежемесячный</option>
-              <option value="weekly">Еженедельный</option>
-              <option value="daily">Ежедневный</option>
-              <option value="yearly">Годовой</option>
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="daily">Daily</option>
+              <option value="yearly">Annual</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-notify" class="form-label">Уведомлять при достижении (%)</label>
+            <label for="${modalId}-notify" class="form-label">Notify when reaching (%)</label>
             <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="80">
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-            <button type="submit" class="btn btn-primary">Создать</button>
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create</button>
           </div>
         </form>
       </div>
@@ -370,11 +370,11 @@ function showCreateBudgetModal() {
   });
 }
 
-// Модальное окно редактирования бюджета
+// Модальное окно редактирования budget
 async function showEditBudgetModal(id) {
   const budget = appState.budgets?.find(b => b.id == id);
   if (!budget) {
-    showNotification('Бюджет не найден', 'error');
+    showNotification('Budget not found', 'error');
     return;
   }
 
@@ -384,29 +384,29 @@ async function showEditBudgetModal(id) {
     <div class="modal-backdrop" id="${modalId}-backdrop">
       <div class="modal" id="${modalId}">
         <div class="modal-header">
-          <h2 class="modal-title">Редактировать бюджет</h2>
+          <h2 class="modal-title">Edit budget</h2>
           <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
         </div>
 
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
-            <label for="${modalId}-name" class="form-label">Название *</label>
+            <label for="${modalId}-name" class="form-label">Name *</label>
             <input type="text" id="${modalId}-name" class="form-control" value="${budget.name}" required>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-category" class="form-label">Категория</label>
+            <label for="${modalId}-category" class="form-label">Category</label>
             <input type="text" id="${modalId}-category" class="form-control" value="${budget.category || ''}">
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="${modalId}-amount" class="form-label">Сумма *</label>
+              <label for="${modalId}-amount" class="form-label">Amount *</label>
               <input type="number" id="${modalId}-amount" class="form-control" min="1" step="0.01" value="${budget.amount}" required>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-currency" class="form-label">Валюта</label>
+              <label for="${modalId}-currency" class="form-label">Currency</label>
               <select id="${modalId}-currency" class="form-control">
                 <option value="UAH" ${budget.currency === 'UAH' ? 'selected' : ''}>UAH</option>
                 <option value="USD" ${budget.currency === 'USD' ? 'selected' : ''}>USD</option>
@@ -417,23 +417,23 @@ async function showEditBudgetModal(id) {
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-period" class="form-label">Период</label>
+            <label for="${modalId}-period" class="form-label">Period</label>
             <select id="${modalId}-period" class="form-control">
-              <option value="monthly" ${budget.period === 'monthly' ? 'selected' : ''}>Ежемесячный</option>
-              <option value="weekly" ${budget.period === 'weekly' ? 'selected' : ''}>Еженедельный</option>
-              <option value="daily" ${budget.period === 'daily' ? 'selected' : ''}>Ежедневный</option>
-              <option value="yearly" ${budget.period === 'yearly' ? 'selected' : ''}>Годовой</option>
+              <option value="monthly" ${budget.period === 'monthly' ? 'selected' : ''}>Monthly</option>
+              <option value="weekly" ${budget.period === 'weekly' ? 'selected' : ''}>Weekly</option>
+              <option value="daily" ${budget.period === 'daily' ? 'selected' : ''}>Daily</option>
+              <option value="yearly" ${budget.period === 'yearly' ? 'selected' : ''}>Annual</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-notify" class="form-label">Уведомлять при (%)</label>
+            <label for="${modalId}-notify" class="form-label">Notify at (%)</label>
             <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="${budget.notifyAtPercent}">
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
           </div>
         </form>
       </div>
@@ -479,9 +479,9 @@ async function showEditBudgetModal(id) {
   });
 }
 
-// Подтверждение удаления бюджета
+// Confirmation удаления budget
 async function confirmDeleteBudget(id) {
-  if (confirm('Вы уверены, что хотите удалить этот бюджет?')) {
+  if (confirm('Are you sure you want to delete this budget?')) {
     const result = await deleteBudget(id);
     if (result) {
       renderBudgetsPage();
@@ -489,17 +489,17 @@ async function confirmDeleteBudget(id) {
   }
 }
 
-// Виджет бюджетов для дашборда
+// Widget budgets для dashboardа
 async function renderBudgetWidget() {
   const stats = await fetchBudgetStats();
 
   if (!stats || stats.totalBudgets === 0) {
     return `
       <div class="widget budget-widget">
-        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Бюджеты</h3>
+        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Budgets</h3>
         <div class="widget-empty">
-          <p>Нет активных бюджетов</p>
-          <button class="btn btn-sm btn-primary" onclick="navigateTo('budgets')">Создать бюджет</button>
+          <p>No active budgets</p>
+          <button class="btn btn-sm btn-primary" onclick="navigateTo('budgets')">Create budget</button>
         </div>
       </div>
     `;
@@ -520,15 +520,15 @@ async function renderBudgetWidget() {
   return `
     <div class="widget budget-widget">
       <div class="widget-header">
-        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Бюджеты</h3>
-        <a href="#" onclick="navigateTo('budgets'); return false;" class="widget-link">Все</a>
+        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Budgets</h3>
+        <a href="#" onclick="navigateTo('budgets'); return false;" class="widget-link">All</a>
       </div>
       <div class="widget-content">
         ${budgetsHtml}
       </div>
       ${stats.overBudgetCount > 0 ? `
         <div class="widget-alert alert-danger">
-          ${stats.overBudgetCount} бюджет(ов) превышено
+          ${stats.overBudgetCount} budgets over
         </div>
       ` : ''}
     </div>
