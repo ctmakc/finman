@@ -326,12 +326,39 @@ async function fetchTransactions(filters = {}) {
     const typeSelect = document.getElementById(`${modalId}-type`);
     const amountInput = document.getElementById(`${modalId}-amount`);
     
-    // Загрузка categories
+    // Load categories
     fetchCategories().then(categories => {
       const categoriesDatalist = document.getElementById(`${modalId}-categories`);
-      categoriesDatalist.innerHTML = categories.map(category => `<option value="${category}">`).join('');
+      categoriesDatalist.innerHTML = categories.map(c => `<option value="${c}">`).join('');
     });
-    
+
+    // Auto-categorize on description blur
+    const descInput = document.getElementById(`${modalId}-description`);
+    const catInput = document.getElementById(`${modalId}-category`);
+    if (descInput && catInput) {
+      descInput.addEventListener('blur', async () => {
+        const desc = descInput.value.trim();
+        if (!desc || catInput.value) return;
+        try {
+          const token = localStorage.getItem('token');
+          const resp = await fetch('/api/ai/categorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ description: desc, amount: document.getElementById(`${modalId}-amount`).value }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.category && data.category !== 'Other') {
+              catInput.value = data.category;
+              catInput.style.borderColor = '#5D5CDE';
+              catInput.title = 'Category suggested by AI';
+              setTimeout(() => { catInput.style.borderColor = ''; }, 2000);
+            }
+          }
+        } catch (_e) { /* auto-categorize is best-effort */ }
+      });
+    }
+
     // Modal close function
     const closeModal = () => {
       modalBackdrop.classList.add('closing');

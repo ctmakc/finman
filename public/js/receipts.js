@@ -53,7 +53,7 @@ const ReceiptsModule = {
         </div>
         <div class="receipt-status">
           <span class="badge ${r.ocr_status === 'completed' ? 'badge-success' : r.ocr_status === 'failed' ? 'badge-danger' : 'badge-warning'}">
-            ${r.ocr_status === 'completed' ? '✓ Распознан' : r.ocr_status === 'failed' ? '✕ Error' : r.ocr_status === 'manual' ? '✎ Вручную' : '⏳ Processing'}
+            ${r.ocr_status === 'completed' ? '✓ Scanned' : r.ocr_status === 'failed' ? '✕ Error' : r.ocr_status === 'manual' ? '✎ Manual' : '⏳ Processing'}
           </span>
           ${r.is_processed ? '<span class="badge badge-success">Transaction created</span>' : ''}
         </div>
@@ -106,20 +106,44 @@ const ReceiptsModule = {
 
   async uploadReceipt() {
     const imageData = document.getElementById('image-data').value;
-    if (!imageData) { alert('Select an image'); return; }
+    if (!imageData) { alert('Please select an image'); return; }
+
+    const statusEl = document.getElementById('upload-status');
+    if (statusEl) { statusEl.textContent = '🤖 Scanning receipt...'; }
 
     try {
-      const response = await fetch('/api/receipts/upload', {
+      // Extract base64 data (strip data URL prefix)
+      const base64 = imageData.split(',')[1] || imageData;
+      const mimeMatch = imageData.match(/data:([^;]+);/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+
+      // Call AI vision endpoint
+      const token = localStorage.getItem('token');
+      const aiResp = await fetch('/api/ai/receipt', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ image_data: imageData })
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ image: base64, mimeType }),
       });
-      const result = await response.json();
+
+      let aiData = {};
+      if (aiResp.ok) {
+        aiData = await aiResp.json();
+        if (statusEl) { statusEl.textContent = '✓ Scanned! Review and save.'; }
+      } else {
+        if (statusEl) { statusEl.textContent = 'AI scan failed — fill manually.'; }
+      }
+
+      // Pre-fill manual form with scanned data
       document.getElementById('upload-modal').classList.remove('active');
-      alert('Receipt uploaded! ID: ' + result.id);
-      setTimeout(() => this.loadReceipts(), 2000);
+      document.getElementById('receipt-id').value = '';
+      document.getElementById('receipt-merchant').value = aiData.merchant || '';
+      document.getElementById('receipt-amount').value = aiData.total || '';
+      document.getElementById('receipt-date').value = aiData.date || new Date().toISOString().split('T')[0];
+      document.getElementById('receipt-category').value = '';
+      document.getElementById('manual-modal-title').textContent = 'Add receipt manually';
+      document.getElementById('manual-modal').classList.add('active');
     } catch (error) {
-      alert('Failed to load');
+      alert('Failed to scan receipt');
     }
   },
 
@@ -132,7 +156,7 @@ const ReceiptsModule = {
     document.getElementById('receipt-amount').value = receipt.total_amount || '';
     document.getElementById('receipt-date').value = receipt.receipt_date || '';
     document.getElementById('receipt-category').value = receipt.category || '';
-    document.getElementById('manual-modal-title').textContent = 'Edit чек';
+    document.getElementById('manual-modal-title').textContent = 'Edit receipt';
     document.getElementById('manual-modal').classList.add('active');
   },
 
