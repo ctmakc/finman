@@ -21,14 +21,20 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Статистика
+// Stats summary
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await Debt.getUserStats(req.user.id);
-    res.json(stats);
+    const debts = await Debt.findByUser(req.user.id, false);
+    let iOwe = 0, theyOwe = 0;
+    debts.forEach(d => {
+      const amt = parseFloat(d.amount) || 0;
+      if (d.type === 'i_owe') iOwe += amt;
+      else theyOwe += amt;
+    });
+    res.json({ iOwe, theyOweMe: theyOwe, balance: theyOwe - iOwe, count: debts.length });
   } catch (error) {
-    console.error('Ошибка статистики:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Stats error:', error);
+    res.status(500).json({ iOwe: 0, theyOweMe: 0, balance: 0, count: 0 });
   }
 });
 

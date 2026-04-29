@@ -54,7 +54,7 @@ const NetWorthModule = {
     container.innerHTML = `
       <div class="networth-main">
         <div class="networth-value">
-          <span class="label">Чистая value</span>
+          <span class="label">Net Worth</span>
           <span class="value ${this.current.netWorth >= 0 ? 'positive' : 'negative'}">${this.current.netWorth.toLocaleString()} $</span>
           ${change !== 0 ? `<span class="change ${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${change.toLocaleString()} $ (${changePercent}%)</span>` : ''}
         </div>
@@ -74,12 +74,12 @@ const NetWorthModule = {
 
     const ab = this.current.assetsBreakdown;
     container.innerHTML = `
-      <div class="card"><h3>📊 Разбивка assetов</h3>
+      <div class="card"><h3>📊 Asset breakdown</h3>
         <div class="breakdown-list">
           <div class="breakdown-row"><span>Accounts</span><span>${(ab.accounts?.total || 0).toLocaleString()} $</span></div>
           <div class="breakdown-row"><span>Investments</span><span>${(ab.investments?.total || 0).toLocaleString()} $</span></div>
           <div class="breakdown-row"><span>Manual assets</span><span>${(ab.manualAssets?.total || 0).toLocaleString()} $</span></div>
-          <div class="breakdown-row"><span>Вам должны</span><span>${(ab.receivables?.total || 0).toLocaleString()} $</span></div>
+          <div class="breakdown-row"><span>Youолжны</span><span>${(ab.receivables?.total || 0).toLocaleString()} $</span></div>
         </div>
       </div>
     `;
@@ -182,7 +182,7 @@ const NetWorthModule = {
     return `
       <div class="networth-page">
         <div class="page-header"><h1>💰 Net Worth</h1>
-          <button class="btn btn-primary" onclick="NetWorthModule.saveSnapshot()">📷 Save снимок</button>
+          <button class="btn btn-primary" onclick="NetWorthModule.saveSnapshot()">📷 Save snapshot</button>
         </div>
         <div id="networth-summary" class="card networth-summary"></div>
         <div class="grid-2">

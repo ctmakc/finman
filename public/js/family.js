@@ -268,9 +268,10 @@ async function fetchAccountPermissions(accountId) {
 // ==================== UI ====================
 
 function renderFamilyPage() {
-  const app = document.getElementById('app');
+  const mc = document.getElementById('main-content');
+  if (!mc) return;
 
-  app.innerHTML = `
+  mc.innerHTML = `
     <div class="family-page">
       <header class="page-header">
         <h1><i class="fas fa-users"></i> Family Access</h1>
@@ -337,9 +338,10 @@ async function openFamilyDetails(familyId) {
   const family = await fetchFamilyDetails(familyId);
   if (!family) return;
 
-  const app = document.getElementById('app');
+  const mc = document.getElementById('main-content');
+  if (!mc) return;
 
-  app.innerHTML = `
+  mc.innerHTML = `
     <div class="family-details-page">
       <header class="page-header">
         <button class="btn-back" onclick="renderFamilyPage()">
@@ -664,9 +666,4 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function formatCurrency(amount, currency = 'UAH') {
-  return new Intl.NumberFormat('uk-UA', {
-    style: 'currency',
-    currency: currency
-  }).format(amount);
-}
+// formatCurrency defined in app.js

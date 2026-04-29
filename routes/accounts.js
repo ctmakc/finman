@@ -50,26 +50,26 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
     
-    // Создание счета
+    // Create account with zero balance; initial transaction will set it
     const newAccount = await Account.create({
       userId: req.user.id,
       name,
       accountNumber,
       bankName,
       currency,
-      balance: balance || 0,
+      balance: 0,
       accountType
     });
     
-    // Если указан начальный баланс, создать стартовую транзакцию
+    // If an opening balance was specified, create the initial transaction
     if (balance && balance !== 0) {
       await Transaction.create({
         accountId: newAccount.id,
         userId: req.user.id,
         date: new Date().toISOString().split('T')[0],
-        description: 'Начальный баланс',
-        category: 'Начальный баланс',
-        amount: balance,
+        description: 'Opening balance',
+        category: 'Opening balance',
+        amount: Math.abs(balance),
         type: balance > 0 ? 'income' : 'expense'
       });
     }

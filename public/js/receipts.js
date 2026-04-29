@@ -36,7 +36,7 @@ const ReceiptsModule = {
     if (!container) return;
 
     if (this.receipts.length === 0) {
-      container.innerHTML = '<div class="empty-state"><p>No loaded чеков</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>No receipts uploaded</p></div>';
       return;
     }
 
@@ -183,9 +183,9 @@ const ReceiptsModule = {
 
   async createTransaction(id) {
     const accounts = await fetch('/api/accounts', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json());
-    if (accounts.length === 0) { alert('Сstart создайте счёт'); return; }
+    if (accounts.length === 0) { alert('Сstart создайте account'); return; }
 
-    const accountId = prompt('Select ID счёта:\n' + accounts.map(a => `${a.id}: ${a.name}`).join('\n'));
+    const accountId = prompt('Select ID accountа:\n' + accounts.map(a => `${a.id}: ${a.name}`).join('\n'));
     if (!accountId) return;
 
     try {
@@ -215,10 +215,10 @@ const ReceiptsModule = {
   getPage() {
     return `
       <div class="receipts-page">
-        <div class="page-header"><h1>🧾 Сканер чеков</h1>
+        <div class="page-header"><h1>🧾 Receipt Scanner</h1>
           <div class="btn-group">
-            <button class="btn btn-primary" onclick="ReceiptsModule.showUploadModal()">📷 Load фото</button>
-            <button class="btn btn-secondary" onclick="ReceiptsModule.showManualModal()">✏️ Ввести вручную</button>
+            <button class="btn btn-primary" onclick="ReceiptsModule.showUploadModal()">📷 Upload photo</button>
+            <button class="btn btn-secondary" onclick="ReceiptsModule.showManualModal()">✏️ Enter manually</button>
           </div>
         </div>
         <div class="stats-grid" id="receipts-stats"></div>
@@ -226,7 +226,7 @@ const ReceiptsModule = {
       </div>
       <div class="modal" id="upload-modal">
         <div class="modal-content">
-          <div class="modal-header"><h2>Load чек</h2><button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('active')">&times;</button></div>
+          <div class="modal-header"><h2>Upload receipt</h2><button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('active')">&times;</button></div>
           <form id="upload-form" onsubmit="event.preventDefault(); ReceiptsModule.uploadReceipt()">
             <input type="hidden" id="image-data">
             <div class="form-group"><label>Фото чека</label><input type="file" accept="image/*" class="form-control" onchange="ReceiptsModule.handleFileSelect(event)"></div>

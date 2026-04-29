@@ -13,7 +13,7 @@ class Account {
           accountData.name,
           accountData.accountNumber || '',
           accountData.bankName || '',
-          accountData.currency || 'RUB',
+          accountData.currency || 'USD',
           accountData.balance || 0,
           accountData.accountType || 'checking'
         ]

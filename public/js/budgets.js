@@ -246,7 +246,7 @@ function renderEmptyBudgets() {
     <div class="empty-state">
       <i class="fas fa-piggy-bank"></i>
       <h3>No budgets</h3>
-      <p>Create первый budget, to контролировать свои expenses</p>
+      <p>Create your first budget, to to track your expenses</p>
       <button class="btn btn-primary" onclick="showCreateBudgetModal()">
         <i class="fas fa-plus"></i> Create budget
       </button>

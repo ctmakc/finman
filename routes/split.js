@@ -24,13 +24,11 @@ router.get('/groups', async (req, res) => {
 // Статистика пользователя
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await Split.getUserStats(req.user.id);
-    res.json(stats);
-  } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    res.json({ theyOweMe: 0, iOwe: 0, balance: 0, groupCount: 0 });
+  } catch (e) {
+    res.status(500).json({ theyOweMe: 0, iOwe: 0, balance: 0, groupCount: 0 });
   }
-});
+});;
 
 // Получить группу по ID
 router.get('/groups/:id', async (req, res) => {

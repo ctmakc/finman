@@ -107,192 +107,152 @@ document.addEventListener('DOMContentLoaded', () => {
   // Render authenticated user interface
   function renderAuthenticatedUI() {
     const app = document.getElementById('app');
-    
+    const initials = (appState.user.fullName || appState.user.username || '?').charAt(0).toUpperCase();
+
     app.innerHTML = `
-      <header class="header">
-        <div class="container header-content">
-          <div class="logo">
-            <a href="/">Finance Manager</a>
+      <div class="app-layout">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-logo">
+            <span class="sidebar-logo-icon">💰</span>
+            <span class="sidebar-logo-text">Finman</span>
+            <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">
+              <i class="fas fa-chevron-left"></i>
+            </button>
           </div>
-          <div class="user-info">
-            <span class="user-name">${appState.user.username}</span>
-            <button id="logout-btn" class="btn btn-sm btn-outline">Log out</button>
+
+          <nav class="sidebar-nav">
+            <div class="nav-group">
+              <div class="nav-group-label">Main</div>
+              <a href="#" class="nav-link" data-page="dashboard"><i class="fas fa-home"></i><span>Dashboard</span></a>
+              <a href="#" class="nav-link" data-page="accounts"><i class="fas fa-wallet"></i><span>Accounts</span></a>
+              <a href="#" class="nav-link" data-page="transactions"><i class="fas fa-arrows-alt-h"></i><span>Transactions</span></a>
+            </div>
+            <div class="nav-group">
+              <div class="nav-group-label">Planning</div>
+              <a href="#" class="nav-link" data-page="budgets"><i class="fas fa-piggy-bank"></i><span>Budgets</span></a>
+              <a href="#" class="nav-link" data-page="goals"><i class="fas fa-bullseye"></i><span>Goals</span></a>
+              <a href="#" class="nav-link" data-page="recurring"><i class="fas fa-sync-alt"></i><span>Recurring</span></a>
+              <a href="#" class="nav-link" data-page="subscriptions"><i class="fas fa-box"></i><span>Subscriptions</span></a>
+            </div>
+            <div class="nav-group">
+              <div class="nav-group-label">Analyze</div>
+              <a href="#" class="nav-link" data-page="analytics"><i class="fas fa-chart-bar"></i><span>Analytics</span></a>
+              <a href="#" class="nav-link" data-page="networth"><i class="fas fa-gem"></i><span>Net Worth</span></a>
+              <a href="#" class="nav-link" data-page="investments"><i class="fas fa-chart-line"></i><span>Investments</span></a>
+              <a href="#" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i><span>Reports</span></a>
+              <a href="#" class="nav-link" data-page="forecast"><i class="fas fa-magic"></i><span>Forecast</span></a>
+            </div>
+            <div class="nav-group">
+              <div class="nav-group-label">Tools</div>
+              <a href="#" class="nav-link" data-page="receipts"><i class="fas fa-receipt"></i><span>Receipts</span></a>
+              <a href="#" class="nav-link" data-page="debts"><i class="fas fa-hand-holding-usd"></i><span>Debts</span></a>
+              <a href="#" class="nav-link" data-page="split"><i class="fas fa-user-friends"></i><span>Split</span></a>
+              <a href="#" class="nav-link" data-page="family"><i class="fas fa-users"></i><span>Family</span></a>
+              <a href="#" class="nav-link" data-page="currency"><i class="fas fa-coins"></i><span>Currencies</span></a>
+              <a href="#" class="nav-link" data-page="bank-connections"><i class="fas fa-university"></i><span>Banks</span></a>
+              <a href="#" class="nav-link" data-page="calendar"><i class="fas fa-calendar-alt"></i><span>Calendar</span></a>
+            </div>
+          </nav>
+
+          <div class="sidebar-footer">
+            <div class="sidebar-user">
+              <div class="sidebar-avatar">${initials}</div>
+              <div class="sidebar-user-info">
+                <div class="sidebar-username">${appState.user.username}</div>
+                <div class="sidebar-role">Personal account</div>
+              </div>
+            </div>
+            <button id="logout-btn" class="sidebar-logout" title="Log out">
+              <i class="fas fa-sign-out-alt"></i>
+            </button>
           </div>
+        </aside>
+
+        <div class="main-area">
+          <header class="topbar">
+            <button class="topbar-menu-btn" id="sidebar-mobile-btn">
+              <i class="fas fa-bars"></i>
+            </button>
+            <div class="topbar-breadcrumb" id="topbar-breadcrumb">Dashboard</div>
+            <div class="topbar-actions">
+              <button class="topbar-icon-btn" title="AI Assistant" id="ai-chat-open-btn">
+                <i class="fas fa-robot"></i>
+              </button>
+            </div>
+          </header>
+          <main id="main-content" class="main-content">
+            <div class="loading-state">
+              <div class="spinner"></div>
+            </div>
+          </main>
         </div>
-      </header>
-      
-      <nav class="navigation">
-        <div class="container nav-container">
-          <button class="mobile-menu-toggle" id="mobile-menu-toggle">
-            <i class="fas fa-bars"></i>
-          </button>
-          <ul class="nav-list" id="nav-list">
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="dashboard">
-                <i class="fas fa-chart-line"></i> Dashboard
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="accounts">
-                <i class="fas fa-wallet"></i> Accounts
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="transactions">
-                <i class="fas fa-exchange-alt"></i> Transactions
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="budgets">
-                <i class="fas fa-piggy-bank"></i> Budgets
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="bank-connections">
-                <i class="fas fa-university"></i> Banks
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="family">
-                <i class="fas fa-users"></i> Family
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="recurring">
-                <i class="fas fa-sync-alt"></i> Payments
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="currency">
-                <i class="fas fa-coins"></i> Currencies
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="goals">
-                <i class="fas fa-bullseye"></i> Goals
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="debts">
-                <i class="fas fa-hand-holding-usd"></i> Debts
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="split">
-                <i class="fas fa-user-friends"></i> Split
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="investments">
-                <i class="fas fa-chart-line"></i> Investments
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="analytics">
-                <i class="fas fa-chart-bar"></i> Analytics
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="subscriptions">
-                <i class="fas fa-box"></i> Subscriptions
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="networth">
-                <i class="fas fa-gem"></i> Net Worth
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="receipts">
-                <i class="fas fa-receipt"></i> Receipts
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="calendar">
-                <i class="fas fa-calendar"></i> Calendar
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="reports">
-                <i class="fas fa-file-alt"></i> Reports
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="forecast">
-                <i class="fas fa-crystal-ball"></i> Forecast
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="#" class="nav-link" data-page="settings">
-                <i class="fas fa-cog"></i> Settings
-              </a>
-            </li>
-          </ul>
-        </div>
-      </nav>
-      
-      <main class="main">
-        <div class="container" id="main-content">
-          <div class="loading">
-            <div class="spinner"></div>
-            <p>Loading...</p>
-          </div>
-        </div>
-      </main>
-    `;
-    
-    // Navigation event handlers
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const page = link.dataset.page;
-        navigateTo(page);
-      });
-    });
-    
-    // Mobile menu
-    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-    const navList = document.getElementById('nav-list');
-    
-    mobileMenuToggle.addEventListener('click', () => {
-      navList.classList.toggle('open');
-    });
-    
-    // Log out handler
-    document.getElementById('logout-btn').addEventListener('click', logout);
-  }
-  
-  // Навигация between pagess
-  function navigateTo(page) {
-    // Update active pagesы
-    appState.currentPage = page;
-    
-    // Update active пункта меню
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-      if (link.dataset.page === page) {
-        link.classList.add('active');
-      } else {
-        link.classList.remove('active');
-      }
-    });
-    
-    // Update URL без перезагрузки pagesы
-    window.history.pushState({}, '', `/${page}`);
-    
-    // Отрисовка соответствующей pagesы
-    const mainContent = document.getElementById('main-content');
-    mainContent.innerHTML = `
-      <div class="loading">
-        <div class="spinner"></div>
-        <p>Loading...</p>
       </div>
     `;
-    
-    // Close mobile menu on navigation
-    const navList = document.getElementById('nav-list');
-    navList.classList.remove('open');
+
+    // Navigation
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        navigateTo(link.dataset.page);
+        // Close mobile sidebar
+        document.getElementById('sidebar').classList.remove('mobile-open');
+      });
+    });
+
+    // Sidebar collapse toggle
+    document.getElementById('sidebar-collapse-btn').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+      localStorage.setItem('sidebarCollapsed', document.getElementById('sidebar').classList.contains('collapsed'));
+    });
+    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+      document.getElementById('sidebar').classList.add('collapsed');
+    }
+
+    // Mobile sidebar toggle
+    document.getElementById('sidebar-mobile-btn').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
+    // AI chat button
+    const aiBtn = document.getElementById('ai-chat-open-btn');
+    if (aiBtn) {
+      aiBtn.addEventListener('click', () => {
+        const panel = document.getElementById('ai-chat-panel');
+        if (panel) panel.classList.toggle('active');
+      });
+    }
+  }
+
+
+  const PAGE_LABELS = {
+    dashboard: 'Dashboard', accounts: 'Accounts', transactions: 'Transactions',
+    budgets: 'Budgets', goals: 'Goals', recurring: 'Recurring', subscriptions: 'Subscriptions',
+    analytics: 'Analytics', networth: 'Net Worth', investments: 'Investments',
+    reports: 'Reports', forecast: 'Forecast', receipts: 'Receipts', debts: 'Debts',
+    split: 'Split', family: 'Family', currency: 'Currencies', 'bank-connections': 'Banks',
+    calendar: 'Calendar', settings: 'Settings'
+  };
+
+  function navigateTo(page) {
+    appState.currentPage = page;
+
+    // Update active nav link
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.classList.toggle('active', link.dataset.page === page);
+    });
+
+    // Update topbar breadcrumb
+    const bc = document.getElementById('topbar-breadcrumb');
+    if (bc) bc.textContent = PAGE_LABELS[page] || page;
+
+    window.history.pushState({}, '', '/' + page);
+
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) { console.warn('navigateTo: main-content not found, skipping'); return; }
+    mainContent.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     
     // Загрузка pagesы
     switch (page) {
@@ -426,13 +386,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       const data = await response.json();
-      appState.accounts = data;
-      
-      return data;
+      appState.accounts = Array.isArray(data) ? data : (data.all || []);
+
+      return appState.accounts;
     } catch (error) {
       console.error('Error fetching accounts:', error);
       showNotification('Error fetching accounts', 'error');
       return [];
+    }
+  }
+
+  async function fetchTransactionStats() {
+    try {
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const [statsResp, accsResp] = await Promise.all([
+        fetchWithAuth('/api/transactions/stats/summary?startDate=' + startDate + '&groupBy=month'),
+        fetchWithAuth('/api/accounts')
+      ]);
+      const rows = statsResp.ok ? await statsResp.json() : [];
+      const accsData = accsResp.ok ? await accsResp.json() : [];
+      const accs = Array.isArray(accsData) ? accsData : (accsData.all || []);
+      const monthlyIncome = rows.reduce((s, r) => s + (r.income || 0), 0);
+      const monthlyExpense = rows.reduce((s, r) => s + (r.expense || 0), 0);
+      const totalBalance = accs.reduce((s, a) => s + (a.balance || 0), 0);
+      return { monthlyIncome, monthlyExpense, totalBalance, rows };
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      return { monthlyIncome: 0, monthlyExpense: 0, totalBalance: 0, rows: [] };
     }
   }
   
@@ -463,8 +444,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="auth-container">
         <div class="auth-card">
           <div class="auth-header">
-            <h1>Finance Manager</h1>
-            <p>Manage your finances simply and effectively</p>
+            <h1>💰 Finman</h1>
+            <p>AI-powered personal finance manager</p>
+          </div>
+          <div class="auth-demo-hint">
+            Demo: <code>admin</code> / <code>password123</code>
           </div>
           
           <div class="auth-tabs">
@@ -677,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="account-balance">${formatCurrency(account.balance, account.currency)}</div>
       </div>
-    `).join('') || '<p>У вас еще нет accounts. <a href="#" class="add-account-link">Add account</a></p>';
+    `).join('') || '<p>No accounts yet. <a href="#" class="add-account-link">Add account</a></p>';
     
     // Build list последних transactions
     const transactionsHtml = recentTransactions.length > 0 
@@ -693,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `).join('')
-      : '<p>У вас еще no transactions. <a href="#" class="add-transaction-link">Add transaction</a></p>';
+      : '<p>No transactions yet. <a href="#" class="add-transaction-link">Add transaction</a></p>';
     
     mainContent.innerHTML = `
       <h1 class="page-title">Finance Overview</h1>
@@ -758,7 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           <div class="section-footer">
             <a href="#" class="btn btn-sm btn-outline" id="view-all-transactions">
-              Посмотреть all transactions
+              View all transactions
             </a>
           </div>
         </div>
@@ -888,10 +872,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         <div class="account-actions">
           <button class="btn btn-sm btn-outline" data-account-action="view" data-account-id="${account.id}">
-            <i class="fas fa-eye"></i> Детали
+            <i class="fas fa-eye"></i> Details
           </button>
           <button class="btn btn-sm btn-outline" data-account-action="edit" data-account-id="${account.id}">
-            <i class="fas fa-edit"></i> Изменить
+            <i class="fas fa-edit"></i> Edit
           </button>
           <button class="btn btn-sm btn-danger" data-account-action="delete" data-account-id="${account.id}">
             <i class="fas fa-trash"></i> Delete

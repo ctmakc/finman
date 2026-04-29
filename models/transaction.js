@@ -18,7 +18,7 @@ class Transaction {
           transactionData.userId,
           transactionData.date,
           transactionData.description || '',
-          transactionData.category || 'Прочее',
+          transactionData.category || 'Other',
           transactionData.amount,
           transactionData.type || (transactionData.amount >= 0 ? 'income' : 'expense')
         ]
@@ -62,7 +62,7 @@ class Transaction {
             transaction.userId,
             transaction.date,
             transaction.description || '',
-            transaction.category || 'Прочее',
+            transaction.category || 'Other',
             transaction.amount,
             transaction.type || (transaction.amount >= 0 ? 'income' : 'expense')
           ]
@@ -109,7 +109,7 @@ class Transaction {
         sortOrder = 'DESC'
       } = options;
       
-      let query = `
+      let sql = `
         SELECT t.*, a.name as account_name
         FROM transactions t
         JOIN accounts a ON t.account_id = a.id
@@ -120,47 +120,47 @@ class Transaction {
       
       // Фильтрация по счету
       if (accountId) {
-        query += ` AND t.account_id = ?`;
+        sql += ` AND t.account_id = ?`;
         params.push(accountId);
       }
       
       // Фильтрация по датам
       if (startDate) {
-        query += ` AND t.date >= ?`;
+        sql += ` AND t.date >= ?`;
         params.push(startDate);
       }
       
       if (endDate) {
-        query += ` AND t.date <= ?`;
+        sql += ` AND t.date <= ?`;
         params.push(endDate);
       }
       
       // Фильтрация по категории
       if (category) {
-        query += ` AND t.category = ?`;
+        sql += ` AND t.category = ?`;
         params.push(category);
       }
       
       // Фильтрация по типу (доход/расход)
       if (type) {
-        query += ` AND t.type = ?`;
+        sql += ` AND t.type = ?`;
         params.push(type);
       }
       
       // Фильтрация по сумме
       if (minAmount !== undefined) {
-        query += ` AND t.amount >= ?`;
+        sql += ` AND t.amount >= ?`;
         params.push(minAmount);
       }
       
       if (maxAmount !== undefined) {
-        query += ` AND t.amount <= ?`;
+        sql += ` AND t.amount <= ?`;
         params.push(maxAmount);
       }
       
       // Поиск по описанию
       if (search) {
-        query += ` AND (t.description LIKE ? OR t.category LIKE ?)`;
+        sql += ` AND (t.description LIKE ? OR t.category LIKE ?)`;
         const searchTerm = `%${search}%`;
         params.push(searchTerm, searchTerm);
       }
@@ -174,14 +174,14 @@ class Transaction {
         ? sortOrder.toUpperCase() 
         : 'DESC';
       
-      query += ` ORDER BY t.${actualSortBy} ${actualSortOrder}`;
+      sql += ` ORDER BY t.${actualSortBy} ${actualSortOrder}`;
       
       // Пагинация
       const offset = (page - 1) * limit;
-      query += ` LIMIT ? OFFSET ?`;
+      sql += ` LIMIT ? OFFSET ?`;
       params.push(limit, offset);
       
-      const transactions = await query(query, params);
+      const transactions = await query(sql, params);
       
       return transactions;
     } catch (error) {
@@ -334,7 +334,7 @@ class Transaction {
         groupBy = 'month' // 'day', 'month', 'year', 'category'
       } = options;
       
-      let query = '';
+      let sql = '';
       const params = [userId];
       
       // Базовые условия фильтрации
@@ -357,7 +357,7 @@ class Transaction {
       
       // Статистика по категориям
       if (groupBy === 'category') {
-        query = `
+        sql = `
           SELECT 
             t.category, 
             t.type,
@@ -381,7 +381,7 @@ class Transaction {
           dateFormat = '%Y';
         }
         
-        query = `
+        sql = `
           SELECT 
             strftime('${dateFormat}', t.date) as period,
             t.type,
@@ -394,7 +394,7 @@ class Transaction {
         `;
       }
       
-      const stats = await query(query, params);
+      const stats = await query(sql, params);
       return stats;
     } catch (error) {
       throw error;

@@ -163,7 +163,7 @@ async function renderRecurringPage() {
   mainContent.innerHTML = `
     <div class="recurring-page">
       <header class="page-header">
-        <h1 class="page-title"><i class="fas fa-sync-alt"></i> Регулярные payments</h1>
+        <h1 class="page-title"><i class="fas fa-sync-alt"></i> Recurring Payments</h1>
         <button class="btn btn-primary" onclick="showAddRecurringModal()">
           <i class="fas fa-plus"></i> Add payment
         </button>
@@ -189,7 +189,7 @@ async function renderRecurringPage() {
           <div class="filter-row">
             <label>
               <input type="checkbox" id="show-inactive" onchange="loadRecurringPayments()">
-              Показать неassetные
+              Showь неassetные
             </label>
           </div>
           <div class="payments-list" id="all-payments-list"></div>
@@ -266,7 +266,7 @@ async function loadRecurringPayments() {
   if (upcomingFiltered.length > 0) {
     upcomingList.innerHTML = upcomingFiltered.map(p => renderPaymentCard(p)).join('');
   } else {
-    upcomingList.innerHTML = '<p class="empty-text">No ближайших платежей</p>';
+    upcomingList.innerHTML = '<p class="empty-text">No upcoming payments</p>';
   }
 
   // All payments
@@ -569,12 +569,7 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function formatCurrency(amount, currency = 'UAH') {
-  return new Intl.NumberFormat('uk-UA', {
-    style: 'currency',
-    currency: currency
-  }).format(amount);
-}
+// formatCurrency defined in app.js
 
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);

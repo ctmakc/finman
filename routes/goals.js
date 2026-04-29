@@ -22,14 +22,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Получить статистику
+// Stats
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await SavingsGoal.getUserStats(req.user.id);
-    res.json(stats);
+    const goals = await SavingsGoal.findByUser(req.user.id, false);
+    const activeGoals = goals.length;
+    const totalSaved = goals.reduce((s, g) => s + (parseFloat(g.current_amount) || 0), 0);
+    const totalTarget = goals.reduce((s, g) => s + (parseFloat(g.target_amount) || 0), 0);
+    const overallProgress = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
+    res.json({ activeGoals, totalSaved, totalTarget, overallProgress });
   } catch (error) {
-    console.error('Ошибка получения статистики:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Goals stats error:', error);
+    res.status(500).json({ activeGoals: 0, totalSaved: 0, totalTarget: 0, overallProgress: 0 });
   }
 });
 

@@ -171,10 +171,10 @@ const ForecastModule = {
   },
 
   getPage() {
-    return ` + "`" + `
+    return `
       <div class="forecast-page">
         <div class="page-header">
-          <h1>🔮 Forecastирование</h1>
+          <h1>🔮 Forecast</h1>
           <div class="period-buttons">
             <button class="btn period-btn" onclick="ForecastModule.changePeriod(7)">7 days</button>
             <button class="btn period-btn active" onclick="ForecastModule.changePeriod(30)">30 days</button>
@@ -190,11 +190,11 @@ const ForecastModule = {
         </div>
 
         <div class="card">
-          <h3>📈 Тренды и forecastы на следующий month</h3>
+          <h3>📈 Trends & forecasts for next month</h3>
           <div id="trends-summary"></div>
           <div class="chart-container" style="height:250px;margin-top:1rem"><canvas id="trends-chart"></canvas></div>
         </div>
       </div>
-    ` + "`" + `;
+    `;
   }
 };
