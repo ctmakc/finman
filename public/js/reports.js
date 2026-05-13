@@ -104,7 +104,7 @@ const ReportsModule = {
       this.showReportResult(result.report, data.report_type);
       await this.loadReports();
     } catch (error) {
-      alert('Error generating report');
+      showNotification('Error generating report', 'error');
     }
   },
 
@@ -116,7 +116,7 @@ const ReportsModule = {
       const report = await response.json();
       this.showReportResult(report.file_data, report.report_type);
     } catch (error) {
-      alert('Failed to load');
+      showNotification('Failed to load report', 'error');
     }
   },
 
@@ -184,7 +184,7 @@ const ReportsModule = {
       await fetch(`/api/reports/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
       await this.loadReports();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to delete report', 'error');
     }
   },
 

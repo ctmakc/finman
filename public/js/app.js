@@ -208,6 +208,54 @@ document.addEventListener('DOMContentLoaded', () => {
           </main>
         </div>
       </div>
+      <button id="fab-add-tx" class="fab-btn" title="Quick add transaction (N)">
+        <i class="fas fa-plus"></i>
+      </button>
+      <div class="modal" id="quick-add-modal">
+        <div class="modal-content" style="max-width:400px">
+          <div class="modal-header">
+            <h2>Quick Add Transaction</h2>
+            <button class="modal-close" onclick="document.getElementById('quick-add-modal').classList.remove('active')">&times;</button>
+          </div>
+          <form id="quick-add-form" onsubmit="event.preventDefault(); submitQuickAdd()">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Amount</label>
+                <input type="number" id="qa-amount" class="form-control" step="0.01" min="0.01" required placeholder="0.00" autofocus>
+              </div>
+              <div class="form-group">
+                <label>Type</label>
+                <select id="qa-type" class="form-control">
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Account</label>
+              <select id="qa-account" class="form-control" required></select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Category</label>
+                <input type="text" id="qa-category" class="form-control" placeholder="e.g. Food">
+              </div>
+              <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="qa-date" class="form-control" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="qa-description" class="form-control" placeholder="Optional note">
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" onclick="document.getElementById('quick-add-modal').classList.remove('active')">Cancel</button>
+              <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
     `;
 
     // Navigation
@@ -303,13 +351,16 @@ document.addEventListener('DOMContentLoaded', () => {
       document.addEventListener('click', () => dropdown?.remove(), { once: true });
     });
 
+    // FAB quick-add
+    document.getElementById('fab-add-tx').addEventListener('click', openQuickAdd);
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-      if (e.key === 'n' || e.key === 'N') { document.getElementById('add-transaction-btn')?.click(); }
+      if (e.key === 'n' || e.key === 'N') { openQuickAdd(); }
       else if (e.key === 'b' || e.key === 'B') { navigateTo('budgets'); }
       else if (e.key === 'g' || e.key === 'G') { navigateTo('goals'); }
-      else if (e.key === 'Escape') { document.querySelector('.modal')?.remove(); }
+      else if (e.key === 'Escape') { document.querySelector('.modal.active')?.classList.remove('active'); }
       else if (e.key === '?') { showKeyboardHelp(); }
     });
 
@@ -319,9 +370,54 @@ document.addEventListener('DOMContentLoaded', () => {
       const modal = document.createElement('div');
       modal.id = 'kbd-help-modal';
       modal.className = 'modal';
-      modal.innerHTML = `<div class="modal-content" style="max-width:360px"><div class="modal-header"><h3>Keyboard Shortcuts</h3><button class="modal-close" onclick="this.closest('.modal').remove()"><i class="fas fa-times"></i></button></div><div class="modal-body"><table style="width:100%;border-collapse:collapse"><tr><td><kbd>N</kbd></td><td>New transaction</td></tr><tr><td><kbd>B</kbd></td><td>Go to Budgets</td></tr><tr><td><kbd>G</kbd></td><td>Go to Goals</td></tr><tr><td><kbd>Esc</kbd></td><td>Close modal</td></tr><tr><td><kbd>?</kbd></td><td>This help</td></tr></table></div></div>`;
+      modal.innerHTML = `<div class="modal-content" style="max-width:360px"><div class="modal-header"><h3>Keyboard Shortcuts</h3><button class="modal-close" onclick="this.closest('.modal').remove()"><i class="fas fa-times"></i></button></div><div class="modal-body"><table style="width:100%;border-collapse:collapse"><tr><td><kbd>N</kbd></td><td>Quick add transaction</td></tr><tr><td><kbd>B</kbd></td><td>Go to Budgets</td></tr><tr><td><kbd>G</kbd></td><td>Go to Goals</td></tr><tr><td><kbd>Esc</kbd></td><td>Close modal</td></tr><tr><td><kbd>?</kbd></td><td>This help</td></tr></table></div></div>`;
       document.body.appendChild(modal);
       modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    }
+  }
+
+  function openQuickAdd() {
+    const modal = document.getElementById('quick-add-modal');
+    if (!modal) return;
+    // Populate account select
+    const sel = document.getElementById('qa-account');
+    sel.innerHTML = (appState.accounts || []).map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('') || '<option value="">No accounts</option>';
+    // Default date = today
+    document.getElementById('qa-date').value = new Date().toISOString().split('T')[0];
+    // Clear previous values
+    document.getElementById('qa-amount').value = '';
+    document.getElementById('qa-category').value = '';
+    document.getElementById('qa-description').value = '';
+    document.getElementById('qa-type').value = 'expense';
+    modal.classList.add('active');
+    setTimeout(() => document.getElementById('qa-amount').focus(), 50);
+  }
+
+  async function submitQuickAdd() {
+    const amount = parseFloat(document.getElementById('qa-amount').value);
+    const type = document.getElementById('qa-type').value;
+    const accountId = document.getElementById('qa-account').value;
+    const category = document.getElementById('qa-category').value.trim();
+    const date = document.getElementById('qa-date').value;
+    const description = document.getElementById('qa-description').value.trim();
+
+    if (!accountId || !amount || !date) { showNotification('Please fill in all required fields', 'error'); return; }
+
+    try {
+      const resp = await fetchWithAuth('/api/transactions', {
+        method: 'POST',
+        body: JSON.stringify({ accountId: parseInt(accountId), amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount), type, category, date, description })
+      });
+      if (!resp.ok) throw new Error('Failed');
+      document.getElementById('quick-add-modal').classList.remove('active');
+      showNotification(`${type === 'expense' ? '−' : '+'}${amount.toLocaleString()} added`, 'success');
+      // Refresh current page data
+      await fetchAccounts();
+      if (appState.currentPage === 'dashboard') renderDashboard();
+      else if (appState.currentPage === 'transactions') renderTransactionsPage?.();
+      else if (appState.currentPage === 'accounts') renderAccountsPage?.();
+    } catch (e) {
+      showNotification('Failed to add transaction', 'error');
     }
   }
 

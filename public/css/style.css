@@ -5005,3 +5005,26 @@ body.dark .ai-insight-banner { background: linear-gradient(135deg, #1e1e3a 0%, #
 .import-drop-zone.drag-over, .import-drop-zone:hover { border-color: var(--accent); background: rgba(93,92,222,.04); }
 body.dark .import-drop-zone { border-color: #3a3a5c; }
 body.dark .import-drop-zone.drag-over { border-color: var(--accent); background: rgba(93,92,222,.08); }
+
+/* ===== FAB Quick-Add Transaction ===== */
+.fab-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent, #5D5CDE);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(93,92,222,0.45);
+  transition: transform .15s, box-shadow .15s;
+  z-index: 900;
+}
+.fab-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(93,92,222,0.55); }
+.fab-btn:active { transform: scale(0.96); }

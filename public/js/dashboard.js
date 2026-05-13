@@ -199,7 +199,7 @@ const SmartDashboard = {
       document.querySelector('.modal-backdrop')?.remove();
       await this.loadWidgets();
     } catch (error) {
-      alert('Failed to add');
+      showNotification('Failed to add widget', 'error');
     }
   },
 
@@ -212,7 +212,7 @@ const SmartDashboard = {
       });
       await this.loadWidgets();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to remove widget', 'error');
     }
   },
 

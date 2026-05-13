@@ -151,7 +151,7 @@ const CalendarModule = {
       document.getElementById('event-modal').classList.remove('active');
       await this.loadEvents();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to save event', 'error');
     }
   },
 
@@ -164,7 +164,7 @@ const CalendarModule = {
       await this.loadEvents();
       document.getElementById('day-modal').classList.remove('active');
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to complete event', 'error');
     }
   },
 

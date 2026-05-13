@@ -106,7 +106,7 @@ const ReceiptsModule = {
 
   async uploadReceipt() {
     const imageData = document.getElementById('image-data').value;
-    if (!imageData) { alert('Please select an image'); return; }
+    if (!imageData) { showNotification('Please select an image', 'warning'); return; }
 
     const statusEl = document.getElementById('upload-status');
     if (statusEl) { statusEl.textContent = '🤖 Scanning receipt...'; }
@@ -143,7 +143,7 @@ const ReceiptsModule = {
       document.getElementById('manual-modal-title').textContent = 'Add receipt manually';
       document.getElementById('manual-modal').classList.add('active');
     } catch (error) {
-      alert('Failed to scan receipt');
+      showNotification('Failed to scan receipt', 'error');
     }
   },
 
@@ -177,7 +177,7 @@ const ReceiptsModule = {
       await this.loadReceipts();
       await this.loadStats();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to save receipt', 'error');
     }
   },
 
@@ -208,7 +208,7 @@ const ReceiptsModule = {
       await this.loadReceipts();
       await this.loadStats();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to delete receipt', 'error');
     }
   },
 

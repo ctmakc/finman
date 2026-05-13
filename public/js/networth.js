@@ -146,10 +146,10 @@ const NetWorthModule = {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      alert('Snapshot saved');
+      showNotification('Snapshot saved', 'success');
       await this.loadHistory();
     } catch (error) {
-      alert('Failed to save');
+      showNotification('Failed to save snapshot', 'error');
     }
   },
 
@@ -186,7 +186,7 @@ const NetWorthModule = {
       await this.loadAssets();
       await this.loadCurrent();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to save asset', 'error');
     }
   },
 
@@ -197,7 +197,7 @@ const NetWorthModule = {
       await this.loadAssets();
       await this.loadCurrent();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to delete asset', 'error');
     }
   },
 
