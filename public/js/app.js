@@ -1,5 +1,11 @@
 // Main application file
 
+// HTML-escape helper for safely embedding user text in innerHTML templates
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function renderPagination(currentPage, totalItems, perPage) {
   const totalPages = Math.max(1, Math.ceil((totalItems || 0) / (perPage || 50)));
   if (totalPages <= 1) return '';
@@ -900,7 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="account-info">
           <div class="account-icon"><i class="fas fa-wallet"></i></div>
           <div class="account-details">
-            <h3 class="account-name">${a.name}</h3>
+            <h3 class="account-name">${esc(a.name)}</h3>
             <p class="account-number">${a.account_number || a.type || ''}</p>
           </div>
         </div>
@@ -913,8 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="transaction-item">
           <div class="transaction-info">
             <div class="transaction-date">${formatDate(t.date)}</div>
-            <div class="transaction-description">${t.description}</div>
-            <div class="transaction-category">${t.category || 'Uncategorized'}</div>
+            <div class="transaction-description">${esc(t.description)}</div>
+            <div class="transaction-category">${esc(t.category) || 'Uncategorized'}</div>
           </div>
           <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">
             ${t.type === 'expense' ? '-' : '+'}${formatCurrency(t.amount)}
@@ -1239,17 +1245,17 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas ${getAccountIcon(account.account_type)}"></i>
           </div>
           <div class="account-details">
-            <h3 class="account-name">${account.name}</h3>
-            <p class="account-number">${account.account_number || 'No number'}</p>
+            <h3 class="account-name">${esc(account.name)}</h3>
+            <p class="account-number">${esc(account.account_number) || 'No number'}</p>
           </div>
         </div>
-        
+
         <div class="account-balance">
           ${formatCurrency(account.balance, account.currency)}
         </div>
-        
+
         <div class="account-info">
-          <p class="account-bank">${account.bank_name || 'Personal account'}</p>
+          <p class="account-bank">${esc(account.bank_name) || 'Personal account'}</p>
           <p class="account-type">${getAccountTypeName(account.account_type)}</p>
         </div>
         
