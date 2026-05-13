@@ -168,7 +168,7 @@ async function fetchAccount(accountId) {
     `;
 
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
 
     // Get element references
     const modal = document.getElementById(modalId);

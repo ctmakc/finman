@@ -315,7 +315,7 @@ async function fetchTransactions(filters = {}) {
     `;
     
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
     
     // Get element references
     const modal = document.getElementById(modalId);
@@ -491,7 +491,7 @@ async function fetchTransactions(filters = {}) {
     `;
     
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
     
     // Get element references
     const modal = document.getElementById(modalId);
@@ -591,9 +591,9 @@ async function fetchTransactions(filters = {}) {
   }
   
   // Рендеринг пагинации
-  function renderPagination(currentPage) {
-    const totalPages = 5; // Упрощенный вариант, в реальности нужно получать of API
-    
+  function renderPagination(currentPage, totalItems, perPage) {
+    const totalPages = Math.max(1, Math.ceil((totalItems || 0) / (perPage || 20)));
+
     if (totalPages <= 1) {
       return '';
     }

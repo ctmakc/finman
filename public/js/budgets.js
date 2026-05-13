@@ -331,7 +331,7 @@ function showCreateBudgetModal() {
     </div>
   `;
 
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  safeInsertHTML(document.body, 'beforeend', modalHtml);
 
   const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
   const modalClose = document.getElementById(`${modalId}-close`);
@@ -440,7 +440,7 @@ async function showEditBudgetModal(id) {
     </div>
   `;
 
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  safeInsertHTML(document.body, 'beforeend', modalHtml);
 
   const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
   const modalClose = document.getElementById(`${modalId}-close`);

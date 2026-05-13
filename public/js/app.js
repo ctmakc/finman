@@ -1,4 +1,18 @@
 // Main application file
+
+function renderPagination(currentPage, totalItems, perPage) {
+  const totalPages = Math.max(1, Math.ceil((totalItems || 0) / (perPage || 50)));
+  if (totalPages <= 1) return '';
+  let html = '<ul class="pagination">';
+  html += `<li class="pagination-item"><a href="#" class="pagination-link ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}" aria-label="Previous"><i class="fas fa-chevron-left"></i></a></li>`;
+  for (let i = 1; i <= totalPages; i++) {
+    html += `<li class="pagination-item"><a href="#" class="pagination-link ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</a></li>`;
+  }
+  html += `<li class="pagination-item"><a href="#" class="pagination-link ${currentPage >= totalPages ? 'disabled' : ''}" data-page="${currentPage + 1}" aria-label="Next"><i class="fas fa-chevron-right"></i></a></li>`;
+  html += '</ul>';
+  return html;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize application
     initApp();
@@ -1010,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         
         <div class="pagination-container" id="pagination-container">
-          ${renderPagination(appState.filters.page)}
+          ${renderPagination(appState.filters.page, transactions.length, appState.filters.limit || 50)}
         </div>
       </div>
     `;

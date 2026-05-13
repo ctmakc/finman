@@ -139,7 +139,7 @@ function showCreateCustomBankModal() {
     </div>
   `;
 
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  safeInsertHTML(document.body, 'beforeend', modalHtml);
 
   const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
   const modalClose = document.getElementById(`${modalId}-close`);
@@ -454,7 +454,7 @@ async function fetchBankConnections() {
     `;
     
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
     
     // Get element references
     const modal = document.getElementById(modalId);
@@ -625,7 +625,7 @@ async function fetchBankConnections() {
     `;
     
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
     
     // Get element references
     const modal = document.getElementById(modalId);
@@ -734,7 +734,7 @@ async function fetchBankConnections() {
     `;
     
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
     
     // Get element references
     const modal = document.getElementById(modalId);
@@ -936,7 +936,7 @@ async function fetchBankConnections() {
     `;
     
     // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    safeInsertHTML(document.body, 'beforeend', modalHtml);
     
     // Get element references
     const modal = document.getElementById(modalId);
