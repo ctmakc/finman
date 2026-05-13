@@ -185,20 +185,26 @@ const ReceiptsModule = {
     const accounts = await fetch('/api/accounts', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json());
     if (accounts.length === 0) { showNotification('Create an account first', 'warning'); return; }
 
-    const accountId = prompt('Select account ID:\n' + accounts.map(a => `${a.id}: ${a.name}`).join('\n'));
-    if (!accountId) return;
+    const m = document.createElement('div');
+    m.className = 'modal-backdrop';
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>Create transaction</h2><button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Account</label><select id="receipt-tx-account" class="form-control">${accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('')}</select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()">Cancel</button><button class="btn btn-primary" id="receipt-tx-confirm">Create</button></div></div>`;
+    document.body.appendChild(m);
 
-    try {
-      await fetch(`/api/receipts/${id}/create-transaction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ account_id: parseInt(accountId) })
-      });
-      showNotification('Transaction created', 'success');
-      await this.loadReceipts();
-    } catch (error) {
-      showNotification('Failed to create transaction', 'error');
-    }
+    document.getElementById('receipt-tx-confirm').addEventListener('click', async () => {
+      const accountId = document.getElementById('receipt-tx-account').value;
+      try {
+        await fetch(`/api/receipts/${id}/create-transaction`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          body: JSON.stringify({ account_id: parseInt(accountId) })
+        });
+        m.remove();
+        showNotification('Transaction created', 'success');
+        await this.loadReceipts();
+      } catch (error) {
+        showNotification('Failed to create transaction', 'error');
+      }
+    });
   },
 
   async delete(id) {

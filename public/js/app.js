@@ -837,13 +837,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('main-content');
 
     // Parallel fetch everything needed for the dashboard
-    const [recentTransactions, statsData, budgetsResp, goalsResp, nwResp, notifResp] = await Promise.allSettled([
+    const [recentTransactions, statsData, budgetsResp, goalsResp, nwResp, notifResp, compareResp] = await Promise.allSettled([
       fetchTransactions({ limit: 5 }),
       fetchTransactionStats(),
       fetchWithAuth('/api/budgets/active').then(r => r.json()).catch(() => []),
       fetchWithAuth('/api/goals/stats').then(r => r.json()).catch(() => ({})),
       fetchWithAuth('/api/networth/current').then(r => r.json()).catch(() => null),
       fetchWithAuth('/api/notifications?limit=5').then(r => r.json()).catch(() => []),
+      fetchWithAuth('/api/analytics/compare').then(r => r.json()).catch(() => null),
     ]);
 
     const txList = budgetsResp.status === 'fulfilled' ? recentTransactions.value || [] : [];
@@ -852,6 +853,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const goals = goalsResp.status === 'fulfilled' ? (goalsResp.value || {}) : {};
     const nw = nwResp.status === 'fulfilled' ? nwResp.value : null;
     const notifications = notifResp.status === 'fulfilled' ? (notifResp.value || []) : [];
+    const compare = compareResp.status === 'fulfilled' ? compareResp.value : null;
 
     const recentTx = recentTransactions.status === 'fulfilled' ? (recentTransactions.value || []) : [];
 
@@ -955,6 +957,35 @@ document.addEventListener('DOMContentLoaded', () => {
         ${healthTips.length ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">${healthTips[0]}</div>` : ''}
       </div>`;
 
+    // ── Month-over-month comparison widget
+    const compareHtml = compare && (compare.thisMonth || compare.changes) ? (() => {
+      const incChg = compare.changes?.income ?? 0;
+      const expChg = compare.changes?.expense ?? 0;
+      const incArrow = incChg >= 0 ? '↑' : '↓';
+      const expArrow = expChg <= 0 ? '↓' : '↑';
+      const incClass = incChg >= 0 ? 'text-success' : 'text-error';
+      const expClass = expChg <= 0 ? 'text-success' : 'text-error';
+      return `<div class="card db-widget" style="padding:14px 16px">
+        <div class="section-header" style="margin-bottom:10px">
+          <h2><i class="fas fa-exchange-alt" style="color:var(--accent)"></i> vs Last Month</h2>
+        </div>
+        <div class="db-compare-row">
+          <span class="db-compare-label"><i class="fas fa-arrow-down" style="color:var(--success)"></i> Income</span>
+          <span class="db-compare-val">
+            <span style="color:var(--text-muted);font-size:12px">${formatCurrency(compare.thisMonth?.income ?? 0)}</span>
+            <span class="${incClass}" style="font-weight:600;margin-left:6px">${incArrow} ${Math.abs(incChg).toFixed(1)}%</span>
+          </span>
+        </div>
+        <div class="db-compare-row" style="margin-top:8px">
+          <span class="db-compare-label"><i class="fas fa-arrow-up" style="color:var(--danger)"></i> Expenses</span>
+          <span class="db-compare-val">
+            <span style="color:var(--text-muted);font-size:12px">${formatCurrency(compare.thisMonth?.expense ?? 0)}</span>
+            <span class="${expClass}" style="font-weight:600;margin-left:6px">${expArrow} ${Math.abs(expChg).toFixed(1)}%</span>
+          </span>
+        </div>
+      </div>`;
+    })() : '';
+
     // ── Budget alert banner
     const alertHtml = alertBudgets.length > 0
       ? `<div class="db-alert-banner">
@@ -1048,6 +1079,8 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
 
           ${healthScoreHtml}
+
+          ${compareHtml}
 
           <div class="card db-widget">
             <div class="section-header">

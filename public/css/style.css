@@ -5028,3 +5028,12 @@ body.dark .import-drop-zone.drag-over { border-color: var(--accent); background:
 }
 .fab-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(93,92,222,0.55); }
 .fab-btn:active { transform: scale(0.96); }
+
+/* ===== Dashboard: vs Last Month comparison widget ===== */
+.db-compare-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.db-compare-label { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.db-compare-val { display: flex; align-items: center; }
