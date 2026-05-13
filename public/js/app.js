@@ -169,6 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
           </nav>
 
           <div class="sidebar-footer">
+            <a href="#" class="nav-link sidebar-settings-link" data-page="settings" title="Settings">
+              <i class="fas fa-cog"></i><span>Settings</span>
+            </a>
             <div class="sidebar-user">
               <div class="sidebar-avatar">${initials}</div>
               <div class="sidebar-user-info">
@@ -358,9 +361,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       if (e.key === 'n' || e.key === 'N') { openQuickAdd(); }
+      else if (e.key === 'd' || e.key === 'D') { navigateTo('dashboard'); }
+      else if (e.key === 't' || e.key === 'T') { navigateTo('transactions'); }
       else if (e.key === 'b' || e.key === 'B') { navigateTo('budgets'); }
       else if (e.key === 'g' || e.key === 'G') { navigateTo('goals'); }
-      else if (e.key === 'Escape') { document.querySelector('.modal.active')?.classList.remove('active'); }
+      else if (e.key === 'a' || e.key === 'A') { navigateTo('analytics'); }
+      else if (e.key === 'i' || e.key === 'I') { navigateTo('investments'); }
+      else if (e.key === 'Escape') {
+        const activeModal = document.querySelector('.modal.active, .modal-backdrop');
+        if (activeModal) { activeModal.classList.remove('active'); activeModal.remove?.(); }
+        document.getElementById('notif-dropdown')?.remove();
+      }
       else if (e.key === '?') { showKeyboardHelp(); }
     });
 
@@ -370,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const modal = document.createElement('div');
       modal.id = 'kbd-help-modal';
       modal.className = 'modal';
-      modal.innerHTML = `<div class="modal-content" style="max-width:360px"><div class="modal-header"><h3>Keyboard Shortcuts</h3><button class="modal-close" onclick="this.closest('.modal').remove()"><i class="fas fa-times"></i></button></div><div class="modal-body"><table style="width:100%;border-collapse:collapse"><tr><td><kbd>N</kbd></td><td>Quick add transaction</td></tr><tr><td><kbd>B</kbd></td><td>Go to Budgets</td></tr><tr><td><kbd>G</kbd></td><td>Go to Goals</td></tr><tr><td><kbd>Esc</kbd></td><td>Close modal</td></tr><tr><td><kbd>?</kbd></td><td>This help</td></tr></table></div></div>`;
+      modal.innerHTML = `<div class="modal-content" style="max-width:380px"><div class="modal-header"><h3>Keyboard Shortcuts</h3><button class="modal-close" onclick="this.closest('.modal').remove()"><i class="fas fa-times"></i></button></div><div class="modal-body"><table style="width:100%;border-collapse:collapse;line-height:2"><tr><td><kbd>N</kbd></td><td>Quick add transaction</td></tr><tr><td><kbd>D</kbd></td><td>Dashboard</td></tr><tr><td><kbd>T</kbd></td><td>Transactions</td></tr><tr><td><kbd>B</kbd></td><td>Budgets</td></tr><tr><td><kbd>G</kbd></td><td>Goals</td></tr><tr><td><kbd>A</kbd></td><td>Analytics</td></tr><tr><td><kbd>I</kbd></td><td>Investments</td></tr><tr><td><kbd>Esc</kbd></td><td>Close modal / dismiss</td></tr><tr><td><kbd>?</kbd></td><td>This help</td></tr></table></div></div>`;
       document.body.appendChild(modal);
       modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     }
