@@ -827,6 +827,38 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`
       : '';
 
+    // ── Financial health score (0-100, computed locally)
+    let healthScore = 0;
+    let healthTips = [];
+    if (stats.monthlyIncome > 0) {
+      healthScore += 20;
+      if (savingsRate >= 20) { healthScore += 25; }
+      else if (savingsRate >= 10) { healthScore += 12; healthTips.push('Save 20%+ of income for optimal health'); }
+      else { healthTips.push('Your savings rate is low — aim for 10-20%'); }
+    } else { healthTips.push('Add income transactions to track savings rate'); }
+    if (budgets.length > 0) { healthScore += 20; } else { healthTips.push('Create budgets to control spending'); }
+    if (goals.activeGoals > 0) { healthScore += 15; } else { healthTips.push('Set a savings goal to stay motivated'); }
+    if (alertBudgets.filter(b => b.percentage >= 100).length === 0) { healthScore += 10; } else { healthTips.push('Some budgets are over limit'); }
+    if (appState.accounts.length > 0) { healthScore += 10; }
+    const healthColor = healthScore >= 70 ? 'var(--success,#38c172)' : healthScore >= 40 ? 'var(--warning,#f6993f)' : 'var(--danger,#e3342f)';
+    const healthLabel = healthScore >= 70 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs work';
+    const healthScoreHtml = `
+      <div class="card db-widget" style="padding:14px 16px">
+        <div class="section-header" style="margin-bottom:8px">
+          <h2><i class="fas fa-heartbeat" style="color:${healthColor}"></i> Financial health</h2>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <div style="font-size:2rem;font-weight:700;color:${healthColor};line-height:1">${healthScore}</div>
+          <div style="flex:1">
+            <div style="background:var(--bg);border-radius:8px;height:8px;overflow:hidden">
+              <div style="height:100%;width:${healthScore}%;background:${healthColor};border-radius:8px;transition:width .5s"></div>
+            </div>
+            <div style="font-size:12px;color:${healthColor};margin-top:4px;font-weight:600">${healthLabel}</div>
+          </div>
+        </div>
+        ${healthTips.length ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">${healthTips[0]}</div>` : ''}
+      </div>`;
+
     // ── Budget alert banner
     const alertHtml = alertBudgets.length > 0
       ? `<div class="db-alert-banner">
@@ -918,6 +950,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ${goalsHtml}
             ${nwHtml}
           </div>
+
+          ${healthScoreHtml}
 
           <div class="card db-widget">
             <div class="section-header">
@@ -1644,6 +1678,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('main-content');
     mainContent.innerHTML = NetWorthModule.getPage();
     NetWorthModule.init();
+    // Auto-save daily snapshot in background (idempotent via the API)
+    fetchWithAuth('/api/networth/snapshot', { method: 'POST' }).catch(() => {});
   }
 
   function renderReceiptsPage() {

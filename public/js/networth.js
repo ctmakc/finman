@@ -79,7 +79,7 @@ const NetWorthModule = {
           <div class="breakdown-row"><span>Accounts</span><span>${(ab.accounts?.total || 0).toLocaleString()} $</span></div>
           <div class="breakdown-row"><span>Investments</span><span>${(ab.investments?.total || 0).toLocaleString()} $</span></div>
           <div class="breakdown-row"><span>Manual assets</span><span>${(ab.manualAssets?.total || 0).toLocaleString()} $</span></div>
-          <div class="breakdown-row"><span>Youолжны</span><span>${(ab.receivables?.total || 0).toLocaleString()} $</span></div>
+          <div class="breakdown-row"><span>Receivables</span><span>${(ab.receivables?.total || 0).toLocaleString()} $</span></div>
         </div>
       </div>
     `;
@@ -109,12 +109,35 @@ const NetWorthModule = {
 
   renderChart() {
     const container = document.getElementById('networth-chart');
-    if (!container || this.history.length < 2) {
-      if (container) container.innerHTML = '<p class="text-secondary">Not enough data for chart</p>';
+    if (!container) return;
+    if (this.history.length < 2) {
+      container.innerHTML = '<p class="text-secondary" style="padding:12px">Add snapshots over time to see your net worth trend.</p>';
       return;
     }
-    container.innerHTML = '<canvas id="nw-chart"></canvas>';
-    // Chart would be rendered here with Chart.js
+    container.innerHTML = '<div style="position:relative;height:200px"><canvas id="nw-chart"></canvas></div>';
+    const ctx = document.getElementById('nw-chart');
+    if (window._nwChart) window._nwChart.destroy();
+    const sorted = [...this.history].sort((a, b) => a.snapshot_date > b.snapshot_date ? 1 : -1);
+    window._nwChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: sorted.map(s => s.snapshot_date ? s.snapshot_date.slice(0, 7) : ''),
+        datasets: [
+          { label: 'Net Worth', data: sorted.map(s => s.net_worth || 0),
+            borderColor: '#5D5CDE', backgroundColor: 'rgba(93,92,222,0.1)', fill: true, tension: 0.3, pointRadius: 4 },
+          { label: 'Assets', data: sorted.map(s => s.total_assets || 0),
+            borderColor: '#38C172', backgroundColor: 'transparent', borderDash: [4,4], tension: 0.3, pointRadius: 2 },
+          { label: 'Liabilities', data: sorted.map(s => s.total_liabilities || 0),
+            borderColor: '#E3342F', backgroundColor: 'transparent', borderDash: [4,4], tension: 0.3, pointRadius: 2 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } },
+          tooltip: { callbacks: { label: c => c.dataset.label + ': $' + c.parsed.y.toLocaleString() } } },
+        scales: { y: { ticks: { callback: v => '$' + v.toLocaleString() } } }
+      }
+    });
   },
 
   async saveSnapshot() {
@@ -187,7 +210,7 @@ const NetWorthModule = {
         <div id="networth-summary" class="card networth-summary"></div>
         <div class="grid-2">
           <div id="networth-details"></div>
-          <div class="card"><h3>📈 История</h3><div id="networth-chart"></div></div>
+          <div class="card"><h3><i class="fas fa-chart-line"></i> History</h3><div id="networth-chart"></div></div>
         </div>
         <div class="card"><div class="card-header"><h3>🏠 Manual assets</h3><button class="btn btn-sm" onclick="NetWorthModule.showAddAssetModal()">+ Add</button></div><div id="manual-assets"></div></div>
       </div>
