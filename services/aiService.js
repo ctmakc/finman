@@ -1,8 +1,10 @@
 /**
  * Multi-provider AI abstraction.
- * Set AI_PROVIDER=anthropic|openai|google in .env
+ * Set AI_PROVIDER=anthropic|openai|google|gemini-oauth in .env
  */
 const config = require('../config/config');
+const fs = require('fs');
+const https = require('https');
 
 const PROVIDER = (process.env.AI_PROVIDER || 'anthropic').toLowerCase();
 const MODEL_OVERRIDE = process.env.AI_MODEL || '';
@@ -13,6 +15,7 @@ const DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   google: 'gemini-1.5-flash',
+  'gemini-oauth': 'gemini-2.5-flash',
 };
 
 function resolveModel(providerOverride) {
@@ -185,19 +188,153 @@ async function googleVision(imageBase64, mimeType, prompt) {
   return { provider: 'google', model, text };
 }
 
+// ─── Gemini OAuth (cloudcode-pa) ──────────────────────────────────────────────
+
+let _geminiOAuthToken = null;
+let _geminiOAuthExpiry = 0;
+let _geminiProjectId = null;
+
+async function getGeminiOAuthToken() {
+  if (_geminiOAuthToken && Date.now() < _geminiOAuthExpiry - 60000) return _geminiOAuthToken;
+
+  // Resolve refresh token: env var first, then creds file
+  let refreshToken = process.env.GEMINI_REFRESH_TOKEN;
+  if (!refreshToken) {
+    const credsPath = process.env.GEMINI_OAUTH_CREDS || `${process.env.HOME}/.gemini-home/.gemini/oauth_creds.json`;
+    try { refreshToken = JSON.parse(fs.readFileSync(credsPath, 'utf8')).refresh_token; } catch {}
+  }
+  if (!refreshToken) throw new Error('No GEMINI_REFRESH_TOKEN configured');
+
+  const clientId = process.env.GEMINI_CLIENT_ID;
+  const clientSecret = process.env.GEMINI_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error('GEMINI_CLIENT_ID / GEMINI_CLIENT_SECRET not set');
+
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
+  }).toString();
+
+  const tokenData = await new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'oauth2.googleapis.com',
+      path: '/token',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+    }, res => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => resolve(JSON.parse(data)));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  if (!tokenData.access_token) throw new Error(`Gemini OAuth token refresh failed: ${JSON.stringify(tokenData)}`);
+  _geminiOAuthToken = tokenData.access_token;
+  _geminiOAuthExpiry = Date.now() + (tokenData.expires_in || 3600) * 1000;
+  return _geminiOAuthToken;
+}
+
+function toGeminiOAuthContents(messages) {
+  const result = [];
+  for (const m of messages) {
+    if (m.role === 'system') continue;
+    const text = Array.isArray(m.content) ? m.content.map(b => b.text || '').join('') : m.content;
+    result.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text }] });
+  }
+  return result;
+}
+
+function cloudcodePost(path, body, token) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const req = https.request({
+      hostname: 'cloudcode-pa.googleapis.com',
+      path,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Length': Buffer.byteLength(payload) },
+    }, res => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(data)); } });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function getGeminiProject(token) {
+  if (_geminiProjectId) return _geminiProjectId;
+  const res = await cloudcodePost('/v1internal:loadCodeAssist', {
+    metadata: { ideType: 'IDE_UNSPECIFIED', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' },
+    cloudaicompanionProject: null,
+  }, token);
+  if (!res.cloudaicompanionProject) throw new Error('loadCodeAssist returned no project');
+  _geminiProjectId = res.cloudaicompanionProject;
+  return _geminiProjectId;
+}
+
+async function geminiOAuthChat(messages) {
+  const token = await getGeminiOAuthToken();
+  const project = await getGeminiProject(token);
+  const model = resolveModel('gemini-oauth');
+  const system = messages.find(m => m.role === 'system');
+  const contents = toGeminiOAuthContents(messages);
+
+  const res = await cloudcodePost('/v1internal:generateContent', {
+    model,
+    project,
+    request: {
+      model: `models/${model}`,
+      contents,
+      ...(system ? { systemInstruction: { parts: [{ text: system.content }] } } : {}),
+      generationConfig: { maxOutputTokens: MAX_TOKENS, temperature: 0.7 },
+    },
+  }, token);
+
+  if (res.error) throw new Error(`Gemini error: ${res.error.message}`);
+  const text = res.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return { provider: 'gemini-oauth', model, content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: {} };
+}
+
+async function geminiOAuthVision(imageBase64, mimeType, prompt) {
+  const token = await getGeminiOAuthToken();
+  const project = await getGeminiProject(token);
+  const model = resolveModel('gemini-oauth');
+
+  const res = await cloudcodePost('/v1internal:generateContent', {
+    model,
+    project,
+    request: {
+      model: `models/${model}`,
+      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mimeType, data: imageBase64 } }, { text: prompt }] }],
+      generationConfig: { maxOutputTokens: MAX_TOKENS },
+    },
+  }, token);
+
+  if (res.error) throw new Error(`Gemini error: ${res.error.message}`);
+  const text = res.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return { provider: 'gemini-oauth', model, text };
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Send a chat request.
  * @param {Array} messages - [{role, content}]
  * @param {Array} [tools] - Anthropic-format tool definitions
- * @param {string} [providerOverride] - 'anthropic'|'openai'|'google'
+ * @param {string} [providerOverride] - 'anthropic'|'openai'|'google'|'gemini-oauth'
  */
 async function chat(messages, tools = null, providerOverride = null) {
   const provider = providerOverride || PROVIDER;
   switch (provider) {
     case 'openai': return openaiChat(messages, tools);
     case 'google': return googleChat(messages, tools);
+    case 'gemini-oauth': return geminiOAuthChat(messages);
     default: return anthropicChat(messages, tools);
   }
 }
@@ -214,6 +351,7 @@ async function vision(imageBase64, mimeType, prompt, providerOverride = null) {
   switch (provider) {
     case 'openai': return openaiVision(imageBase64, mimeType, prompt);
     case 'google': return googleVision(imageBase64, mimeType, prompt);
+    case 'gemini-oauth': return geminiOAuthVision(imageBase64, mimeType, prompt);
     default: return anthropicVision(imageBase64, mimeType, prompt);
   }
 }
