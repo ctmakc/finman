@@ -147,9 +147,24 @@ async function renderExportPage() {
   const mainContent = document.getElementById('main-content');
   mainContent.innerHTML = `<div class="export-page"><div class="page-header"><h1><i class="fas fa-download"></i> Export Data</h1></div>
     <div class="card-grid">
-      <div class="card"><h3><i class="fas fa-file-csv"></i> Export Transactions</h3><p>Download all transactions in CSV format</p><a href="/api/export/transactions/csv" class="btn btn-primary" download><i class="fas fa-download"></i> Download CSV</a></div>
-      <div class="card"><h3><i class="fas fa-file-csv"></i> Export Accounts</h3><p>Download account list in CSV format</p><a href="/api/export/accounts/csv" class="btn btn-primary" download><i class="fas fa-download"></i> Download CSV</a></div>
-      <div class="card"><h3><i class="fas fa-file-code"></i> Full Backup</h3><p>Download all data in JSON format for backup</p><a href="/api/export/full/json" class="btn btn-primary" download><i class="fas fa-download"></i> Download JSON</a></div>
+      <div class="card"><h3><i class="fas fa-file-csv"></i> Export Transactions</h3><p>Download all transactions as a CSV spreadsheet</p><button class="btn btn-primary" onclick="downloadExport('/api/export/transactions/csv','transactions.csv','text/csv')"><i class="fas fa-download"></i> Download CSV</button></div>
+      <div class="card"><h3><i class="fas fa-file-csv"></i> Export Accounts</h3><p>Download account list as a CSV spreadsheet</p><button class="btn btn-primary" onclick="downloadExport('/api/export/accounts/csv','accounts.csv','text/csv')"><i class="fas fa-download"></i> Download CSV</button></div>
+      <div class="card"><h3><i class="fas fa-file-code"></i> Full Backup</h3><p>Download all your data as a JSON backup file</p><button class="btn btn-primary" onclick="downloadExport('/api/export/full/json','finman_backup.json','application/json')"><i class="fas fa-download"></i> Download JSON</button></div>
     </div>
   </div>`;
+}
+
+async function downloadExport(url, filename, mime) {
+  try {
+    const resp = await fetchWithAuth(url);
+    if (!resp.ok) { showNotification('Export failed', 'error'); return; }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([blob], { type: mime }));
+    a.download = filename.replace('.csv', '_' + new Date().toISOString().split('T')[0] + '.csv').replace('.json', '_' + new Date().toISOString().split('T')[0] + '.json');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showNotification('Download started', 'success');
+  } catch (e) { showNotification('Export failed', 'error'); }
 }
