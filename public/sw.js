@@ -25,6 +25,8 @@ const STATIC_ASSETS = [
   '/js/dashboard.js',
   '/js/bank-api.js',
   '/js/charts.js',
+  '/js/ai-insights.js',
+  '/js/ai-chat.js',
   '/manifest.json'
 ];
 

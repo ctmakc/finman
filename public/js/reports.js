@@ -179,13 +179,14 @@ const ReportsModule = {
   },
 
   async deleteReport(id) {
-    if (!confirm('Delete report?')) return;
-    try {
-      await fetch(`/api/reports/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-      await this.loadReports();
-    } catch (error) {
-      showNotification('Failed to delete report', 'error');
-    }
+    showConfirm('Delete this report?', async () => {
+      try {
+        await fetch(`/api/reports/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+        await this.loadReports();
+      } catch (error) {
+        showNotification('Failed to delete report', 'error');
+      }
+    });
   },
 
   getPage() {

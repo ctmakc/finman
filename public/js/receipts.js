@@ -207,15 +207,16 @@ const ReceiptsModule = {
     });
   },
 
-  async delete(id) {
-    if (!confirm('Delete receipt?')) return;
-    try {
-      await fetch(`/api/receipts/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-      await this.loadReceipts();
-      await this.loadStats();
-    } catch (error) {
-      showNotification('Failed to delete receipt', 'error');
-    }
+  delete(id) {
+    showConfirm('Delete this receipt?', async () => {
+      try {
+        await fetch(`/api/receipts/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+        await ReceiptsModule.loadReceipts();
+        await ReceiptsModule.loadStats();
+      } catch (error) {
+        showNotification('Failed to delete receipt', 'error');
+      }
+    });
   },
 
   getPage() {

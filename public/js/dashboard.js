@@ -203,17 +203,18 @@ const SmartDashboard = {
     }
   },
 
-  async removeWidget(id) {
-    if (!confirm('Delete widget?')) return;
-    try {
-      await fetch(`/api/widgets/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      await this.loadWidgets();
-    } catch (error) {
-      showNotification('Failed to remove widget', 'error');
-    }
+  removeWidget(id) {
+    showConfirm('Delete this widget?', async () => {
+      try {
+        await fetch(`/api/widgets/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        await SmartDashboard.loadWidgets();
+      } catch (error) {
+        showNotification('Failed to remove widget', 'error');
+      }
+    });
   },
 
   async moveWidget(id, direction) {

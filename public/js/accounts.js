@@ -257,14 +257,10 @@ async function fetchAccount(accountId) {
         break;
 
       case 'delete':
-        if (confirm('Are you sure you want to delete this account? All associated transactions will also be deleted.')) {
+        showConfirm('Delete this account? All associated transactions will also be deleted.', async () => {
           const success = await deleteAccount(accountId);
-
-          if (success) {
-            // Update UI
-            renderAccountsPage();
-          }
-        }
+          if (success) renderAccountsPage();
+        });
         break;
     }
   }

@@ -655,18 +655,13 @@ async function fetchTransactions(filters = {}) {
         break;
         
       case 'delete':
-        if (confirm('Delete this transaction?')) {
+        showConfirm('Delete this transaction?', async () => {
           const success = await deleteTransaction(transactionId);
-          
           if (success) {
-            // Update UI
-            if (appState.currentPage === 'transactions') {
-              renderTransactionsPage();
-            } else if (appState.currentPage === 'dashboard') {
-              renderDashboard();
-            }
+            if (appState.currentPage === 'transactions') renderTransactionsPage();
+            else if (appState.currentPage === 'dashboard') renderDashboard();
           }
-        }
+        });
         break;
     }
   }

@@ -376,6 +376,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // ── Global confirm dialog (replaces native browser confirm())
+  window.showConfirm = function(message, onConfirm, opts = {}) {
+    const danger = opts.danger !== false;
+    const confirmLabel = opts.confirmLabel || (danger ? 'Delete' : 'Confirm');
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `<div class="modal" style="max-width:380px">
+      <div class="modal-header"><h3 style="margin:0">${opts.title || 'Confirm'}</h3></div>
+      <div class="modal-body"><p style="margin:0;line-height:1.5">${DOMPurify.sanitize(message)}</p></div>
+      <div class="modal-footer" style="gap:8px">
+        <button class="btn btn-outline" id="confirm-cancel">Cancel</button>
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-ok">${confirmLabel}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(backdrop);
+    backdrop.querySelector('#confirm-cancel').onclick = () => backdrop.remove();
+    backdrop.querySelector('#confirm-ok').onclick = () => { backdrop.remove(); onConfirm(); };
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+    setTimeout(() => backdrop.querySelector('#confirm-ok').focus(), 50);
+  };
+
   function openQuickAdd() {
     const modal = document.getElementById('quick-add-modal');
     if (!modal) return;

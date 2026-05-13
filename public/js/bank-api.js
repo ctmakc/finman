@@ -870,17 +870,13 @@ async function fetchBankConnections() {
         break;
         
       case 'disconnect':
-        if (confirm('Disconnect this bank connection?')) {
+        showConfirm('Disconnect this bank connection?', async () => {
           const success = await disconnectBank(connectionId);
-          
           if (success) {
-            // Update list connections
             await fetchBankConnections();
-            
-            // Update UI
             renderBankConnectionsPage();
           }
-        }
+        }, { title: 'Disconnect bank' });
         break;
     }
   }

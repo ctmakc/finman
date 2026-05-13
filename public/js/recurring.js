@@ -516,20 +516,22 @@ async function editRecurring(id) {
   }
 }
 
-async function deleteRecurring(id) {
-  if (!confirm('Delete this recurring payment?')) return;
-  if (await deleteRecurringPayment(id)) {
-    await loadRecurringStats();
-    await loadRecurringPayments();
-  }
+function deleteRecurring(id) {
+  showConfirm('Delete this recurring payment?', async () => {
+    if (await deleteRecurringPayment(id)) {
+      await loadRecurringStats();
+      await loadRecurringPayments();
+    }
+  });
 }
 
-async function payRecurring(id) {
-  const createTx = confirm('Create transaction?');
-  if (await markPaymentAsPaid(id, createTx)) {
-    await loadRecurringStats();
-    await loadRecurringPayments();
-  }
+function payRecurring(id) {
+  showConfirm('Mark as paid and create a transaction?', async () => {
+    if (await markPaymentAsPaid(id, true)) {
+      await loadRecurringStats();
+      await loadRecurringPayments();
+    }
+  }, { danger: false, confirmLabel: 'Mark paid', title: 'Mark as paid' });
 }
 
 async function skipRecurring(id) {

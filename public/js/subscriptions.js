@@ -148,18 +148,19 @@ const SubscriptionsModule = {
     }
   },
 
-  async cancel(id) {
-    if (!confirm('Cancel subscription?')) return;
-    try {
-      await fetch(`/api/subscriptions/${id}/cancel`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      await this.loadSubscriptions();
-      await this.loadStats();
-    } catch (error) {
-      showNotification('Failed to cancel subscription', 'error');
-    }
+  cancel(id) {
+    showConfirm('Cancel this subscription?', async () => {
+      try {
+        await fetch(`/api/subscriptions/${id}/cancel`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        await SubscriptionsModule.loadSubscriptions();
+        await SubscriptionsModule.loadStats();
+      } catch (error) {
+        showNotification('Failed to cancel subscription', 'error');
+      }
+    }, { danger: false, confirmLabel: 'Cancel subscription', title: 'Cancel subscription' });
   },
 
   getPage() {

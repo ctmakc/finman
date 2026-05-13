@@ -525,13 +525,11 @@ function copyInviteCode() {
   });
 }
 
-async function regenerateCode(familyId) {
-  if (!confirm('The old code will stop working. Continue?')) return;
-
-  const newCode = await regenerateInviteCode(familyId);
-  if (newCode) {
-    document.getElementById('invite-code').textContent = newCode;
-  }
+function regenerateCode(familyId) {
+  showConfirm('The old invite code will stop working. Continue?', async () => {
+    const newCode = await regenerateInviteCode(familyId);
+    if (newCode) document.getElementById('invite-code').textContent = newCode;
+  }, { danger: false, confirmLabel: 'Regenerate', title: 'Regenerate invite code' });
 }
 
 async function promoteMember(familyId, userId, role) {
@@ -540,28 +538,22 @@ async function promoteMember(familyId, userId, role) {
   }
 }
 
-async function kickMember(familyId, userId) {
-  if (!confirm('Remove this member from the family?')) return;
-
-  if (await removeMember(familyId, userId)) {
-    openFamilyDetails(familyId);
-  }
+function kickMember(familyId, userId) {
+  showConfirm('Remove this member from the family?', async () => {
+    if (await removeMember(familyId, userId)) openFamilyDetails(familyId);
+  }, { title: 'Remove member' });
 }
 
-async function confirmLeaveFamily(familyId) {
-  if (!confirm('Are you sure you want to leave this family?')) return;
-
-  if (await leaveFamily(familyId)) {
-    renderFamilyPage();
-  }
+function confirmLeaveFamily(familyId) {
+  showConfirm('Are you sure you want to leave this family?', async () => {
+    if (await leaveFamily(familyId)) renderFamilyPage();
+  }, { title: 'Leave family' });
 }
 
-async function confirmDeleteFamily(familyId) {
-  if (!confirm('Delete family? All members will lose access.')) return;
-
-  if (await deleteFamily(familyId)) {
-    renderFamilyPage();
-  }
+function confirmDeleteFamily(familyId) {
+  showConfirm('Delete family? All members will lose access.', async () => {
+    if (await deleteFamily(familyId)) renderFamilyPage();
+  }, { title: 'Delete family' });
 }
 
 function showPermissionsModal(userId, username) {

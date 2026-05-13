@@ -756,16 +756,11 @@ function confirmDeleteTag(tagId) {
   const tag = currencyState.tags.find(t => t.id === tagId);
   if (!tag) return;
 
-  if (confirm(`Delete tag "${tag.name}"? It will be removed from all transactions.`)) {
+  showConfirm(`Delete tag "${tag.name}"? It will be removed from all transactions.`, () => {
     deleteTag(tagId)
-      .then(() => {
-        showNotification('Tag deleted', 'success');
-        loadTags();
-      })
-      .catch(error => {
-        showNotification('Failed to delete tag', 'error');
-      });
-  }
+      .then(() => { showNotification('Tag deleted', 'success'); loadTags(); })
+      .catch(() => showNotification('Failed to delete tag', 'error'));
+  });
 }
 
 // ==================== ВЫБОР ТЕГОВ ДЛЯ ТРАНЗАКЦИИ ====================

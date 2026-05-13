@@ -481,12 +481,10 @@ async function showEditBudgetModal(id) {
 
 // Confirmation удаления budget
 async function confirmDeleteBudget(id) {
-  if (confirm('Are you sure you want to delete this budget?')) {
+  showConfirm('Delete this budget?', async () => {
     const result = await deleteBudget(id);
-    if (result) {
-      renderBudgetsPage();
-    }
-  }
+    if (result) renderBudgetsPage();
+  });
 }
 
 // Widget budgets для dashboardа

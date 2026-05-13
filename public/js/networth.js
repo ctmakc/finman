@@ -190,15 +190,16 @@ const NetWorthModule = {
     }
   },
 
-  async deleteAsset(id) {
-    if (!confirm('Delete asset?')) return;
-    try {
-      await fetch(`/api/networth/assets/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-      await this.loadAssets();
-      await this.loadCurrent();
-    } catch (error) {
-      showNotification('Failed to delete asset', 'error');
-    }
+  deleteAsset(id) {
+    showConfirm('Delete this asset?', async () => {
+      try {
+        await fetch(`/api/networth/assets/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+        await NetWorthModule.loadAssets();
+        await NetWorthModule.loadCurrent();
+      } catch (error) {
+        showNotification('Failed to delete asset', 'error');
+      }
+    });
   },
 
   getPage() {
