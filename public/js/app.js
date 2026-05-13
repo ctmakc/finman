@@ -291,12 +291,12 @@ document.addEventListener('DOMContentLoaded', () => {
           const notifs = await res.json();
           const list = dropdown.querySelector('.notif-list');
           if (notifs.length) {
-            list.innerHTML = notifs.map(n => `<div class="notif-item${n.read ? '' : ' unread'}"><div class="notif-icon ${n.type === 'budget_alert' ? 'warn' : n.type === 'goal_reached' ? 'ok' : 'info'}"><i class="fas fa-${n.type === 'budget_alert' ? 'exclamation-triangle' : n.type === 'goal_reached' ? 'trophy' : 'info-circle'}"></i></div><div class="notif-body"><div class="notif-msg">${DOMPurify.sanitize(n.message)}</div><div class="notif-time">${new Date(n.created_at).toLocaleDateString()}</div></div></div>`).join('');
+            list.innerHTML = notifs.map(n => `<div class="notif-item${n.is_read ? '' : ' unread'}"><div class="notif-icon ${n.type === 'budget_alert' ? 'warn' : n.type === 'goal_reached' ? 'ok' : 'info'}"><i class="fas fa-${n.type === 'budget_alert' ? 'exclamation-triangle' : n.type === 'goal_reached' ? 'trophy' : 'info-circle'}"></i></div><div class="notif-body"><div class="notif-msg">${DOMPurify.sanitize(n.message || n.title || '')}</div><div class="notif-time">${new Date(n.created_at).toLocaleDateString()}</div></div></div>`).join('');
           }
         }
       } catch {}
       dropdown.querySelector('#notif-mark-all')?.addEventListener('click', async () => {
-        await fetch('/api/notifications/mark-all-read', { method: 'POST', headers: { Authorization: `Bearer ${appState.token}` } });
+        await fetch('/api/notifications/read-all', { method: 'PUT', headers: { Authorization: `Bearer ${appState.token}` } });
         dropdown.remove();
         refreshNotifBadge();
       });
@@ -936,7 +936,10 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    initCharts(stats);
+    // Fetch category data for pie chart then init charts
+    fetchWithAuth('/api/analytics/expenses-by-category')
+      .then(r => r.json()).catch(() => [])
+      .then(catData => initCharts(stats, catData));
 
     // Load AI weekly insight asynchronously
     (async () => {
@@ -1347,8 +1350,31 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         
         <div class="card">
+          <h2 class="card-title">Import transactions</h2>
+          <div class="settings-section">
+            <p>Import transactions from a CSV file. Expected columns: <code>date, description, amount, type, category</code></p>
+            <div id="import-drop-zone" class="import-drop-zone">
+              <i class="fas fa-file-csv" style="font-size:2rem;color:var(--accent);margin-bottom:8px"></i>
+              <p>Drag & drop CSV file here, or</p>
+              <label class="btn btn-outline" style="cursor:pointer">
+                Choose file <input type="file" id="import-file" accept=".csv" style="display:none">
+              </label>
+              <p id="import-filename" style="margin-top:8px;font-size:13px;color:#888"></p>
+            </div>
+            <div style="margin-top:10px">
+              <select id="import-account" class="form-control" style="max-width:280px;margin-bottom:8px">
+                <option value="">— Select account —</option>
+                ${appState.accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+              </select>
+              <button id="import-btn" class="btn btn-primary" disabled><i class="fas fa-upload"></i> Import</button>
+              <span id="import-status" style="margin-left:10px;font-size:13px"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
           <h2 class="card-title">Export data</h2>
-          
+
           <div class="settings-section">
             <p>Export your financial data to CSV format for use in other applications.</p>
             
@@ -1384,6 +1410,53 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
     document.getElementById('password-form').addEventListener('submit', handlePasswordUpdate);
     document.getElementById('export-btn').addEventListener('click', handleDataExport);
+
+    // CSV Import
+    const importFile = document.getElementById('import-file');
+    const importBtn = document.getElementById('import-btn');
+    const importFilename = document.getElementById('import-filename');
+    const importStatus = document.getElementById('import-status');
+    const importDropZone = document.getElementById('import-drop-zone');
+    let importSelectedFile = null;
+
+    function setImportFile(file) {
+      importSelectedFile = file;
+      importFilename.textContent = file ? file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)' : '';
+      importBtn.disabled = !file;
+    }
+    importFile?.addEventListener('change', e => setImportFile(e.target.files[0]));
+    importDropZone?.addEventListener('dragover', e => { e.preventDefault(); importDropZone.classList.add('drag-over'); });
+    importDropZone?.addEventListener('dragleave', () => importDropZone.classList.remove('drag-over'));
+    importDropZone?.addEventListener('drop', e => {
+      e.preventDefault(); importDropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file?.name.endsWith('.csv')) setImportFile(file);
+    });
+    importBtn?.addEventListener('click', async () => {
+      if (!importSelectedFile) return;
+      const accountId = document.getElementById('import-account').value;
+      importBtn.disabled = true;
+      importStatus.textContent = 'Importing…';
+      importStatus.style.color = '#888';
+      try {
+        const text = await importSelectedFile.text();
+        const r = await fetchWithAuth('/api/transactions/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/csv' },
+          body: text,
+        });
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        const result = await r.json();
+        importStatus.textContent = `✓ Imported ${result.imported} transactions`;
+        importStatus.style.color = 'var(--success, #38c172)';
+        setImportFile(null);
+        importFile.value = '';
+      } catch (err) {
+        importStatus.textContent = '✗ Import failed: ' + err.message;
+        importStatus.style.color = 'var(--danger, #e3342f)';
+        importBtn.disabled = false;
+      }
+    });
     
     // Export period change handler
     const exportPeriod = document.getElementById('export-period');

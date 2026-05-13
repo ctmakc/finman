@@ -4995,3 +4995,13 @@ body.dark .topbar, body.dark .sidebar { background: var(--card); border-color: v
 }
 .ai-insight-close:hover { color: #555; }
 body.dark .ai-insight-banner { background: linear-gradient(135deg, #1e1e3a 0%, #1a2a3a 100%); border-color: #3a3580; }
+
+/* ── CSV Import Drop Zone ──────────────────────────────── */
+.import-drop-zone {
+  border: 2px dashed var(--border, #ddd); border-radius: 10px;
+  padding: 24px; text-align: center; transition: border-color .2s, background .2s;
+  cursor: pointer;
+}
+.import-drop-zone.drag-over, .import-drop-zone:hover { border-color: var(--accent); background: rgba(93,92,222,.04); }
+body.dark .import-drop-zone { border-color: #3a3a5c; }
+body.dark .import-drop-zone.drag-over { border-color: var(--accent); background: rgba(93,92,222,.08); }

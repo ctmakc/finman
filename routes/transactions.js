@@ -144,16 +144,57 @@ router.post('/', authenticate, async (req, res) => {
     const { get } = require('../db/database');
     const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [accountId]);
 
+    const txType = type || (amount >= 0 ? 'income' : 'expense');
+
     // Создание транзакции (от имени владельца счета)
     const newTransaction = await Transaction.create({
-      accountId,
-      userId: account.user_id,
-      date,
-      description,
-      category,
-      amount,
-      type: type || (amount >= 0 ? 'income' : 'expense')
+      accountId, userId: account.user_id, date, description, category,
+      amount, type: txType,
     });
+
+    // Budget threshold notifications (fire-and-forget, non-blocking)
+    if (txType === 'expense') {
+      const { query: dbQuery, run: dbRun } = require('../db/database');
+      setImmediate(async () => {
+        try {
+          const now = new Date();
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+          const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+          const budgets = await dbQuery(
+            `SELECT b.id, b.name, b.amount as budget_amount,
+                    COALESCE(SUM(ABS(t.amount)), 0) as spent
+             FROM budgets b
+             LEFT JOIN transactions t ON t.user_id = b.user_id
+               AND t.type = 'expense' AND t.date BETWEEN ? AND ?
+               AND (b.category_id IS NULL OR t.category_id = b.category_id)
+             WHERE b.user_id = ? AND b.is_active = 1
+             GROUP BY b.id`,
+            [monthStart, monthEnd, account.user_id]
+          );
+          for (const bud of budgets) {
+            const pct = bud.budget_amount > 0 ? (bud.spent / bud.budget_amount) * 100 : 0;
+            if (pct >= 80) {
+              const severity = pct >= 100 ? 'over' : 'warn';
+              const msg = pct >= 100
+                ? `Budget "${bud.name}" exceeded (${Math.round(pct)}%)`
+                : `Budget "${bud.name}" at ${Math.round(pct)}% of limit`;
+              const existing = await dbQuery(
+                `SELECT id FROM notifications WHERE user_id=? AND type='budget_alert'
+                 AND message LIKE ? AND created_at > datetime('now','-1 day')`,
+                [account.user_id, `%${bud.name}%`]
+              );
+              if (!existing.length) {
+                await dbRun(
+                  `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+                   VALUES (?, 'budget_alert', ?, ?, 0, datetime('now'))`,
+                  [account.user_id, severity === 'over' ? 'Budget exceeded' : 'Budget warning', msg]
+                );
+              }
+            }
+          }
+        } catch (_) {}
+      });
+    }
 
     res.status(201).json(newTransaction);
   } catch (error) {
