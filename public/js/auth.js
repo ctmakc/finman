@@ -15,7 +15,7 @@ async function handleProfileUpdate(e) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Failed to update профиля', 'error');
+        showNotification(data.message || 'Failed to update profile', 'error');
         return;
       }
       
@@ -31,7 +31,7 @@ async function handleProfileUpdate(e) {
       showNotification('Profile updated successfully', 'success');
     } catch (error) {
       console.error('Failed to update профиля:', error);
-      showNotification('An error occurred при updatedии профиля', 'error');
+      showNotification('An error occurred while updating profile', 'error');
     }
   }
   
@@ -59,7 +59,7 @@ async function handleProfileUpdate(e) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Failed to update пароля', 'error');
+        showNotification(data.message || 'Failed to update password', 'error');
         return;
       }
       
@@ -71,7 +71,7 @@ async function handleProfileUpdate(e) {
       showNotification('Password updated successfully', 'success');
     } catch (error) {
       console.error('Failed to update пароля:', error);
-      showNotification('An error occurred при updatedии пароля', 'error');
+      showNotification('An error occurred while updating password', 'error');
     }
   }
   

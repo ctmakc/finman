@@ -460,9 +460,9 @@ async function fetchTransactions(filters = {}) {
               <select id="${modalId}-bank-type" class="form-control">
                 <option value="generic">Generic format</option>
                 <option value="tinkoff">Tinkoff</option>
-                <option value="sberbank">Сбербанк</option>
-                <option value="vtb">ВТБ</option>
-                <option value="alfabank">Альфа-Банк</option>
+                <option value="sberbank">Sberbank</option>
+                <option value="vtb">VTB</option>
+                <option value="alfabank">Alfa-Bank</option>
               </select>
             </div>
             
@@ -477,13 +477,13 @@ async function fetchTransactions(filters = {}) {
             </div>
             
             <div class="import-info">
-              <p><i class="fas fa-info-circle"></i> Файл должен содержать заголовки и следующие колонки: date, description, amount, category (опционально).</p>
-              <p>Select соответствующий type bank для корректн импорта дан.</p>
+              <p><i class="fas fa-info-circle"></i> File must contain headers with columns: date, description, amount, category (optional).</p>
+              <p>Select the matching bank type for correct data import.</p>
             </div>
             
             <div class="modal-footer">
               <button type="button" class="btn btn-outline" id="${modalId}-cancel">Cancel</button>
-              <button type="submit" class="btn btn-primary">Импортировать</button>
+              <button type="submit" class="btn btn-primary">Import</button>
             </div>
           </form>
         </div>
@@ -539,7 +539,7 @@ async function fetchTransactions(filters = {}) {
       const file = fileInput.files[0];
       
       if (!accountId || !file) {
-        showNotification('Please, select account и file', 'error');
+        showNotification('Please select an account and file', 'error');
         return;
       }
       
@@ -570,7 +570,7 @@ async function fetchTransactions(filters = {}) {
     return transactions.map(transaction => `
       <tr data-transaction-id="${transaction.id}">
         <td>${formatDate(transaction.date)}</td>
-        <td>${transaction.description || 'Без описания'}</td>
+        <td>${transaction.description || 'No description'}</td>
         <td>${transaction.category || 'Uncategorized'}</td>
         <td>${transaction.account_name}</td>
         <td class="text-right ${transaction.type === 'income' ? 'text-success' : 'text-error'}">
@@ -655,7 +655,7 @@ async function fetchTransactions(filters = {}) {
         break;
         
       case 'delete':
-        if (confirm('Вы действительно do you want to delete эту transaction?')) {
+        if (confirm('Delete this transaction?')) {
           const success = await deleteTransaction(transactionId);
           
           if (success) {
@@ -678,7 +678,7 @@ async function fetchTransactions(filters = {}) {
     
     if (filtersForm.classList.contains('hidden')) {
       filtersForm.classList.remove('hidden');
-      toggleButton.innerHTML = '<i class="fas fa-filter"></i> Скрыть filters';
+      toggleButton.innerHTML = '<i class="fas fa-filter"></i> Hide filters';
     } else {
       filtersForm.classList.add('hidden');
       toggleButton.innerHTML = '<i class="fas fa-filter"></i> Show filters';
@@ -737,7 +737,7 @@ async function fetchTransactions(filters = {}) {
       endDate = document.getElementById('export-end-date').value;
       
       if (!startDate || !endDate) {
-        showNotification('Please, укажите начальную и конечную даты', 'error');
+        showNotification('Please specify start and end dates', 'error');
         return;
       }
     } else if (period === 'month') {
@@ -758,7 +758,7 @@ async function fetchTransactions(filters = {}) {
     });
     
     if (!transactions.length) {
-      showNotification('No data для экспорта', 'warning');
+      showNotification('No data to export', 'warning');
       return;
     }
     
@@ -787,10 +787,10 @@ async function fetchTransactions(filters = {}) {
     const link = document.createElement('a');
     
     link.href = url;
-    link.setAttribute('download', `финансы_${startDate || 'all'}_${endDate || 'all'}.csv`);
+    link.setAttribute('download', `finances_${startDate || 'all'}_${endDate || 'all'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    showNotification('Данные successfully экспортированы', 'success');
+    showNotification('Data exported successfully', 'success');
   }

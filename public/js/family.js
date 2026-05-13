@@ -1,4 +1,4 @@
-// Модуль управления семьей и правs доступа
+// Family Management Module
 
 // ==================== API ====================
 
@@ -193,7 +193,7 @@ async function regenerateInviteCode(familyId) {
       throw new Error(data.message || 'Error');
     }
 
-    showNotification('Код updated', 'success');
+    showNotification('Invite code updated', 'success');
     return data.inviteCode;
   } catch (error) {
     console.error('Error:', error);
@@ -397,14 +397,14 @@ async function openFamilyDetails(familyId) {
                           </a>
                         ` : `
                           <a onclick="promoteMember(${family.id}, ${member.user_id}, 'member')">
-                            <i class="fas fa-arrow-down"></i> Снять админа
+                            <i class="fas fa-arrow-down"></i> Remove admin
                           </a>
                         `}
                         <a onclick="kickMember(${family.id}, ${member.user_id})" class="danger">
                           <i class="fas fa-user-minus"></i> Delete
                         </a>
                         <a onclick="showPermissionsModal(${member.user_id}, '${escapeHtml(member.username)}')">
-                          <i class="fas fa-key"></i> Права доступа
+                          <i class="fas fa-key"></i> Permissions
                         </a>
                       </div>
                     </div>
@@ -418,7 +418,7 @@ async function openFamilyDetails(familyId) {
         <div class="family-actions">
           ${family.myRole !== 'owner' ? `
             <button class="btn btn-danger" onclick="confirmLeaveFamily(${family.id})">
-              <i class="fas fa-sign-out-alt"></i> Покинуть family
+              <i class="fas fa-sign-out-alt"></i> Leave family
             </button>
           ` : `
             <button class="btn btn-danger" onclick="confirmDeleteFamily(${family.id})">
@@ -446,11 +446,11 @@ function showCreateFamilyModal() {
       <div class="modal-body">
         <div class="form-group">
           <label>Name family</label>
-          <input type="text" id="family-name" placeholder="E.g.: Family Ивановых" required>
+          <input type="text" id="family-name" placeholder="E.g.: The Smith Family" required>
         </div>
         <div class="form-group">
           <label>Description (optional)</label>
-          <textarea id="family-description" placeholder="Краткое description"></textarea>
+          <textarea id="family-description" placeholder="Brief description"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -467,7 +467,7 @@ async function submitCreateFamily() {
   const description = document.getElementById('family-description').value.trim();
 
   if (!name) {
-    showNotification('Enter name family', 'error');
+    showNotification('Enter a family name', 'error');
     return;
   }
 
@@ -485,7 +485,7 @@ function showJoinFamilyModal() {
   modal.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <h3>Join к семье</h3>
+        <h3>Join a family</h3>
         <button class="btn-close" onclick="closeModal('join-family-modal')">&times;</button>
       </div>
       <div class="modal-body">
@@ -507,7 +507,7 @@ async function submitJoinFamily() {
   const code = document.getElementById('invite-code-input').value.trim().toUpperCase();
 
   if (!code) {
-    showNotification('Enter code приглашения', 'error');
+    showNotification('Enter the invite code', 'error');
     return;
   }
 
@@ -521,12 +521,12 @@ async function submitJoinFamily() {
 function copyInviteCode() {
   const code = document.getElementById('invite-code').textContent;
   navigator.clipboard.writeText(code).then(() => {
-    showNotification('Код скопирован', 'success');
+    showNotification('Code copied to clipboard', 'success');
   });
 }
 
 async function regenerateCode(familyId) {
-  if (!confirm('Старый code перестанет работать. Продолжить?')) return;
+  if (!confirm('The old code will stop working. Continue?')) return;
 
   const newCode = await regenerateInviteCode(familyId);
   if (newCode) {
@@ -541,7 +541,7 @@ async function promoteMember(familyId, userId, role) {
 }
 
 async function kickMember(familyId, userId) {
-  if (!confirm('Delete участника of family?')) return;
+  if (!confirm('Remove this member from the family?')) return;
 
   if (await removeMember(familyId, userId)) {
     openFamilyDetails(familyId);
@@ -549,7 +549,7 @@ async function kickMember(familyId, userId) {
 }
 
 async function confirmLeaveFamily(familyId) {
-  if (!confirm('Are you sure, что do you want to leave family?')) return;
+  if (!confirm('Are you sure you want to leave this family?')) return;
 
   if (await leaveFamily(familyId)) {
     renderFamilyPage();
@@ -557,7 +557,7 @@ async function confirmLeaveFamily(familyId) {
 }
 
 async function confirmDeleteFamily(familyId) {
-  if (!confirm('Delete family? All участники потеряют доступ.')) return;
+  if (!confirm('Delete family? All members will lose access.')) return;
 
   if (await deleteFamily(familyId)) {
     renderFamilyPage();
@@ -573,11 +573,11 @@ function showPermissionsModal(userId, username) {
   modal.innerHTML = `
     <div class="modal modal-large">
       <div class="modal-header">
-        <h3>Права доступа для ${escapeHtml(username)}</h3>
+        <h3>Permissions for ${escapeHtml(username)}</h3>
         <button class="btn-close" onclick="closeModal('permissions-modal')">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="info-text">Select accounts и права доступа:</p>
+        <p class="info-text">Select accounts and permissions:</p>
         <div class="permissions-list">
           ${accounts.length === 0 ? '<p>No accounts</p>' : accounts.map(account => `
             <div class="permission-item" data-account-id="${account.id}">
@@ -587,7 +587,7 @@ function showPermissionsModal(userId, username) {
               </div>
               <div class="permission-checkboxes">
                 <label>
-                  <input type="checkbox" class="perm-view" checked> Просмотр
+                  <input type="checkbox" class="perm-view" checked> View
                 </label>
                 <label>
                   <input type="checkbox" class="perm-add"> Adding
@@ -596,7 +596,7 @@ function showPermissionsModal(userId, username) {
                   <input type="checkbox" class="perm-edit"> Edit
                 </label>
                 <label>
-                  <input type="checkbox" class="perm-delete"> Удаление
+                  <input type="checkbox" class="perm-delete"> Delete
                 </label>
               </div>
             </div>
@@ -633,7 +633,7 @@ async function savePermissions(userId) {
   }
 
   closeModal('permissions-modal');
-  showNotification('Права сохранены', 'success');
+  showNotification('Permissions saved', 'success');
 }
 
 function toggleDropdown(btn) {

@@ -230,7 +230,7 @@ function renderBudgetCards(budgets) {
 
         <div class="budget-footer">
           <span class="budget-remaining ${budget.remaining < 0 ? 'negative' : ''}">
-            ${budget.remaining >= 0 ? 'Remaining: ' : 'Overо на: '}
+            ${budget.remaining >= 0 ? 'Remaining: ' : 'Over by: '}
             ${formatCurrency(Math.abs(budget.remaining))}
           </span>
           <span class="budget-period">${getPeriodLabel(budget.period)}</span>
@@ -287,7 +287,7 @@ function showCreateBudgetModal() {
           <div class="form-group">
             <label for="${modalId}-category" class="form-label">Category</label>
             <input type="text" id="${modalId}-category" class="form-control" placeholder="Category expenses (optional)">
-            <small class="form-hint">Leave empty для общего budget на all expenses</small>
+            <small class="form-hint">Leave empty for a general budget covering all expenses</small>
           </div>
 
           <div class="form-row">

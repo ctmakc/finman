@@ -220,7 +220,7 @@ const NetWorthModule = {
           <form id="asset-form" onsubmit="event.preventDefault(); NetWorthModule.saveAsset()">
             <input type="hidden" id="asset-id">
             <div class="form-group"><label>Name</label><input type="text" id="asset-name" class="form-control" required></div>
-            <div class="form-group"><label>Type</label><select id="asset-type" class="form-control"><option value="real_estate">Недвижимость</option><option value="vehicle">Транспорт</option><option value="crypto">Криптоcurrency</option><option value="precious_metals">Драгметаллы</option><option value="collectibles">Коллекции</option><option value="business">Бизнес</option><option value="other">Other</option></select></div>
+            <div class="form-group"><label>Type</label><select id="asset-type" class="form-control"><option value="real_estate">Real estate</option><option value="vehicle">Vehicle</option><option value="crypto">Cryptocurrency</option><option value="precious_metals">Precious metals</option><option value="collectibles">Collectibles</option><option value="business">Business</option><option value="other">Other</option></select></div>
             <div class="form-group"><label>Value ($)</label><input type="number" id="asset-value" class="form-control" step="0.01" required></div>
             <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('asset-modal').classList.remove('active')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
           </form>

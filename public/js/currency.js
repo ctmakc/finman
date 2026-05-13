@@ -472,7 +472,7 @@ async function renderCurrencySettingsTab() {
       });
 
       currencyState.settings = result.settings;
-      showNotification('Settings сохранены', 'success');
+      showNotification('Settings saved', 'success');
     } catch (error) {
       showNotification('Failed to save settings', 'error');
     }
@@ -518,8 +518,8 @@ async function loadTags() {
       container.innerHTML = `
         <div class="empty-state">
           <i class="fas fa-tags"></i>
-          <h3>No tagов</h3>
-          <p>Create tags для каtagоризации transactions</p>
+          <h3>No tags</h3>
+          <p>Create tags to categorize your transactions</p>
         </div>
       `;
       return;
@@ -553,7 +553,7 @@ async function loadTags() {
     container.innerHTML = `
       <div class="empty-text">
         <i class="fas fa-exclamation-circle"></i>
-        <p>Failed to load tagов</p>
+        <p>Failed to load tags</p>
       </div>
     `;
   }
@@ -574,7 +574,7 @@ function showAddTagModal() {
         <form id="add-tag-form">
           <div class="form-group">
             <label class="form-label">Name tag</label>
-            <input type="text" id="tag-name" class="form-control" required placeholder="E.g.: Работа">
+            <input type="text" id="tag-name" class="form-control" required placeholder="E.g.: Work">
           </div>
 
           <div class="form-group">
@@ -614,7 +614,7 @@ function showAddTagModal() {
     try {
       await createTag(name, color);
       modal.remove();
-      showNotification('Тег создан', 'success');
+      showNotification('Tag created', 'success');
       loadTags();
     } catch (error) {
       showNotification(error.message, 'error');
@@ -680,7 +680,7 @@ async function showEditTagModal(tagId) {
     try {
       await updateTag(tagId, { name, color });
       modal.remove();
-      showNotification('Тег updated', 'success');
+      showNotification('Tag updated', 'success');
       loadTags();
     } catch (error) {
       showNotification(error.message, 'error');
@@ -712,7 +712,7 @@ async function showTagStats(tagId) {
               <div class="stat-icon"><i class="fas fa-list"></i></div>
               <div class="stat-data">
                 <div class="stat-value">${stats.transactionCount}</div>
-                <div class="stat-label">Транзакций</div>
+                <div class="stat-label">Transactions</div>
               </div>
             </div>
 
@@ -756,10 +756,10 @@ function confirmDeleteTag(tagId) {
   const tag = currencyState.tags.find(t => t.id === tagId);
   if (!tag) return;
 
-  if (confirm(`Delete tag "${tag.name}"? Он будет удален со all transactions.`)) {
+  if (confirm(`Delete tag "${tag.name}"? It will be removed from all transactions.`)) {
     deleteTag(tagId)
       .then(() => {
-        showNotification('Тег удален', 'success');
+        showNotification('Tag deleted', 'success');
         loadTags();
       })
       .catch(error => {
@@ -790,7 +790,7 @@ async function renderTagSelector(transactionId, containerId) {
         `).join('')}
       </div>
       <div class="tag-dropdown">
-        <input type="text" class="form-control tag-search" placeholder="Search или добавление tagов..."
+        <input type="text" class="form-control tag-search" placeholder="Search or add tags..."
                id="tag-search-${containerId}">
         <div class="tag-options hidden" id="tag-options-${containerId}">
           ${tags.filter(t => !selectedIds.includes(t.id)).map(t => `
@@ -799,7 +799,7 @@ async function renderTagSelector(transactionId, containerId) {
               ${escapeHtml(t.name)}
             </div>
           `).join('')}
-          ${tags.length === 0 ? '<div class="tag-option-empty">No tagов</div>' : ''}
+          ${tags.length === 0 ? '<div class="tag-option-empty">No tags</div>' : ''}
         </div>
       </div>
       <input type="hidden" name="tagIds" id="tag-ids-${containerId}" value="${selectedIds.join(',')}">

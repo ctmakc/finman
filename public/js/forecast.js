@@ -47,17 +47,17 @@ const ForecastModule = {
         </div>
         <div class="forecast-arrow ${isPositive ? 'up' : 'down'}">${isPositive ? '↗' : '↘'}</div>
         <div class="forecast-projected">
-          <span class="label">Через 30 days</span>
+          <span class="label">Projected balance</span>
           <span class="value ${isPositive ? 'positive' : 'negative'}">${s.projectedBalance.toLocaleString()} $</span>
         </div>
       </div>
       <div class="forecast-details">
         <div class="detail-item">
-          <span class="label">Изменение</span>
+          <span class="label">Change</span>
           <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${s.change.toLocaleString()} $ (${s.changePercent}%)</span>
         </div>
         <div class="detail-item warning">
-          <span class="label">Минимум balance</span>
+          <span class="label">Lowest balance</span>
           <span class="value">${s.lowestPoint.toLocaleString()} $</span>
           <small>${s.lowestDate}</small>
         </div>
@@ -127,7 +127,7 @@ const ForecastModule = {
           <div class="trend-prediction">Forecast: <strong>${p.nextMonthExpense.toLocaleString()} $</strong></div>
         </div>
         <div class="trend-card">
-          <div class="trend-header"><span>💰 Сбережения</span><span class="${t.savings.direction === 'up' ? 'positive' : 'negative'}">${t.savings.direction === 'up' ? '↑' : '↓'} ${t.savings.percent}%</span></div>
+          <div class="trend-header"><span>💰 Savings</span><span class="${t.savings.direction === 'up' ? 'positive' : 'negative'}">${t.savings.direction === 'up' ? '↑' : '↓'} ${t.savings.percent}%</span></div>
           <div class="trend-prediction">Forecast: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${p.nextMonthSavings.toLocaleString()} $</strong></div>
         </div>
       </div>

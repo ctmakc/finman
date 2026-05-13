@@ -593,24 +593,24 @@ async function fetchBankConnections() {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Авторизация ${bankName}</h2>
+            <h2 class="modal-title">Connect to ${bankName}</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <div class="modal-body">
             <div class="auth-instructions">
-              <h3>Инструкции по авторизации</h3>
+              <h3>Authorization instructions</h3>
               <ol>
-                <li>В открывшемся окне войдите в свой аккаунт ${bankName}.</li>
-                <li>Предоставьте доступ к запрашиваемым данным.</li>
-                <li>После завершения вернитесь в это окно и нажмите "I signed in".</li>
+                <li>In the opened window, sign in to your ${bankName} account.</li>
+                <li>Grant access to the requested data.</li>
+                <li>After completing, return to this window and click "I signed in".</li>
               </ol>
-              
+
               <div class="auth-code-form">
                 <div class="form-group">
-                  <label for="${modalId}-code" class="form-label">Код авторизации</label>
-                  <input type="text" id="${modalId}-code" class="form-control" placeholder="Вставьте code of адресной строки...">
-                  <p class="form-hint">Если вы были перенаправлены на pagesу с codeом, скопируйте его и вставьте сюда.</p>
+                  <label for="${modalId}-code" class="form-label">Authorization code</label>
+                  <input type="text" id="${modalId}-code" class="form-control" placeholder="Paste the code from the address bar...">
+                  <p class="form-hint">If you were redirected to a page with a code, copy and paste it here.</p>
                 </div>
               </div>
             </div>
@@ -661,12 +661,12 @@ async function fetchBankConnections() {
       const bankId = localStorage.getItem('bank_auth_id');
       
       if (!state || !bankId) {
-        showNotification('Error авторизации: data не сохранены', 'error');
+        showNotification('Authorization error: state data missing', 'error');
         return;
       }
       
       if (!code) {
-        showNotification('Please, enter code авторизации', 'warning');
+        showNotification('Please enter the authorization code', 'warning');
         return;
       }
       
@@ -712,7 +712,7 @@ async function fetchBankConnections() {
           </div>
           
           <form id="${modalId}-form" class="modal-body">
-            <p>Sync transactions для accounts <strong>${account.name}</strong>.</p>
+            <p>Sync transactions for account <strong>${account.name}</strong>.</p>
             
             <div class="form-group">
               <label for="${modalId}-start-date" class="form-label">Start date</label>
@@ -770,13 +770,13 @@ async function fetchBankConnections() {
       const endDate = document.getElementById(`${modalId}-end-date`).value;
       
       if (!startDate || !endDate) {
-        showNotification('Please, укажите даты', 'error');
+        showNotification('Please specify both dates', 'error');
         return;
       }
       
       // Проверка корректности дат
       if (new Date(startDate) > new Date(endDate)) {
-        showNotification('Start date не может быть позже конечной', 'error');
+        showNotification('Start date cannot be after end date', 'error');
         return;
       }
       
@@ -808,14 +808,14 @@ async function fetchBankConnections() {
             <h3 class="bank-connection-name">${connection.bankName}</h3>
             <p class="bank-connection-status">
               <span class="status-indicator ${connection.isActive ? 'active' : 'inactive'}"></span>
-              ${connection.isActive ? 'Активно' : 'Неassetно'}
+              ${connection.isActive ? 'Active' : 'Inactive'}
             </p>
           </div>
         </div>
         
         <div class="bank-connection-info">
-          <p class="bank-connection-date">Подkeyено: ${new Date(connection.createdAt).toLocaleDateString()}</p>
-          ${connection.expiresAt ? `<p class="bank-connection-expires">Действует до: ${new Date(connection.expiresAt).toLocaleDateString()}</p>` : ''}
+          <p class="bank-connection-date">Connected: ${new Date(connection.createdAt).toLocaleDateString()}</p>
+          ${connection.expiresAt ? `<p class="bank-connection-expires">Expires: ${new Date(connection.expiresAt).toLocaleDateString()}</p>` : ''}
         </div>
         
         <div class="bank-connection-actions">
@@ -826,7 +826,7 @@ async function fetchBankConnections() {
             <i class="fas fa-exchange-alt"></i> Sync transactions
           </button>
           <button class="btn btn-sm btn-danger" data-connection-action="disconnect" data-connection-id="${connection.id}">
-            <i class="fas fa-unlink"></i> Отkeyить
+            <i class="fas fa-unlink"></i> Disconnect
           </button>
         </div>
       </div>
@@ -861,7 +861,7 @@ async function fetchBankConnections() {
         const connection = appState.bankConnections.find(conn => conn.id == connectionId);
         
         if (!connection || !connection.accountIds || connection.accountIds.length === 0) {
-          showNotification('Сstart необходимо синхронизировать accounts', 'warning');
+          showNotification('Please sync accounts first', 'warning');
           return;
         }
         
@@ -870,7 +870,7 @@ async function fetchBankConnections() {
         break;
         
       case 'disconnect':
-        if (confirm('Вы действительно do you want to отkeyить этот банк?')) {
+        if (confirm('Disconnect this bank connection?')) {
           const success = await disconnectBank(connectionId);
           
           if (success) {
@@ -893,7 +893,7 @@ async function fetchBankConnections() {
     );
     
     if (accountsForConnection.length === 0) {
-      showNotification('No доступ accounts для синхронизации', 'warning');
+      showNotification('No linked accounts available to sync', 'warning');
       return;
     }
     
@@ -904,12 +904,12 @@ async function fetchBankConnections() {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Select account для синхронизации</h2>
+            <h2 class="modal-title">Select account to sync</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <div class="modal-body">
-            <p>Select account для синхронизации transactions of bank ${connection.bankName}:</p>
+            <p>Select account to sync transactions from ${connection.bankName}:</p>
             
             <div class="accounts-selection-list">
               ${accountsForConnection.map(account => `

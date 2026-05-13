@@ -1040,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="fas fa-wallet"></i>
               </div>
               <h2>You have no accounts yet</h2>
-              <p>Добавьте свой первый account, to начать отслеживать финансы</p>
+              <p>Add your first account to start tracking your finances</p>
               <button id="empty-add-account-btn" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add account
               </button>

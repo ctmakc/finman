@@ -1,4 +1,4 @@
-// Модуль регуляр платежей
+// Recurring Payments Module
 
 // ==================== API ====================
 
@@ -11,7 +11,7 @@ async function fetchRecurringPayments(includeInactive = false) {
     return await response.json();
   } catch (error) {
     console.error('Error:', error);
-    showNotification('Failed to load платежей', 'error');
+    showNotification('Failed to load payments', 'error');
     return [];
   }
 }
@@ -54,7 +54,7 @@ async function createRecurringPayment(data) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Error');
-    showNotification('Платеж создан', 'success');
+    showNotification('Payment created', 'success');
     return result.payment;
   } catch (error) {
     console.error('Error:', error);
@@ -75,7 +75,7 @@ async function updateRecurringPayment(id, data) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Error');
-    showNotification('Платеж updated', 'success');
+    showNotification('Payment updated', 'success');
     return result.payment;
   } catch (error) {
     console.error('Error:', error);
@@ -129,7 +129,7 @@ async function skipPayment(id) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Error');
-    showNotification('Платеж пропущен', 'success');
+    showNotification('Payment skipped', 'success');
     return result;
   } catch (error) {
     console.error('Error:', error);
@@ -146,7 +146,7 @@ async function togglePayment(id) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Error');
-    showNotification(result.payment.is_active ? 'Платеж возupdated' : 'Платеж приостановлен', 'success');
+    showNotification(result.payment.is_active ? 'Payment resumed' : 'Payment paused', 'success');
     return result.payment;
   } catch (error) {
     console.error('Error:', error);
@@ -189,7 +189,7 @@ async function renderRecurringPage() {
           <div class="filter-row">
             <label>
               <input type="checkbox" id="show-inactive" onchange="loadRecurringPayments()">
-              Showь неassetные
+              Show inactive
             </label>
           </div>
           <div class="payments-list" id="all-payments-list"></div>
@@ -233,7 +233,7 @@ async function loadRecurringStats() {
         <div class="stat-icon"><i class="fas fa-exclamation-circle"></i></div>
         <div class="stat-data">
           <div class="stat-value">${stats.overdueCount}</div>
-          <div class="stat-label">Просрочено</div>
+          <div class="stat-label">Overdue</div>
         </div>
       </div>
     </div>
@@ -274,7 +274,7 @@ async function loadRecurringPayments() {
   if (payments.length > 0) {
     allList.innerHTML = payments.map(p => renderPaymentCard(p)).join('');
   } else {
-    allList.innerHTML = '<p class="empty-text">No регуляр платежей</p>';
+    allList.innerHTML = '<p class="empty-text">No recurring payments</p>';
   }
 }
 
@@ -301,9 +301,9 @@ function renderPaymentCard(payment, isOverdue = false) {
       <div class="payment-schedule">
         <span class="frequency">${getFrequencyLabel(payment.frequency)}</span>
         <span class="next-date ${statusClass}">
-          ${isOverdue ? 'Просрочено: ' : 'Next: '}
+          ${isOverdue ? 'Overdue: ' : 'Next: '}
           ${formatDateShort(payment.next_payment_date)}
-          ${!isOverdue && daysUntil >= 0 ? `(via ${daysUntil} days)` : ''}
+          ${!isOverdue && daysUntil >= 0 ? `(in ${daysUntil} days)` : ''}
         </span>
       </div>
 
@@ -312,7 +312,7 @@ function renderPaymentCard(payment, isOverdue = false) {
           <button class="btn btn-sm btn-success" onclick="payRecurring(${payment.id})" title="Pay">
             <i class="fas fa-check"></i>
           </button>
-          <button class="btn btn-sm btn-warning" onclick="skipRecurring(${payment.id})" title="Пропустить">
+          <button class="btn btn-sm btn-warning" onclick="skipRecurring(${payment.id})" title="Skip">
             <i class="fas fa-forward"></i>
           </button>
         ` : ''}
@@ -320,7 +320,7 @@ function renderPaymentCard(payment, isOverdue = false) {
           <i class="fas fa-edit"></i>
         </button>
         <button class="btn btn-sm ${payment.is_active ? 'btn-secondary' : 'btn-primary'}"
-                onclick="toggleRecurring(${payment.id})" title="${payment.is_active ? 'Приостановить' : 'Возrefresh'}">
+                onclick="toggleRecurring(${payment.id})" title="${payment.is_active ? 'Pause' : 'Resume'}">
           <i class="fas fa-${payment.is_active ? 'pause' : 'play'}"></i>
         </button>
         <button class="btn btn-sm btn-danger" onclick="deleteRecurring(${payment.id})" title="Delete">
@@ -341,7 +341,7 @@ function showAddRecurringModal(payment = null) {
   modal.innerHTML = `
     <div class="modal modal-large">
       <div class="modal-header">
-        <h3>${isEdit ? 'Edit платеж' : 'New регулярный платеж'}</h3>
+        <h3>${isEdit ? 'Edit payment' : 'New recurring payment'}</h3>
         <button class="btn-close" onclick="closeModal('recurring-modal')">&times;</button>
       </div>
       <div class="modal-body">
@@ -385,7 +385,7 @@ function showAddRecurringModal(payment = null) {
             <div class="form-group">
               <label>Frequency *</label>
               <select id="rp-frequency" onchange="updateFrequencyOptions()">
-                <option value="daily" ${payment?.frequency === 'daily' ? 'selected' : ''}>Everydaily</option>
+                <option value="daily" ${payment?.frequency === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="weekly" ${payment?.frequency === 'weekly' ? 'selected' : ''}>Weekly</option>
                 <option value="biweekly" ${payment?.frequency === 'biweekly' ? 'selected' : ''}>Every 2 weeks</option>
                 <option value="monthly" ${!payment || payment?.frequency === 'monthly' ? 'selected' : ''}>Monthly</option>
@@ -394,19 +394,19 @@ function showAddRecurringModal(payment = null) {
               </select>
             </div>
             <div class="form-group" id="day-of-week-group" style="display:none;">
-              <label>День weeks</label>
+              <label>Day of week</label>
               <select id="rp-day-of-week">
-                <option value="0">Воскресенье</option>
-                <option value="1" ${payment?.day_of_week === 1 ? 'selected' : ''}>Поwkельник</option>
-                <option value="2">Вторник</option>
-                <option value="3">Среда</option>
-                <option value="4">Четверг</option>
-                <option value="5">Пятница</option>
-                <option value="6">Суббота</option>
+                <option value="0">Sunday</option>
+                <option value="1" ${payment?.day_of_week === 1 ? 'selected' : ''}>Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
               </select>
             </div>
             <div class="form-group" id="day-of-month-group">
-              <label>День monthа</label>
+              <label>Day of month</label>
               <input type="number" id="rp-day-of-month" min="1" max="31" value="${payment?.day_of_month || ''}">
             </div>
           </div>
@@ -417,7 +417,7 @@ function showAddRecurringModal(payment = null) {
               <input type="date" id="rp-start-date" value="${payment?.start_date || new Date().toISOString().split('T')[0]}" required>
             </div>
             <div class="form-group">
-              <label>Date окончания</label>
+              <label>End date</label>
               <input type="date" id="rp-end-date" value="${payment?.end_date || ''}">
             </div>
           </div>
@@ -426,11 +426,11 @@ function showAddRecurringModal(payment = null) {
             <div class="form-group checkbox-group">
               <label>
                 <input type="checkbox" id="rp-auto-create" ${payment?.auto_create ? 'checked' : ''}>
-                Автоматически создавать transactions
+                Auto-create transactions
               </label>
             </div>
             <div class="form-group">
-              <label>Напоминать за (days)</label>
+              <label>Remind before (days)</label>
               <input type="number" id="rp-notify-before" min="0" max="30" value="${payment?.notify_before || 3}">
             </div>
           </div>
@@ -488,7 +488,7 @@ async function saveRecurring(id) {
   };
 
   if (!data.name || !data.amount || !data.startDate) {
-    showNotification('Заполните обязательные fields', 'error');
+    showNotification('Please fill required fields', 'error');
     return;
   }
 
@@ -517,7 +517,7 @@ async function editRecurring(id) {
 }
 
 async function deleteRecurring(id) {
-  if (!confirm('Delete этот регулярный платеж?')) return;
+  if (!confirm('Delete this recurring payment?')) return;
   if (await deleteRecurringPayment(id)) {
     await loadRecurringStats();
     await loadRecurringPayments();
@@ -547,7 +547,7 @@ async function toggleRecurring(id) {
 
 function getFrequencyLabel(frequency) {
   const labels = {
-    daily: 'Everydaily',
+    daily: 'Daily',
     weekly: 'Weekly',
     biweekly: 'Every 2 weeks',
     monthly: 'Monthly',

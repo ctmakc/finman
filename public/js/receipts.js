@@ -44,11 +44,11 @@ const ReceiptsModule = {
       <div class="card receipt-card ${r.is_processed ? 'processed' : 'pending'}" data-id="${r.id}">
         <div class="receipt-header">
           <div class="receipt-info">
-            <h3>${r.merchant || 'Неизвестный магазин'}</h3>
-            <small>${r.receipt_date || 'Date не указана'} | ${r.category || 'Uncategorized'}</small>
+            <h3>${r.merchant || 'Unknown merchant'}</h3>
+            <small>${r.receipt_date || 'Date not set'} | ${r.category || 'Uncategorized'}</small>
           </div>
           <div class="receipt-amount">
-            <strong>${r.total_amount ? r.total_amount.toLocaleString() + ' ' + (r.currency || '$') : 'Не распознано'}</strong>
+            <strong>${r.total_amount ? r.total_amount.toLocaleString() + ' ' + (r.currency || '$') : 'Not recognized'}</strong>
           </div>
         </div>
         <div class="receipt-status">
@@ -72,9 +72,9 @@ const ReceiptsModule = {
     if (!container || !this.stats) return;
 
     container.innerHTML = `
-      <div class="stat-card"><div class="stat-value">${this.stats.total}</div><div class="stat-label">Allго чеков</div></div>
-      <div class="stat-card"><div class="stat-value">${this.stats.processed}</div><div class="stat-label">Обработано</div></div>
-      <div class="stat-card"><div class="stat-value">${this.stats.pending}</div><div class="stat-label">Ожидают</div></div>
+      <div class="stat-card"><div class="stat-value">${this.stats.total}</div><div class="stat-label">Total receipts</div></div>
+      <div class="stat-card"><div class="stat-value">${this.stats.processed}</div><div class="stat-label">Processed</div></div>
+      <div class="stat-card"><div class="stat-value">${this.stats.pending}</div><div class="stat-label">Pending</div></div>
       <div class="stat-card"><div class="stat-value">${this.stats.totalAmount.toLocaleString()} $</div><div class="stat-label">Amount</div></div>
     `;
   },
@@ -88,7 +88,7 @@ const ReceiptsModule = {
   showManualModal() {
     document.getElementById('manual-form').reset();
     document.getElementById('receipt-id').value = '';
-    document.getElementById('manual-modal-title').textContent = 'Add receipt вручную';
+    document.getElementById('manual-modal-title').textContent = 'Add receipt manually';
     document.getElementById('manual-modal').classList.add('active');
   },
 
@@ -183,9 +183,9 @@ const ReceiptsModule = {
 
   async createTransaction(id) {
     const accounts = await fetch('/api/accounts', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json());
-    if (accounts.length === 0) { alert('Сstart создайте account'); return; }
+    if (accounts.length === 0) { showNotification('Create an account first', 'warning'); return; }
 
-    const accountId = prompt('Select ID accountа:\n' + accounts.map(a => `${a.id}: ${a.name}`).join('\n'));
+    const accountId = prompt('Select account ID:\n' + accounts.map(a => `${a.id}: ${a.name}`).join('\n'));
     if (!accountId) return;
 
     try {
@@ -194,15 +194,15 @@ const ReceiptsModule = {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: JSON.stringify({ account_id: parseInt(accountId) })
       });
-      alert('Transaction created');
+      showNotification('Transaction created', 'success');
       await this.loadReceipts();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to create transaction', 'error');
     }
   },
 
   async delete(id) {
-    if (!confirm('Delete чек?')) return;
+    if (!confirm('Delete receipt?')) return;
     try {
       await fetch(`/api/receipts/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
       await this.loadReceipts();
@@ -229,7 +229,7 @@ const ReceiptsModule = {
           <div class="modal-header"><h2>Upload receipt</h2><button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('active')">&times;</button></div>
           <form id="upload-form" onsubmit="event.preventDefault(); ReceiptsModule.uploadReceipt()">
             <input type="hidden" id="image-data">
-            <div class="form-group"><label>Фото чека</label><input type="file" accept="image/*" class="form-control" onchange="ReceiptsModule.handleFileSelect(event)"></div>
+            <div class="form-group"><label>Receipt photo</label><input type="file" accept="image/*" class="form-control" onchange="ReceiptsModule.handleFileSelect(event)"></div>
             <div id="image-preview"></div>
             <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('upload-modal').classList.remove('active')">Cancel</button><button type="submit" class="btn btn-primary">Load</button></div>
           </form>
@@ -240,7 +240,7 @@ const ReceiptsModule = {
           <div class="modal-header"><h2 id="manual-modal-title">Add receipt</h2><button class="modal-close" onclick="document.getElementById('manual-modal').classList.remove('active')">&times;</button></div>
           <form id="manual-form" onsubmit="event.preventDefault(); ReceiptsModule.saveManual()">
             <input type="hidden" id="receipt-id">
-            <div class="form-group"><label>Магазин</label><input type="text" id="receipt-merchant" class="form-control" required></div>
+            <div class="form-group"><label>Merchant</label><input type="text" id="receipt-merchant" class="form-control" required></div>
             <div class="form-row">
               <div class="form-group"><label>Amount</label><input type="number" id="receipt-amount" class="form-control" step="0.01" required></div>
               <div class="form-group"><label>Date</label><input type="date" id="receipt-date" class="form-control" required></div>

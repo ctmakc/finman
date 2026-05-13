@@ -131,12 +131,11 @@ const SubscriptionsModule = {
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert('Failed to save');
+      showNotification('Failed to save subscription', 'error');
     }
   },
 
   async markPaid(id) {
-    if (!confirm('Mark as paid?')) return;
     try {
       await fetch(`/api/subscriptions/${id}/pay`, {
         method: 'POST',
@@ -145,7 +144,7 @@ const SubscriptionsModule = {
       });
       await this.loadSubscriptions();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to mark as paid', 'error');
     }
   },
 
@@ -159,7 +158,7 @@ const SubscriptionsModule = {
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert('Error');
+      showNotification('Failed to cancel subscription', 'error');
     }
   },
 
