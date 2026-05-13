@@ -61,7 +61,8 @@ const SubscriptionsModule = {
           <span>${sub.daysUntilBilling !== null ? (sub.daysUntilBilling <= 0 ? '⚠️ Today/Overdue' : sub.daysUntilBilling + ' days') : ''}</span>
         </div>
         <div class="subscription-actions">
-          <button class="btn btn-sm" onclick="SubscriptionsModule.markPaid(${sub.id})">✓ Mark paid</button>
+          ${sub.is_active ? `<button class="btn btn-sm" onclick="SubscriptionsModule.markPaid(${sub.id})">✓ Mark paid</button>` : '<span class="badge badge-warning" style="font-size:11px">Paused</span>'}
+          <button class="btn btn-sm btn-outline" onclick="SubscriptionsModule.toggle(${sub.id})" title="${sub.is_active ? 'Pause' : 'Resume'}">${sub.is_active ? '⏸' : '▶'}</button>
           <button class="btn btn-sm btn-secondary" onclick="SubscriptionsModule.edit(${sub.id})">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="SubscriptionsModule.cancel(${sub.id})">✕</button>
         </div>
@@ -145,6 +146,19 @@ const SubscriptionsModule = {
       await this.loadSubscriptions();
     } catch (error) {
       showNotification('Failed to mark as paid', 'error');
+    }
+  },
+
+  async toggle(id) {
+    try {
+      await fetch(`/api/subscriptions/${id}/toggle`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      await SubscriptionsModule.loadSubscriptions();
+      await SubscriptionsModule.loadStats();
+    } catch (error) {
+      showNotification('Failed to toggle subscription', 'error');
     }
   },
 

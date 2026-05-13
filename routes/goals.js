@@ -114,18 +114,18 @@ router.post('/:id/withdraw', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const { amount, note } = req.body;
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Сумма должна быть положительной' });
+      return res.status(400).json({ message: 'Amount must be positive' });
     }
 
     const updated = await SavingsGoal.withdraw(req.params.id, amount, note);
     res.json(updated);
   } catch (error) {
-    console.error('Error снятия:', error);
+    console.error('Withdrawal error:', error);
     res.status(500).json({ message: error.message || 'Server error' });
   }
 });

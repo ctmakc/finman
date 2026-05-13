@@ -106,11 +106,11 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/toggle', async (req, res) => {
   try {
     const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!sub) return res.status(404).json({ message: 'Подписка не найдена' });
+    if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     await run('UPDATE subscriptions SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [sub.is_active ? 0 : 1, req.params.id]);
 
-    res.json({ message: sub.is_active ? 'Подписка отменена' : 'Подписка возобновлена' });
+    res.json({ message: sub.is_active ? 'Subscription paused' : 'Subscription resumed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

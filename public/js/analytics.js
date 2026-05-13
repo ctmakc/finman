@@ -168,3 +168,5 @@ async function downloadExport(url, filename, mime) {
     showNotification('Download started', 'success');
   } catch (e) { showNotification('Export failed', 'error'); }
 }
+
+window.downloadExport = downloadExport;
