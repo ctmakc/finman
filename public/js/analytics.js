@@ -3,11 +3,12 @@ async function renderAnalyticsPage() {
   const mainContent = document.getElementById('main-content');
   mainContent.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const [overview, byCategory, compare, topExpenses] = await Promise.all([
+    const [overview, byCategory, compare, topExpenses, trends] = await Promise.all([
       fetchWithAuth('/api/analytics/overview').then(r => r.json()),
       fetchWithAuth('/api/analytics/expenses-by-category').then(r => r.json()),
       fetchWithAuth('/api/analytics/compare').then(r => r.json()),
       fetchWithAuth('/api/analytics/top-expenses').then(r => r.json()).catch(() => []),
+      fetchWithAuth('/api/analytics/trends?period=monthly&months=6').then(r => r.json()).catch(() => ({ data: [] })),
     ]);
 
     const savingsGoals = overview.savingsGoals || { progress: 0, saved: 0, target: 0, count: 0 };
@@ -39,8 +40,13 @@ async function renderAnalyticsPage() {
         <div class="db-grid">
           <div class="db-col">
             <div class="card db-widget">
+              <div class="section-header"><h2><i class="fas fa-chart-line" style="color:var(--accent)"></i> 6-month trend</h2></div>
+              <div style="position:relative;height:220px"><canvas id="analytics-trend-chart"></canvas></div>
+            </div>
+
+            <div class="card db-widget">
               <div class="section-header"><h2><i class="fas fa-chart-bar" style="color:var(--accent)"></i> Expenses by category</h2></div>
-              <div style="position:relative;height:240px"><canvas id="analytics-cat-chart"></canvas></div>
+              <div style="position:relative;height:220px"><canvas id="analytics-cat-chart"></canvas></div>
             </div>
 
             <div class="card db-widget">
@@ -130,6 +136,7 @@ async function renderAnalyticsPage() {
       </div>`;
 
     renderAnalyticsChart('analytics-cat-chart', byCategory);
+    renderAnalyticsTrendChart('analytics-trend-chart', trends.data || []);
   } catch (e) {
     mainContent.innerHTML = '<div class="alert alert-error">Failed to load analytics</div>';
     console.error(e);

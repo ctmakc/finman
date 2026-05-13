@@ -98,6 +98,38 @@ function initExpenseCategoriesChart(categoryRows) {
 }
 
 // Analytics page chart (rendered into a given canvas id)
+function renderAnalyticsTrendChart(canvasId, rows) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (!rows.length) {
+    ctx.closest('div').innerHTML = '<p style="text-align:center;color:#aaa;padding:20px">No trend data yet</p>';
+    return;
+  }
+  const labels = rows.map(r => {
+    const [y, m] = String(r.period).split('-');
+    return m ? new Date(y, m - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : r.period;
+  });
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Income', data: rows.map(r => r.income || 0),
+          borderColor: 'rgba(56,193,114,1)', backgroundColor: 'rgba(56,193,114,0.1)',
+          tension: 0.3, fill: true, pointRadius: 3 },
+        { label: 'Expenses', data: rows.map(r => r.expense || 0),
+          borderColor: 'rgba(227,52,47,1)', backgroundColor: 'rgba(227,52,47,0.07)',
+          tension: 0.3, fill: true, pointRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } },
+      plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': $' + c.parsed.y.toLocaleString() } } }
+    }
+  });
+}
+
 function renderAnalyticsChart(canvasId, categoryRows) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
