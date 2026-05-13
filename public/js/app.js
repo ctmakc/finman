@@ -192,6 +192,13 @@ document.addEventListener('DOMContentLoaded', () => {
               <button class="topbar-icon-btn" title="AI Assistant" id="ai-chat-open-btn">
                 <i class="fas fa-robot"></i>
               </button>
+              <button class="topbar-icon-btn" id="notif-btn" title="Notifications" style="position:relative">
+                <i class="fas fa-bell"></i>
+                <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+              </button>
+              <button class="topbar-icon-btn" id="dark-toggle" title="Toggle dark mode">
+                <i class="fas fa-moon" id="dark-toggle-icon"></i>
+              </button>
             </div>
           </header>
           <main id="main-content" class="main-content">
@@ -237,6 +244,84 @@ document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById('ai-chat-panel');
         if (panel) panel.classList.toggle('active');
       });
+    }
+
+    // Dark mode
+    const darkToggle = document.getElementById('dark-toggle');
+    const darkIcon = document.getElementById('dark-toggle-icon');
+    function applyDarkMode(dark) {
+      document.body.classList.toggle('dark', dark);
+      if (darkIcon) { darkIcon.className = dark ? 'fas fa-sun' : 'fas fa-moon'; }
+    }
+    applyDarkMode(localStorage.getItem('darkMode') === 'true');
+    darkToggle?.addEventListener('click', () => {
+      const isDark = document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', isDark);
+      if (darkIcon) { darkIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon'; }
+    });
+
+    // Notifications bell
+    async function refreshNotifBadge() {
+      try {
+        const res = await fetch('/api/notifications/unread-count', { headers: { Authorization: `Bearer ${appState.token}` } });
+        if (!res.ok) return;
+        const { count } = await res.json();
+        const badge = document.getElementById('notif-badge');
+        if (!badge) return;
+        if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = ''; }
+        else { badge.style.display = 'none'; }
+      } catch {}
+    }
+    refreshNotifBadge();
+    setInterval(refreshNotifBadge, 60000);
+
+    const notifBtn = document.getElementById('notif-btn');
+    notifBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      let dropdown = document.getElementById('notif-dropdown');
+      if (dropdown) { dropdown.remove(); return; }
+      dropdown = document.createElement('div');
+      dropdown.id = 'notif-dropdown';
+      dropdown.className = 'notif-dropdown';
+      dropdown.innerHTML = '<div class="notif-header">Notifications <button id="notif-mark-all" style="float:right;font-size:11px;background:none;border:none;cursor:pointer;color:var(--accent)">Mark all read</button></div><div class="notif-list"><div class="notif-empty"><i class="fas fa-check-circle"></i><p>All caught up!</p></div></div>';
+      notifBtn.appendChild(dropdown);
+      try {
+        const res = await fetch('/api/notifications?limit=10', { headers: { Authorization: `Bearer ${appState.token}` } });
+        if (res.ok) {
+          const notifs = await res.json();
+          const list = dropdown.querySelector('.notif-list');
+          if (notifs.length) {
+            list.innerHTML = notifs.map(n => `<div class="notif-item${n.read ? '' : ' unread'}"><div class="notif-icon ${n.type === 'budget_alert' ? 'warn' : n.type === 'goal_reached' ? 'ok' : 'info'}"><i class="fas fa-${n.type === 'budget_alert' ? 'exclamation-triangle' : n.type === 'goal_reached' ? 'trophy' : 'info-circle'}"></i></div><div class="notif-body"><div class="notif-msg">${DOMPurify.sanitize(n.message)}</div><div class="notif-time">${new Date(n.created_at).toLocaleDateString()}</div></div></div>`).join('');
+          }
+        }
+      } catch {}
+      dropdown.querySelector('#notif-mark-all')?.addEventListener('click', async () => {
+        await fetch('/api/notifications/mark-all-read', { method: 'POST', headers: { Authorization: `Bearer ${appState.token}` } });
+        dropdown.remove();
+        refreshNotifBadge();
+      });
+      document.addEventListener('click', () => dropdown?.remove(), { once: true });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'n' || e.key === 'N') { document.getElementById('add-transaction-btn')?.click(); }
+      else if (e.key === 'b' || e.key === 'B') { navigateTo('budgets'); }
+      else if (e.key === 'g' || e.key === 'G') { navigateTo('goals'); }
+      else if (e.key === 'Escape') { document.querySelector('.modal')?.remove(); }
+      else if (e.key === '?') { showKeyboardHelp(); }
+    });
+
+    function showKeyboardHelp() {
+      const existing = document.getElementById('kbd-help-modal');
+      if (existing) { existing.remove(); return; }
+      const modal = document.createElement('div');
+      modal.id = 'kbd-help-modal';
+      modal.className = 'modal';
+      modal.innerHTML = `<div class="modal-content" style="max-width:360px"><div class="modal-header"><h3>Keyboard Shortcuts</h3><button class="modal-close" onclick="this.closest('.modal').remove()"><i class="fas fa-times"></i></button></div><div class="modal-body"><table style="width:100%;border-collapse:collapse"><tr><td><kbd>N</kbd></td><td>New transaction</td></tr><tr><td><kbd>B</kbd></td><td>Go to Budgets</td></tr><tr><td><kbd>G</kbd></td><td>Go to Goals</td></tr><tr><td><kbd>Esc</kbd></td><td>Close modal</td></tr><tr><td><kbd>?</kbd></td><td>This help</td></tr></table></div></div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     }
   }
 
@@ -654,142 +739,228 @@ document.addEventListener('DOMContentLoaded', () => {
   // Отрисовка dashboardа
   async function renderDashboard() {
     const mainContent = document.getElementById('main-content');
-    
-    // Fetch последних transactions
-    const recentTransactions = await fetchTransactions({ limit: 5 });
-    
-    // Fetch statistics
-    const statsData = await fetchTransactionStats();
-    
-    // Build list accounts
-    const accountsHtml = appState.accounts.map(account => `
+
+    // Parallel fetch everything needed for the dashboard
+    const [recentTransactions, statsData, budgetsResp, goalsResp, nwResp, notifResp] = await Promise.allSettled([
+      fetchTransactions({ limit: 5 }),
+      fetchTransactionStats(),
+      fetchWithAuth('/api/budgets/active').then(r => r.json()).catch(() => []),
+      fetchWithAuth('/api/goals/stats').then(r => r.json()).catch(() => ({})),
+      fetchWithAuth('/api/networth/current').then(r => r.json()).catch(() => null),
+      fetchWithAuth('/api/notifications?limit=5').then(r => r.json()).catch(() => []),
+    ]);
+
+    const txList = budgetsResp.status === 'fulfilled' ? recentTransactions.value || [] : [];
+    const stats = statsData.status === 'fulfilled' ? statsData.value : {};
+    const budgets = budgetsResp.status === 'fulfilled' ? (budgetsResp.value || []) : [];
+    const goals = goalsResp.status === 'fulfilled' ? (goalsResp.value || {}) : {};
+    const nw = nwResp.status === 'fulfilled' ? nwResp.value : null;
+    const notifications = notifResp.status === 'fulfilled' ? (notifResp.value || []) : [];
+
+    const recentTx = recentTransactions.status === 'fulfilled' ? (recentTransactions.value || []) : [];
+
+    // ── Savings rate
+    const savingsRate = stats.monthlyIncome > 0
+      ? Math.round(((stats.monthlyIncome - stats.monthlyExpense) / stats.monthlyIncome) * 100)
+      : 0;
+
+    // ── Accounts HTML
+    const accountsHtml = appState.accounts.map(a => `
       <div class="account-summary">
         <div class="account-info">
-          <div class="account-icon">
-            <i class="fas fa-wallet"></i>
-          </div>
+          <div class="account-icon"><i class="fas fa-wallet"></i></div>
           <div class="account-details">
-            <h3 class="account-name">${account.name}</h3>
-            <p class="account-number">${account.account_number || ''}</p>
+            <h3 class="account-name">${a.name}</h3>
+            <p class="account-number">${a.account_number || a.type || ''}</p>
           </div>
         </div>
-        <div class="account-balance">${formatCurrency(account.balance, account.currency)}</div>
-      </div>
-    `).join('') || '<p>No accounts yet. <a href="#" class="add-account-link">Add account</a></p>';
-    
-    // Build list последних transactions
-    const transactionsHtml = recentTransactions.length > 0 
-      ? recentTransactions.map(transaction => `
+        <div class="account-balance">${formatCurrency(a.balance, a.currency)}</div>
+      </div>`).join('') || '<p>No accounts yet. <a href="#" class="add-account-link">Add account</a></p>';
+
+    // ── Recent transactions HTML
+    const transactionsHtml = recentTx.length > 0
+      ? recentTx.map(t => `
         <div class="transaction-item">
           <div class="transaction-info">
-            <div class="transaction-date">${formatDate(transaction.date)}</div>
-            <div class="transaction-description">${transaction.description}</div>
-            <div class="transaction-category">${transaction.category}</div>
+            <div class="transaction-date">${formatDate(t.date)}</div>
+            <div class="transaction-description">${t.description}</div>
+            <div class="transaction-category">${t.category || 'Uncategorized'}</div>
           </div>
-          <div class="transaction-amount ${transaction.type === 'income' ? 'income' : 'expense'}">
-            ${formatCurrency(transaction.amount)}
+          <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">
+            ${t.type === 'expense' ? '-' : '+'}${formatCurrency(t.amount)}
           </div>
-        </div>
-      `).join('')
-      : '<p>No transactions yet. <a href="#" class="add-transaction-link">Add transaction</a></p>';
-    
+        </div>`).join('')
+      : '<p class="empty-hint">No transactions yet. <a href="#" class="add-transaction-link">Add one →</a></p>';
+
+    // ── Budget progress bars
+    const alertBudgets = budgets.filter(b => b.percentage >= 80);
+    const budgetsHtml = budgets.length === 0
+      ? '<p class="empty-hint">No active budgets. <a href="#" onclick="navigateTo(\'budgets\')">Create one →</a></p>'
+      : budgets.slice(0, 4).map(b => {
+          const pct = Math.min(b.percentage || 0, 100);
+          const color = pct >= 100 ? 'var(--danger)' : pct >= 80 ? 'var(--warning)' : 'var(--success)';
+          return `<div class="db-budget-row">
+            <div class="db-budget-label">
+              <span>${b.name}</span>
+              <span style="color:${color};font-weight:600">${formatCurrency(b.spent || 0)} / ${formatCurrency(b.limit_amount)}</span>
+            </div>
+            <div class="db-progress-bar">
+              <div class="db-progress-fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+          </div>`;
+        }).join('');
+
+    // ── Goals widget
+    const goalsHtml = goals.activeGoals > 0
+      ? `<div class="db-goals-summary">
+          <div class="db-goal-stat"><span class="db-goal-num">${goals.activeGoals}</span><span class="db-goal-lbl">Active</span></div>
+          <div class="db-goal-stat"><span class="db-goal-num">${formatCurrency(goals.totalSaved || 0)}</span><span class="db-goal-lbl">Saved</span></div>
+          <div class="db-goal-stat"><span class="db-goal-num">${goals.overallProgress || 0}%</span><span class="db-goal-lbl">Overall</span></div>
+        </div>`
+      : '<p class="empty-hint">No goals. <a href="#" onclick="navigateTo(\'goals\')">Set a goal →</a></p>';
+
+    // ── Net worth snippet
+    const nwHtml = nw
+      ? `<div class="db-networth">
+          <span class="db-networth-val">${formatCurrency(nw.netWorth || 0)}</span>
+          <span class="db-networth-lbl">net worth</span>
+        </div>`
+      : '';
+
+    // ── Budget alert banner
+    const alertHtml = alertBudgets.length > 0
+      ? `<div class="db-alert-banner">
+          <i class="fas fa-exclamation-triangle"></i>
+          ${alertBudgets.map(b => `<strong>${b.name}</strong> at ${Math.round(b.percentage)}%`).join(', ')} — near or over limit
+        </div>`
+      : '';
+
     mainContent.innerHTML = `
-      <h1 class="page-title">Finance Overview</h1>
-      
+      ${alertHtml}
+      <div id="ai-insight-banner" class="ai-insight-banner ai-insight-loading">
+        <i class="fas fa-robot"></i> <span id="ai-insight-text">Generating weekly AI insight…</span>
+        <button class="ai-insight-close" onclick="this.closest('.ai-insight-banner').remove()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="db-toprow">
+        <h1 class="page-title" style="margin:0">Finance Overview</h1>
+        <button class="btn btn-sm btn-primary" id="add-transaction-quick"><i class="fas fa-plus"></i> Add transaction</button>
+      </div>
+
       <div class="dashboard-summary">
         <div class="summary-card income">
-          <div class="summary-icon">
-            <i class="fas fa-arrow-down"></i>
-          </div>
+          <div class="summary-icon"><i class="fas fa-arrow-down"></i></div>
           <div class="summary-data">
-            <h3>Income per month</h3>
-            <div class="summary-amount">${formatCurrency(statsData.monthlyIncome || 0)}</div>
+            <h3>Income / month</h3>
+            <div class="summary-amount">${formatCurrency(stats.monthlyIncome || 0)}</div>
           </div>
         </div>
-        
         <div class="summary-card expense">
-          <div class="summary-icon">
-            <i class="fas fa-arrow-up"></i>
-          </div>
+          <div class="summary-icon"><i class="fas fa-arrow-up"></i></div>
           <div class="summary-data">
-            <h3>Expenses per month</h3>
-            <div class="summary-amount">${formatCurrency(statsData.monthlyExpense || 0)}</div>
+            <h3>Expenses / month</h3>
+            <div class="summary-amount">${formatCurrency(stats.monthlyExpense || 0)}</div>
           </div>
         </div>
-        
         <div class="summary-card balance">
-          <div class="summary-icon">
-            <i class="fas fa-wallet"></i>
-          </div>
+          <div class="summary-icon"><i class="fas fa-wallet"></i></div>
           <div class="summary-data">
             <h3>Total balance</h3>
-            <div class="summary-amount">${formatCurrency(statsData.totalBalance || 0)}</div>
+            <div class="summary-amount">${formatCurrency(stats.totalBalance || 0)}</div>
+          </div>
+        </div>
+        <div class="summary-card ${savingsRate >= 20 ? 'income' : savingsRate >= 0 ? 'balance' : 'expense'}">
+          <div class="summary-icon"><i class="fas fa-piggy-bank"></i></div>
+          <div class="summary-data">
+            <h3>Savings rate</h3>
+            <div class="summary-amount">${savingsRate}%</div>
           </div>
         </div>
       </div>
-      
-      <div class="dashboard-content">
-        <div class="dashboard-section">
-          <div class="section-header">
-            <h2>Your accounts</h2>
-            <button id="add-account-btn" class="btn btn-sm btn-primary">
-              <i class="fas fa-plus"></i> Add account
-            </button>
+
+      <div class="db-grid">
+        <!-- Left column -->
+        <div class="db-col">
+          <div class="card db-widget">
+            <div class="section-header">
+              <h2><i class="fas fa-wallet" style="color:var(--accent)"></i> Accounts</h2>
+              <button id="add-account-btn" class="btn btn-sm btn-outline"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="accounts-list">${accountsHtml}</div>
           </div>
-          
-          <div class="accounts-list">
-            ${accountsHtml}
-          </div>
-        </div>
-        
-        <div class="dashboard-section">
-          <div class="section-header">
-            <h2>Recent transactions</h2>
-            <button id="add-transaction-btn" class="btn btn-sm btn-primary">
-              <i class="fas fa-plus"></i> Add transaction
-            </button>
-          </div>
-          
-          <div class="transactions-list">
-            ${transactionsHtml}
-          </div>
-          
-          <div class="section-footer">
-            <a href="#" class="btn btn-sm btn-outline" id="view-all-transactions">
-              View all transactions
-            </a>
+
+          <div class="card db-widget">
+            <div class="section-header">
+              <h2><i class="fas fa-arrows-alt-h" style="color:var(--accent)"></i> Recent transactions</h2>
+              <button id="add-transaction-btn" class="btn btn-sm btn-outline"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="transactions-list">${transactionsHtml}</div>
+            <div class="section-footer">
+              <a href="#" class="btn btn-sm btn-outline" id="view-all-transactions">View all →</a>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div class="dashboard-charts">
-        <div class="chart-container">
-          <h2>Income and expenses trend</h2>
-          <canvas id="income-expense-chart"></canvas>
-        </div>
-        
-        <div class="chart-container">
-          <h2>Expenses by category</h2>
-          <canvas id="expense-categories-chart"></canvas>
+
+        <!-- Right column -->
+        <div class="db-col">
+          <div class="card db-widget">
+            <div class="section-header">
+              <h2><i class="fas fa-tachometer-alt" style="color:var(--warning)"></i> Budgets</h2>
+              <a href="#" class="btn btn-sm btn-outline" onclick="navigateTo('budgets')">All</a>
+            </div>
+            ${budgetsHtml}
+          </div>
+
+          <div class="card db-widget">
+            <div class="section-header">
+              <h2><i class="fas fa-bullseye" style="color:var(--success)"></i> Goals</h2>
+              <a href="#" class="btn btn-sm btn-outline" onclick="navigateTo('goals')">All</a>
+            </div>
+            ${goalsHtml}
+            ${nwHtml}
+          </div>
+
+          <div class="card db-widget">
+            <div class="section-header">
+              <h2><i class="fas fa-chart-bar" style="color:var(--accent)"></i> Spending trend</h2>
+            </div>
+            <div style="position:relative;height:180px"><canvas id="income-expense-chart"></canvas></div>
+          </div>
+
+          <div class="card db-widget">
+            <div class="section-header">
+              <h2><i class="fas fa-chart-pie" style="color:var(--accent)"></i> By category</h2>
+            </div>
+            <div style="position:relative;height:180px"><canvas id="expense-categories-chart"></canvas></div>
+          </div>
         </div>
       </div>
     `;
-    
-    // Initialize графиков
-    initCharts(statsData);
-    
-    // Event handlers
-    document.getElementById('add-account-btn').addEventListener('click', () => {
-      showAddAccountModal();
-    });
-    
-    document.getElementById('add-transaction-btn').addEventListener('click', () => {
-      showAddTransactionModal();
-    });
-    
-    document.getElementById('view-all-transactions').addEventListener('click', (e) => {
-      e.preventDefault();
-      navigateTo('transactions');
+
+    initCharts(stats);
+
+    // Load AI weekly insight asynchronously
+    (async () => {
+      const banner = document.getElementById('ai-insight-banner');
+      const textEl = document.getElementById('ai-insight-text');
+      if (!banner || !textEl) return;
+      try {
+        const r = await fetch('/api/ai/insights/weekly', { headers: { Authorization: `Bearer ${appState.token}` } });
+        if (!r.ok) throw new Error('non-ok');
+        const data = await r.json();
+        banner.classList.remove('ai-insight-loading');
+        textEl.textContent = data.brief || 'No insights available.';
+      } catch {
+        banner.classList.add('ai-insight-error');
+        textEl.textContent = 'AI insight unavailable right now.';
+      }
+    })();
+
+    // Event handlers — use optional chaining since some may not exist with empty data
+    document.getElementById('add-account-btn')?.addEventListener('click', showAddAccountModal);
+    document.getElementById('add-transaction-btn')?.addEventListener('click', showAddTransactionModal);
+    document.getElementById('add-transaction-quick')?.addEventListener('click', showAddTransactionModal);
+    document.getElementById('view-all-transactions')?.addEventListener('click', (e) => {
+      e.preventDefault(); navigateTo('transactions');
     });
     
     const addAccountLinks = document.querySelectorAll('.add-account-link');
