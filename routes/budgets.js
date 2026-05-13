@@ -15,7 +15,7 @@ router.get('/', authenticate, async (req, res) => {
 
     res.json(budgets);
   } catch (error) {
-    console.error('Ошибка при получении бюджетов:', error);
+    console.error('Failed to get budgets:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении бюджетов'
@@ -32,7 +32,7 @@ router.get('/stats', authenticate, async (req, res) => {
     const stats = await Budget.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка при получении статистики бюджетов:', error);
+    console.error('Error при получении статистики бюджетов:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении статистики'
@@ -49,7 +49,7 @@ router.get('/active', authenticate, async (req, res) => {
     const budgets = await Budget.getActiveBudgets(req.user.id);
     res.json(budgets);
   } catch (error) {
-    console.error('Ошибка при получении активных бюджетов:', error);
+    console.error('Error при получении активных бюджетов:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении активных бюджетов'
@@ -71,7 +71,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json(budget);
   } catch (error) {
-    console.error('Ошибка при получении бюджета:', error);
+    console.error('Error при получении бюджета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении бюджета'
@@ -117,7 +117,7 @@ router.post('/', authenticate, async (req, res) => {
       budget
     });
   } catch (error) {
-    console.error('Ошибка при создании бюджета:', error);
+    console.error('Error при создании бюджета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при создании бюджета'
@@ -161,7 +161,7 @@ router.put('/:id', authenticate, async (req, res) => {
       res.status(400).json({ error: true, message: 'Не удалось обновить бюджет' });
     }
   } catch (error) {
-    console.error('Ошибка при обновлении бюджета:', error);
+    console.error('Error при обновлении бюджета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при обновлении бюджета'
@@ -188,7 +188,7 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
       budget: updatedBudget
     });
   } catch (error) {
-    console.error('Ошибка при пересчете бюджета:', error);
+    console.error('Error при пересчете бюджета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при пересчете бюджета'
@@ -208,7 +208,7 @@ router.post('/recalculate-all', authenticate, async (req, res) => {
       budgets
     });
   } catch (error) {
-    console.error('Ошибка при пересчете бюджетов:', error);
+    console.error('Error при пересчете бюджетов:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при пересчете бюджетов'
@@ -237,7 +237,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       res.status(400).json({ error: true, message: 'Не удалось удалить бюджет' });
     }
   } catch (error) {
-    console.error('Ошибка при удалении бюджета:', error);
+    console.error('Error при удалении бюджета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при удалении бюджета'

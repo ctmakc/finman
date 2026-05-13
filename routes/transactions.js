@@ -92,7 +92,7 @@ router.get('/', authenticate, async (req, res) => {
     
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка при получении транзакций:', error);
+    console.error('Error при получении транзакций:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при получении транзакций' 
@@ -198,7 +198,7 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json(newTransaction);
   } catch (error) {
-    console.error('Ошибка при создании транзакции:', error);
+    console.error('Error при создании транзакции:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при создании транзакции'
@@ -220,7 +220,7 @@ router.get('/:id', authenticate, async (req, res) => {
     
     res.json(transaction);
   } catch (error) {
-    console.error('Ошибка при получении транзакции:', error);
+    console.error('Error при получении транзакции:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при получении транзакции' 
@@ -258,7 +258,7 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Ошибка при обновлении транзакции:', error);
+    console.error('Error при обновлении транзакции:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при обновлении транзакции' 
@@ -283,7 +283,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Ошибка при удалении транзакции:', error);
+    console.error('Error при удалении транзакции:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при удалении транзакции' 
@@ -336,7 +336,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
       transactions: savedTransactions
     });
   } catch (error) {
-    console.error('Ошибка при импорте транзакций:', error);
+    console.error('Error при импорте транзакций:', error);
     
     // Удаление временного файла в случае ошибки
     if (req.file) {
@@ -371,7 +371,7 @@ router.get('/stats/summary', authenticate, async (req, res) => {
     
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка при получении статистики:', error);
+    console.error('Error при получении статистики:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при получении статистики' 

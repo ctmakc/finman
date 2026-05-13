@@ -16,8 +16,8 @@ router.get('/portfolios', async (req, res) => {
     const portfolios = await Investment.findPortfoliosByUser(req.user.id);
     res.json(portfolios);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -27,8 +27,8 @@ router.get('/stats', async (req, res) => {
     const stats = await Investment.getUserStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -43,8 +43,8 @@ router.get('/portfolios/:id', async (req, res) => {
     const stats = await Investment.calculatePortfolioValue(req.params.id);
     res.json({ ...portfolio, ...stats });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -63,8 +63,8 @@ router.post('/portfolios', async (req, res) => {
 
     res.status(201).json(portfolio);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -79,8 +79,8 @@ router.put('/portfolios/:id', async (req, res) => {
     const updated = await Investment.updatePortfolio(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -95,8 +95,8 @@ router.delete('/portfolios/:id', async (req, res) => {
     await Investment.deletePortfolio(req.params.id);
     res.json({ message: 'Портфель удалён' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -111,8 +111,8 @@ router.get('/portfolios/:id/investments', async (req, res) => {
     );
     res.json(withValues.filter(v => v));
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -132,8 +132,8 @@ router.post('/portfolios/:id/investments', async (req, res) => {
 
     res.status(201).json(investment);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -143,8 +143,8 @@ router.put('/investments/:id', async (req, res) => {
     const updated = await Investment.updateInvestment(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -159,8 +159,8 @@ router.put('/investments/:id/price', async (req, res) => {
     const updated = await Investment.updatePrice(req.params.id, price);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -176,8 +176,8 @@ router.post('/investments/:id/sell', async (req, res) => {
     const result = await Investment.sell(req.params.id, quantity, price, fee, date);
     res.json(result);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -187,8 +187,8 @@ router.get('/investments/:id/transactions', async (req, res) => {
     const transactions = await Investment.getTransactions(req.params.id);
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -198,8 +198,8 @@ router.get('/portfolios/:id/transactions', async (req, res) => {
     const transactions = await Investment.getPortfolioTransactions(req.params.id);
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

@@ -16,8 +16,8 @@ router.get('/', authenticate, async (req, res) => {
     const families = await Family.findByUserId(req.user.id);
     res.json(families);
   } catch (error) {
-    console.error('Ошибка при получении семей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении семей' });
+    console.error('Failed to get families:', error);
+    res.status(500).json({ error: true, message: 'Failed to get families' });
   }
 });
 
@@ -38,8 +38,8 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json({ success: true, family });
   } catch (error) {
-    console.error('Ошибка при создании семьи:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при создании семьи' });
+    console.error('Failed to create family:', error);
+    res.status(500).json({ error: true, message: 'Failed to create family' });
   }
 });
 
@@ -61,8 +61,8 @@ router.get('/:id', authenticate, async (req, res) => {
     const myRole = await Family.getUserRole(req.params.id, req.user.id);
     res.json({ ...family, myRole });
   } catch (error) {
-    console.error('Ошибка при получении семьи:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении семьи' });
+    console.error('Failed to get family:', error);
+    res.status(500).json({ error: true, message: 'Failed to get family' });
   }
 });
 
@@ -81,8 +81,8 @@ router.put('/:id', authenticate, async (req, res) => {
     const updatedFamily = await Family.findById(req.params.id);
     res.json({ success: true, family: updatedFamily });
   } catch (error) {
-    console.error('Ошибка при обновлении семьи:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при обновлении семьи' });
+    console.error('Failed to update family:', error);
+    res.status(500).json({ error: true, message: 'Failed to update family' });
   }
 });
 
@@ -92,13 +92,13 @@ router.delete('/:id', authenticate, async (req, res) => {
     const deleted = await Family.delete(req.params.id, req.user.id);
 
     if (!deleted) {
-      return res.status(403).json({ error: true, message: 'Только владелец может удалить семью' });
+      return res.status(403).json({ error: true, message: 'Only the owner can delete the family' });
     }
 
     res.json({ success: true, message: 'Семья удалена' });
   } catch (error) {
-    console.error('Ошибка при удалении семьи:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при удалении семьи' });
+    console.error('Failed to delete family:', error);
+    res.status(500).json({ error: true, message: 'Failed to delete family' });
   }
 });
 
@@ -115,8 +115,8 @@ router.get('/:id/members', authenticate, async (req, res) => {
     const members = await Family.getMembers(req.params.id);
     res.json(members);
   } catch (error) {
-    console.error('Ошибка при получении участников:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении участников' });
+    console.error('Failed to get members:', error);
+    res.status(500).json({ error: true, message: 'Failed to get members' });
   }
 });
 
@@ -135,8 +135,8 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Участник удален' });
   } catch (error) {
-    console.error('Ошибка при удалении участника:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при удалении участника' });
+    console.error('Failed to remove member:', error);
+    res.status(500).json({ error: true, message: 'Failed to remove member' });
   }
 });
 
@@ -158,8 +158,8 @@ router.put('/:id/members/:userId/role', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Роль изменена' });
   } catch (error) {
-    console.error('Ошибка при изменении роли:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при изменении роли' });
+    console.error('Failed to change role:', error);
+    res.status(500).json({ error: true, message: 'Failed to change role' });
   }
 });
 
@@ -180,8 +180,8 @@ router.post('/:id/transfer', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Владение передано' });
   } catch (error) {
-    console.error('Ошибка при передаче владения:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при передаче владения' });
+    console.error('Failed to transfer ownership:', error);
+    res.status(500).json({ error: true, message: 'Failed to transfer ownership' });
   }
 });
 
@@ -196,8 +196,8 @@ router.post('/:id/leave', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Вы покинули семью' });
   } catch (error) {
-    console.error('Ошибка при выходе из семьи:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при выходе из семьи' });
+    console.error('Failed to leave family:', error);
+    res.status(500).json({ error: true, message: 'Failed to leave family' });
   }
 });
 
@@ -214,8 +214,8 @@ router.post('/:id/regenerate-code', authenticate, async (req, res) => {
 
     res.json({ success: true, inviteCode: newCode });
   } catch (error) {
-    console.error('Ошибка при регенерации кода:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при регенерации кода' });
+    console.error('Failed to regenerate code:', error);
+    res.status(500).json({ error: true, message: 'Failed to regenerate code' });
   }
 });
 
@@ -237,8 +237,8 @@ router.post('/join', authenticate, async (req, res) => {
     const family = await Family.findById(result.familyId);
     res.json({ success: true, family });
   } catch (error) {
-    console.error('Ошибка при присоединении:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при присоединении к семье' });
+    console.error('Error при присоединении:', error);
+    res.status(500).json({ error: true, message: 'Failed to join family' });
   }
 });
 
@@ -264,8 +264,8 @@ router.post('/:id/invite', authenticate, async (req, res) => {
 
     res.json({ success: true, invite });
   } catch (error) {
-    console.error('Ошибка при создании приглашения:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при создании приглашения' });
+    console.error('Failed to create invitation:', error);
+    res.status(500).json({ error: true, message: 'Failed to create invitation' });
   }
 });
 
@@ -287,8 +287,8 @@ router.post('/accept-invite', authenticate, async (req, res) => {
     const family = await Family.findById(result.familyId);
     res.json({ success: true, family });
   } catch (error) {
-    console.error('Ошибка при принятии приглашения:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при принятии приглашения' });
+    console.error('Failed to accept invitation:', error);
+    res.status(500).json({ error: true, message: 'Failed to accept invitation' });
   }
 });
 
@@ -304,8 +304,8 @@ router.get('/accounts/:accountId/permissions', authenticate, async (req, res) =>
 
     res.json(users);
   } catch (error) {
-    console.error('Ошибка при получении прав:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении прав доступа' });
+    console.error('Error при получении прав:', error);
+    res.status(500).json({ error: true, message: 'Failed to get permissions' });
   }
 });
 
@@ -331,8 +331,8 @@ router.post('/accounts/:accountId/permissions', authenticate, async (req, res) =
 
     res.json({ success: true, message: 'Права выданы' });
   } catch (error) {
-    console.error('Ошибка при выдаче прав:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при выдаче прав' });
+    console.error('Failed to grant permissions:', error);
+    res.status(500).json({ error: true, message: 'Failed to grant permissions' });
   }
 });
 
@@ -351,8 +351,8 @@ router.delete('/accounts/:accountId/permissions/:userId', authenticate, async (r
 
     res.json({ success: true, message: 'Права отозваны' });
   } catch (error) {
-    console.error('Ошибка при отзыве прав:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при отзыве прав' });
+    console.error('Failed to revoke permissions:', error);
+    res.status(500).json({ error: true, message: 'Failed to revoke permissions' });
   }
 });
 
@@ -362,8 +362,8 @@ router.get('/accessible-accounts', authenticate, async (req, res) => {
     const accounts = await AccountPermission.getAccessibleAccounts(req.user.id);
     res.json(accounts);
   } catch (error) {
-    console.error('Ошибка при получении счетов:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении счетов' });
+    console.error('Failed to get accounts:', error);
+    res.status(500).json({ error: true, message: 'Failed to get accounts' });
   }
 });
 
@@ -385,8 +385,8 @@ router.post('/bulk-permissions', authenticate, async (req, res) => {
 
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error('Ошибка при массовой выдаче прав:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при выдаче прав' });
+    console.error('Error при массовой выдаче прав:', error);
+    res.status(500).json({ error: true, message: 'Failed to grant permissions' });
   }
 });
 
@@ -414,8 +414,8 @@ router.post('/budgets/:budgetId/permissions', authenticate, async (req, res) => 
 
     res.json({ success: true, message: 'Права выданы' });
   } catch (error) {
-    console.error('Ошибка при выдаче прав:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при выдаче прав' });
+    console.error('Failed to grant permissions:', error);
+    res.status(500).json({ error: true, message: 'Failed to grant permissions' });
   }
 });
 
@@ -434,8 +434,8 @@ router.delete('/budgets/:budgetId/permissions/:userId', authenticate, async (req
 
     res.json({ success: true, message: 'Права отозваны' });
   } catch (error) {
-    console.error('Ошибка при отзыве прав:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при отзыве прав' });
+    console.error('Failed to revoke permissions:', error);
+    res.status(500).json({ error: true, message: 'Failed to revoke permissions' });
   }
 });
 
@@ -445,8 +445,8 @@ router.get('/accessible-budgets', authenticate, async (req, res) => {
     const budgets = await BudgetPermission.getAccessibleBudgets(req.user.id);
     res.json(budgets);
   } catch (error) {
-    console.error('Ошибка при получении бюджетов:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении бюджетов' });
+    console.error('Failed to get budgets:', error);
+    res.status(500).json({ error: true, message: 'Failed to get budgets' });
   }
 });
 

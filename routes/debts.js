@@ -16,8 +16,8 @@ router.get('/', async (req, res) => {
     const debtsWithInfo = debts.map(d => Debt.calculateDebtInfo ? Debt.calculateDebtInfo(d) : d);
     res.json(debtsWithInfo);
   } catch (error) {
-    console.error('Ошибка получения долгов:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error получения долгов:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -45,8 +45,8 @@ router.get('/upcoming', async (req, res) => {
     const debts = await Debt.getUpcomingPayments(req.user.id, days);
     res.json(debts);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -59,8 +59,8 @@ router.get('/:id', async (req, res) => {
     }
     res.json(Debt.calculateDebtInfo ? Debt.calculateDebtInfo(debt) : debt);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -80,8 +80,8 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(debt);
   } catch (error) {
-    console.error('Ошибка создания:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error создания:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -96,8 +96,8 @@ router.put('/:id', async (req, res) => {
     const updated = await Debt.update(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка обновления:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error обновления:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -117,8 +117,8 @@ router.post('/:id/payment', async (req, res) => {
     const updated = await Debt.addPayment(req.params.id, amount, payment_type, note, null, payment_date);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка платежа:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Error платежа:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -133,8 +133,8 @@ router.get('/:id/payments', async (req, res) => {
     const payments = await Debt.getPayments(req.params.id);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -149,8 +149,8 @@ router.delete('/:id', async (req, res) => {
     await Debt.delete(req.params.id);
     res.json({ message: 'Долг удалён' });
   } catch (error) {
-    console.error('Ошибка удаления:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error удаления:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

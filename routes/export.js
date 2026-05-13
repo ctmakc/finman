@@ -26,7 +26,7 @@ router.get('/transactions/csv', async (req, res) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=transactions_' + new Date().toISOString().split('T')[0] + '.csv');
     res.send('\ufeff' + csv);
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.get('/accounts/csv', async (req, res) => {
@@ -38,7 +38,7 @@ router.get('/accounts/csv', async (req, res) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=accounts_' + new Date().toISOString().split('T')[0] + '.csv');
     res.send('\ufeff' + csv);
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.get('/full/json', async (req, res) => {
@@ -54,7 +54,7 @@ router.get('/full/json', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename=finman_backup_' + new Date().toISOString().split('T')[0] + '.json');
     res.json({ exportDate: new Date().toISOString(), accounts, transactions, budgets, savingsGoals: goals, debts });
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' }), async (req, res) => {
@@ -74,7 +74,7 @@ router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' 
       } catch (e) {}
     }
     res.json({ imported });
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.post('/full/json', express.json({ limit: '10mb' }), async (req, res) => {
@@ -85,7 +85,7 @@ router.post('/full/json', express.json({ limit: '10mb' }), async (req, res) => {
     if (data.savingsGoals) for (const g of data.savingsGoals) { try { await run('INSERT INTO savings_goals (user_id, name, target_amount, current_amount, currency, target_date) VALUES (?, ?, ?, ?, ?, ?)', [userId, g.name, g.target_amount, g.current_amount || 0, g.currency, g.target_date]); results.goals++; } catch(e){} }
     if (data.debts) for (const d of data.debts) { try { await run('INSERT INTO debts (user_id, name, type, amount, paid_amount, currency, start_date, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, d.name, d.type, d.amount, d.paid_amount || 0, d.currency, d.start_date, d.due_date]); results.debts++; } catch(e){} }
     res.json({ message: 'Import complete', results });
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 module.exports = router;

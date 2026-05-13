@@ -52,7 +52,7 @@ router.get('/supported-banks', authenticate, (req, res) => {
 
     res.json(supportedBanks);
   } catch (error) {
-    console.error('Ошибка при получении списка банков:', error);
+    console.error('Error при получении списка банков:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении списка банков'
@@ -107,7 +107,7 @@ router.get('/banks-by-region', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при получении банков по регионам:', error);
+    console.error('Error при получении банков по регионам:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении списка банков'
@@ -120,7 +120,7 @@ router.get('/auth-types', authenticate, (req, res) => {
   try {
     res.json(bankApiConfig.authTypes || {});
   } catch (error) {
-    res.status(500).json({ error: true, message: 'Ошибка получения типов авторизации' });
+    res.status(500).json({ error: true, message: 'Failed to get auth types' });
   }
 });
 
@@ -147,7 +147,7 @@ router.get('/connections', authenticate, async (req, res) => {
     
     res.json(connectionsWithBankInfo);
   } catch (error) {
-    console.error('Ошибка при получении подключений к банкам:', error);
+    console.error('Error при получении подключений к банкам:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при получении подключений к банкам' 
@@ -173,7 +173,7 @@ router.post('/connect/:bankId', authenticate, async (req, res) => {
     
     res.json(authUrlData);
   } catch (error) {
-    console.error('Ошибка при инициализации подключения к банку:', error);
+    console.error('Error при инициализации подключения к банку:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при инициализации подключения к банку' 
@@ -204,7 +204,7 @@ router.post('/connect/:bankId/callback', authenticate, async (req, res) => {
       bankName: bankApiConfig[bankId].name
     });
   } catch (error) {
-    console.error('Ошибка при завершении подключения к банку:', error);
+    console.error('Error при завершении подключения к банку:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при завершении подключения к банку'
@@ -255,7 +255,7 @@ router.post('/connect/:bankId/direct', authenticate, async (req, res) => {
       bankName: bankApiConfig[bankId].name
     });
   } catch (error) {
-    console.error('Ошибка при прямом подключении к банку:', error);
+    console.error('Error при прямом подключении к банку:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при прямом подключении к банку' 
@@ -289,7 +289,7 @@ router.post('/disconnect/:connectionId', authenticate, async (req, res) => {
       message: 'Подключение успешно удалено'
     });
   } catch (error) {
-    console.error('Ошибка при отключении от банка:', error);
+    console.error('Error при отключении от банка:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при отключении от банка' 
@@ -374,7 +374,7 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
       accounts: createdAccounts
     });
   } catch (error) {
-    console.error('Ошибка при синхронизации счетов:', error);
+    console.error('Error при синхронизации счетов:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при синхронизации счетов'
@@ -441,7 +441,7 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
       transactions: savedTransactions
     });
   } catch (error) {
-    console.error('Ошибка при синхронизации транзакций:', error);
+    console.error('Error при синхронизации транзакций:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при синхронизации транзакций'
@@ -457,7 +457,7 @@ router.get('/custom-banks', authenticate, async (req, res) => {
     const customBanks = await CustomBank.findByUserId(req.user.id);
     res.json(customBanks);
   } catch (error) {
-    console.error('Ошибка при получении кастомных банков:', error);
+    console.error('Error при получении кастомных банков:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении кастомных банков'
@@ -510,7 +510,7 @@ router.post('/custom-banks', authenticate, async (req, res) => {
       bank: customBank
     });
   } catch (error) {
-    console.error('Ошибка при создании кастомного банка:', error);
+    console.error('Error при создании кастомного банка:', error);
     if (error.message.includes('уже существует')) {
       return res.status(400).json({ error: true, message: error.message });
     }
@@ -559,7 +559,7 @@ router.put('/custom-banks/:id', authenticate, async (req, res) => {
       res.status(400).json({ error: true, message: 'Не удалось обновить банк' });
     }
   } catch (error) {
-    console.error('Ошибка при обновлении кастомного банка:', error);
+    console.error('Error при обновлении кастомного банка:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при обновлении кастомного банка'
@@ -586,7 +586,7 @@ router.delete('/custom-banks/:id', authenticate, async (req, res) => {
       res.status(400).json({ error: true, message: 'Не удалось удалить банк' });
     }
   } catch (error) {
-    console.error('Ошибка при удалении кастомного банка:', error);
+    console.error('Error при удалении кастомного банка:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при удалении кастомного банка'
@@ -624,7 +624,7 @@ router.post('/connect-custom/:bankKey/direct', authenticate, async (req, res) =>
       bankName: customBank.name
     });
   } catch (error) {
-    console.error('Ошибка при подключении к кастомному банку:', error);
+    console.error('Error при подключении к кастомному банку:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при подключении к кастомному банку'

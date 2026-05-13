@@ -17,8 +17,8 @@ router.get('/', async (req, res) => {
     const goalsWithProgress = goals.map(g => SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(g) : g);
     res.json(goalsWithProgress);
   } catch (error) {
-    console.error('Ошибка получения целей:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error получения целей:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -46,8 +46,8 @@ router.get('/:id', async (req, res) => {
     }
     res.json(SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(goal) : goal);
   } catch (error) {
-    console.error('Ошибка получения цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error получения цели:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -67,8 +67,8 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(goal);
   } catch (error) {
-    console.error('Ошибка создания цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error создания цели:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -83,8 +83,8 @@ router.put('/:id', async (req, res) => {
     const updated = await SavingsGoal.update(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка обновления цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error обновления цели:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -104,8 +104,8 @@ router.post('/:id/contribute', async (req, res) => {
     const updated = await SavingsGoal.addContribution(req.params.id, amount, note);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка пополнения:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Error пополнения:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -125,8 +125,8 @@ router.post('/:id/withdraw', async (req, res) => {
     const updated = await SavingsGoal.withdraw(req.params.id, amount, note);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка снятия:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Error снятия:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -141,8 +141,8 @@ router.get('/:id/contributions', async (req, res) => {
     const contributions = await SavingsGoal.getContributions(req.params.id);
     res.json(contributions);
   } catch (error) {
-    console.error('Ошибка получения истории:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error получения истории:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -157,8 +157,8 @@ router.delete('/:id', async (req, res) => {
     await SavingsGoal.delete(req.params.id);
     res.json({ message: 'Цель удалена' });
   } catch (error) {
-    console.error('Ошибка удаления цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error удаления цели:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

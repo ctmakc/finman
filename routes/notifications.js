@@ -20,8 +20,8 @@ router.get('/', async (req, res) => {
     });
     res.json(notifications);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -31,8 +31,8 @@ router.get('/unread-count', async (req, res) => {
     const count = await Notification.getUnreadCount(req.user.id);
     res.json({ count });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -42,8 +42,8 @@ router.get('/settings', async (req, res) => {
     const settings = await Notification.getSettings(req.user.id);
     res.json(settings);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -53,8 +53,8 @@ router.put('/settings', async (req, res) => {
     const settings = await Notification.updateSettings(req.user.id, req.body);
     res.json(settings);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -69,8 +69,8 @@ router.put('/:id/read', async (req, res) => {
     const updated = await Notification.markAsRead(req.params.id);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -80,8 +80,8 @@ router.put('/read-all', async (req, res) => {
     await Notification.markAllAsRead(req.user.id);
     res.json({ message: 'Все уведомления прочитаны' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -96,8 +96,8 @@ router.delete('/:id', async (req, res) => {
     await Notification.delete(req.params.id);
     res.json({ message: 'Уведомление удалено' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -108,8 +108,8 @@ router.delete('/old', async (req, res) => {
     await Notification.deleteOld(req.user.id, days);
     res.json({ message: 'Старые уведомления удалены' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

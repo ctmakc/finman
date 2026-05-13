@@ -19,8 +19,8 @@ router.get('/settings', authenticate, async (req, res) => {
     const settings = await Currency.getUserSettings(req.user.id);
     res.json(settings);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения настроек' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get settings' });
   }
 });
 
@@ -31,8 +31,8 @@ router.put('/settings', authenticate, async (req, res) => {
     const settings = await Currency.getUserSettings(req.user.id);
     res.json({ success: true, settings });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка обновления настроек' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to update settings' });
   }
 });
 
@@ -46,8 +46,8 @@ router.get('/rates', authenticate, async (req, res) => {
     const rates = await Currency.getRatesForCurrency(baseCurrency);
     res.json({ base: baseCurrency, rates });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения курсов' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get rates' });
   }
 });
 
@@ -63,8 +63,8 @@ router.get('/rate/:from/:to', authenticate, async (req, res) => {
 
     res.json({ from, to, rate });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения курса' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get rate' });
   }
 });
 
@@ -83,8 +83,8 @@ router.get('/convert', authenticate, async (req, res) => {
     const result = await Currency.convert(parseFloat(amount), from, to);
     res.json(result);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка конвертации' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Conversion error' });
   }
 });
 
@@ -94,8 +94,8 @@ router.post('/fetch-nbu', authenticate, async (req, res) => {
     const result = await Currency.fetchRatesFromNBU();
     res.json(result);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка обновления курсов' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to update rates' });
   }
 });
 
@@ -114,8 +114,8 @@ router.post('/rate', authenticate, async (req, res) => {
     await Currency.saveRate(from, to, parseFloat(rate), 'manual', date);
     res.json({ success: true });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка сохранения курса' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to save rate' });
   }
 });
 
@@ -128,8 +128,8 @@ router.get('/history/:from/:to', authenticate, async (req, res) => {
     const history = await Currency.getRateHistory(from, to, days);
     res.json(history);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения истории' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get history' });
   }
 });
 
@@ -141,8 +141,8 @@ router.get('/tags', authenticate, async (req, res) => {
     const tags = await Tag.findByUserId(req.user.id);
     res.json(tags);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения тегов' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get tags' });
   }
 });
 
@@ -163,8 +163,8 @@ router.post('/tags', authenticate, async (req, res) => {
 
     res.status(201).json({ success: true, tag: result });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка создания тега' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to create tag' });
   }
 });
 
@@ -180,8 +180,8 @@ router.put('/tags/:id', authenticate, async (req, res) => {
     const tag = await Tag.findById(req.params.id);
     res.json({ success: true, tag });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка обновления тега' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to update tag' });
   }
 });
 
@@ -196,8 +196,8 @@ router.delete('/tags/:id', authenticate, async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка удаления тега' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to delete tag' });
   }
 });
 
@@ -207,8 +207,8 @@ router.get('/tags/:id/stats', authenticate, async (req, res) => {
     const stats = await Tag.getTagStats(req.params.id, req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения статистики' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get stats' });
   }
 });
 
@@ -218,8 +218,8 @@ router.get('/transaction/:transactionId/tags', authenticate, async (req, res) =>
     const tags = await Tag.getTransactionTags(req.params.transactionId);
     res.json(tags);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка получения тегов' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to get tags' });
   }
 });
 
@@ -237,8 +237,8 @@ router.put('/transaction/:transactionId/tags', authenticate, async (req, res) =>
 
     res.json({ success: true, tags });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка установки тегов' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Failed to set tags' });
   }
 });
 
@@ -248,8 +248,8 @@ router.get('/tags/search/:query', authenticate, async (req, res) => {
     const tags = await Tag.search(req.user.id, req.params.query);
     res.json(tags);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка поиска' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Error поиска' });
   }
 });
 
@@ -260,8 +260,8 @@ router.get('/tags/popular', authenticate, async (req, res) => {
     const tags = await Tag.getPopular(req.user.id, limit);
     res.json(tags);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ error: true, message: 'Ошибка' });
+    console.error(`Error:`, error);
+    res.status(500).json({ error: true, message: 'Error' });
   }
 });
 

@@ -15,8 +15,8 @@ router.get('/', authenticate, async (req, res) => {
     const payments = await RecurringPayment.findByUserId(req.user.id, includeInactive);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка при получении платежей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежей' });
+    console.error('Error при получении платежей:', error);
+    res.status(500).json({ error: true, message: 'Failed to get payments' });
   }
 });
 
@@ -26,8 +26,8 @@ router.get('/stats', authenticate, async (req, res) => {
     const stats = await RecurringPayment.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка при получении статистики:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении статистики' });
+    console.error('Error при получении статистики:', error);
+    res.status(500).json({ error: true, message: 'Failed to get stats' });
   }
 });
 
@@ -38,8 +38,8 @@ router.get('/upcoming', authenticate, async (req, res) => {
     const payments = await RecurringPayment.getUpcoming(req.user.id, days);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка при получении ближайших платежей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежей' });
+    console.error('Error при получении ближайших платежей:', error);
+    res.status(500).json({ error: true, message: 'Failed to get payments' });
   }
 });
 
@@ -49,8 +49,8 @@ router.get('/overdue', authenticate, async (req, res) => {
     const payments = await RecurringPayment.getOverdue(req.user.id);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка при получении просроченных платежей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежей' });
+    console.error('Error при получении просроченных платежей:', error);
+    res.status(500).json({ error: true, message: 'Failed to get payments' });
   }
 });
 
@@ -111,8 +111,8 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json({ success: true, payment });
   } catch (error) {
-    console.error('Ошибка при создании платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при создании платежа' });
+    console.error('Error при создании платежа:', error);
+    res.status(500).json({ error: true, message: 'Failed to create payment' });
   }
 });
 
@@ -127,8 +127,8 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json(payment);
   } catch (error) {
-    console.error('Ошибка при получении платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежа' });
+    console.error('Error при получении платежа:', error);
+    res.status(500).json({ error: true, message: 'Failed to get payment' });
   }
 });
 
@@ -148,8 +148,8 @@ router.put('/:id', authenticate, async (req, res) => {
     const payment = await RecurringPayment.findById(req.params.id);
     res.json({ success: true, payment });
   } catch (error) {
-    console.error('Ошибка при обновлении платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при обновлении платежа' });
+    console.error('Error при обновлении платежа:', error);
+    res.status(500).json({ error: true, message: 'Failed to update payment' });
   }
 });
 
@@ -164,8 +164,8 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Платеж удален' });
   } catch (error) {
-    console.error('Ошибка при удалении платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при удалении платежа' });
+    console.error('Error при удалении платежа:', error);
+    res.status(500).json({ error: true, message: 'Failed to delete payment' });
   }
 });
 
@@ -185,8 +185,8 @@ router.post('/:id/pay', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при оплате:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при оплате' });
+    console.error('Error при оплате:', error);
+    res.status(500).json({ error: true, message: 'Failed to process payment' });
   }
 });
 
@@ -201,8 +201,8 @@ router.post('/:id/skip', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при пропуске:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при пропуске платежа' });
+    console.error('Error при пропуске:', error);
+    res.status(500).json({ error: true, message: 'Failed to skip payment' });
   }
 });
 
@@ -222,8 +222,8 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     const updated = await RecurringPayment.findById(req.params.id);
     res.json({ success: true, payment: updated });
   } catch (error) {
-    console.error('Ошибка при переключении:', error);
-    res.status(500).json({ error: true, message: 'Ошибка' });
+    console.error('Error при переключении:', error);
+    res.status(500).json({ error: true, message: 'Error' });
   }
 });
 

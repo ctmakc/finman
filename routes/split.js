@@ -16,8 +16,8 @@ router.get('/groups', async (req, res) => {
     const groups = await Split.findGroupsByUser(req.user.id);
     res.json(groups);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -39,8 +39,8 @@ router.get('/groups/:id', async (req, res) => {
     }
     res.json(group);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -50,8 +50,8 @@ router.get('/groups/:id/stats', async (req, res) => {
     const stats = await Split.getGroupStats(req.params.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -70,8 +70,8 @@ router.post('/groups', async (req, res) => {
 
     res.status(201).json(group);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -86,8 +86,8 @@ router.put('/groups/:id', async (req, res) => {
     const updated = await Split.updateGroup(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -99,8 +99,8 @@ router.get('/groups/:id/members', async (req, res) => {
     const members = await Split.getMembers(req.params.id);
     res.json(members);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -115,8 +115,8 @@ router.post('/groups/:id/members', async (req, res) => {
     const member = await Split.addMember(req.params.id, { name, email, is_registered: false });
     res.status(201).json(member);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -126,8 +126,8 @@ router.delete('/members/:id', async (req, res) => {
     await Split.removeMember(req.params.id);
     res.json({ message: 'Участник удалён' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -139,8 +139,8 @@ router.get('/groups/:id/expenses', async (req, res) => {
     const expenses = await Split.getExpenses(req.params.id);
     res.json(expenses);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -160,8 +160,8 @@ router.post('/groups/:id/expenses', async (req, res) => {
 
     res.status(201).json(expense);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -171,8 +171,8 @@ router.delete('/expenses/:id', async (req, res) => {
     await Split.deleteExpense(req.params.id);
     res.json({ message: 'Расход удалён' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -184,8 +184,8 @@ router.get('/groups/:id/balances', async (req, res) => {
     const balances = await Split.calculateBalances(req.params.id);
     res.json(balances);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -195,8 +195,8 @@ router.get('/groups/:id/settlements/suggested', async (req, res) => {
     const settlements = await Split.calculateSettlements(req.params.id);
     res.json(settlements);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -216,8 +216,8 @@ router.post('/groups/:id/settlements', async (req, res) => {
 
     res.status(201).json(settlement);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -227,8 +227,8 @@ router.get('/groups/:id/settlements', async (req, res) => {
     const settlements = await Split.getSettlements(req.params.id);
     res.json(settlements);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

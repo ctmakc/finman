@@ -69,8 +69,8 @@ router.get('/overview', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Ошибка аналитики:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Analytics error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -91,8 +91,8 @@ router.get('/expenses-by-category', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -113,8 +113,8 @@ router.get('/income-by-category', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -153,8 +153,8 @@ router.get('/trends', async (req, res) => {
 
     res.json({ period: dateFormat, data });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -192,8 +192,8 @@ router.get('/compare', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -215,8 +215,8 @@ router.get('/top-expenses', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -232,8 +232,8 @@ router.get('/account-balances', async (req, res) => {
 
     res.json(accounts);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

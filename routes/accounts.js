@@ -22,7 +22,7 @@ router.get('/', authenticate, async (req, res) => {
       res.json({ own: accounts, shared: [], all: accounts });
     }
   } catch (error) {
-    console.error('Ошибка при получении счетов:', error);
+    console.error('Failed to get accounts:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении счетов'
@@ -76,7 +76,7 @@ router.post('/', authenticate, async (req, res) => {
     
     res.status(201).json(newAccount);
   } catch (error) {
-    console.error('Ошибка при создании счета:', error);
+    console.error('Error при создании счета:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Произошла ошибка при создании счета' 
@@ -116,7 +116,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json({ ...account, permissions });
   } catch (error) {
-    console.error('Ошибка при получении счета:', error);
+    console.error('Error при получении счета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении счета'
@@ -178,7 +178,7 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Ошибка при обновлении счета:', error);
+    console.error('Error при обновлении счета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при обновлении счета'
@@ -227,7 +227,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Ошибка при удалении счета:', error);
+    console.error('Error при удалении счета:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при удалении счета'
@@ -288,7 +288,7 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
 
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка при получении транзакций по счету:', error);
+    console.error('Error при получении транзакций по счету:', error);
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при получении транзакций по счету'
