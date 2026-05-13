@@ -62,7 +62,7 @@ router.post('/snapshot', async (req, res) => {
       [req.user.id, data.totalAssets, data.totalLiabilities, data.netWorth, JSON.stringify(data.assetsBreakdown), JSON.stringify(data.liabilitiesBreakdown), new Date().toISOString().split('T')[0], notes]
     );
 
-    res.status(201).json({ id: result.id, message: 'Snapshot создан', data });
+    res.status(201).json({ id: result.id, message: 'Snapshot created', data });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -89,7 +89,7 @@ router.post('/assets', async (req, res) => {
       [req.user.id, name, type, value, currency || 'UAH', purchase_date, purchase_price, description]
     );
 
-    res.status(201).json({ id: result.id, message: 'Актив добавлен' });
+    res.status(201).json({ id: result.id, message: 'Asset added' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -99,7 +99,7 @@ router.post('/assets', async (req, res) => {
 router.put('/assets/:id', async (req, res) => {
   try {
     const asset = await get('SELECT * FROM manual_assets WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!asset) return res.status(404).json({ message: 'Актив не найден' });
+    if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
     const { name, type, value, currency, purchase_date, purchase_price, description, is_active } = req.body;
 
@@ -108,7 +108,7 @@ router.put('/assets/:id', async (req, res) => {
       [name || asset.name, type || asset.type, value || asset.value, currency || asset.currency, purchase_date, purchase_price, description, is_active !== undefined ? (is_active ? 1 : 0) : asset.is_active, req.params.id]
     );
 
-    res.json({ message: 'Актив обновлён' });
+    res.json({ message: 'Asset updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -118,7 +118,7 @@ router.put('/assets/:id', async (req, res) => {
 router.delete('/assets/:id', async (req, res) => {
   try {
     await run('DELETE FROM manual_assets WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Актив удалён' });
+    res.json({ message: 'Asset deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

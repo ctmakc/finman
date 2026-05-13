@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!receipt) return res.status(404).json({ message: 'Чек не найден' });
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
     res.json({
       ...receipt,
@@ -53,7 +53,7 @@ router.post('/upload', async (req, res) => {
     const { image_data, notes } = req.body;
 
     if (!image_data) {
-      return res.status(400).json({ message: 'Изображение обязательно' });
+      return res.status(400).json({ message: 'Image is required' });
     }
 
     const result = await run(
@@ -70,7 +70,7 @@ router.post('/upload', async (req, res) => {
       }
     }, 1000);
 
-    res.status(201).json({ id: result.id, message: 'Чек загружен, обработка...' });
+    res.status(201).json({ id: result.id, message: 'Receipt uploaded, processing...' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -87,7 +87,7 @@ router.post('/manual', async (req, res) => {
       [req.user.id, merchant, total_amount, currency || 'UAH', receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
     );
 
-    res.status(201).json({ id: result.id, message: 'Чек добавлен' });
+    res.status(201).json({ id: result.id, message: 'Receipt added' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -97,7 +97,7 @@ router.post('/manual', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!receipt) return res.status(404).json({ message: 'Чек не найден' });
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
     const { merchant, total_amount, currency, receipt_date, category, items, notes, is_processed } = req.body;
 
@@ -116,7 +116,7 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/create-transaction', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!receipt) return res.status(404).json({ message: 'Чек не найден' });
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
     const { account_id, category } = req.body;
 

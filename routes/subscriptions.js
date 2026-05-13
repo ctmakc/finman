@@ -77,7 +77,7 @@ router.post('/', async (req, res) => {
       [req.user.id, name, description, amount, currency || 'UAH', billing_cycle || 'monthly', category, icon, color, start_date, nextBilling, reminder_days || 3, auto_renew !== false ? 1 : 0, account_id, url, notes]
     );
 
-    res.status(201).json({ id: result.id, message: 'Подписка создана' });
+    res.status(201).json({ id: result.id, message: 'Subscription created' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -87,7 +87,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!sub) return res.status(404).json({ message: 'Подписка не найдена' });
+    if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     const { name, description, amount, currency, billing_cycle, category, icon, color, reminder_days, auto_renew, account_id, url, notes, is_active } = req.body;
 
@@ -96,7 +96,7 @@ router.put('/:id', async (req, res) => {
       [name || sub.name, description, amount || sub.amount, currency || sub.currency, billing_cycle || sub.billing_cycle, category, icon, color, reminder_days, auto_renew !== undefined ? (auto_renew ? 1 : 0) : sub.auto_renew, account_id, url, notes, is_active !== undefined ? (is_active ? 1 : 0) : sub.is_active, req.params.id]
     );
 
-    res.json({ message: 'Подписка обновлена' });
+    res.json({ message: 'Subscription updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -120,7 +120,7 @@ router.post('/:id/toggle', async (req, res) => {
 router.post('/:id/payment', async (req, res) => {
   try {
     const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!sub) return res.status(404).json({ message: 'Подписка не найдена' });
+    if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     const { amount, payment_date, transaction_id } = req.body;
 
@@ -133,7 +133,7 @@ router.post('/:id/payment', async (req, res) => {
     const nextBilling = calculateNextBillingDate(payment_date || new Date().toISOString().split('T')[0], sub.billing_cycle);
     await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
 
-    res.json({ message: 'Платёж записан' });
+    res.json({ message: 'Payment recorded' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -156,7 +156,7 @@ router.get('/:id/payments', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Подписка удалена' });
+    res.json({ message: 'Subscription deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

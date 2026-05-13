@@ -63,7 +63,7 @@ router.put('/:id/read', async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
     if (!notification || notification.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Уведомление не найдено' });
+      return res.status(404).json({ message: 'Notification not found' });
     }
 
     const updated = await Notification.markAsRead(req.params.id);
@@ -78,7 +78,7 @@ router.put('/:id/read', async (req, res) => {
 router.put('/read-all', async (req, res) => {
   try {
     await Notification.markAllAsRead(req.user.id);
-    res.json({ message: 'Все уведомления прочитаны' });
+    res.json({ message: 'All notifications marked as read' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });
@@ -90,11 +90,11 @@ router.delete('/:id', async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
     if (!notification || notification.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Уведомление не найдено' });
+      return res.status(404).json({ message: 'Notification not found' });
     }
 
     await Notification.delete(req.params.id);
-    res.json({ message: 'Уведомление удалено' });
+    res.json({ message: 'Notification deleted' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });
@@ -106,7 +106,7 @@ router.delete('/old', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
     await Notification.deleteOld(req.user.id, days);
-    res.json({ message: 'Старые уведомления удалены' });
+    res.json({ message: 'Old notifications deleted' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });
