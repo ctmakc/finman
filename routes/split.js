@@ -31,7 +31,33 @@ router.get('/groups', async (req, res) => {
 });
 
 router.get('/stats', async (req, res) => {
-  res.json({ theyOweMe: 0, iOwe: 0, balance: 0, groupCount: 0 });
+  try {
+    const groups = await Split.findGroupsByUser(req.user.id);
+    let totalOwed = 0, totalOwes = 0;
+
+    for (const group of groups) {
+      const member = await dbGet(
+        'SELECT id FROM split_members WHERE group_id = ? AND user_id = ?',
+        [group.id, req.user.id]
+      );
+      if (!member) continue;
+      const balancesObj = await Split.calculateBalances(group.id);
+      const userBalance = balancesObj[member.id];
+      if (!userBalance) continue;
+      if (userBalance.balance > 0) totalOwed += userBalance.balance;
+      else totalOwes += Math.abs(userBalance.balance);
+    }
+
+    res.json({
+      totalOwed: Math.round(totalOwed * 100) / 100,
+      totalOwes: Math.round(totalOwes * 100) / 100,
+      netBalance: Math.round((totalOwed - totalOwes) * 100) / 100,
+      groupCount: groups.length,
+    });
+  } catch (e) {
+    console.error('Split stats error:', e);
+    res.json({ totalOwed: 0, totalOwes: 0, netBalance: 0, groupCount: 0 });
+  }
 });
 
 router.get('/groups/:id', async (req, res) => {
