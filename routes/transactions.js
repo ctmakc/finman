@@ -166,7 +166,7 @@ router.post('/', authenticate, async (req, res) => {
              FROM budgets b
              LEFT JOIN transactions t ON t.user_id = b.user_id
                AND t.type = 'expense' AND t.date BETWEEN ? AND ?
-               AND (b.category_id IS NULL OR t.category_id = b.category_id)
+               AND (b.category IS NULL OR t.category = b.category)
              WHERE b.user_id = ? AND b.is_active = 1
              GROUP BY b.id`,
             [monthStart, monthEnd, account.user_id]

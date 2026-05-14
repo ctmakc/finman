@@ -86,13 +86,12 @@ async function executeTool(toolName, toolInput, userId, orgId) {
 
     case 'get_recent_transactions': {
       const limit = toolInput.limit || 20;
-      let sql = `SELECT t.id, t.amount, t.description, t.date, t.type, c.name as category, a.name as account
+      let sql = `SELECT t.id, t.amount, t.description, t.date, t.type, COALESCE(t.category, 'Uncategorized') as category, a.name as account
                  FROM transactions t
-                 LEFT JOIN categories c ON c.id = t.category_id
                  LEFT JOIN accounts a ON a.id = t.account_id
                  WHERE t.user_id = ?`;
       const params = [userId];
-      if (toolInput.category) { sql += ` AND c.name = ?`; params.push(toolInput.category); }
+      if (toolInput.category) { sql += ` AND t.category = ?`; params.push(toolInput.category); }
       if (toolInput.account_id) { sql += ` AND t.account_id = ?`; params.push(toolInput.account_id); }
       sql += ` ORDER BY t.date DESC LIMIT ?`;
       params.push(limit);
@@ -102,11 +101,10 @@ async function executeTool(toolName, toolInput, userId, orgId) {
     case 'get_spending_by_category': {
       const month = toolInput.month || new Date().toISOString().slice(0, 7);
       return await query(
-        `SELECT c.name as category, SUM(ABS(t.amount)) as total, COUNT(*) as count
+        `SELECT COALESCE(t.category, 'Uncategorized') as category, SUM(ABS(t.amount)) as total, COUNT(*) as count
          FROM transactions t
-         LEFT JOIN categories c ON c.id = t.category_id
          WHERE t.user_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.date) = ?
-         GROUP BY c.name ORDER BY total DESC`,
+         GROUP BY t.category ORDER BY total DESC`,
         [userId, month]
       );
     }
@@ -114,15 +112,14 @@ async function executeTool(toolName, toolInput, userId, orgId) {
     case 'get_budget_status': {
       const month = new Date().toISOString().slice(0, 7);
       return await query(
-        `SELECT b.category_id, c.name as category, b.amount as budget_limit,
+        `SELECT b.category, b.amount as budget_limit,
                 COALESCE(SUM(ABS(t.amount)), 0) as spent
          FROM budgets b
-         LEFT JOIN categories c ON c.id = b.category_id
-         LEFT JOIN transactions t ON t.category_id = b.category_id
+         LEFT JOIN transactions t ON t.category = b.category
            AND t.user_id = b.user_id AND t.type = 'expense'
            AND strftime('%Y-%m', t.date) = ?
          WHERE b.user_id = ?
-         GROUP BY b.category_id`,
+         GROUP BY b.category`,
         [month, userId]
       );
     }
@@ -131,9 +128,8 @@ async function executeTool(toolName, toolInput, userId, orgId) {
       const limit = toolInput.limit || 5;
       const days = toolInput.days || 30;
       return await query(
-        `SELECT t.amount, t.description, t.date, c.name as category, a.name as account
+        `SELECT t.amount, t.description, t.date, COALESCE(t.category, 'Uncategorized') as category, a.name as account
          FROM transactions t
-         LEFT JOIN categories c ON c.id = t.category_id
          LEFT JOIN accounts a ON a.id = t.account_id
          WHERE t.user_id = ? AND t.type = 'expense'
            AND t.date >= date('now', ?)
@@ -296,10 +292,10 @@ router.get('/insights/monthly', auth, async (req, res) => {
     // Gather data
     const [spending, income, topExpenses, budgets] = await Promise.all([
       query(
-        `SELECT c.name as category, SUM(ABS(t.amount)) as total
-         FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
+        `SELECT COALESCE(t.category, 'Uncategorized') as category, SUM(ABS(t.amount)) as total
+         FROM transactions t
          WHERE t.user_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.date) = ?
-         GROUP BY c.name ORDER BY total DESC LIMIT 10`,
+         GROUP BY t.category ORDER BY total DESC LIMIT 10`,
         [req.user.id, month]
       ),
       query(
@@ -314,11 +310,11 @@ router.get('/insights/monthly', auth, async (req, res) => {
         [req.user.id, month]
       ),
       query(
-        `SELECT c.name, b.amount as budget, COALESCE(SUM(ABS(t.amount)),0) as spent
-         FROM budgets b LEFT JOIN categories c ON c.id = b.category_id
-         LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
+        `SELECT b.category as name, b.amount as budget, COALESCE(SUM(ABS(t.amount)),0) as spent
+         FROM budgets b
+         LEFT JOIN transactions t ON t.category = b.category AND t.user_id = b.user_id
            AND t.type = 'expense' AND strftime('%Y-%m', t.date) = ?
-         WHERE b.user_id = ? GROUP BY b.category_id`,
+         WHERE b.user_id = ? GROUP BY b.category`,
         [month, req.user.id]
       ),
     ]);
@@ -367,8 +363,8 @@ router.get('/insights/weekly', auth, async (req, res) => {
 
     const [transactions, dailyTotals] = await Promise.all([
       query(
-        `SELECT t.amount, t.description, t.date, t.type, c.name as category
-         FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
+        `SELECT t.amount, t.description, t.date, t.type, COALESCE(t.category, 'Uncategorized') as category
+         FROM transactions t
          WHERE t.user_id = ? AND t.date >= ? ORDER BY t.date DESC`,
         [req.user.id, since]
       ),
