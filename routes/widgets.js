@@ -9,20 +9,20 @@ router.use(authenticate);
 // Доступные виджеты
 router.get('/available', (req, res) => {
   res.json([
-    { type: 'balance', name: 'Общий баланс', description: 'Сумма всех счетов', sizes: ['small', 'medium'] },
-    { type: 'networth', name: 'Net Worth', description: 'Чистая стоимость', sizes: ['small', 'medium'] },
-    { type: 'budget', name: 'Бюджеты', description: 'Статус бюджетов', sizes: ['medium', 'large'] },
-    { type: 'expenses', name: 'Расходы', description: 'Расходы за период', sizes: ['small', 'medium', 'large'] },
-    { type: 'income', name: 'Доходы', description: 'Доходы за период', sizes: ['small', 'medium'] },
-    { type: 'goals', name: 'Цели', description: 'Прогресс целей', sizes: ['medium', 'large'] },
-    { type: 'upcoming', name: 'Предстоящее', description: 'Ближайшие платежи', sizes: ['medium', 'large'] },
-    { type: 'subscriptions', name: 'Подписки', description: 'Активные подписки', sizes: ['small', 'medium'] },
-    { type: 'investments', name: 'Инвестиции', description: 'Портфель', sizes: ['medium', 'large'] },
-    { type: 'debts', name: 'Долги', description: 'Текущие долги', sizes: ['small', 'medium'] },
-    { type: 'chart_expenses', name: 'График расходов', description: 'Динамика расходов', sizes: ['large'] },
-    { type: 'chart_balance', name: 'График баланса', description: 'Динамика баланса', sizes: ['large'] },
-    { type: 'recent', name: 'Последние операции', description: 'Недавние транзакции', sizes: ['medium', 'large'] },
-    { type: 'quick_add', name: 'Быстрый ввод', description: 'Добавить транзакцию', sizes: ['small'] }
+    { type: 'balance', name: 'Total balance', description: 'Total accounts balance', sizes: ['small', 'medium'] },
+    { type: 'networth', name: 'Net Worth', description: 'Net worth', sizes: ['small', 'medium'] },
+    { type: 'budget', name: 'Budgets', description: 'Budget status', sizes: ['medium', 'large'] },
+    { type: 'expenses', name: 'Expenses', description: 'Expenses for period', sizes: ['small', 'medium', 'large'] },
+    { type: 'income', name: 'Income', description: 'Income for period', sizes: ['small', 'medium'] },
+    { type: 'goals', name: 'Goals', description: 'Goals progress', sizes: ['medium', 'large'] },
+    { type: 'upcoming', name: 'Upcoming', description: 'Upcoming payments', sizes: ['medium', 'large'] },
+    { type: 'subscriptions', name: 'Subscriptions', description: 'Active subscriptions', sizes: ['small', 'medium'] },
+    { type: 'investments', name: 'Investments', description: 'Portfolio', sizes: ['medium', 'large'] },
+    { type: 'debts', name: 'Debts', description: 'Current debts', sizes: ['small', 'medium'] },
+    { type: 'chart_expenses', name: 'Expenses chart', description: 'Expenses dynamics', sizes: ['large'] },
+    { type: 'chart_balance', name: 'Balance chart', description: 'Balance dynamics', sizes: ['large'] },
+    { type: 'recent', name: 'Recent operations', description: 'Recent transactions', sizes: ['medium', 'large'] },
+    { type: 'quick_add', name: 'Quick add', description: 'Add transaction', sizes: ['small'] }
   ]);
 });
 
@@ -37,12 +37,12 @@ router.get('/', async (req, res) => {
     // Если нет виджетов, создаём дефолтные
     if (widgets.length === 0) {
       const defaults = [
-        { type: 'balance', title: 'Баланс', position: 0, size: 'small' },
-        { type: 'expenses', title: 'Расходы за месяц', position: 1, size: 'small' },
-        { type: 'income', title: 'Доходы за месяц', position: 2, size: 'small' },
-        { type: 'budget', title: 'Бюджеты', position: 3, size: 'medium' },
-        { type: 'upcoming', title: 'Предстоящие платежи', position: 4, size: 'medium' },
-        { type: 'recent', title: 'Последние операции', position: 5, size: 'medium' }
+        { type: 'balance', title: 'Balance', position: 0, size: 'small' },
+        { type: 'expenses', title: 'Monthly expenses', position: 1, size: 'small' },
+        { type: 'income', title: 'Monthly income', position: 2, size: 'small' },
+        { type: 'budget', title: 'Budgets', position: 3, size: 'medium' },
+        { type: 'upcoming', title: 'Upcoming payments', position: 4, size: 'medium' },
+        { type: 'recent', title: 'Recent operations', position: 5, size: 'medium' }
       ];
 
       for (const w of defaults) {
@@ -113,7 +113,7 @@ router.get('/:type/data', async (req, res) => {
         data = await getChartBalanceData(req.user.id);
         break;
       default:
-        return res.status(400).json({ message: 'Неизвестный тип виджета' });
+        return res.status(400).json({ message: 'Unknown widget type' });
     }
 
     res.json(data);
@@ -134,7 +134,7 @@ router.post('/', async (req, res) => {
       [req.user.id, widget_type, title, (maxPos.max || 0) + 1, size || 'medium', JSON.stringify(settings || {})]
     );
 
-    res.status(201).json({ id: result.id, message: 'Виджет добавлен' });
+    res.status(201).json({ id: result.id, message: 'Widget added' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -144,7 +144,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const widget = await get('SELECT * FROM dashboard_widgets WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!widget) return res.status(404).json({ message: 'Виджет не найден' });
+    if (!widget) return res.status(404).json({ message: 'Widget not found' });
 
     const { title, size, settings, is_visible } = req.body;
 
@@ -153,7 +153,7 @@ router.put('/:id', async (req, res) => {
       [title || widget.title, size || widget.size, JSON.stringify(settings || JSON.parse(widget.settings || '{}')), is_visible !== undefined ? (is_visible ? 1 : 0) : widget.is_visible, req.params.id]
     );
 
-    res.json({ message: 'Виджет обновлён' });
+    res.json({ message: 'Widget updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -168,7 +168,7 @@ router.post('/reorder', async (req, res) => {
       await run('UPDATE dashboard_widgets SET position = ? WHERE id = ? AND user_id = ?', [item.position, item.id, req.user.id]);
     }
 
-    res.json({ message: 'Порядок обновлён' });
+    res.json({ message: 'Order updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -178,7 +178,7 @@ router.post('/reorder', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM dashboard_widgets WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Виджет удалён' });
+    res.json({ message: 'Widget deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

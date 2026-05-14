@@ -22,12 +22,12 @@ router.get('/', async (req, res) => {
 // Типы отчётов
 router.get('/types', (req, res) => {
   res.json([
-    { id: 'monthly', name: 'Месячный отчёт', description: 'Доходы и расходы за месяц' },
+    { id: 'monthly', name: 'Месячный отчёт', description: 'Income и расходы за месяц' },
     { id: 'yearly', name: 'Годовой отчёт', description: 'Сводка за год' },
-    { id: 'category', name: 'По категориям', description: 'Расходы по категориям' },
+    { id: 'category', name: 'По категориям', description: 'Expenses по категориям' },
     { id: 'networth', name: 'Net Worth', description: 'Динамика чистой стоимости' },
-    { id: 'budget', name: 'Бюджеты', description: 'Выполнение бюджетов' },
-    { id: 'investments', name: 'Инвестиции', description: 'Портфель и доходность' },
+    { id: 'budget', name: 'Budgets', description: 'Выполнение бюджетов' },
+    { id: 'investments', name: 'Investments', description: 'Portfolio и доходность' },
     { id: 'tax', name: 'Налоговый', description: 'Данные для налоговой отчётности' }
   ]);
 });
@@ -70,7 +70,7 @@ router.post('/generate', async (req, res) => {
         title = `Налоговый отчёт ${period_start} - ${period_end}`;
         break;
       default:
-        return res.status(400).json({ message: 'Неизвестный тип отчёта' });
+        return res.status(400).json({ message: 'Unknown report type' });
     }
 
     // Сохраняем отчёт
@@ -96,7 +96,7 @@ router.post('/generate', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const report = await get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!report) return res.status(404).json({ message: 'Отчёт не найден' });
+    if (!report) return res.status(404).json({ message: 'Report not found' });
 
     res.json({
       ...report,
@@ -112,7 +112,7 @@ router.get('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM reports WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Отчёт удалён' });
+    res.json({ message: 'Report deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

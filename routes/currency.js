@@ -58,7 +58,7 @@ router.get('/rate/:from/:to', authenticate, async (req, res) => {
     const rate = await Currency.getRate(from, to);
 
     if (rate === null) {
-      return res.status(404).json({ error: true, message: 'Курс не найден' });
+      return res.status(404).json({ error: true, message: 'Rate not found' });
     }
 
     res.json({ from, to, rate });
@@ -76,7 +76,7 @@ router.get('/convert', authenticate, async (req, res) => {
     if (!amount || !from || !to) {
       return res.status(400).json({
         error: true,
-        message: 'Укажите amount, from и to'
+        message: 'Specify amount, from and to'
       });
     }
 
@@ -107,7 +107,7 @@ router.post('/rate', authenticate, async (req, res) => {
     if (!from || !to || !rate) {
       return res.status(400).json({
         error: true,
-        message: 'Укажите from, to и rate'
+        message: 'Specify from, to and rate'
       });
     }
 
@@ -191,7 +191,7 @@ router.delete('/tags/:id', authenticate, async (req, res) => {
     const success = await Tag.delete(req.params.id, req.user.id);
 
     if (!success) {
-      return res.status(404).json({ error: true, message: 'Тег не найден' });
+      return res.status(404).json({ error: true, message: 'Тег not found' });
     }
 
     res.json({ success: true });

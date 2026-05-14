@@ -17,7 +17,7 @@ router.get('/overview', async (req, res) => {
     const start = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
     const end = endDate || new Date().toISOString().split('T')[0];
 
-    // Доходы и расходы
+    // Income и расходы
     const totals = await get(`
       SELECT 
         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income,
@@ -27,7 +27,7 @@ router.get('/overview', async (req, res) => {
       WHERE user_id = ? AND date BETWEEN ? AND ?
     `, [userId, start, end]);
 
-    // Баланс по счетам
+    // Balance по счетам
     const balance = await get(`
       SELECT COALESCE(SUM(balance), 0) as total_balance
       FROM accounts WHERE user_id = ? AND is_active = 1
@@ -74,7 +74,7 @@ router.get('/overview', async (req, res) => {
   }
 });
 
-// Расходы по категориям
+// Expenses по категориям
 router.get('/expenses-by-category', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -96,7 +96,7 @@ router.get('/expenses-by-category', async (req, res) => {
   }
 });
 
-// Доходы по категориям
+// Income по категориям
 router.get('/income-by-category', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -220,7 +220,7 @@ router.get('/top-expenses', async (req, res) => {
   }
 });
 
-// Баланс по счетам
+// Balance по счетам
 router.get('/account-balances', async (req, res) => {
   try {
     const accounts = await query(`

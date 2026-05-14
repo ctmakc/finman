@@ -1642,12 +1642,13 @@ document.addEventListener('DOMContentLoaded', () => {
     importBtn?.addEventListener('click', async () => {
       if (!importSelectedFile) return;
       const accountId = document.getElementById('import-account').value;
+      if (!accountId) { importStatus.textContent = '✗ Please select an account'; importStatus.style.color = 'var(--danger, #e3342f)'; return; }
       importBtn.disabled = true;
       importStatus.textContent = 'Importing…';
       importStatus.style.color = '#888';
       try {
         const text = await importSelectedFile.text();
-        const r = await fetchWithAuth('/api/transactions/import', {
+        const r = await fetchWithAuth(`/api/export/transactions/csv?accountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'text/csv' },
           body: text,
@@ -1658,6 +1659,7 @@ document.addEventListener('DOMContentLoaded', () => {
         importStatus.style.color = 'var(--success, #38c172)';
         setImportFile(null);
         importFile.value = '';
+        importBtn.disabled = false;
       } catch (err) {
         importStatus.textContent = '✗ Import failed: ' + err.message;
         importStatus.style.color = 'var(--danger, #e3342f)';

@@ -82,14 +82,14 @@ router.post('/', authenticate, async (req, res) => {
     if (!accountId || !name || !amount || !startDate) {
       return res.status(400).json({
         error: true,
-        message: 'Необходимо указать счет, название, сумму и дату начала'
+        message: 'Account, name, amount and start date are required'
       });
     }
 
     // Проверка счета
     const account = await Account.findById(accountId, req.user.id);
     if (!account) {
-      return res.status(404).json({ error: true, message: 'Счет не найден' });
+      return res.status(404).json({ error: true, message: 'Account not found' });
     }
 
     const payment = await RecurringPayment.create({
@@ -122,7 +122,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const payment = await RecurringPayment.findById(req.params.id);
 
     if (!payment || payment.user_id !== req.user.id) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
     res.json(payment);
@@ -142,7 +142,7 @@ router.put('/:id', authenticate, async (req, res) => {
     );
 
     if (!success) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
     const payment = await RecurringPayment.findById(req.params.id);
@@ -159,10 +159,10 @@ router.delete('/:id', authenticate, async (req, res) => {
     const success = await RecurringPayment.delete(req.params.id, req.user.id);
 
     if (!success) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
-    res.json({ success: true, message: 'Платеж удален' });
+    res.json({ success: true, message: 'Payment deleted' });
   } catch (error) {
     console.error('Error при удалении платежа:', error);
     res.status(500).json({ error: true, message: 'Failed to delete payment' });
@@ -212,7 +212,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     const payment = await RecurringPayment.findById(req.params.id);
 
     if (!payment || payment.user_id !== req.user.id) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
     await RecurringPayment.update(req.params.id, req.user.id, {

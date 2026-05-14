@@ -95,7 +95,7 @@ router.get('/', authenticate, async (req, res) => {
     console.error('Error при получении транзакций:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при получении транзакций' 
+      message: 'Failed to get transactions' 
     });
   }
 });
@@ -116,7 +116,7 @@ router.post('/', authenticate, async (req, res) => {
     if (!accountId || !date || amount === undefined) {
       return res.status(400).json({
         error: true,
-        message: 'Необходимо указать счет, дату и сумму'
+        message: 'Account, date and amount are required'
       });
     }
 
@@ -129,14 +129,14 @@ router.post('/', authenticate, async (req, res) => {
     if (!permissions) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
     if (!permissions.isOwner && !permissions.canAddTransactions) {
       return res.status(403).json({
         error: true,
-        message: 'Недостаточно прав для добавления транзакций'
+        message: 'Insufficient permissions to add transactions'
       });
     }
 
@@ -201,7 +201,7 @@ router.post('/', authenticate, async (req, res) => {
     console.error('Error при создании транзакции:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при создании транзакции'
+      message: 'Failed to create transaction'
     });
   }
 });
@@ -214,7 +214,7 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!transaction) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Транзакция не найдена' 
+        message: 'Transaction not found' 
       });
     }
     
@@ -254,14 +254,14 @@ router.put('/:id', authenticate, async (req, res) => {
     } else {
       res.status(404).json({ 
         error: true, 
-        message: 'Транзакция не найдена или не обновлена' 
+        message: 'Transaction not found или не обновлена' 
       });
     }
   } catch (error) {
     console.error('Error при обновлении транзакции:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при обновлении транзакции' 
+      message: 'Failed to update transaction' 
     });
   }
 });
@@ -279,14 +279,14 @@ router.delete('/:id', authenticate, async (req, res) => {
     } else {
       res.status(404).json({ 
         error: true, 
-        message: 'Транзакция не найдена или не удалена' 
+        message: 'Transaction not found или не удалена' 
       });
     }
   } catch (error) {
     console.error('Error при удалении транзакции:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при удалении транзакции' 
+      message: 'Failed to delete transaction' 
     });
   }
 });
@@ -297,7 +297,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
     if (!req.file) {
       return res.status(400).json({ 
         error: true, 
-        message: 'Файл не загружен' 
+        message: 'File not uploaded' 
       });
     }
     
@@ -310,7 +310,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
     if (!account) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Счет не найден' 
+        message: 'Account not found' 
       });
     }
     
@@ -345,7 +345,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
     
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при импорте транзакций'
+      message: 'Failed to import transactions'
     });
   }
 });
@@ -374,7 +374,7 @@ router.get('/stats/summary', authenticate, async (req, res) => {
     console.error('Error при получении статистики:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при получении статистики' 
+      message: 'Failed to get stats' 
     });
   }
 });

@@ -35,7 +35,7 @@ router.get('/groups/:id', async (req, res) => {
   try {
     const group = await Split.findGroupById(req.params.id);
     if (!group) {
-      return res.status(404).json({ message: 'Группа не найдена' });
+      return res.status(404).json({ message: 'Group not found' });
     }
     res.json(group);
   } catch (error) {
@@ -60,7 +60,7 @@ router.post('/groups', async (req, res) => {
   try {
     const { name, description, currency, creator_name } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Название обязательно' });
+      return res.status(400).json({ message: 'Name is required' });
     }
 
     const group = await Split.createGroup({
@@ -80,7 +80,7 @@ router.put('/groups/:id', async (req, res) => {
   try {
     const group = await Split.findGroupById(req.params.id);
     if (!group || group.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Группа не найдена' });
+      return res.status(404).json({ message: 'Group not found' });
     }
 
     const updated = await Split.updateGroup(req.params.id, req.body);
@@ -109,7 +109,7 @@ router.post('/groups/:id/members', async (req, res) => {
   try {
     const { name, email } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Имя обязательно' });
+      return res.status(400).json({ message: 'Name is required' });
     }
 
     const member = await Split.addMember(req.params.id, { name, email, is_registered: false });
@@ -124,7 +124,7 @@ router.post('/groups/:id/members', async (req, res) => {
 router.delete('/members/:id', async (req, res) => {
   try {
     await Split.removeMember(req.params.id);
-    res.json({ message: 'Участник удалён' });
+    res.json({ message: 'Member removed' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });
@@ -150,7 +150,7 @@ router.post('/groups/:id/expenses', async (req, res) => {
     const { paid_by, description, amount, split_type, date, category, shares } = req.body;
     
     if (!paid_by || !description || !amount) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Required fields are missing' });
     }
 
     const expense = await Split.addExpense({
@@ -206,7 +206,7 @@ router.post('/groups/:id/settlements', async (req, res) => {
     const { from_member, to_member, amount, date, note } = req.body;
     
     if (!from_member || !to_member || !amount) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Required fields are missing' });
     }
 
     const settlement = await Split.addSettlement({

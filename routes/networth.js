@@ -142,7 +142,7 @@ async function calculateNetWorth(userId) {
   const accounts = await query('SELECT SUM(balance) as total FROM accounts WHERE user_id = ?', [userId]);
   const accountsTotal = accounts[0]?.total || 0;
 
-  // Инвестиции
+  // Investments
   const investments = await query(
     `SELECT SUM(i.quantity * i.current_price) as total
      FROM investments i
@@ -152,7 +152,7 @@ async function calculateNetWorth(userId) {
   );
   const investmentsTotal = investments[0]?.total || 0;
 
-  // Цели накопления
+  // Goals накопления
   const goals = await query('SELECT SUM(current_amount) as total FROM savings_goals WHERE user_id = ? AND is_active = 1', [userId]);
   const goalsTotal = goals[0]?.total || 0;
 
@@ -160,7 +160,7 @@ async function calculateNetWorth(userId) {
   const manualAssets = await query('SELECT SUM(value) as total FROM manual_assets WHERE user_id = ? AND is_active = 1', [userId]);
   const manualTotal = manualAssets[0]?.total || 0;
 
-  // Долги (обязательства)
+  // Debts (обязательства)
   const debts = await query(
     `SELECT SUM(amount - paid_amount) as total FROM debts WHERE user_id = ? AND is_active = 1 AND type IN ('i_owe', 'credit', 'mortgage', 'loan')`,
     [userId]

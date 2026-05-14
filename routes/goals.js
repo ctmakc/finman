@@ -42,7 +42,7 @@ router.get('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
     res.json(SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(goal) : goal);
   } catch (error) {
@@ -57,7 +57,7 @@ router.post('/', async (req, res) => {
     const { name, description, target_amount, currency, target_date, category, icon, color } = req.body;
     
     if (!name || !target_amount) {
-      return res.status(400).json({ message: 'Название и целевая сумма обязательны' });
+      return res.status(400).json({ message: 'Name and target amount are required' });
     }
 
     const goal = await SavingsGoal.create({
@@ -77,7 +77,7 @@ router.put('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const updated = await SavingsGoal.update(req.params.id, req.body);
@@ -93,12 +93,12 @@ router.post('/:id/contribute', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const { amount, note } = req.body;
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Сумма должна быть положительной' });
+      return res.status(400).json({ message: 'Amount must be positive' });
     }
 
     const updated = await SavingsGoal.addContribution(req.params.id, amount, note);
@@ -135,7 +135,7 @@ router.get('/:id/contributions', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const contributions = await SavingsGoal.getContributions(req.params.id);
@@ -151,11 +151,11 @@ router.delete('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     await SavingsGoal.delete(req.params.id);
-    res.json({ message: 'Цель удалена' });
+    res.json({ message: 'Goal deleted' });
   } catch (error) {
     console.error('Error удаления цели:', error);
     res.status(500).json({ message: 'Server error' });

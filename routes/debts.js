@@ -38,7 +38,7 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// Предстоящие платежи
+// Upcoming payments
 router.get('/upcoming', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
@@ -55,7 +55,7 @@ router.get('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
     res.json(Debt.calculateDebtInfo ? Debt.calculateDebtInfo(debt) : debt);
   } catch (error) {
@@ -70,7 +70,7 @@ router.post('/', async (req, res) => {
     const { name, description, type, amount, interest_rate, currency, counterparty, start_date, due_date } = req.body;
     
     if (!name || !type || !amount || !start_date) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Required fields are missing' });
     }
 
     const debt = await Debt.create({
@@ -90,7 +90,7 @@ router.put('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const updated = await Debt.update(req.params.id, req.body);
@@ -106,12 +106,12 @@ router.post('/:id/payment', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const { amount, payment_type, note, payment_date } = req.body;
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Сумма должна быть положительной' });
+      return res.status(400).json({ message: 'Amount must be positive' });
     }
 
     const updated = await Debt.addPayment(req.params.id, amount, payment_type, note, null, payment_date);
@@ -127,7 +127,7 @@ router.get('/:id/payments', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const payments = await Debt.getPayments(req.params.id);
@@ -143,11 +143,11 @@ router.delete('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     await Debt.delete(req.params.id);
-    res.json({ message: 'Долг удалён' });
+    res.json({ message: 'Debt deleted' });
   } catch (error) {
     console.error('Error удаления:', error);
     res.status(500).json({ message: 'Server error' });

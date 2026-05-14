@@ -30,7 +30,7 @@ router.get('/events', async (req, res) => {
       [req.user.id, start, end]
     );
 
-    // Подписки
+    // Subscriptions
     const subscriptions = await query(
       `SELECT id, name as title, amount, 'subscription' as event_type, next_billing_date as event_date, color
        FROM subscriptions
@@ -46,7 +46,7 @@ router.get('/events', async (req, res) => {
       [req.user.id, start, end]
     );
 
-    // Цели
+    // Goals
     const goals = await query(
       `SELECT id, name as title, target_amount as amount, 'goal' as event_type, target_date as event_date, color
        FROM savings_goals
@@ -116,7 +116,7 @@ router.post('/events', async (req, res) => {
       [req.user.id, title, description, event_type, amount, currency || 'UAH', event_date, end_date, is_recurring ? 1 : 0, recurrence_rule, reminder_enabled !== false ? 1 : 0, reminder_days || 1, color || '#5D5CDE']
     );
 
-    res.status(201).json({ id: result.id, message: 'Событие создано' });
+    res.status(201).json({ id: result.id, message: 'Event created' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -126,7 +126,7 @@ router.post('/events', async (req, res) => {
 router.put('/events/:id', async (req, res) => {
   try {
     const event = await get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!event) return res.status(404).json({ message: 'Событие не найдено' });
+    if (!event) return res.status(404).json({ message: 'Event not found' });
 
     const { title, description, event_type, amount, currency, event_date, end_date, is_recurring, recurrence_rule, reminder_enabled, reminder_days, color, is_completed } = req.body;
 
@@ -135,7 +135,7 @@ router.put('/events/:id', async (req, res) => {
       [title || event.title, description, event_type || event.event_type, amount, currency || event.currency, event_date || event.event_date, end_date, is_recurring !== undefined ? (is_recurring ? 1 : 0) : event.is_recurring, recurrence_rule, reminder_enabled !== undefined ? (reminder_enabled ? 1 : 0) : event.reminder_enabled, reminder_days || event.reminder_days, color || event.color, is_completed ? 1 : 0, is_completed ? new Date().toISOString() : null, req.params.id]
     );
 
-    res.json({ message: 'Событие обновлено' });
+    res.json({ message: 'Event updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -148,7 +148,7 @@ router.post('/events/:id/complete', async (req, res) => {
       'UPDATE calendar_events SET is_completed = 1, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
       [req.params.id, req.user.id]
     );
-    res.json({ message: 'Событие выполнено' });
+    res.json({ message: 'Event completed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -158,7 +158,7 @@ router.post('/events/:id/complete', async (req, res) => {
 router.delete('/events/:id', async (req, res) => {
   try {
     await run('DELETE FROM calendar_events WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Событие удалено' });
+    res.json({ message: 'Event deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

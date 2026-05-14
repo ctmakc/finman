@@ -50,7 +50,7 @@ router.get('/balance', async (req, res) => {
       [userId]
     );
 
-    // Подписки
+    // Subscriptions
     const subscriptions = await query(
       `SELECT amount, billing_cycle, next_billing_date
        FROM subscriptions
@@ -175,7 +175,7 @@ router.get('/goal/:id', async (req, res) => {
     );
 
     if (!goal) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     // История пополнений
@@ -188,7 +188,7 @@ router.get('/goal/:id', async (req, res) => {
     const remaining = goal.target_amount - goal.current_amount;
 
     if (contributions.length < 2) {
-      // Недостаточно данных
+      // Not enough data
       const daysToTarget = goal.target_date
         ? Math.ceil((new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24))
         : null;
@@ -201,7 +201,7 @@ router.get('/goal/:id', async (req, res) => {
         daysToTarget,
         requiredDaily: daysToTarget ? remaining / daysToTarget : null,
         onTrack: null,
-        message: 'Недостаточно данных для прогноза'
+        message: 'Not enough data for forecast'
       });
     }
 
@@ -251,7 +251,7 @@ router.get('/debt/:id', async (req, res) => {
     );
 
     if (!debt) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const remaining = debt.amount - debt.paid_amount;
@@ -268,7 +268,7 @@ router.get('/debt/:id', async (req, res) => {
         remaining,
         avgPayment: 0,
         projectedDate: null,
-        message: 'Недостаточно данных для прогноза'
+        message: 'Not enough data for forecast'
       });
     }
 

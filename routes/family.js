@@ -27,7 +27,7 @@ router.post('/', authenticate, async (req, res) => {
     const { name, description } = req.body;
 
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: true, message: 'Название семьи обязательно' });
+      return res.status(400).json({ error: true, message: 'Family name is required' });
     }
 
     const family = await Family.create({
@@ -49,13 +49,13 @@ router.get('/:id', authenticate, async (req, res) => {
     const family = await Family.findById(req.params.id);
 
     if (!family) {
-      return res.status(404).json({ error: true, message: 'Семья не найдена' });
+      return res.status(404).json({ error: true, message: 'Family not found' });
     }
 
     // Проверяем, что пользователь - участник
     const isMember = await Family.isMember(req.params.id, req.user.id);
     if (!isMember) {
-      return res.status(403).json({ error: true, message: 'Доступ запрещен' });
+      return res.status(403).json({ error: true, message: 'Access denied' });
     }
 
     const myRole = await Family.getUserRole(req.params.id, req.user.id);
@@ -73,7 +73,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const family = await Family.findById(req.params.id);
     if (!family || family.owner_id !== req.user.id) {
-      return res.status(403).json({ error: true, message: 'Только владелец может редактировать семью' });
+      return res.status(403).json({ error: true, message: 'Only the owner can редактировать семью' });
     }
 
     await Family.update(req.params.id, req.user.id, { name, description });
@@ -95,7 +95,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: true, message: 'Only the owner can delete the family' });
     }
 
-    res.json({ success: true, message: 'Семья удалена' });
+    res.json({ success: true, message: 'Family deleted' });
   } catch (error) {
     console.error('Failed to delete family:', error);
     res.status(500).json({ error: true, message: 'Failed to delete family' });
@@ -109,7 +109,7 @@ router.get('/:id/members', authenticate, async (req, res) => {
   try {
     const isMember = await Family.isMember(req.params.id, req.user.id);
     if (!isMember) {
-      return res.status(403).json({ error: true, message: 'Доступ запрещен' });
+      return res.status(403).json({ error: true, message: 'Access denied' });
     }
 
     const members = await Family.getMembers(req.params.id);
@@ -133,7 +133,7 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Участник удален' });
+    res.json({ success: true, message: 'Member removed' });
   } catch (error) {
     console.error('Failed to remove member:', error);
     res.status(500).json({ error: true, message: 'Failed to remove member' });

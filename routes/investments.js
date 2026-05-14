@@ -37,7 +37,7 @@ router.get('/portfolios/:id', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     const stats = await Investment.calculatePortfolioValue(req.params.id);
@@ -53,7 +53,7 @@ router.post('/portfolios', async (req, res) => {
   try {
     const { name, description, currency } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Название обязательно' });
+      return res.status(400).json({ message: 'Name is required' });
     }
 
     const portfolio = await Investment.createPortfolio({
@@ -73,7 +73,7 @@ router.put('/portfolios/:id', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     const updated = await Investment.updatePortfolio(req.params.id, req.body);
@@ -89,11 +89,11 @@ router.delete('/portfolios/:id', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     await Investment.deletePortfolio(req.params.id);
-    res.json({ message: 'Портфель удалён' });
+    res.json({ message: 'Portfolio deleted' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });
@@ -122,7 +122,7 @@ router.post('/portfolios/:id/investments', async (req, res) => {
     const { symbol, name, type, quantity, buy_price, currency, buy_date, notes, fee } = req.body;
     
     if (!symbol || !name || !type || !quantity || !buy_price || !buy_date) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Required fields are missing' });
     }
 
     const investment = await Investment.addInvestment({

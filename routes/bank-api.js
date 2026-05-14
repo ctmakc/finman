@@ -55,7 +55,7 @@ router.get('/supported-banks', authenticate, (req, res) => {
     console.error('Error при получении списка банков:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении списка банков'
+      message: 'Failed to get bank list'
     });
   }
 });
@@ -110,7 +110,7 @@ router.get('/banks-by-region', authenticate, async (req, res) => {
     console.error('Error при получении банков по регионам:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении списка банков'
+      message: 'Failed to get bank list'
     });
   }
 });
@@ -150,7 +150,7 @@ router.get('/connections', authenticate, async (req, res) => {
     console.error('Error при получении подключений к банкам:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при получении подключений к банкам' 
+      message: 'Failed to get bank connections' 
     });
   }
 });
@@ -274,7 +274,7 @@ router.post('/disconnect/:connectionId', authenticate, async (req, res) => {
     if (!connection) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Подключение не найдено' 
+        message: 'Подключение not foundо' 
       });
     }
     
@@ -308,7 +308,7 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
     if (!connection) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Подключение не найдено' 
+        message: 'Подключение not foundо' 
       });
     }
     
@@ -394,7 +394,7 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
     if (!account) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Счет не найден' 
+        message: 'Account not found' 
       });
     }
     
@@ -408,7 +408,7 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
     if (!bankConnection) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Подключение к банку не найдено' 
+        message: 'Подключение к банку not foundо' 
       });
     }
     
@@ -530,7 +530,7 @@ router.put('/custom-banks/:id', authenticate, async (req, res) => {
     // Проверка существования
     const existingBank = await CustomBank.findById(id, req.user.id);
     if (!existingBank) {
-      return res.status(404).json({ error: true, message: 'Кастомный банк не найден' });
+      return res.status(404).json({ error: true, message: 'Кастомный банк not found' });
     }
 
     // Валидация URL если передан
@@ -575,7 +575,7 @@ router.delete('/custom-banks/:id', authenticate, async (req, res) => {
     // Проверка существования
     const existingBank = await CustomBank.findById(id, req.user.id);
     if (!existingBank) {
-      return res.status(404).json({ error: true, message: 'Кастомный банк не найден' });
+      return res.status(404).json({ error: true, message: 'Кастомный банк not found' });
     }
 
     const deleted = await CustomBank.delete(id, req.user.id);
@@ -603,7 +603,7 @@ router.post('/connect-custom/:bankKey/direct', authenticate, async (req, res) =>
     // Получение кастомного банка
     const customBank = await CustomBank.findByKey(bankKey, req.user.id);
     if (!customBank) {
-      return res.status(404).json({ error: true, message: 'Кастомный банк не найден' });
+      return res.status(404).json({ error: true, message: 'Кастомный банк not found' });
     }
 
     // Проверка API-ключа

@@ -106,7 +106,7 @@ router.put('/:id', async (req, res) => {
       [merchant || receipt.merchant, total_amount || receipt.total_amount, currency || receipt.currency, receipt_date || receipt.receipt_date, category || receipt.category, JSON.stringify(items || JSON.parse(receipt.items || '[]')), notes, is_processed !== undefined ? (is_processed ? 1 : 0) : receipt.is_processed, req.params.id]
     );
 
-    res.json({ message: 'Чек обновлён' });
+    res.json({ message: 'Receipt updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -121,7 +121,7 @@ router.post('/:id/create-transaction', async (req, res) => {
     const { account_id, category } = req.body;
 
     if (!account_id) {
-      return res.status(400).json({ message: 'Укажите счёт' });
+      return res.status(400).json({ message: 'Account required' });
     }
 
     // Создаём транзакцию
@@ -137,7 +137,7 @@ router.post('/:id/create-transaction', async (req, res) => {
     // Связываем чек с транзакцией
     await run('UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [txResult.id, req.params.id]);
 
-    res.json({ transaction_id: txResult.id, message: 'Транзакция создана' });
+    res.json({ transaction_id: txResult.id, message: 'Transaction created' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -147,7 +147,7 @@ router.post('/:id/create-transaction', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Чек удалён' });
+    res.json({ message: 'Receipt deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
