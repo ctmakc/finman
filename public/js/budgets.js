@@ -408,7 +408,7 @@ async function showEditBudgetModal(id) {
             <div class="form-group">
               <label for="${modalId}-currency" class="form-label">Currency</label>
               <select id="${modalId}-currency" class="form-control">
-                <option value="UAH" ${budget.currency === 'UAH' ? 'selected' : ''}>UAH</option>
+                <option value="USD" ${budget.currency === 'USD' ? 'selected' : ''}>USD</option>
                 <option value="USD" ${budget.currency === 'USD' ? 'selected' : ''}>USD</option>
                 <option value="EUR" ${budget.currency === 'EUR' ? 'selected' : ''}>EUR</option>
                 <option value="CAD" ${budget.currency === 'CAD' ? 'selected' : ''}>CAD</option>

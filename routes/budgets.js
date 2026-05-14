@@ -108,7 +108,7 @@ router.post('/', authenticate, async (req, res) => {
       period: period || 'monthly',
       startDate: budgetStartDate,
       endDate: endDate || null,
-      currency: currency || 'UAH',
+      currency: currency || 'USD',
       notifyAtPercent: notifyAtPercent || 80
     });
 

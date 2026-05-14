@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
     const result = await run(
       `INSERT INTO subscriptions (user_id, name, description, amount, currency, billing_cycle, category, icon, color, start_date, next_billing_date, reminder_days, auto_renew, account_id, url, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, name, description, amount, currency || 'UAH', billing_cycle || 'monthly', category, icon, color, start_date, nextBilling, reminder_days || 3, auto_renew !== false ? 1 : 0, account_id, url, notes]
+      [req.user.id, name, description, amount, currency || 'USD', billing_cycle || 'monthly', category, icon, color, start_date, nextBilling, reminder_days || 3, auto_renew !== false ? 1 : 0, account_id, url, notes]
     );
 
     res.status(201).json({ id: result.id, message: 'Subscription created' });

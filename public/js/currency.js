@@ -307,7 +307,7 @@ async function performConversion() {
 
 async function renderRatesTab() {
   const container = document.getElementById('currency-tab-content');
-  const settings = currencyState.settings || { base_currency: 'UAH' };
+  const settings = currencyState.settings || { base_currency: 'USD' };
 
   container.innerHTML = `
     <div class="rates-section">
@@ -395,8 +395,8 @@ async function loadRates() {
 async function renderCurrencySettingsTab() {
   const container = document.getElementById('currency-tab-content');
   const settings = currencyState.settings || {
-    base_currency: 'UAH',
-    display_currencies: ['UAH', 'USD', 'EUR'],
+    base_currency: 'USD',
+    display_currencies: ['USD', 'EUR', 'CAD'],
     auto_convert: false
   };
 
@@ -406,7 +406,7 @@ async function renderCurrencySettingsTab() {
     try {
       displayCurrencies = JSON.parse(displayCurrencies);
     } catch {
-      displayCurrencies = ['UAH', 'USD', 'EUR'];
+      displayCurrencies = ['USD', 'EUR', 'CAD'];
     }
   }
 

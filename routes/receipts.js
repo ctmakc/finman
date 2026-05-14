@@ -84,7 +84,7 @@ router.post('/manual', async (req, res) => {
     const result = await run(
       `INSERT INTO receipts (user_id, merchant, total_amount, currency, receipt_date, category, items, ocr_status, is_processed, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', 1, ?)`,
-      [req.user.id, merchant, total_amount, currency || 'UAH', receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
+      [req.user.id, merchant, total_amount, currency || 'USD', receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
     );
 
     res.status(201).json({ id: result.id, message: 'Receipt added' });

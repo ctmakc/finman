@@ -86,7 +86,7 @@ router.post('/assets', async (req, res) => {
     const result = await run(
       `INSERT INTO manual_assets (user_id, name, type, value, currency, purchase_date, purchase_price, description)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, name, type, value, currency || 'UAH', purchase_date, purchase_price, description]
+      [req.user.id, name, type, value, currency || 'USD', purchase_date, purchase_price, description]
     );
 
     res.status(201).json({ id: result.id, message: 'Asset added' });
