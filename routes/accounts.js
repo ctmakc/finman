@@ -3,6 +3,7 @@ const passport = require('passport');
 const Account = require('../models/account');
 const Transaction = require('../models/transaction');
 const { AccountPermission } = require('../models/permission');
+const { run: dbRun } = require('../db/database');
 
 const router = express.Router();
 
@@ -50,30 +51,37 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
     
-    // Create account with zero balance; initial transaction will set it
-    const newAccount = await Account.create({
-      userId: req.user.id,
-      name,
-      accountNumber,
-      bankName,
-      currency,
-      balance: 0,
-      accountType
-    });
-    
-    // If an opening balance was specified, create the initial transaction
-    if (balance && balance !== 0) {
-      await Transaction.create({
-        accountId: newAccount.id,
+    await dbRun('BEGIN TRANSACTION');
+    let newAccount;
+    try {
+      newAccount = await Account.create({
         userId: req.user.id,
-        date: new Date().toISOString().split('T')[0],
-        description: 'Opening balance',
-        category: 'Opening balance',
-        amount: balance,
-        type: balance > 0 ? 'income' : 'expense'
+        name,
+        accountNumber,
+        bankName,
+        currency,
+        balance: 0,
+        accountType
       });
+
+      if (balance && balance !== 0) {
+        await Transaction.create({
+          accountId: newAccount.id,
+          userId: req.user.id,
+          date: new Date().toISOString().split('T')[0],
+          description: 'Opening balance',
+          category: 'Opening balance',
+          amount: balance,
+          type: balance > 0 ? 'income' : 'expense'
+        });
+      }
+
+      await dbRun('COMMIT');
+    } catch (innerError) {
+      try { await dbRun('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
+      throw innerError;
     }
-    
+
     res.status(201).json(newAccount);
   } catch (error) {
     console.error('Error creating account:', error);

@@ -207,7 +207,7 @@ router.post('/', authenticate, async (req, res) => {
               }
             }
           }
-        } catch (_) {}
+        } catch (notifErr) { console.error('Budget notification error:', notifErr); }
       });
     }
 
@@ -421,24 +421,20 @@ router.post('/transfer', authenticate, async (req, res) => {
 
     await dbRun('BEGIN TRANSACTION');
     try {
-      const [r1, r2] = await Promise.all([
-        dbRun(
-          `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, 'Transfer', ?, 'transfer')`,
-          [fromAccountId, req.user.id, txDate, note + ' (out)', -amt]
-        ),
-        dbRun(
-          `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, 'Transfer', ?, 'transfer')`,
-          [toAccountId, req.user.id, txDate, note + ' (in)', amt]
-        ),
-      ]);
-      await Promise.all([
-        dbRun('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [amt, fromAccountId, req.user.id]),
-        dbRun('UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?', [amt, toAccountId, req.user.id]),
-      ]);
+      const r1 = await dbRun(
+        `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, 'Transfer', ?, 'transfer')`,
+        [fromAccountId, req.user.id, txDate, note + ' (out)', -amt]
+      );
+      const r2 = await dbRun(
+        `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, 'Transfer', ?, 'transfer')`,
+        [toAccountId, req.user.id, txDate, note + ' (in)', amt]
+      );
+      await dbRun('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [amt, fromAccountId, req.user.id]);
+      await dbRun('UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?', [amt, toAccountId, req.user.id]);
       await dbRun('COMMIT');
       res.status(201).json({ message: 'Transfer completed', fromTxId: r1.id, toTxId: r2.id });
     } catch (e) {
-      await dbRun('ROLLBACK');
+      try { await dbRun('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
       throw e;
     }
   } catch (error) {

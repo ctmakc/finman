@@ -33,7 +33,7 @@ router.get('/stats', async (req, res) => {
     res.json({ activeGoals, totalSaved, totalTarget, overallProgress });
   } catch (error) {
     console.error('Goals stats error:', error);
-    res.status(500).json({ activeGoals: 0, totalSaved: 0, totalTarget: 0, overallProgress: 0 });
+    res.status(500).json({ error: true, message: 'Failed to load stats' });
   }
 });
 

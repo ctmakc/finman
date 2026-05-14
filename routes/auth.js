@@ -82,8 +82,12 @@ router.post('/login', (req, res, next) => {
         const org = await Organization.create({ name: user.username, ownerId: user.id });
         orgId = org.id;
       } catch (e) {
+        console.error('Failed to auto-create org for user', user.id, e);
         const row = await get('SELECT org_id FROM users WHERE id = ?', [user.id]);
-        orgId = row ? row.org_id : null;
+        orgId = row?.org_id ?? null;
+        if (!orgId) {
+          return res.status(500).json({ error: true, message: 'Login failed: could not establish organization context' });
+        }
       }
     }
 
