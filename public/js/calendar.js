@@ -53,7 +53,7 @@ const CalendarModule = {
 
       html += `<div class="calendar-day ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-events' : ''}" onclick="CalendarModule.showDayEvents('${dateStr}')">
         <span class="day-number">${day}</span>
-        ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${e.color || '#5D5CDE'}" title="${e.title}"></div>`).join('')}
+        ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${e.color || '#5D5CDE'}" title="${esc(e.title)}"></div>`).join('')}
         ${dayEvents.length > 3 ? `<small>+${dayEvents.length - 3}</small>` : ''}
       </div>`;
     }
@@ -84,7 +84,7 @@ const CalendarModule = {
       container.innerHTML = upcoming.map(e => `
         <div class="upcoming-item" style="border-left: 3px solid ${e.color || '#5D5CDE'}">
           <span class="event-icon">${typeIcons[e.event_type] || '📅'}</span>
-          <div class="event-info"><strong>${e.title}</strong><small>${e.event_date}</small></div>
+          <div class="event-info"><strong>${esc(e.title)}</strong><small>${e.event_date}</small></div>
           ${e.amount ? `<span class="event-amount">${e.amount.toLocaleString()} $</span>` : ''}
         </div>
       `).join('');
@@ -118,7 +118,7 @@ const CalendarModule = {
       : dayEvents.map(e => `
         <div class="day-event-item">
           <span>${typeIcons[e.event_type] || '📅'}</span>
-          <div><strong>${e.title}</strong>${e.amount ? ` - ${e.amount.toLocaleString()} $` : ''}<br><small>${e.description || e.event_type}</small></div>
+          <div><strong>${esc(e.title)}</strong>${e.amount ? ` - ${e.amount.toLocaleString()} $` : ''}<br><small>${esc(e.description || e.event_type)}</small></div>
           ${e.source ? '' : `<button class="btn btn-sm btn-icon" onclick="CalendarModule.completeEvent(${e.id})">✓</button>`}
         </div>
       `).join('');

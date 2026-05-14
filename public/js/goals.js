@@ -14,7 +14,7 @@ function renderGoalCard(g) {
   const dueDate = g.target_date ? `<small class="text-muted" style="font-size:12px">Target: ${g.target_date}</small>` : '';
   return `<div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fas fa-piggy-bank"></i> ${g.name}</h3>
+      <h3 class="card-title"><i class="fas fa-piggy-bank"></i> ${esc(g.name)}</h3>
       <div class="card-actions">
         <button class="btn btn-sm btn-outline" onclick="showContributeModal(${g.id})" title="Add funds"><i class="fas fa-plus"></i></button>
         ${g.current_amount > 0 ? `<button class="btn btn-sm btn-outline" onclick="showWithdrawModal(${g.id})" title="Withdraw"><i class="fas fa-minus"></i></button>` : ''}

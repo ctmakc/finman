@@ -47,8 +47,8 @@ const SubscriptionsModule = {
           <div class="subscription-info">
             <span class="subscription-icon">${sub.icon || '📦'}</span>
             <div>
-              <h3>${sub.name}</h3>
-              <small>${sub.category || 'Uncategorized'}</small>
+              <h3>${esc(sub.name)}</h3>
+              <small>${esc(sub.category || 'Uncategorized')}</small>
             </div>
           </div>
           <div class="subscription-amount">
@@ -138,12 +138,14 @@ const SubscriptionsModule = {
 
   async markPaid(id) {
     try {
-      await fetch(`/api/subscriptions/${id}/pay`, {
+      await fetch(`/api/subscriptions/${id}/payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: JSON.stringify({ create_transaction: true })
       });
-      await this.loadSubscriptions();
+      showNotification('Payment recorded', 'success');
+      await SubscriptionsModule.loadSubscriptions();
+      await SubscriptionsModule.loadStats();
     } catch (error) {
       showNotification('Failed to mark as paid', 'error');
     }
@@ -163,18 +165,19 @@ const SubscriptionsModule = {
   },
 
   cancel(id) {
-    showConfirm('Cancel this subscription?', async () => {
+    showConfirm('Delete this subscription permanently?', async () => {
       try {
-        await fetch(`/api/subscriptions/${id}/cancel`, {
-          method: 'POST',
+        await fetch(`/api/subscriptions/${id}`, {
+          method: 'DELETE',
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
+        showNotification('Subscription deleted', 'success');
         await SubscriptionsModule.loadSubscriptions();
         await SubscriptionsModule.loadStats();
       } catch (error) {
-        showNotification('Failed to cancel subscription', 'error');
+        showNotification('Failed to delete subscription', 'error');
       }
-    }, { danger: false, confirmLabel: 'Cancel subscription', title: 'Cancel subscription' });
+    }, { danger: true, confirmLabel: 'Delete', title: 'Delete subscription' });
   },
 
   getPage() {

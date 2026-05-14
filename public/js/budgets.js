@@ -205,8 +205,8 @@ function renderBudgetCards(budgets) {
       <div class="budget-card budget-${statusClass}">
         <div class="budget-header">
           <div class="budget-info">
-            <h3 class="budget-name">${budget.name}</h3>
-            ${budget.category ? `<span class="budget-category">${budget.category}</span>` : ''}
+            <h3 class="budget-name">${esc(budget.name)}</h3>
+            ${budget.category ? `<span class="budget-category">${esc(budget.category)}</span>` : ''}
           </div>
           <div class="budget-actions">
             <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budget.id}">
@@ -391,12 +391,12 @@ async function showEditBudgetModal(id) {
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
             <label for="${modalId}-name" class="form-label">Name *</label>
-            <input type="text" id="${modalId}-name" class="form-control" value="${budget.name}" required>
+            <input type="text" id="${modalId}-name" class="form-control" value="${esc(budget.name)}" required>
           </div>
 
           <div class="form-group">
             <label for="${modalId}-category" class="form-label">Category</label>
-            <input type="text" id="${modalId}-category" class="form-control" value="${budget.category || ''}">
+            <input type="text" id="${modalId}-category" class="form-control" value="${esc(budget.category || '')}">
           </div>
 
           <div class="form-row">
@@ -506,7 +506,7 @@ async function renderBudgetWidget() {
   const budgetsHtml = stats.budgets.slice(0, 3).map(budget => `
     <div class="budget-mini budget-${budget.status}">
       <div class="budget-mini-info">
-        <span class="budget-mini-name">${budget.name}</span>
+        <span class="budget-mini-name">${esc(budget.name)}</span>
         <span class="budget-mini-progress">${budget.percentUsed}%</span>
       </div>
       <div class="progress-bar-mini">

@@ -122,15 +122,27 @@ router.post('/:id/payment', async (req, res) => {
     const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
-    const { amount, payment_date, transaction_id } = req.body;
+    const { amount, payment_date, transaction_id, create_transaction, account_id } = req.body;
+    const paidAmount = amount || sub.amount;
+    const paidDate = payment_date || new Date().toISOString().split('T')[0];
 
     await run(
       'INSERT INTO subscription_payments (subscription_id, amount, payment_date, transaction_id) VALUES (?, ?, ?, ?)',
-      [req.params.id, amount || sub.amount, payment_date || new Date().toISOString().split('T')[0], transaction_id]
+      [req.params.id, paidAmount, paidDate, transaction_id]
     );
 
-    // Обновить следующую дату оплаты
-    const nextBilling = calculateNextBillingDate(payment_date || new Date().toISOString().split('T')[0], sub.billing_cycle);
+    if (create_transaction) {
+      const acctId = account_id || sub.account_id;
+      if (acctId) {
+        await run(
+          'INSERT INTO transactions (user_id, account_id, type, amount, description, category, date) VALUES (?, ?, \'expense\', ?, ?, ?, ?)',
+          [req.user.id, acctId, paidAmount, sub.name, sub.category || 'subscriptions', paidDate]
+        );
+        await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [paidAmount, acctId, req.user.id]);
+      }
+    }
+
+    const nextBilling = calculateNextBillingDate(paidDate, sub.billing_cycle);
     await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
 
     res.json({ message: 'Payment recorded' });
