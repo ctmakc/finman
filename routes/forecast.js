@@ -150,7 +150,7 @@ router.get('/expenses', async (req, res) => {
     );
 
     const projections = categoryAvg.map(cat => ({
-      category: cat.category || 'Без категории',
+      category: cat.category || 'Uncategorized',
       currentMonthly: Math.round(cat.daily_avg * 30 * 100) / 100,
       projected: Math.round(cat.daily_avg * parseInt(days) * 100) / 100,
       dailyAvg: Math.round(cat.daily_avg * 100) / 100

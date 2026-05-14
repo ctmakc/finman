@@ -76,7 +76,7 @@ router.post('/', authenticate, async (req, res) => {
     
     res.status(201).json(newAccount);
   } catch (error) {
-    console.error('Error при создании счета:', error);
+    console.error('Error creating account:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to create account' 
@@ -116,7 +116,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json({ ...account, permissions });
   } catch (error) {
-    console.error('Error при получении счета:', error);
+    console.error('Error fetching account:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get account'
@@ -178,7 +178,7 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error при обновлении счета:', error);
+    console.error('Error updating account:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to update account'
@@ -218,7 +218,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (success) {
       res.json({
         success: true,
-        message: 'Счет успешно удален'
+        message: 'Account deleted successfully'
       });
     } else {
       res.status(404).json({
@@ -227,7 +227,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error при удалении счета:', error);
+    console.error('Error deleting account:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to delete account'
@@ -288,10 +288,10 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
 
     res.json(transactions);
   } catch (error) {
-    console.error('Error при получении транзакций по счету:', error);
+    console.error('Error fetching account transactions:', error);
     res.status(500).json({
       error: true,
-      message: 'Failed to get transactions по счету'
+      message: 'Failed to get account transactions'
     });
   }
 });

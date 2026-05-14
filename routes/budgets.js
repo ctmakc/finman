@@ -32,7 +32,7 @@ router.get('/stats', authenticate, async (req, res) => {
     const stats = await Budget.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Error при получении статистики бюджетов:', error);
+    console.error('Error fetching budget stats:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get stats'
@@ -49,7 +49,7 @@ router.get('/active', authenticate, async (req, res) => {
     const budgets = await Budget.getActiveBudgets(req.user.id);
     res.json(budgets);
   } catch (error) {
-    console.error('Error при получении активных бюджетов:', error);
+    console.error('Error fetching active budgets:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get active budgets'
@@ -71,7 +71,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json(budget);
   } catch (error) {
-    console.error('Error при получении бюджета:', error);
+    console.error('Error fetching budget:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get budget'
@@ -86,15 +86,15 @@ router.post('/', authenticate, async (req, res) => {
 
     // Валидация
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: true, message: 'Название бюджета required' });
+      return res.status(400).json({ error: true, message: 'Budget name is required' });
     }
     if (!amount || amount <= 0) {
-      return res.status(400).json({ error: true, message: 'Сумма бюджета должна быть положительной' });
+      return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
     }
 
     const validPeriods = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
     if (period && !validPeriods.includes(period)) {
-      return res.status(400).json({ error: true, message: 'Некорректный период' });
+      return res.status(400).json({ error: true, message: 'Invalid period' });
     }
 
     // Устанавливаем дату начала если не указана
@@ -117,7 +117,7 @@ router.post('/', authenticate, async (req, res) => {
       budget
     });
   } catch (error) {
-    console.error('Error при создании бюджета:', error);
+    console.error('Error creating budget:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to create budget'
@@ -139,7 +139,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     // Валидация суммы
     if (amount !== undefined && amount <= 0) {
-      return res.status(400).json({ error: true, message: 'Сумма бюджета должна быть положительной' });
+      return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
     }
 
     const updated = await Budget.update(id, req.user.id, {
@@ -158,10 +158,10 @@ router.put('/:id', authenticate, async (req, res) => {
       const budget = await Budget.findById(id, req.user.id);
       res.json({ success: true, budget });
     } else {
-      res.status(400).json({ error: true, message: 'Failed to обновить бюджет' });
+      res.status(400).json({ error: true, message: 'Failed to update budget' });
     }
   } catch (error) {
-    console.error('Error при обновлении бюджета:', error);
+    console.error('Error updating budget:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to update budget'
@@ -188,10 +188,10 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
       budget: updatedBudget
     });
   } catch (error) {
-    console.error('Error при пересчете бюджета:', error);
+    console.error('Error recalculating budget:', error);
     res.status(500).json({
       error: true,
-      message: 'An error occurred при пересчете бюджета'
+      message: 'An error occurred recalculating budget'
     });
   }
 });
@@ -208,10 +208,10 @@ router.post('/recalculate-all', authenticate, async (req, res) => {
       budgets
     });
   } catch (error) {
-    console.error('Error при пересчете бюджетов:', error);
+    console.error('Error recalculating budgets:', error);
     res.status(500).json({
       error: true,
-      message: 'An error occurred при пересчете бюджетов'
+      message: 'An error occurred recalculating budgets'
     });
   }
 });
@@ -234,10 +234,10 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (deleted) {
       res.json({ success: true, message: 'Budget deleted' });
     } else {
-      res.status(400).json({ error: true, message: 'Failed to удалить бюджет' });
+      res.status(400).json({ error: true, message: 'Failed to delete budget' });
     }
   } catch (error) {
-    console.error('Error при удалении бюджета:', error);
+    console.error('Error deleting budget:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to delete budget'

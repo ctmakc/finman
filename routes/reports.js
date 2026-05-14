@@ -22,13 +22,13 @@ router.get('/', async (req, res) => {
 // Типы отчётов
 router.get('/types', (req, res) => {
   res.json([
-    { id: 'monthly', name: 'Месячный отчёт', description: 'Income и расходы за месяц' },
-    { id: 'yearly', name: 'Годовой отчёт', description: 'Сводка за год' },
-    { id: 'category', name: 'По категориям', description: 'Expenses по категориям' },
-    { id: 'networth', name: 'Net Worth', description: 'Динамика чистой стоимости' },
-    { id: 'budget', name: 'Budgets', description: 'Выполнение бюджетов' },
-    { id: 'investments', name: 'Investments', description: 'Portfolio и доходность' },
-    { id: 'tax', name: 'Налоговый', description: 'Данные для налоговой отчётности' }
+    { id: 'monthly', name: 'Monthly Report', description: 'Income and expenses for the month' },
+    { id: 'yearly', name: 'Annual Report', description: 'Annual summary' },
+    { id: 'category', name: 'By Category', description: 'Expenses by category' },
+    { id: 'networth', name: 'Net Worth', description: 'Net worth dynamics' },
+    { id: 'budget', name: 'Budgets', description: 'Budget performance' },
+    { id: 'investments', name: 'Investments', description: 'Portfolio and returns' },
+    { id: 'tax', name: 'Tax', description: 'Data for tax reporting' }
   ]);
 });
 
@@ -55,7 +55,7 @@ router.post('/generate', async (req, res) => {
         break;
       case 'networth':
         reportData = await generateNetWorthReport(req.user.id);
-        title = 'Отчёт Net Worth';
+        title = 'Net Worth Report';
         break;
       case 'budget':
         reportData = await generateBudgetReport(req.user.id, period_start, period_end);
@@ -63,7 +63,7 @@ router.post('/generate', async (req, res) => {
         break;
       case 'investments':
         reportData = await generateInvestmentReport(req.user.id);
-        title = 'Отчёт по инвестициям';
+        title = 'Investment Report';
         break;
       case 'tax':
         reportData = await generateTaxReport(req.user.id, period_start, period_end);

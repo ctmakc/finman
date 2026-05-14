@@ -153,7 +153,7 @@ router.put('/investments/:id/price', async (req, res) => {
   try {
     const { price } = req.body;
     if (!price) {
-      return res.status(400).json({ message: 'Цена обязательна' });
+      return res.status(400).json({ message: 'Price is required' });
     }
 
     const updated = await Investment.updatePrice(req.params.id, price);
@@ -170,7 +170,7 @@ router.post('/investments/:id/sell', async (req, res) => {
     const { quantity, price, fee, date } = req.body;
     
     if (!quantity || !price) {
-      return res.status(400).json({ message: 'Количество и цена required' });
+      return res.status(400).json({ message: 'Quantity and price are required' });
     }
 
     const result = await Investment.sell(req.params.id, quantity, price, fee, date);

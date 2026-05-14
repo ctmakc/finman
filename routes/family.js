@@ -73,7 +73,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const family = await Family.findById(req.params.id);
     if (!family || family.owner_id !== req.user.id) {
-      return res.status(403).json({ error: true, message: 'Only the owner can редактировать семью' });
+      return res.status(403).json({ error: true, message: 'Only the owner can edit the family' });
     }
 
     await Family.update(req.params.id, req.user.id, { name, description });
@@ -156,7 +156,7 @@ router.put('/:id/members/:userId/role', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Роль изменена' });
+    res.json({ success: true, message: 'Role updated' });
   } catch (error) {
     console.error('Failed to change role:', error);
     res.status(500).json({ error: true, message: 'Failed to change role' });
@@ -178,7 +178,7 @@ router.post('/:id/transfer', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Владение передано' });
+    res.json({ success: true, message: 'Ownership transferred' });
   } catch (error) {
     console.error('Failed to transfer ownership:', error);
     res.status(500).json({ error: true, message: 'Failed to transfer ownership' });
@@ -194,7 +194,7 @@ router.post('/:id/leave', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Вы покинули семью' });
+    res.json({ success: true, message: 'You have left the family' });
   } catch (error) {
     console.error('Failed to leave family:', error);
     res.status(500).json({ error: true, message: 'Failed to leave family' });
@@ -225,7 +225,7 @@ router.post('/join', authenticate, async (req, res) => {
     const { inviteCode } = req.body;
 
     if (!inviteCode || !inviteCode.trim()) {
-      return res.status(400).json({ error: true, message: 'Код приглашения обязателен' });
+      return res.status(400).json({ error: true, message: 'Invitation code is required' });
     }
 
     const result = await Family.joinByCode(inviteCode.trim(), req.user.id);
@@ -237,7 +237,7 @@ router.post('/join', authenticate, async (req, res) => {
     const family = await Family.findById(result.familyId);
     res.json({ success: true, family });
   } catch (error) {
-    console.error('Error при присоединении:', error);
+    console.error('Error joining family:', error);
     res.status(500).json({ error: true, message: 'Failed to join family' });
   }
 });
@@ -248,7 +248,7 @@ router.post('/:id/invite', authenticate, async (req, res) => {
     const { email, role } = req.body;
 
     if (!email || !email.trim()) {
-      return res.status(400).json({ error: true, message: 'Email обязателен' });
+      return res.status(400).json({ error: true, message: 'Email is required' });
     }
 
     const invite = await Family.createInvite(
@@ -275,7 +275,7 @@ router.post('/accept-invite', authenticate, async (req, res) => {
     const { token } = req.body;
 
     if (!token) {
-      return res.status(400).json({ error: true, message: 'Токен приглашения обязателен' });
+      return res.status(400).json({ error: true, message: 'Invitation token is required' });
     }
 
     const result = await Family.acceptInvite(token, req.user.id);
@@ -304,7 +304,7 @@ router.get('/accounts/:accountId/permissions', authenticate, async (req, res) =>
 
     res.json(users);
   } catch (error) {
-    console.error('Error при получении прав:', error);
+    console.error('Error fetching permissions:', error);
     res.status(500).json({ error: true, message: 'Failed to get permissions' });
   }
 });
@@ -315,7 +315,7 @@ router.post('/accounts/:accountId/permissions', authenticate, async (req, res) =
     const { userId, canView, canEdit, canDelete, canAddTransactions } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ error: true, message: 'userId обязателен' });
+      return res.status(400).json({ error: true, message: 'userId is required' });
     }
 
     const result = await AccountPermission.grant(
@@ -329,7 +329,7 @@ router.post('/accounts/:accountId/permissions', authenticate, async (req, res) =
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Права выданы' });
+    res.json({ success: true, message: 'Permissions granted' });
   } catch (error) {
     console.error('Failed to grant permissions:', error);
     res.status(500).json({ error: true, message: 'Failed to grant permissions' });
@@ -349,7 +349,7 @@ router.delete('/accounts/:accountId/permissions/:userId', authenticate, async (r
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Права отозваны' });
+    res.json({ success: true, message: 'Permissions revoked' });
   } catch (error) {
     console.error('Failed to revoke permissions:', error);
     res.status(500).json({ error: true, message: 'Failed to revoke permissions' });
@@ -373,7 +373,7 @@ router.post('/bulk-permissions', authenticate, async (req, res) => {
     const { targetUserId, permissions } = req.body;
 
     if (!targetUserId) {
-      return res.status(400).json({ error: true, message: 'targetUserId обязателен' });
+      return res.status(400).json({ error: true, message: 'targetUserId is required' });
     }
 
     const result = await AccountPermission.grantToFamilyMember(
@@ -385,7 +385,7 @@ router.post('/bulk-permissions', authenticate, async (req, res) => {
 
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error('Error при массовой выдаче прав:', error);
+    console.error('Error bulk-granting permissions:', error);
     res.status(500).json({ error: true, message: 'Failed to grant permissions' });
   }
 });
@@ -398,7 +398,7 @@ router.post('/budgets/:budgetId/permissions', authenticate, async (req, res) => 
     const { userId, canView, canEdit } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ error: true, message: 'userId обязателен' });
+      return res.status(400).json({ error: true, message: 'userId is required' });
     }
 
     const result = await BudgetPermission.grant(
@@ -412,7 +412,7 @@ router.post('/budgets/:budgetId/permissions', authenticate, async (req, res) => 
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Права выданы' });
+    res.json({ success: true, message: 'Permissions granted' });
   } catch (error) {
     console.error('Failed to grant permissions:', error);
     res.status(500).json({ error: true, message: 'Failed to grant permissions' });
@@ -432,7 +432,7 @@ router.delete('/budgets/:budgetId/permissions/:userId', authenticate, async (req
       return res.status(400).json({ error: true, message: result.message });
     }
 
-    res.json({ success: true, message: 'Права отозваны' });
+    res.json({ success: true, message: 'Permissions revoked' });
   } catch (error) {
     console.error('Failed to revoke permissions:', error);
     res.status(500).json({ error: true, message: 'Failed to revoke permissions' });

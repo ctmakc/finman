@@ -38,7 +38,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Только CSV файлы разрешены'), false);
+    cb(new Error('Only CSV files are allowed'), false);
   }
 };
 
@@ -92,7 +92,7 @@ router.get('/', authenticate, async (req, res) => {
     
     res.json(transactions);
   } catch (error) {
-    console.error('Error при получении транзакций:', error);
+    console.error('Error fetching transactions:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to get transactions' 
@@ -198,7 +198,7 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json(newTransaction);
   } catch (error) {
-    console.error('Error при создании транзакции:', error);
+    console.error('Error creating transaction:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to create transaction'
@@ -220,10 +220,10 @@ router.get('/:id', authenticate, async (req, res) => {
     
     res.json(transaction);
   } catch (error) {
-    console.error('Error при получении транзакции:', error);
+    console.error('Error fetching transaction:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'An error occurred при получении транзакции' 
+      message: 'An error occurred fetching transaction' 
     });
   }
 });
@@ -254,11 +254,11 @@ router.put('/:id', authenticate, async (req, res) => {
     } else {
       res.status(404).json({ 
         error: true, 
-        message: 'Transaction not found или не обновлена' 
+        message: 'Transaction not found or not updated' 
       });
     }
   } catch (error) {
-    console.error('Error при обновлении транзакции:', error);
+    console.error('Error updating transaction:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to update transaction' 
@@ -274,16 +274,16 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (success) {
       res.json({ 
         success: true, 
-        message: 'Транзакция успешно удалена' 
+        message: 'Transaction deleted successfully' 
       });
     } else {
       res.status(404).json({ 
         error: true, 
-        message: 'Transaction not found или не удалена' 
+        message: 'Transaction not found or not deleted' 
       });
     }
   } catch (error) {
-    console.error('Error при удалении транзакции:', error);
+    console.error('Error deleting transaction:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to delete transaction' 
@@ -336,7 +336,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
       transactions: savedTransactions
     });
   } catch (error) {
-    console.error('Error при импорте транзакций:', error);
+    console.error('Error importing transactions:', error);
     
     // Удаление временного файла в случае ошибки
     if (req.file) {
@@ -371,7 +371,7 @@ router.get('/stats/summary', authenticate, async (req, res) => {
     
     res.json(stats);
   } catch (error) {
-    console.error('Error при получении статистики:', error);
+    console.error('Error fetching stats:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to get stats' 

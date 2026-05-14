@@ -15,7 +15,7 @@ router.get('/', authenticate, async (req, res) => {
     const payments = await RecurringPayment.findByUserId(req.user.id, includeInactive);
     res.json(payments);
   } catch (error) {
-    console.error('Error при получении платежей:', error);
+    console.error('Error fetching payments:', error);
     res.status(500).json({ error: true, message: 'Failed to get payments' });
   }
 });
@@ -26,7 +26,7 @@ router.get('/stats', authenticate, async (req, res) => {
     const stats = await RecurringPayment.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Error при получении статистики:', error);
+    console.error('Error fetching stats:', error);
     res.status(500).json({ error: true, message: 'Failed to get stats' });
   }
 });
@@ -38,7 +38,7 @@ router.get('/upcoming', authenticate, async (req, res) => {
     const payments = await RecurringPayment.getUpcoming(req.user.id, days);
     res.json(payments);
   } catch (error) {
-    console.error('Error при получении ближайших платежей:', error);
+    console.error('Error fetching upcoming payments:', error);
     res.status(500).json({ error: true, message: 'Failed to get payments' });
   }
 });
@@ -49,7 +49,7 @@ router.get('/overdue', authenticate, async (req, res) => {
     const payments = await RecurringPayment.getOverdue(req.user.id);
     res.json(payments);
   } catch (error) {
-    console.error('Error при получении просроченных платежей:', error);
+    console.error('Error fetching overdue payments:', error);
     res.status(500).json({ error: true, message: 'Failed to get payments' });
   }
 });
@@ -111,7 +111,7 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json({ success: true, payment });
   } catch (error) {
-    console.error('Error при создании платежа:', error);
+    console.error('Error creating payment:', error);
     res.status(500).json({ error: true, message: 'Failed to create payment' });
   }
 });
@@ -127,7 +127,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json(payment);
   } catch (error) {
-    console.error('Error при получении платежа:', error);
+    console.error('Error fetching payment:', error);
     res.status(500).json({ error: true, message: 'Failed to get payment' });
   }
 });
@@ -148,7 +148,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const payment = await RecurringPayment.findById(req.params.id);
     res.json({ success: true, payment });
   } catch (error) {
-    console.error('Error при обновлении платежа:', error);
+    console.error('Error updating payment:', error);
     res.status(500).json({ error: true, message: 'Failed to update payment' });
   }
 });
@@ -164,7 +164,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Payment deleted' });
   } catch (error) {
-    console.error('Error при удалении платежа:', error);
+    console.error('Error deleting payment:', error);
     res.status(500).json({ error: true, message: 'Failed to delete payment' });
   }
 });
@@ -185,7 +185,7 @@ router.post('/:id/pay', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error при оплате:', error);
+    console.error('Error processing payment:', error);
     res.status(500).json({ error: true, message: 'Failed to process payment' });
   }
 });
@@ -201,7 +201,7 @@ router.post('/:id/skip', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error при пропуске:', error);
+    console.error('Error skipping payment:', error);
     res.status(500).json({ error: true, message: 'Failed to skip payment' });
   }
 });
@@ -222,7 +222,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     const updated = await RecurringPayment.findById(req.params.id);
     res.json({ success: true, payment: updated });
   } catch (error) {
-    console.error('Error при переключении:', error);
+    console.error('Error toggling payment:', error);
     res.status(500).json({ error: true, message: 'Error' });
   }
 });

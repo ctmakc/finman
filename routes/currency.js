@@ -152,7 +152,7 @@ router.post('/tags', authenticate, async (req, res) => {
     const { name, color } = req.body;
 
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: true, message: 'Укажите название тега' });
+      return res.status(400).json({ error: true, message: 'Tag name is required' });
     }
 
     const result = await Tag.create(req.user.id, name, color);
@@ -191,7 +191,7 @@ router.delete('/tags/:id', authenticate, async (req, res) => {
     const success = await Tag.delete(req.params.id, req.user.id);
 
     if (!success) {
-      return res.status(404).json({ error: true, message: 'Тег not found' });
+      return res.status(404).json({ error: true, message: 'Tag not found' });
     }
 
     res.json({ success: true });
@@ -229,7 +229,7 @@ router.put('/transaction/:transactionId/tags', authenticate, async (req, res) =>
     const { tagIds } = req.body;
 
     if (!Array.isArray(tagIds)) {
-      return res.status(400).json({ error: true, message: 'tagIds должен быть массивом' });
+      return res.status(400).json({ error: true, message: 'tagIds must be an array' });
     }
 
     await Tag.setTransactionTags(req.params.transactionId, tagIds);
@@ -249,7 +249,7 @@ router.get('/tags/search/:query', authenticate, async (req, res) => {
     res.json(tags);
   } catch (error) {
     console.error(`Error:`, error);
-    res.status(500).json({ error: true, message: 'Error поиска' });
+    res.status(500).json({ error: true, message: 'Search error' });
   }
 });
 

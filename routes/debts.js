@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     const debtsWithInfo = debts.map(d => Debt.calculateDebtInfo ? Debt.calculateDebtInfo(d) : d);
     res.json(debtsWithInfo);
   } catch (error) {
-    console.error('Error получения долгов:', error);
+    console.error('Error fetching debts:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -80,7 +80,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(debt);
   } catch (error) {
-    console.error('Error создания:', error);
+    console.error('Error creating:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -96,7 +96,7 @@ router.put('/:id', async (req, res) => {
     const updated = await Debt.update(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Error обновления:', error);
+    console.error('Error updating:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -117,7 +117,7 @@ router.post('/:id/payment', async (req, res) => {
     const updated = await Debt.addPayment(req.params.id, amount, payment_type, note, null, payment_date);
     res.json(updated);
   } catch (error) {
-    console.error('Error платежа:', error);
+    console.error('Payment error:', error);
     res.status(500).json({ message: error.message || 'Server error' });
   }
 });
@@ -149,7 +149,7 @@ router.delete('/:id', async (req, res) => {
     await Debt.delete(req.params.id);
     res.json({ message: 'Debt deleted' });
   } catch (error) {
-    console.error('Error удаления:', error);
+    console.error('Deletion error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

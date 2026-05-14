@@ -52,7 +52,7 @@ router.get('/supported-banks', authenticate, (req, res) => {
 
     res.json(supportedBanks);
   } catch (error) {
-    console.error('Error при получении списка банков:', error);
+    console.error('Error fetching bank list:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get bank list'
@@ -107,7 +107,7 @@ router.get('/banks-by-region', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error при получении банков по регионам:', error);
+    console.error('Error fetching banks by region:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get bank list'
@@ -147,7 +147,7 @@ router.get('/connections', authenticate, async (req, res) => {
     
     res.json(connectionsWithBankInfo);
   } catch (error) {
-    console.error('Error при получении подключений к банкам:', error);
+    console.error('Error fetching bank connections:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to get bank connections' 
@@ -173,7 +173,7 @@ router.post('/connect/:bankId', authenticate, async (req, res) => {
     
     res.json(authUrlData);
   } catch (error) {
-    console.error('Error при инициализации подключения к банку:', error);
+    console.error('Error initializing bank connection:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to initialize bank connection' 
@@ -204,7 +204,7 @@ router.post('/connect/:bankId/callback', authenticate, async (req, res) => {
       bankName: bankApiConfig[bankId].name
     });
   } catch (error) {
-    console.error('Error при завершении подключения к банку:', error);
+    console.error('Error completing bank connection:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to complete bank connection'
@@ -255,7 +255,7 @@ router.post('/connect/:bankId/direct', authenticate, async (req, res) => {
       bankName: bankApiConfig[bankId].name
     });
   } catch (error) {
-    console.error('Error при прямом подключении к банку:', error);
+    console.error('Error with direct bank connection:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to connect to bank directly' 
@@ -289,7 +289,7 @@ router.post('/disconnect/:connectionId', authenticate, async (req, res) => {
       message: 'Connection deleted'
     });
   } catch (error) {
-    console.error('Error при отключении от банка:', error);
+    console.error('Error disconnecting bank:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to disconnect from bank' 
@@ -374,10 +374,10 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
       accounts: createdAccounts
     });
   } catch (error) {
-    console.error('Error при синхронизации счетов:', error);
+    console.error('Error syncing accounts:', error);
     res.status(500).json({
       error: true,
-      message: 'An error occurred при синхронизации счетов'
+      message: 'An error occurred syncing accounts'
     });
   }
 });
@@ -441,10 +441,10 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
       transactions: savedTransactions
     });
   } catch (error) {
-    console.error('Error при синхронизации транзакций:', error);
+    console.error('Error syncing transactions:', error);
     res.status(500).json({
       error: true,
-      message: 'An error occurred при синхронизации транзакций'
+      message: 'An error occurred syncing transactions'
     });
   }
 });
@@ -457,7 +457,7 @@ router.get('/custom-banks', authenticate, async (req, res) => {
     const customBanks = await CustomBank.findByUserId(req.user.id);
     res.json(customBanks);
   } catch (error) {
-    console.error('Error при получении кастомных банков:', error);
+    console.error('Error fetching custom banks:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to get custom banks'
@@ -475,10 +475,10 @@ router.post('/custom-banks', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: 'Bank name required' });
     }
     if (!country || !country.trim()) {
-      return res.status(400).json({ error: true, message: 'Страна обязательна' });
+      return res.status(400).json({ error: true, message: 'Country is required' });
     }
     if (!apiUrl || !apiUrl.trim()) {
-      return res.status(400).json({ error: true, message: 'URL API обязателен' });
+      return res.status(400).json({ error: true, message: 'API URL is required' });
     }
 
     // Валидация URL
@@ -510,13 +510,13 @@ router.post('/custom-banks', authenticate, async (req, res) => {
       bank: customBank
     });
   } catch (error) {
-    console.error('Error при создании кастомного банка:', error);
-    if (error.message.includes('уже существует')) {
+    console.error('Error creating custom bank:', error);
+    if (error.message.includes('already exists')) {
       return res.status(400).json({ error: true, message: error.message });
     }
     res.status(500).json({
       error: true,
-      message: 'An error occurred при создании кастомного банка'
+      message: 'An error occurred creating custom bank'
     });
   }
 });
@@ -559,7 +559,7 @@ router.put('/custom-banks/:id', authenticate, async (req, res) => {
       res.status(400).json({ error: true, message: 'Failed to update bank' });
     }
   } catch (error) {
-    console.error('Error при обновлении кастомного банка:', error);
+    console.error('Error updating custom bank:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to update custom bank'
@@ -586,10 +586,10 @@ router.delete('/custom-banks/:id', authenticate, async (req, res) => {
       res.status(400).json({ error: true, message: 'Failed to delete bank' });
     }
   } catch (error) {
-    console.error('Error при удалении кастомного банка:', error);
+    console.error('Error deleting custom bank:', error);
     res.status(500).json({
       error: true,
-      message: 'An error occurred при удалении кастомного банка'
+      message: 'An error occurred deleting custom bank'
     });
   }
 });
@@ -624,7 +624,7 @@ router.post('/connect-custom/:bankKey/direct', authenticate, async (req, res) =>
       bankName: customBank.name
     });
   } catch (error) {
-    console.error('Error при подключении к кастомному банку:', error);
+    console.error('Error connecting to custom bank:', error);
     res.status(500).json({
       error: true,
       message: 'Failed to connect to custom bank'

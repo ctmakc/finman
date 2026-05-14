@@ -167,14 +167,14 @@ router.delete('/events/:id', async (req, res) => {
 // Типы событий
 router.get('/event-types', (req, res) => {
   res.json({
-    'payment': 'Платёж',
-    'income': 'Доход',
-    'reminder': 'Напоминание',
-    'goal': 'Цель',
-    'debt': 'Долг',
-    'subscription': 'Подписка',
-    'recurring': 'Регулярный платёж',
-    'other': 'Другое'
+    'payment': 'Payment',
+    'income': 'Income',
+    'reminder': 'Reminder',
+    'goal': 'Goal',
+    'debt': 'Debt',
+    'subscription': 'Subscription',
+    'recurring': 'Recurring payment',
+    'other': 'Other'
   });
 });
 

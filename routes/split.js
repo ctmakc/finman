@@ -169,7 +169,7 @@ router.post('/groups/:id/expenses', async (req, res) => {
 router.delete('/expenses/:id', async (req, res) => {
   try {
     await Split.deleteExpense(req.params.id);
-    res.json({ message: 'Расход удалён' });
+    res.json({ message: 'Expense deleted' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });

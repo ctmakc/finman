@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
     const goalsWithProgress = goals.map(g => SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(g) : g);
     res.json(goalsWithProgress);
   } catch (error) {
-    console.error('Error получения целей:', error);
+    console.error('Error fetching goals:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -46,7 +46,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(goal) : goal);
   } catch (error) {
-    console.error('Error получения цели:', error);
+    console.error('Error fetching goal:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(goal);
   } catch (error) {
-    console.error('Error создания цели:', error);
+    console.error('Error creating goal:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -83,7 +83,7 @@ router.put('/:id', async (req, res) => {
     const updated = await SavingsGoal.update(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Error обновления цели:', error);
+    console.error('Error updating goal:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -104,7 +104,7 @@ router.post('/:id/contribute', async (req, res) => {
     const updated = await SavingsGoal.addContribution(req.params.id, amount, note);
     res.json(updated);
   } catch (error) {
-    console.error('Error пополнения:', error);
+    console.error('Error adding funds:', error);
     res.status(500).json({ message: error.message || 'Server error' });
   }
 });
@@ -141,7 +141,7 @@ router.get('/:id/contributions', async (req, res) => {
     const contributions = await SavingsGoal.getContributions(req.params.id);
     res.json(contributions);
   } catch (error) {
-    console.error('Error получения истории:', error);
+    console.error('Error fetching history:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -157,7 +157,7 @@ router.delete('/:id', async (req, res) => {
     await SavingsGoal.delete(req.params.id);
     res.json({ message: 'Goal deleted' });
   } catch (error) {
-    console.error('Error удаления цели:', error);
+    console.error('Error deleting goal:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
