@@ -59,7 +59,7 @@ const ForecastModule = {
         <div class="detail-item warning">
           <span class="label">Lowest balance</span>
           <span class="value">${formatCurrency(s.lowestPoint)}</span>
-          <small>${s.lowestDate}</small>
+          <small>${esc(s.lowestDate)}</small>
         </div>
         <div class="detail-item">
           <span class="label">Avg. expense/day</span>

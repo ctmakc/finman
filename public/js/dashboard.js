@@ -122,7 +122,7 @@ const SmartDashboard = {
       case 'upcoming':
         if (!data.items || data.items.length === 0) return '<p class="text-secondary">No upcoming payments</p>';
         return `<div class="mini-list">${data.items.slice(0, 5).map(i => `
-          <div class="mini-item"><span>${esc(i.title)}</span><span>${i.amount.toLocaleString()} $</span><small>${i.date}</small></div>
+          <div class="mini-item"><span>${esc(i.title)}</span><span>${i.amount.toLocaleString()} $</span><small>${esc(i.date)}</small></div>
         `).join('')}</div>`;
 
       case 'subscriptions':
