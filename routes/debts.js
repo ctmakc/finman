@@ -34,7 +34,7 @@ router.get('/stats', async (req, res) => {
     res.json({ iOwe, theyOweMe: theyOwe, balance: theyOwe - iOwe, count: debts.length });
   } catch (error) {
     console.error('Debts stats error:', error);
-    res.status(500).json({ error: true, message: 'Failed to load stats' });
+    res.status(500).json({ error: true, iOwe: 0, theyOweMe: 0, balance: 0, count: 0 });
   }
 });
 
