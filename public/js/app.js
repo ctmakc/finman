@@ -1120,6 +1120,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
           ${compareHtml}
 
+          <div class="card db-widget" id="ai-insights-slot" style="padding:14px 16px"></div>
+
           <div class="card db-widget">
             <div class="section-header">
               <h2><i class="fas fa-chart-bar" style="color:var(--accent)"></i> Spending trend</h2>
@@ -1141,6 +1143,10 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchWithAuth('/api/analytics/expenses-by-category')
       .then(r => r.json()).catch(() => [])
       .then(catData => initCharts(stats, catData));
+
+    // Render AI monthly/weekly insights widget
+    const insightSlot = document.getElementById('ai-insights-slot');
+    if (insightSlot && window.AIInsights) AIInsights.renderInsightWidget(insightSlot);
 
     // Load AI weekly insight asynchronously
     (async () => {
