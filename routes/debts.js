@@ -42,7 +42,7 @@ router.get('/stats', async (req, res) => {
 router.get('/upcoming', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
-    const debts = await Debt.getUpcomingPayments(req.user.id, days);
+    const debts = await Debt.getUpcoming(req.user.id, days);
     res.json(debts);
   } catch (error) {
     console.error(`Error:`, error);
