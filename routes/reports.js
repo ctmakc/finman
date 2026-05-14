@@ -126,11 +126,11 @@ async function generateMonthlyReport(userId, start, end) {
   );
 
   const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const byCategory = {};
   transactions.filter(t => t.type === 'expense').forEach(t => {
-    byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+    byCategory[t.category] = (byCategory[t.category] || 0) + Math.abs(t.amount);
   });
 
   const accounts = await query('SELECT name, balance FROM accounts WHERE user_id = ?', [userId]);
@@ -141,7 +141,7 @@ async function generateMonthlyReport(userId, start, end) {
     transactionCount: transactions.length,
     expensesByCategory: byCategory,
     accountBalances: accounts,
-    topExpenses: transactions.filter(t => t.type === 'expense').sort((a, b) => b.amount - a.amount).slice(0, 10)
+    topExpenses: transactions.filter(t => t.type === 'expense').sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 10)
   };
 }
 

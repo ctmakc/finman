@@ -994,6 +994,13 @@ function initDatabase() {
         `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read, created_at DESC)`,
         `CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_payments(user_id, is_active)`,
         `CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active)`,
+        `CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, is_active, next_billing_date)`,
+        `CREATE INDEX IF NOT EXISTS idx_goals_user ON savings_goals(user_id, is_active)`,
+        `CREATE INDEX IF NOT EXISTS idx_debts_user ON debts(user_id, is_active)`,
+        `CREATE INDEX IF NOT EXISTS idx_transactions_user_type_date ON transactions(user_id, type, date)`,
+        `CREATE INDEX IF NOT EXISTS idx_ai_insights_lookup ON ai_insights(org_id, user_id, period, type)`,
+        `CREATE INDEX IF NOT EXISTS idx_sub_payments_sub ON subscription_payments(subscription_id, payment_date DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_calendar_events_user ON calendar_events(user_id, event_date)`,
       ];
       for (const sql of indexes) {
         db.run(sql, (err) => { if (err) console.error('Index error:', err.message); });
