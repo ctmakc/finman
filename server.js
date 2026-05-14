@@ -99,10 +99,20 @@ app.use(session({ // nosemgrep
   }
 }));
 
+// Rate limiting - AI endpoints (expensive)
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: { error: true, message: 'Too many AI requests, please wait a moment' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Применение rate limiting
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/ai/', aiLimiter);
 
 // Инициализация Passport.js
 app.use(passport.initialize());

@@ -949,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="transaction-category">${esc(t.category) || 'Uncategorized'}</div>
           </div>
           <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">
-            ${t.type === 'expense' ? '-' : '+'}${formatCurrency(t.amount)}
+            ${t.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(t.amount))}
           </div>
         </div>`).join('')
       : '<p class="empty-hint">No transactions yet. <a href="#" class="add-transaction-link">Add one →</a></p>';

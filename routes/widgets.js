@@ -206,7 +206,7 @@ async function getBudgetData(userId) {
 
 async function getExpensesData(userId, period) {
   const start = period === 'month' ? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0] : new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-  const result = await get(`SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?`, [userId, start]);
+  const result = await get(`SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?`, [userId, start]);
   return { total: result.total || 0, period };
 }
 
@@ -266,7 +266,7 @@ async function getChartExpensesData(userId) {
     const start = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
     const end = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
 
-    const result = await get(`SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`, [userId, start, end]);
+    const result = await get(`SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`, [userId, start, end]);
     data.push({ month: start.substring(0, 7), amount: result.total || 0 });
   }
   return { data };
