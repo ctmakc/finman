@@ -81,7 +81,7 @@ async function connectToCustomBank(bankKey, apiKey) {
     showNotification('Bank successfully connected', 'success');
     return true;
   } catch (error) {
-    console.error('Error connection к custom bank:', error);
+    console.error('Error connecting to custom bank:', error);
     showNotification('An error occurred during connection', 'error');
     return false;
   }

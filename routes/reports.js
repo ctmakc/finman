@@ -43,15 +43,15 @@ router.post('/generate', async (req, res) => {
     switch (report_type) {
       case 'monthly':
         reportData = await generateMonthlyReport(req.user.id, period_start, period_end);
-        title = `Месячный отчёт ${period_start} - ${period_end}`;
+        title = `Monthly Report ${period_start} - ${period_end}`;
         break;
       case 'yearly':
         reportData = await generateYearlyReport(req.user.id, period_start);
-        title = `Годовой отчёт ${period_start}`;
+        title = `Annual Report ${period_start}`;
         break;
       case 'category':
         reportData = await generateCategoryReport(req.user.id, period_start, period_end);
-        title = `Отчёт по категориям ${period_start} - ${period_end}`;
+        title = `Category Report ${period_start} - ${period_end}`;
         break;
       case 'networth':
         reportData = await generateNetWorthReport(req.user.id);
@@ -59,7 +59,7 @@ router.post('/generate', async (req, res) => {
         break;
       case 'budget':
         reportData = await generateBudgetReport(req.user.id, period_start, period_end);
-        title = `Отчёт по бюджетам ${period_start} - ${period_end}`;
+        title = `Budget Report ${period_start} - ${period_end}`;
         break;
       case 'investments':
         reportData = await generateInvestmentReport(req.user.id);
@@ -67,7 +67,7 @@ router.post('/generate', async (req, res) => {
         break;
       case 'tax':
         reportData = await generateTaxReport(req.user.id, period_start, period_end);
-        title = `Налоговый отчёт ${period_start} - ${period_end}`;
+        title = `Tax Report ${period_start} - ${period_end}`;
         break;
       default:
         return res.status(400).json({ message: 'Unknown report type' });
