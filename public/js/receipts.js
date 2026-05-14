@@ -45,10 +45,10 @@ const ReceiptsModule = {
         <div class="receipt-header">
           <div class="receipt-info">
             <h3>${esc(r.merchant || 'Unknown merchant')}</h3>
-            <small>${r.receipt_date || 'Date not set'} | ${esc(r.category || 'Uncategorized')}</small>
+            <small>${esc(r.receipt_date || 'Date not set')} | ${esc(r.category || 'Uncategorized')}</small>
           </div>
           <div class="receipt-amount">
-            <strong>${r.total_amount ? r.total_amount.toLocaleString() + ' ' + (r.currency || '$') : 'Not recognized'}</strong>
+            <strong>${r.total_amount ? r.total_amount.toLocaleString() + ' ' + esc(r.currency || '$') : 'Not recognized'}</strong>
           </div>
         </div>
         <div class="receipt-status">
