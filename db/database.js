@@ -971,7 +971,7 @@ function initDatabase() {
         content TEXT NOT NULL,
         model TEXT,
         generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(org_id, period, type)
+        UNIQUE(org_id, user_id, period, type)
       )`, (err) => { if (err) console.error('Error creating ai_insights table:', err); });
 
       db.run(`CREATE TABLE IF NOT EXISTS ai_chat_sessions (

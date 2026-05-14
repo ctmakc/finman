@@ -335,11 +335,13 @@ Data: ${dataContext}`,
 
     const insight = { text: aiService.extractText(response), month, totalIncome, totalSpent };
 
-    // Cache it
+    // Cache it (per user — DELETE+INSERT to avoid schema UNIQUE constraint issues)
     await run(
-      `INSERT INTO ai_insights (org_id, user_id, period, type, content, model)
-       VALUES (?, ?, ?, 'monthly', ?, ?)
-       ON CONFLICT(org_id, period, type) DO UPDATE SET content = excluded.content, model = excluded.model`,
+      `DELETE FROM ai_insights WHERE org_id = ? AND user_id = ? AND period = ? AND type = 'monthly'`,
+      [req.user.orgId, req.user.id, month]
+    );
+    await run(
+      `INSERT INTO ai_insights (org_id, user_id, period, type, content, model) VALUES (?, ?, ?, 'monthly', ?, ?)`,
       [req.user.orgId, req.user.id, month, JSON.stringify(insight), aiService.resolveModel(provider)]
     );
 

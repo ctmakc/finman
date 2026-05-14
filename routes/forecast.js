@@ -23,7 +23,7 @@ router.get('/balance', async (req, res) => {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const avgExpenses = await get(
       `SELECT AVG(daily_total) as avg FROM (
-        SELECT date, SUM(amount) as daily_total
+        SELECT date, SUM(ABS(amount)) as daily_total
         FROM transactions
         WHERE user_id = ? AND type = 'expense' AND date >= ?
         GROUP BY date
@@ -139,9 +139,9 @@ router.get('/expenses', async (req, res) => {
 
     const categoryAvg = await query(
       `SELECT category,
-              SUM(amount) as total,
+              SUM(ABS(amount)) as total,
               COUNT(DISTINCT date) as days,
-              SUM(amount) / COUNT(DISTINCT date) as daily_avg
+              SUM(ABS(amount)) / COUNT(DISTINCT date) as daily_avg
        FROM transactions
        WHERE user_id = ? AND type = 'expense' AND date >= ?
        GROUP BY category
@@ -313,7 +313,7 @@ router.get('/trends', async (req, res) => {
         [userId, start, end]
       );
       const expense = await get(
-        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
+        `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
         [userId, start, end]
       );
 

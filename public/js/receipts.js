@@ -57,7 +57,7 @@ const ReceiptsModule = {
           </span>
           ${r.is_processed ? '<span class="badge badge-success">Transaction created</span>' : ''}
         </div>
-        ${r.items && r.items.length > 0 ? `<div class="receipt-items"><small>${r.items.map(i => i.name).join(', ')}</small></div>` : ''}
+        ${r.items && r.items.length > 0 ? `<div class="receipt-items"><small>${r.items.map(i => esc(i.name || '')).join(', ')}</small></div>` : ''}
         <div class="receipt-actions">
           ${!r.is_processed ? `<button class="btn btn-sm btn-primary" onclick="ReceiptsModule.createTransaction(${r.id})">Create transaction</button>` : ''}
           <button class="btn btn-sm" onclick="ReceiptsModule.edit(${r.id})">✏️ Edit</button>

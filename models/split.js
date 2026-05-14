@@ -10,7 +10,7 @@ const Split = {
     const result = await run(
       `INSERT INTO split_groups (user_id, name, description, currency)
        VALUES (?, ?, ?, ?)`,
-      [data.user_id, data.name, data.description, data.currency || 'UAH']
+      [data.user_id, data.name, data.description, data.currency || 'USD']
     );
 
     // Добавляем создателя как участника

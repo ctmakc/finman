@@ -21,7 +21,7 @@ router.get('/overview', async (req, res) => {
     const totals = await get(`
       SELECT 
         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expense,
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as total_expense,
         COUNT(*) as transaction_count
       FROM transactions
       WHERE user_id = ? AND date BETWEEN ? AND ?
@@ -82,7 +82,7 @@ router.get('/expenses-by-category', async (req, res) => {
     const end = endDate || new Date().toISOString().split('T')[0];
 
     const data = await query(`
-      SELECT category, SUM(amount) as total, COUNT(*) as count
+      SELECT category, SUM(ABS(amount)) as total, COUNT(*) as count
       FROM transactions
       WHERE user_id = ? AND type = 'expense' AND date BETWEEN ? AND ?
       GROUP BY category
@@ -144,7 +144,7 @@ router.get('/trends', async (req, res) => {
       SELECT 
         ${groupBy} as period,
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
-        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
+        SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) as expense
       FROM transactions
       WHERE user_id = ? AND date >= ?
       GROUP BY ${groupBy}
@@ -209,7 +209,7 @@ router.get('/top-expenses', async (req, res) => {
       FROM transactions t
       LEFT JOIN accounts a ON t.account_id = a.id
       WHERE t.user_id = ? AND t.type = 'expense' AND t.date BETWEEN ? AND ?
-      ORDER BY t.amount DESC
+      ORDER BY ABS(t.amount) DESC
       LIMIT ?
     `, [req.user.id, start, end, parseInt(limit)]);
 

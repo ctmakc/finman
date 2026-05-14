@@ -1,4 +1,4 @@
-const CACHE_NAME = 'finman-v10';
+const CACHE_NAME = 'finman-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

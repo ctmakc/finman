@@ -18,7 +18,7 @@ const Debt = {
       `INSERT INTO debts (user_id, name, description, type, amount, interest_rate, currency, counterparty, start_date, due_date)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.user_id, data.name, data.description, data.type, data.amount,
-       data.interest_rate || 0, data.currency || 'UAH', data.counterparty,
+       data.interest_rate || 0, data.currency || 'USD', data.counterparty,
        data.start_date, data.due_date]
     );
     return this.findById(result.id);

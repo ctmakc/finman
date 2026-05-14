@@ -159,7 +159,7 @@ async function generateYearlyReport(userId, year) {
       [userId, monthStart, monthEnd]
     );
     const expenses = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
+      `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
       [userId, monthStart, monthEnd]
     );
 
@@ -183,7 +183,7 @@ async function generateYearlyReport(userId, year) {
 
 async function generateCategoryReport(userId, start, end) {
   const expenses = await query(
-    `SELECT category, SUM(amount) as total, COUNT(*) as count
+    `SELECT category, SUM(ABS(amount)) as total, COUNT(*) as count
      FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?
      GROUP BY category ORDER BY total DESC`,
     [userId, start, end]
@@ -230,7 +230,7 @@ async function generateBudgetReport(userId, start, end) {
 
   const budgetStatus = await Promise.all(budgets.map(async b => {
     const spent = await get(
-      `SELECT SUM(amount) as total FROM transactions
+      `SELECT SUM(ABS(amount)) as total FROM transactions
        WHERE user_id = ? AND type = 'expense' AND category = ? AND date >= ? AND date <= ?`,
       [userId, b.category, start, end]
     );

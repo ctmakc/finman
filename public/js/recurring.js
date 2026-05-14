@@ -289,9 +289,9 @@ function renderPaymentCard(payment, isOverdue = false) {
           <i class="fas fa-${payment.type === 'income' ? 'arrow-down' : 'arrow-up'}"></i>
         </div>
         <div class="payment-info">
-          <h4>${escapeHtml(payment.name)}</h4>
-          <span class="payment-account">${escapeHtml(payment.account_name)}</span>
-          ${payment.category ? `<span class="payment-category">${escapeHtml(payment.category)}</span>` : ''}
+          <h4>${esc(payment.name)}</h4>
+          <span class="payment-account">${esc(payment.account_name)}</span>
+          ${payment.category ? `<span class="payment-category">${esc(payment.category)}</span>` : ''}
         </div>
         <div class="payment-amount ${payment.type}">
           ${payment.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(payment.amount), payment.account_currency)}
@@ -356,7 +356,7 @@ function showAddRecurringModal(payment = null) {
               <select id="rp-account" required>
                 ${accounts.map(a => `
                   <option value="${a.id}" ${payment?.account_id === a.id ? 'selected' : ''}>
-                    ${escapeHtml(a.name)}
+                    ${esc(a.name)}
                   </option>
                 `).join('')}
               </select>
@@ -564,14 +564,7 @@ function formatDateShort(dateStr) {
   return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 }
 
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// formatCurrency defined in app.js
+// esc() and formatCurrency() defined in app.js
 
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);

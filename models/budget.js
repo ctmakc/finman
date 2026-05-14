@@ -16,7 +16,7 @@ class Budget {
           budgetData.period || 'monthly',
           budgetData.startDate,
           budgetData.endDate || null,
-          budgetData.currency || 'UAH',
+          budgetData.currency || 'USD',
           budgetData.notifyAtPercent || 80
         ]
       );
