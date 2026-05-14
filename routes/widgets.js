@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const Budget = require('../models/budget');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -200,8 +201,9 @@ async function getNetWorthData(userId) {
 }
 
 async function getBudgetData(userId) {
-  const budgets = await query('SELECT * FROM budgets WHERE user_id = ? LIMIT 5', [userId]);
-  return { budgets, count: budgets.length };
+  await Budget.recalculateSpent(userId);
+  const budgets = await Budget.getActiveBudgets(userId);
+  return { budgets: budgets.slice(0, 5), count: budgets.length };
 }
 
 async function getExpensesData(userId, period) {
@@ -217,8 +219,9 @@ async function getIncomeData(userId, period) {
 }
 
 async function getGoalsData(userId) {
+  const SavingsGoal = require('../models/savingsGoal');
   const goals = await query('SELECT * FROM savings_goals WHERE user_id = ? AND is_active = 1 AND is_completed = 0 LIMIT 5', [userId]);
-  return { goals: goals.map(g => ({ ...g, progress: g.target_amount > 0 ? (g.current_amount / g.target_amount * 100) : 0 })) };
+  return { goals: goals.map(g => SavingsGoal.calculateProgress(g)) };
 }
 
 async function getUpcomingData(userId) {
