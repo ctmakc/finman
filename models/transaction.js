@@ -361,7 +361,7 @@ class Transaction {
           SELECT 
             t.category, 
             t.type,
-            SUM(t.amount) as total_amount,
+            SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE t.amount END) as total_amount,
             COUNT(*) as count
           FROM transactions t
           ${whereClause}
