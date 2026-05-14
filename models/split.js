@@ -289,24 +289,32 @@ const Split = {
   // ==================== СТАТИСТИКА ====================
 
   async getGroupStats(groupId) {
-    const expenses = await this.getGroupExpenses(groupId);
-    const balances = await this.calculateBalances(groupId);
-    const settlements = await this.calculateSettlements(groupId);
+    const [group, members, expenses, settlements] = await Promise.all([
+      get('SELECT * FROM split_groups WHERE id = ?', [groupId]),
+      this.getMembers(groupId),
+      this.getGroupExpenses(groupId),
+      this.calculateSettlements(groupId),
+    ]);
 
-    const stats = {
-      totalExpenses: expenses.length,
-      totalAmount: expenses.reduce((sum, e) => sum + e.amount, 0),
-      byCategory: {},
-      pendingSettlements: settlements.length,
-      pendingAmount: settlements.reduce((sum, s) => sum + s.amount, 0)
-    };
-
+    const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const memberCount = members.length;
+    const byCategory = {};
     expenses.forEach(e => {
       const cat = e.category || 'Other';
-      stats.byCategory[cat] = (stats.byCategory[cat] || 0) + e.amount;
+      byCategory[cat] = (byCategory[cat] || 0) + e.amount;
     });
 
-    return stats;
+    return {
+      group,
+      memberCount,
+      totalExpenses: expenses.length,
+      totalAmount,
+      totalSpent: totalAmount,
+      averagePerPerson: memberCount > 0 ? totalAmount / memberCount : 0,
+      byCategory,
+      pendingSettlements: settlements.length,
+      pendingAmount: settlements.reduce((sum, s) => sum + s.amount, 0),
+    };
   }
 };
 

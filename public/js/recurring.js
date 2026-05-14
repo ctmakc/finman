@@ -349,7 +349,7 @@ function showAddRecurringModal(payment = null) {
           <div class="form-row">
             <div class="form-group">
               <label>Name *</label>
-              <input type="text" id="rp-name" value="${payment?.name || ''}" required placeholder="E.g.: Netflix">
+              <input type="text" id="rp-name" value="${esc(payment?.name || '')}" required placeholder="E.g.: Netflix">
             </div>
             <div class="form-group">
               <label>Account *</label>
@@ -377,7 +377,7 @@ function showAddRecurringModal(payment = null) {
             </div>
             <div class="form-group">
               <label>Category</label>
-              <input type="text" id="rp-category" value="${payment?.category || ''}" placeholder="Subscriptions">
+              <input type="text" id="rp-category" value="${esc(payment?.category || '')}" placeholder="Subscriptions">
             </div>
           </div>
 

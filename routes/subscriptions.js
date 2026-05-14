@@ -154,6 +154,8 @@ router.post('/:id/payment', async (req, res) => {
 // История платежей
 router.get('/:id/payments', async (req, res) => {
   try {
+    const sub = await get('SELECT id FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    if (!sub) return res.status(404).json({ message: 'Subscription not found' });
     const payments = await query(
       'SELECT * FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date DESC',
       [req.params.id]

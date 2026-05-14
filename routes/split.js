@@ -180,8 +180,8 @@ router.get('/groups/:id/balances', async (req, res) => {
   try {
     const access = await canAccessGroup(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ message: 'Group not found' });
-    const balances = await Split.calculateBalances(req.params.id);
-    res.json(balances);
+    const balancesObj = await Split.calculateBalances(req.params.id);
+    res.json(Object.values(balancesObj));
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });

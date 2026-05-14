@@ -325,7 +325,7 @@ async function fetchTransactions(filters = {}) {
     // Load categories
     fetchCategories().then(categories => {
       const categoriesDatalist = document.getElementById(`${modalId}-categories`);
-      categoriesDatalist.innerHTML = categories.map(c => `<option value="${c}">`).join('');
+      categoriesDatalist.innerHTML = categories.map(c => `<option value="${esc(c)}">`).join('');
     });
 
     // Auto-categorize on description blur
