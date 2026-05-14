@@ -19,7 +19,7 @@ class CsvImportService {
       // Разбор CSV
       const lines = data.split('\n');
       if (lines.length <= 1) {
-        throw new Error('Файл пуст или содержит только заголовки');
+        throw new Error('File is empty or contains only headers');
       }
       
       // Получение заголовков
@@ -54,7 +54,7 @@ class CsvImportService {
       
       return transactions;
     } catch (error) {
-      throw new Error(`Ошибка при обработке CSV-файла: ${error.message}`);
+      throw new Error(`CSV processing error: ${error.message}`);
     }
   }
   
@@ -208,77 +208,83 @@ class CsvImportService {
    * Категоризация транзакций по описанию
    */
   categorizeTransaction(description) {
-    if (!description) return 'Другое';
-    
+    if (!description) return 'Other';
+
     description = description.toLowerCase();
-    
-    // Расходы
-    if (description.includes('кафе') || description.includes('ресторан') || 
+
+    if (description.includes('кафе') || description.includes('ресторан') ||
         description.includes('кофе') || description.includes('пицца') ||
-        description.includes('бургер') || description.includes('еда')) {
-      return 'Рестораны';
+        description.includes('бургер') || description.includes('еда') ||
+        description.includes('cafe') || description.includes('restaurant') ||
+        description.includes('coffee') || description.includes('pizza') || description.includes('food')) {
+      return 'Food & Dining';
     }
-    
-    if (description.includes('супермаркет') || description.includes('продукты') || 
-        description.includes('магазин') || description.includes('market') || 
-        description.includes('пятерочка') || description.includes('перекресток') || 
-        description.includes('магнит') || description.includes('ашан') || 
-        description.includes('лента')) {
-      return 'Продукты';
+
+    if (description.includes('супермаркет') || description.includes('продукты') ||
+        description.includes('магазин') || description.includes('market') ||
+        description.includes('пятерочка') || description.includes('перекресток') ||
+        description.includes('магнит') || description.includes('ашан') ||
+        description.includes('лента') || description.includes('grocery') ||
+        description.includes('walmart') || description.includes('target')) {
+      return 'Groceries';
     }
-    
-    if (description.includes('такси') || description.includes('uber') || 
-        description.includes('метро') || description.includes('автобус') || 
-        description.includes('транспорт')) {
-      return 'Транспорт';
+
+    if (description.includes('такси') || description.includes('uber') ||
+        description.includes('метро') || description.includes('автобус') ||
+        description.includes('транспорт') || description.includes('lyft') ||
+        description.includes('transit') || description.includes('gas station') ||
+        description.includes('fuel')) {
+      return 'Transport';
     }
-    
-    if (description.includes('аптека') || description.includes('clinic') || 
-        description.includes('больниц') || description.includes('врач') || 
-        description.includes('доктор')) {
-      return 'Здоровье';
+
+    if (description.includes('аптека') || description.includes('clinic') ||
+        description.includes('больниц') || description.includes('врач') ||
+        description.includes('доктор') || description.includes('pharmacy') ||
+        description.includes('hospital') || description.includes('doctor')) {
+      return 'Health';
     }
-    
-    if (description.includes('одежда') || description.includes('обувь') || 
-        description.includes('zara') || description.includes('h&m')) {
-      return 'Одежда';
+
+    if (description.includes('одежда') || description.includes('обувь') ||
+        description.includes('zara') || description.includes('h&m') ||
+        description.includes('clothing') || description.includes('shoes')) {
+      return 'Shopping';
     }
-    
-    if (description.includes('кино') || description.includes('театр') || 
-        description.includes('концерт') || description.includes('развлечения')) {
-      return 'Развлечения';
+
+    if (description.includes('кино') || description.includes('театр') ||
+        description.includes('концерт') || description.includes('развлечения') ||
+        description.includes('netflix') || description.includes('spotify') ||
+        description.includes('entertainment') || description.includes('cinema')) {
+      return 'Entertainment';
     }
-    
-    if (description.includes('комиссия') || description.includes('плата за обслуживание')) {
-      return 'Банковские услуги';
+
+    if (description.includes('комиссия') || description.includes('плата за обслуживание') ||
+        description.includes('bank fee') || description.includes('service charge')) {
+      return 'Bank Fees';
     }
-    
+
     if (description.includes('подписка') || description.includes('subscription')) {
-      return 'Подписки';
+      return 'Subscriptions';
     }
-    
-    // Доходы
-    if (description.includes('зарплата') || description.includes('аванс') || 
-        description.includes('salary')) {
-      return 'Зарплата';
+
+    if (description.includes('зарплата') || description.includes('аванс') ||
+        description.includes('salary') || description.includes('payroll') || description.includes('paycheck')) {
+      return 'Salary';
     }
-    
-    if (description.includes('дивиденд') || description.includes('процент') || 
-        description.includes('вклад')) {
-      return 'Инвестиции';
+
+    if (description.includes('дивиденд') || description.includes('процент') ||
+        description.includes('вклад') || description.includes('dividend') || description.includes('interest')) {
+      return 'Investments';
     }
-    
+
     if (description.includes('возврат') || description.includes('refund')) {
-      return 'Возврат средств';
+      return 'Refunds';
     }
-    
+
     if (description.includes('перевод') || description.includes('transfer')) {
-      return 'Переводы';
+      return 'Transfers';
     }
-    
-    // По умолчанию
-    return description.includes('перевод') ? 'Переводы' : 
-           (description.includes('зачисление') ? 'Прочие доходы' : 'Прочие расходы');
+
+    return 'Other';
   }
 }
 
