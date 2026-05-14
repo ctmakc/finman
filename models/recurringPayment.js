@@ -194,7 +194,7 @@ class RecurringPayment {
       [id, userId]
     );
 
-    if (!payment) return { success: false, message: 'Платеж не найден' };
+    if (!payment) return { success: false, message: 'Payment not found' };
 
     const today = new Date().toISOString().split('T')[0];
     const nextDate = this.calculateNextPaymentDate(
@@ -228,7 +228,7 @@ class RecurringPayment {
         userId: payment.user_id,
         date: today,
         description: payment.name,
-        category: payment.category || 'Регулярный платеж',
+        category: payment.category || 'Recurring payment',
         amount: payment.type === 'expense' ? -Math.abs(payment.amount) : Math.abs(payment.amount),
         type: payment.type
       });
@@ -249,7 +249,7 @@ class RecurringPayment {
       [id, userId]
     );
 
-    if (!payment) return { success: false, message: 'Платеж не найден' };
+    if (!payment) return { success: false, message: 'Payment not found' };
 
     const nextDate = this.calculateNextPaymentDate(
       payment.next_payment_date,
@@ -365,12 +365,12 @@ class RecurringPayment {
   // Получение частот с названиями
   static getFrequencies() {
     return [
-      { value: 'daily', label: 'Ежедневно' },
-      { value: 'weekly', label: 'Еженедельно' },
-      { value: 'biweekly', label: 'Раз в 2 недели' },
-      { value: 'monthly', label: 'Ежемесячно' },
-      { value: 'quarterly', label: 'Ежеквартально' },
-      { value: 'yearly', label: 'Ежегодно' }
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' },
+      { value: 'biweekly', label: 'Every 2 weeks' },
+      { value: 'monthly', label: 'Monthly' },
+      { value: 'quarterly', label: 'Quarterly' },
+      { value: 'yearly', label: 'Yearly' }
     ];
   }
 }

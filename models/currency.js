@@ -2,20 +2,20 @@ const { query, get, run } = require('../db/database');
 
 // Список поддерживаемых валют
 const SUPPORTED_CURRENCIES = [
-  { code: 'UAH', name: 'Украинская гривна', symbol: '₴' },
-  { code: 'USD', name: 'Доллар США', symbol: '$' },
-  { code: 'EUR', name: 'Евро', symbol: '€' },
-  { code: 'GBP', name: 'Британский фунт', symbol: '£' },
-  { code: 'PLN', name: 'Польский злотый', symbol: 'zł' },
-  { code: 'CZK', name: 'Чешская крона', symbol: 'Kč' },
-  { code: 'CHF', name: 'Швейцарский франк', symbol: 'CHF' },
-  { code: 'CAD', name: 'Канадский доллар', symbol: 'C$' },
-  { code: 'AUD', name: 'Австралийский доллар', symbol: 'A$' },
-  { code: 'JPY', name: 'Японская йена', symbol: '¥' },
-  { code: 'CNY', name: 'Китайский юань', symbol: '¥' },
-  { code: 'TRY', name: 'Турецкая лира', symbol: '₺' },
-  { code: 'ILS', name: 'Израильский шекель', symbol: '₪' },
-  { code: 'BTC', name: 'Биткоин', symbol: '₿' }
+  { code: 'UAH', name: 'Ukrainian Hryvnia', symbol: '₴' },
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'PLN', name: 'Polish Zloty', symbol: 'zł' },
+  { code: 'CZK', name: 'Czech Koruna', symbol: 'Kč' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'TRY', name: 'Turkish Lira', symbol: '₺' },
+  { code: 'ILS', name: 'Israeli Shekel', symbol: '₪' },
+  { code: 'BTC', name: 'Bitcoin', symbol: '₿' }
 ];
 
 class Currency {
@@ -41,7 +41,7 @@ class Currency {
       );
       return true;
     } catch (error) {
-      console.error('Ошибка сохранения курса:', error);
+      console.error('Error saving exchange rate:', error);
       return false;
     }
   }
@@ -93,7 +93,7 @@ class Currency {
     const rate = await this.getRate(fromCurrency, toCurrency, date);
 
     if (rate === null) {
-      return { success: false, message: 'Курс не найден' };
+      return { success: false, message: 'Exchange rate not found' };
     }
 
     return {
@@ -151,7 +151,7 @@ class Currency {
 
       return { success: true, saved, source: 'NBU' };
     } catch (error) {
-      console.error('Ошибка получения курсов НБУ:', error);
+      console.error('Error fetching NBU rates:', error);
       return { success: false, error: error.message };
     }
   }
@@ -194,7 +194,7 @@ class Currency {
 
       return { success: true, saved, source: 'exchangerate.host' };
     } catch (error) {
-      console.error('Ошибка получения курсов:', error);
+      console.error('Error fetching rates:', error);
       return { success: false, error: error.message };
     }
   }

@@ -128,7 +128,7 @@ router.post('/:id/create-transaction', async (req, res) => {
     const txResult = await run(
       `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
        VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
-      [req.user.id, account_id, receipt.total_amount, receipt.merchant || 'Чек', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
+      [req.user.id, account_id, receipt.total_amount, receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
     );
 
     // Обновляем баланс счёта
@@ -180,17 +180,17 @@ async function processReceiptOCR(receiptId) {
   // В реальном приложении здесь был бы вызов Google Vision API, Tesseract или другого OCR сервиса
   // Для демонстрации создаём случайные данные
 
-  const merchants = ['АТБ', 'Сільпо', 'Rozetka', 'Епіцентр', 'Comfy', 'WOG', 'OKKO'];
+  const merchants = ['Walmart', 'Target', 'Amazon', 'Costco', 'Whole Foods', 'Shell', 'BP'];
   const categories = ['food', 'shopping', 'transport', 'entertainment', 'other'];
 
   const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-  const amount = Math.floor(Math.random() * 2000) + 50;
+  const amount = Math.floor(Math.random() * 200) + 10;
   const category = categories[Math.floor(Math.random() * categories.length)];
 
   const items = [
-    { name: 'Товар 1', price: Math.floor(amount * 0.4), quantity: 1 },
-    { name: 'Товар 2', price: Math.floor(amount * 0.35), quantity: 2 },
-    { name: 'Товар 3', price: Math.floor(amount * 0.25), quantity: 1 }
+    { name: 'Item 1', price: Math.floor(amount * 0.4), quantity: 1 },
+    { name: 'Item 2', price: Math.floor(amount * 0.35), quantity: 2 },
+    { name: 'Item 3', price: Math.floor(amount * 0.25), quantity: 1 }
   ];
 
   await run(

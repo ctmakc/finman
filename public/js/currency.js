@@ -18,7 +18,7 @@ async function initCurrencyModule() {
     currencyState.settings = settings;
     currencyState.supportedCurrencies = currencies;
   } catch (error) {
-    console.error('Error инициализации модуля валют:', error);
+    console.error('Currency module initialization error:', error);
   }
 }
 

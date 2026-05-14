@@ -127,12 +127,12 @@ router.delete('/assets/:id', async (req, res) => {
 // Типы активов
 router.get('/asset-types', (req, res) => {
   res.json({
-    'real_estate': 'Недвижимость',
-    'vehicle': 'Транспорт',
-    'jewelry': 'Драгоценности',
-    'collectibles': 'Коллекции',
-    'equipment': 'Оборудование',
-    'other': 'Другое'
+    'real_estate': 'Real Estate',
+    'vehicle': 'Vehicle',
+    'jewelry': 'Jewelry',
+    'collectibles': 'Collectibles',
+    'equipment': 'Equipment',
+    'other': 'Other'
   });
 });
 

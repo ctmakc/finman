@@ -26,7 +26,7 @@ class CustomBank {
       return { id: result.id, bank_key: bankKey, ...bankData };
     } catch (error) {
       if (error.message.includes('UNIQUE constraint')) {
-        throw new Error('Банк с таким именем уже существует');
+        throw new Error('A bank with this name already exists');
       }
       throw error;
     }

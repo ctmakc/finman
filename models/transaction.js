@@ -213,7 +213,7 @@ class Transaction {
       const currentTransaction = await this.findById(id, userId);
       
       if (!currentTransaction) {
-        throw new Error('Транзакция не найдена');
+        throw new Error('Transaction not found');
       }
       
       // Начать транзакцию
@@ -294,7 +294,7 @@ class Transaction {
       const transaction = await this.findById(id, userId);
       
       if (!transaction) {
-        throw new Error('Транзакция не найдена');
+        throw new Error('Transaction not found');
       }
       
       // Начать транзакцию

@@ -21,7 +21,7 @@ class BankConnection {
         refresh_token: connection.refresh_token ? decryptToken(connection.refresh_token) : null
       };
     } catch (error) {
-      console.error('Ошибка расшифровки токенов:', error.message);
+      console.error('Token decryption error:', error.message);
       return connection; // Возвращаем как есть если не удалось расшифровать
     }
   }

@@ -30,7 +30,7 @@ async function handleProfileUpdate(e) {
       
       showNotification('Profile updated successfully', 'success');
     } catch (error) {
-      console.error('Failed to update профиля:', error);
+      console.error('Failed to update profile:', error);
       showNotification('An error occurred while updating profile', 'error');
     }
   }
@@ -70,7 +70,7 @@ async function handleProfileUpdate(e) {
       
       showNotification('Password updated successfully', 'success');
     } catch (error) {
-      console.error('Failed to update пароля:', error);
+      console.error('Failed to update password:', error);
       showNotification('An error occurred while updating password', 'error');
     }
   }
@@ -92,7 +92,7 @@ async function handleProfileUpdate(e) {
       
       return response.ok;
     } catch (error) {
-      console.error('Error проверки токена:', error);
+      console.error('Token verification error:', error);
       return false;
     }
   }

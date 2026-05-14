@@ -12,12 +12,12 @@ class AccountPermission {
     );
 
     if (!account || account.user_id !== grantedBy) {
-      return { success: false, message: 'Только владелец счета может управлять доступом' };
+      return { success: false, message: 'Only the account owner can manage access' };
     }
 
     // Нельзя выдать права самому себе
     if (userId === grantedBy) {
-      return { success: false, message: 'Нельзя изменить собственные права' };
+      return { success: false, message: 'Cannot change your own permissions' };
     }
 
     // Проверяем существующие права
@@ -54,7 +54,7 @@ class AccountPermission {
     );
 
     if (!account || account.user_id !== revokedBy) {
-      return { success: false, message: 'Только владелец счета может отозвать доступ' };
+      return { success: false, message: 'Only the account owner can revoke access' };
     }
 
     await run(
@@ -185,11 +185,11 @@ class BudgetPermission {
     );
 
     if (!budget || budget.user_id !== grantedBy) {
-      return { success: false, message: 'Только владелец бюджета может управлять доступом' };
+      return { success: false, message: 'Only the budget owner can manage access' };
     }
 
     if (userId === grantedBy) {
-      return { success: false, message: 'Нельзя изменить собственные права' };
+      return { success: false, message: 'Cannot change your own permissions' };
     }
 
     const existing = await get(
@@ -221,7 +221,7 @@ class BudgetPermission {
     );
 
     if (!budget || budget.user_id !== revokedBy) {
-      return { success: false, message: 'Только владелец бюджета может отозвать доступ' };
+      return { success: false, message: 'Only the budget owner can revoke access' };
     }
 
     await run(

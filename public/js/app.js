@@ -6,6 +6,11 @@ function esc(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// Global currency formatter used by page modules defined outside initApp
+function formatCurrency(amount, currency = 'USD') {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount || 0);
+}
+
 function renderPagination(currentPage, totalItems, perPage) {
   const totalPages = Math.max(1, Math.ceil((totalItems || 0) / (perPage || 50)));
   if (totalPages <= 1) return '';
@@ -414,6 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => backdrop.querySelector('#confirm-ok').focus(), 50);
   };
 
+  let _qaDescBlurAttached = false;
   function openQuickAdd() {
     const modal = document.getElementById('quick-add-modal');
     if (!modal) return;
@@ -429,6 +435,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('qa-type').value = 'expense';
     modal.classList.add('active');
     setTimeout(() => document.getElementById('qa-amount').focus(), 50);
+    // Wire AI auto-categorize on description blur (once)
+    if (!_qaDescBlurAttached) {
+      _qaDescBlurAttached = true;
+      document.getElementById('qa-description').addEventListener('blur', async () => {
+        const desc = document.getElementById('qa-description').value.trim();
+        const catInput = document.getElementById('qa-category');
+        if (!desc || catInput.value.trim()) return;
+        try {
+          const r = await fetchWithAuth('/api/ai/categorize', { method: 'POST', body: JSON.stringify({ description: desc }) });
+          if (r.ok) {
+            const { category } = await r.json();
+            if (category && category !== 'Other' && !catInput.value.trim()) {
+              catInput.value = category;
+              catInput.style.borderColor = 'var(--accent)';
+              setTimeout(() => { catInput.style.borderColor = ''; }, 1500);
+            }
+          }
+        } catch (_) {}
+      });
+    }
   }
 
   async function submitQuickAdd() {
@@ -487,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!mainContent) { console.warn('navigateTo: main-content not found, skipping'); return; }
     mainContent.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     
-    // Загрузка pagesы
+    // Load page content
     switch (page) {
       case 'dashboard':
         renderDashboard();
@@ -937,7 +963,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const color = pct >= 100 ? 'var(--danger)' : pct >= 80 ? 'var(--warning)' : 'var(--success)';
           return `<div class="db-budget-row">
             <div class="db-budget-label">
-              <span>${b.name}</span>
+              <span>${esc(b.name)}</span>
               <span style="color:${color};font-weight:600">${formatCurrency(b.spent || 0)} / ${formatCurrency(b.limit_amount)}</span>
             </div>
             <div class="db-progress-bar">
@@ -1028,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const alertHtml = alertBudgets.length > 0
       ? `<div class="db-alert-banner">
           <i class="fas fa-exclamation-triangle"></i>
-          ${alertBudgets.map(b => `<strong>${b.name}</strong> at ${Math.round(b.percentage)}%`).join(', ')} — near or over limit
+          ${alertBudgets.map(b => `<strong>${esc(b.name)}</strong> at ${Math.round(b.percentage)}%`).join(', ')} — near or over limit
         </div>`
       : '';
 

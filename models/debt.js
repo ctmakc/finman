@@ -69,7 +69,7 @@ const Debt = {
   // Добавить платёж по долгу
   async addPayment(debtId, amount, paymentType = 'principal', note = null, transactionId = null) {
     const debt = await this.findById(debtId);
-    if (!debt) throw new Error('Долг не найден');
+    if (!debt) throw new Error('Debt not found');
 
     const paymentDate = new Date().toISOString().split('T')[0];
 

@@ -52,7 +52,7 @@ const SavingsGoal = {
   // Добавить пополнение
   async addContribution(goalId, amount, note = null, transactionId = null) {
     const goal = await this.findById(goalId);
-    if (!goal) throw new Error('Цель не найдена');
+    if (!goal) throw new Error('Goal not found');
 
     // Добавляем запись о пополнении
     await run(
@@ -75,13 +75,13 @@ const SavingsGoal = {
   // Снять средства с цели
   async withdraw(goalId, amount, note = null) {
     const goal = await this.findById(goalId);
-    if (!goal) throw new Error('Цель не найдена');
-    if (goal.current_amount < amount) throw new Error('Недостаточно средств');
+    if (!goal) throw new Error('Goal not found');
+    if (goal.current_amount < amount) throw new Error('Insufficient funds');
 
     // Добавляем запись об снятии (отрицательная сумма)
     await run(
       `INSERT INTO goal_contributions (goal_id, amount, note) VALUES (?, ?, ?)`,
-      [goalId, -amount, note || 'Снятие средств']
+      [goalId, -amount, note || 'Withdrawal']
     );
 
     // Обновляем текущую сумму

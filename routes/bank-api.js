@@ -230,7 +230,7 @@ router.post('/connect/:bankId/direct', authenticate, async (req, res) => {
     if (bankApiConfig[bankId].requiresRedirect) {
       return res.status(400).json({ 
         error: true, 
-        message: 'Этот банк не поддерживает прямую авторизацию' 
+        message: 'This bank does not support direct authorization'
       });
     }
     

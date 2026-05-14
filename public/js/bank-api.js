@@ -288,7 +288,7 @@ async function fetchBankConnections() {
       showNotification('Bank successfully connected', 'success');
       return true;
     } catch (error) {
-      console.error('Error обработки callback:', error);
+      console.error('Error processing callback:', error);
       showNotification('An error occurred completing bank connection', 'error');
       return false;
     }

@@ -177,13 +177,13 @@ class Family {
     );
 
     if (!family) {
-      return { success: false, message: 'Семья не найдена или код неверный' };
+      return { success: false, message: 'Family not found or invalid code' };
     }
 
     // Проверяем, не является ли уже участником
     const isMember = await this.isMember(family.id, userId);
     if (isMember) {
-      return { success: false, message: 'Вы уже являетесь участником этой семьи' };
+      return { success: false, message: 'You are already a member of this family' };
     }
 
     await run(
@@ -221,13 +221,13 @@ class Family {
     );
 
     if (!invite) {
-      return { success: false, message: 'Приглашение не найдено или истекло' };
+      return { success: false, message: 'Invitation not found or expired' };
     }
 
     // Проверяем, не является ли уже участником
     const isMember = await this.isMember(invite.family_id, userId);
     if (isMember) {
-      return { success: false, message: 'Вы уже являетесь участником этой семьи' };
+      return { success: false, message: 'You are already a member of this family' };
     }
 
     // Добавляем участника
@@ -252,22 +252,22 @@ class Family {
     const memberRole = await this.getUserRole(familyId, memberId);
 
     if (!removerRole || !memberRole) {
-      return { success: false, message: 'Участник не найден' };
+      return { success: false, message: 'Member not found' };
     }
 
     // Владельца нельзя удалить
     if (memberRole === 'owner') {
-      return { success: false, message: 'Нельзя удалить владельца семьи' };
+      return { success: false, message: 'Cannot remove the family owner' };
     }
 
     // Только owner и admin могут удалять
     if (removerRole !== 'owner' && removerRole !== 'admin') {
-      return { success: false, message: 'Недостаточно прав' };
+      return { success: false, message: 'Insufficient permissions' };
     }
 
     // Admin не может удалить другого admin
     if (removerRole === 'admin' && memberRole === 'admin') {
-      return { success: false, message: 'Администратор не может удалить другого администратора' };
+      return { success: false, message: 'An admin cannot remove another admin' };
     }
 
     // Удаляем права доступа участника к счетам семьи
@@ -294,22 +294,22 @@ class Family {
     const currentRole = await this.getUserRole(familyId, memberId);
 
     if (!changerRole || !currentRole) {
-      return { success: false, message: 'Участник не найден' };
+      return { success: false, message: 'Member not found' };
     }
 
     // Только владелец может менять роли
     if (changerRole !== 'owner') {
-      return { success: false, message: 'Только владелец может менять роли' };
+      return { success: false, message: 'Only the owner can change roles' };
     }
 
     // Нельзя изменить роль владельца
     if (currentRole === 'owner') {
-      return { success: false, message: 'Нельзя изменить роль владельца' };
+      return { success: false, message: 'Cannot change the owner role' };
     }
 
     const validRoles = ['admin', 'member'];
     if (!validRoles.includes(newRole)) {
-      return { success: false, message: 'Некорректная роль' };
+      return { success: false, message: 'Invalid role' };
     }
 
     await run(
@@ -325,11 +325,11 @@ class Family {
     const role = await this.getUserRole(familyId, userId);
 
     if (!role) {
-      return { success: false, message: 'Вы не являетесь участником этой семьи' };
+      return { success: false, message: 'You are not a member of this family' };
     }
 
     if (role === 'owner') {
-      return { success: false, message: 'Владелец не может покинуть семью. Сначала передайте права или удалите семью.' };
+      return { success: false, message: 'The owner cannot leave. Transfer ownership or delete the family first.' };
     }
 
     // Удаляем права доступа
@@ -356,12 +356,12 @@ class Family {
     );
 
     if (!family) {
-      return { success: false, message: 'Семья не найдена или вы не владелец' };
+      return { success: false, message: 'Family not found or you are not the owner' };
     }
 
     const isMember = await this.isMember(familyId, newOwnerId);
     if (!isMember) {
-      return { success: false, message: 'Новый владелец должен быть участником семьи' };
+      return { success: false, message: 'The new owner must be a family member' };
     }
 
     // Обновляем владельца в families

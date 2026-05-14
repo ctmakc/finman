@@ -43,31 +43,31 @@ const ForecastModule = {
       <div class="forecast-main">
         <div class="forecast-current">
           <span class="label">Current balance</span>
-          <span class="value">${s.currentBalance.toLocaleString()} $</span>
+          <span class="value">${formatCurrency(s.currentBalance)}</span>
         </div>
         <div class="forecast-arrow ${isPositive ? 'up' : 'down'}">${isPositive ? '↗' : '↘'}</div>
         <div class="forecast-projected">
           <span class="label">Projected balance</span>
-          <span class="value ${isPositive ? 'positive' : 'negative'}">${s.projectedBalance.toLocaleString()} $</span>
+          <span class="value ${isPositive ? 'positive' : 'negative'}">${formatCurrency(s.projectedBalance)}</span>
         </div>
       </div>
       <div class="forecast-details">
         <div class="detail-item">
           <span class="label">Change</span>
-          <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${s.change.toLocaleString()} $ (${s.changePercent}%)</span>
+          <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${formatCurrency(s.change)} (${s.changePercent}%)</span>
         </div>
         <div class="detail-item warning">
           <span class="label">Lowest balance</span>
-          <span class="value">${s.lowestPoint.toLocaleString()} $</span>
+          <span class="value">${formatCurrency(s.lowestPoint)}</span>
           <small>${s.lowestDate}</small>
         </div>
         <div class="detail-item">
           <span class="label">Avg. expense/day</span>
-          <span class="value negative">${s.avgDailyExpense.toLocaleString()} $</span>
+          <span class="value negative">${formatCurrency(s.avgDailyExpense)}</span>
         </div>
         <div class="detail-item">
           <span class="label">Avg. income/day</span>
-          <span class="value positive">${s.avgDailyIncome.toLocaleString()} $</span>
+          <span class="value positive">${formatCurrency(s.avgDailyIncome)}</span>
         </div>
       </div>
     `;
@@ -120,15 +120,15 @@ const ForecastModule = {
       <div class="trends-grid">
         <div class="trend-card">
           <div class="trend-header"><span>📈 Income</span><span class="${t.income.direction === 'up' ? 'positive' : 'negative'}">${t.income.direction === 'up' ? '↑' : '↓'} ${t.income.percent}%</span></div>
-          <div class="trend-prediction">Forecast: <strong>${p.nextMonthIncome.toLocaleString()} $</strong></div>
+          <div class="trend-prediction">Forecast: <strong>${formatCurrency(p.nextMonthIncome)}</strong></div>
         </div>
         <div class="trend-card">
           <div class="trend-header"><span>📉 Expenses</span><span class="${t.expense.direction === 'down' ? 'positive' : 'negative'}">${t.expense.direction === 'up' ? '↑' : '↓'} ${t.expense.percent}%</span></div>
-          <div class="trend-prediction">Forecast: <strong>${p.nextMonthExpense.toLocaleString()} $</strong></div>
+          <div class="trend-prediction">Forecast: <strong>${formatCurrency(p.nextMonthExpense)}</strong></div>
         </div>
         <div class="trend-card">
           <div class="trend-header"><span>💰 Savings</span><span class="${t.savings.direction === 'up' ? 'positive' : 'negative'}">${t.savings.direction === 'up' ? '↑' : '↓'} ${t.savings.percent}%</span></div>
-          <div class="trend-prediction">Forecast: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${p.nextMonthSavings.toLocaleString()} $</strong></div>
+          <div class="trend-prediction">Forecast: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${formatCurrency(p.nextMonthSavings)}</strong></div>
         </div>
       </div>
     `;
