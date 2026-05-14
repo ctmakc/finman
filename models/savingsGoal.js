@@ -174,4 +174,15 @@ const SavingsGoal = {
   }
 };
 
+SavingsGoal.calculateProgress = function(goal) {
+  const current = parseFloat(goal.current_amount) || 0;
+  const target = parseFloat(goal.target_amount) || 0;
+  const progress = target > 0 ? (current / target) * 100 : 0;
+  return {
+    ...goal,
+    progress: Math.round(progress * 100) / 100,
+    remaining: Math.max(target - current, 0)
+  };
+};
+
 module.exports = SavingsGoal;

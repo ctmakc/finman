@@ -208,4 +208,18 @@ const Debt = {
   }
 };
 
+Debt.calculateDebtInfo = function(debt) {
+  const amount = parseFloat(debt.amount) || 0;
+  const paid = parseFloat(debt.paid_amount) || 0;
+  const progress = amount > 0 ? (paid / amount) * 100 : 0;
+  const remaining = Math.max(amount - paid, 0);
+  const isOverdue = !debt.is_paid && debt.due_date && new Date(debt.due_date) < new Date();
+  return {
+    ...debt,
+    progress: Math.round(progress * 100) / 100,
+    remaining,
+    isOverdue: !!isOverdue
+  };
+};
+
 module.exports = Debt;
