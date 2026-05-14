@@ -54,7 +54,7 @@ const SmartDashboard = {
     return `
       <div class="dashboard-widget ${sizeClass}" data-id="${widget.id}" data-type="${widget.widget_type}">
         <div class="widget-header">
-          <h3>${widget.title}</h3>
+          <h3>${esc(widget.title)}</h3>
           ${this.editMode ? `<div class="widget-actions">
             <button class="btn btn-sm btn-icon" onclick="SmartDashboard.moveWidget(${widget.id}, -1)">↑</button>
             <button class="btn btn-sm btn-icon" onclick="SmartDashboard.moveWidget(${widget.id}, 1)">↓</button>
@@ -104,7 +104,7 @@ const SmartDashboard = {
         if (!data.budgets || data.budgets.length === 0) return '<p class="text-secondary">No budgets</p>';
         return data.budgets.slice(0, 3).map(b => `
           <div class="mini-budget">
-            <div class="mini-budget-header"><span>${b.category}</span><span>${b.spent || 0}/${b.amount}</span></div>
+            <div class="mini-budget-header"><span>${esc(b.category)}</span><span>${b.spent || 0}/${b.amount}</span></div>
             <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100, ((b.spent || 0) / b.amount) * 100)}%"></div></div>
           </div>
         `).join('');
@@ -113,7 +113,7 @@ const SmartDashboard = {
         if (!data.goals || data.goals.length === 0) return '<p class="text-secondary">No goals</p>';
         return data.goals.slice(0, 3).map(g => `
           <div class="mini-goal">
-            <span>${g.name}</span>
+            <span>${esc(g.name)}</span>
             <div class="progress-bar"><div class="progress-fill progress-ok" style="width:${g.progress}%"></div></div>
             <span>${Math.round(g.progress)}%</span>
           </div>
@@ -122,7 +122,7 @@ const SmartDashboard = {
       case 'upcoming':
         if (!data.items || data.items.length === 0) return '<p class="text-secondary">No upcoming payments</p>';
         return `<div class="mini-list">${data.items.slice(0, 5).map(i => `
-          <div class="mini-item"><span>${i.title}</span><span>${i.amount.toLocaleString()} $</span><small>${i.date}</small></div>
+          <div class="mini-item"><span>${esc(i.title)}</span><span>${i.amount.toLocaleString()} $</span><small>${i.date}</small></div>
         `).join('')}</div>`;
 
       case 'subscriptions':
@@ -138,7 +138,7 @@ const SmartDashboard = {
         if (!data.transactions || data.transactions.length === 0) return '<p class="text-secondary">No transactions</p>';
         return `<div class="mini-list">${data.transactions.slice(0, 5).map(t => `
           <div class="mini-item">
-            <span>${t.description || t.category}</span>
+            <span>${esc(t.description || t.category)}</span>
             <span class="${t.type === 'income' ? 'positive' : 'negative'}">${t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}</span>
           </div>
         `).join('')}</div>`;
@@ -176,9 +176,9 @@ const SmartDashboard = {
           ${available.length === 0 ? '<p>All widgets already added</p>' : `
             <div class="widget-picker">
               ${available.map(w => `
-                <div class="widget-option" onclick="SmartDashboard.addWidget('${w.type}', '${w.name}')">
-                  <strong>${w.name}</strong>
-                  <small>${w.description}</small>
+                <div class="widget-option" onclick="SmartDashboard.addWidget('${w.type}', '${esc(w.name)}')">
+                  <strong>${esc(w.name)}</strong>
+                  <small>${esc(w.description)}</small>
                 </div>
               `).join('')}
             </div>
