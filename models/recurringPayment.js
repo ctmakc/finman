@@ -211,27 +211,34 @@ class RecurringPayment {
       isActive = 0;
     }
 
-    await run(
-      `UPDATE recurring_payments
-       SET last_payment_date = ?, next_payment_date = ?, is_active = ?,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [today, nextDate, isActive, id]
-    );
-
-    // Создать транзакцию если нужно
+    await run('BEGIN TRANSACTION');
     let transaction = null;
-    if (createTransaction) {
-      const Transaction = require('./transaction');
-      transaction = await Transaction.create({
-        accountId: payment.account_id,
-        userId: payment.user_id,
-        date: today,
-        description: payment.name,
-        category: payment.category || 'Recurring payment',
-        amount: payment.type === 'expense' ? -Math.abs(payment.amount) : Math.abs(payment.amount),
-        type: payment.type
-      });
+    try {
+      await run(
+        `UPDATE recurring_payments
+         SET last_payment_date = ?, next_payment_date = ?, is_active = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [today, nextDate, isActive, id]
+      );
+
+      if (createTransaction) {
+        const Transaction = require('./transaction');
+        transaction = await Transaction.create({
+          accountId: payment.account_id,
+          userId: payment.user_id,
+          date: today,
+          description: payment.name,
+          category: payment.category || 'Recurring payment',
+          amount: payment.type === 'expense' ? -Math.abs(payment.amount) : Math.abs(payment.amount),
+          type: payment.type
+        });
+      }
+
+      await run('COMMIT');
+    } catch (innerError) {
+      try { await run('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
+      throw innerError;
     }
 
     return {

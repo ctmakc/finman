@@ -125,25 +125,32 @@ router.post('/:id/payment', async (req, res) => {
     const { amount, payment_date, transaction_id, create_transaction, account_id } = req.body;
     const paidAmount = amount || sub.amount;
     const paidDate = payment_date || new Date().toISOString().split('T')[0];
-
-    await run(
-      'INSERT INTO subscription_payments (subscription_id, amount, payment_date, transaction_id) VALUES (?, ?, ?, ?)',
-      [req.params.id, paidAmount, paidDate, transaction_id]
-    );
-
-    if (create_transaction) {
-      const acctId = account_id || sub.account_id;
-      if (acctId) {
-        await run(
-          'INSERT INTO transactions (user_id, account_id, type, amount, description, category, date) VALUES (?, ?, \'expense\', ?, ?, ?, ?)',
-          [req.user.id, acctId, -Math.abs(paidAmount), sub.name, sub.category || 'subscriptions', paidDate]
-        );
-        await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [paidAmount, acctId, req.user.id]);
-      }
-    }
-
     const nextBilling = calculateNextBillingDate(paidDate, sub.billing_cycle);
-    await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
+
+    await run('BEGIN TRANSACTION');
+    try {
+      await run(
+        'INSERT INTO subscription_payments (subscription_id, amount, payment_date, transaction_id) VALUES (?, ?, ?, ?)',
+        [req.params.id, paidAmount, paidDate, transaction_id]
+      );
+
+      if (create_transaction) {
+        const acctId = account_id || sub.account_id;
+        if (acctId) {
+          await run(
+            'INSERT INTO transactions (user_id, account_id, type, amount, description, category, date) VALUES (?, ?, \'expense\', ?, ?, ?, ?)',
+            [req.user.id, acctId, -Math.abs(paidAmount), sub.name, sub.category || 'subscriptions', paidDate]
+          );
+          await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [paidAmount, acctId, req.user.id]);
+        }
+      }
+
+      await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
+      await run('COMMIT');
+    } catch (innerError) {
+      try { await run('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
+      throw innerError;
+    }
 
     res.json({ message: 'Payment recorded' });
   } catch (error) {
