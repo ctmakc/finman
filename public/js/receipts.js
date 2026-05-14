@@ -44,8 +44,8 @@ const ReceiptsModule = {
       <div class="card receipt-card ${r.is_processed ? 'processed' : 'pending'}" data-id="${r.id}">
         <div class="receipt-header">
           <div class="receipt-info">
-            <h3>${r.merchant || 'Unknown merchant'}</h3>
-            <small>${r.receipt_date || 'Date not set'} | ${r.category || 'Uncategorized'}</small>
+            <h3>${esc(r.merchant || 'Unknown merchant')}</h3>
+            <small>${r.receipt_date || 'Date not set'} | ${esc(r.category || 'Uncategorized')}</small>
           </div>
           <div class="receipt-amount">
             <strong>${r.total_amount ? r.total_amount.toLocaleString() + ' ' + (r.currency || '$') : 'Not recognized'}</strong>
@@ -187,7 +187,7 @@ const ReceiptsModule = {
 
     const m = document.createElement('div');
     m.className = 'modal-backdrop';
-    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>Create transaction</h2><button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Account</label><select id="receipt-tx-account" class="form-control">${accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('')}</select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()">Cancel</button><button class="btn btn-primary" id="receipt-tx-confirm">Create</button></div></div>`;
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>Create transaction</h2><button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Account</label><select id="receipt-tx-account" class="form-control">${accounts.map(a => `<option value="${a.id}">${esc(a.name)} (${a.currency})</option>`).join('')}</select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()">Cancel</button><button class="btn btn-primary" id="receipt-tx-confirm">Create</button></div></div>`;
     document.body.appendChild(m);
 
     document.getElementById('receipt-tx-confirm').addEventListener('click', async () => {

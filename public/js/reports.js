@@ -40,7 +40,7 @@ const ReportsModule = {
     container.innerHTML = this.types.map(t => `
       <div class="report-type-card" onclick="ReportsModule.showGenerateModal('${t.id}')">
         <span class="report-icon">${icons[t.id] || '📄'}</span>
-        <div class="report-type-info"><h3>${t.name}</h3><p>${t.description}</p></div>
+        <div class="report-type-info"><h3>${esc(t.name)}</h3><p>${esc(t.description)}</p></div>
       </div>
     `).join('');
   },
@@ -59,7 +59,7 @@ const ReportsModule = {
       <tbody>
         ${this.reports.map(r => `
           <tr>
-            <td>${r.title}</td>
+            <td>${esc(r.title)}</td>
             <td>${r.report_type}</td>
             <td>${r.period_start || ''} - ${r.period_end || ''}</td>
             <td>${new Date(r.created_at).toLocaleDateString()}</td>
@@ -138,7 +138,7 @@ const ReportsModule = {
       if (data.byCategory) {
         html += '<h3>By categories</h3><div class="categories-list">';
         data.byCategory.forEach(c => {
-          html += `<div class="category-row"><span>${c.category || 'Uncategorized'}</span><span>${c.total.toLocaleString()} $</span></div>`;
+          html += `<div class="category-row"><span>${esc(c.category || 'Uncategorized')}</span><span>${c.total.toLocaleString()} $</span></div>`;
         });
         html += '</div>';
       }
@@ -152,7 +152,7 @@ const ReportsModule = {
     } else if (type === 'category') {
       html += '<h3>Expenses by category</h3><div class="categories-list">';
       (data.expenses || []).forEach(c => {
-        html += `<div class="category-row"><span>${c.category}</span><span>${c.total.toLocaleString()} $</span><span>${c.percent}%</span></div>`;
+        html += `<div class="category-row"><span>${esc(c.category)}</span><span>${c.total.toLocaleString()} $</span><span>${c.percent}%</span></div>`;
       });
       html += '</div>';
     } else if (type === 'networth') {

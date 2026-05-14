@@ -268,7 +268,7 @@ async function fetchTransactions(filters = {}) {
                 <option value="">Select account</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
-                    ${account.name} (${formatCurrency(account.balance, account.currency)})
+                    ${esc(account.name)} (${formatCurrency(account.balance, account.currency)})
                   </option>
                 `).join('')}
               </select>
@@ -449,7 +449,7 @@ async function fetchTransactions(filters = {}) {
                 <option value="">Select account</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}">
-                    ${account.name} (${formatCurrency(account.balance, account.currency)})
+                    ${esc(account.name)} (${formatCurrency(account.balance, account.currency)})
                   </option>
                 `).join('')}
               </select>
@@ -570,8 +570,8 @@ async function fetchTransactions(filters = {}) {
     return transactions.map(transaction => `
       <tr data-transaction-id="${transaction.id}">
         <td>${formatDate(transaction.date)}</td>
-        <td>${transaction.description || 'No description'}</td>
-        <td>${transaction.category || 'Uncategorized'}</td>
+        <td>${esc(transaction.description || 'No description')}</td>
+        <td>${esc(transaction.category || 'Uncategorized')}</td>
         <td>${transaction.account_name}</td>
         <td class="text-right ${transaction.type === 'income' ? 'text-success' : 'text-error'}">
           ${formatCurrency(transaction.amount)}
