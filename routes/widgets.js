@@ -225,7 +225,7 @@ async function getUpcomingData(userId) {
   const today = new Date().toISOString().split('T')[0];
   const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  const recurring = await query(`SELECT description as title, amount, next_execution_date as date FROM recurring_payments WHERE user_id = ? AND is_active = 1 AND next_execution_date >= ? AND next_execution_date <= ? LIMIT 5`, [userId, today, weekLater]);
+  const recurring = await query(`SELECT name as title, amount, next_payment_date as date FROM recurring_payments WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ? LIMIT 5`, [userId, today, weekLater]);
   const subscriptions = await query(`SELECT name as title, amount, next_billing_date as date FROM subscriptions WHERE user_id = ? AND is_active = 1 AND next_billing_date >= ? AND next_billing_date <= ? LIMIT 5`, [userId, today, weekLater]);
 
   return { items: [...recurring, ...subscriptions].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5) };

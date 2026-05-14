@@ -67,11 +67,11 @@ const Debt = {
   },
 
   // Добавить платёж по долгу
-  async addPayment(debtId, amount, paymentType = 'principal', note = null, transactionId = null) {
+  async addPayment(debtId, amount, paymentType = 'principal', note = null, transactionId = null, paymentDate = null) {
     const debt = await this.findById(debtId);
     if (!debt) throw new Error('Debt not found');
 
-    const paymentDate = new Date().toISOString().split('T')[0];
+    paymentDate = paymentDate || new Date().toISOString().split('T')[0];
 
     const newPaid = debt.paid_amount + amount;
     const isPaid = newPaid >= debt.amount;

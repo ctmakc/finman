@@ -44,7 +44,7 @@ router.get('/balance', async (req, res) => {
 
     // Регулярные платежи
     const recurringPayments = await query(
-      `SELECT amount, type, frequency, next_execution_date
+      `SELECT amount, type, frequency, next_payment_date
        FROM recurring_payments
        WHERE user_id = ? AND is_active = 1`,
       [userId]
@@ -180,8 +180,8 @@ router.get('/goal/:id', async (req, res) => {
 
     // История пополнений
     const contributions = await query(
-      `SELECT date, amount FROM goal_contributions
-       WHERE goal_id = ? ORDER BY date`,
+      `SELECT date(created_at) as date, amount FROM goal_contributions
+       WHERE goal_id = ? ORDER BY created_at`,
       [goal.id]
     );
 
@@ -258,7 +258,7 @@ router.get('/debt/:id', async (req, res) => {
 
     // История платежей
     const payments = await query(
-      `SELECT date, amount FROM debt_payments WHERE debt_id = ? ORDER BY date`,
+      `SELECT payment_date as date, amount FROM debt_payments WHERE debt_id = ? ORDER BY payment_date`,
       [debt.id]
     );
 
@@ -354,8 +354,8 @@ router.get('/trends', async (req, res) => {
 
 // Вспомогательные функции
 function isPaymentDue(payment, dateStr) {
-  if (!payment.next_execution_date) return false;
-  const nextDate = new Date(payment.next_execution_date);
+  if (!payment.next_payment_date) return false;
+  const nextDate = new Date(payment.next_payment_date);
   const checkDate = new Date(dateStr);
 
   if (payment.frequency === 'daily') return true;
@@ -365,7 +365,7 @@ function isPaymentDue(payment, dateStr) {
   if (payment.frequency === 'monthly') {
     return nextDate.getDate() === checkDate.getDate();
   }
-  return payment.next_execution_date === dateStr;
+  return payment.next_payment_date === dateStr;
 }
 
 function isSubscriptionDue(sub, dateStr) {
