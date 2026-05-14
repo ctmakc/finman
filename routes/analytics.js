@@ -169,14 +169,14 @@ router.get('/compare', async (req, res) => {
     const thisMonth = await get(`
       SELECT 
         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as expense
       FROM transactions WHERE user_id = ? AND date >= ?
     `, [req.user.id, thisMonthStart.toISOString().split('T')[0]]);
 
     const lastMonth = await get(`
-      SELECT 
+      SELECT
         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as expense
       FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?
     `, [req.user.id, lastMonthStart.toISOString().split('T')[0], lastMonthEnd.toISOString().split('T')[0]]);
 

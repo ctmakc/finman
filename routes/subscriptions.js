@@ -136,7 +136,7 @@ router.post('/:id/payment', async (req, res) => {
       if (acctId) {
         await run(
           'INSERT INTO transactions (user_id, account_id, type, amount, description, category, date) VALUES (?, ?, \'expense\', ?, ?, ?, ?)',
-          [req.user.id, acctId, paidAmount, sub.name, sub.category || 'subscriptions', paidDate]
+          [req.user.id, acctId, -Math.abs(paidAmount), sub.name, sub.category || 'subscriptions', paidDate]
         );
         await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [paidAmount, acctId, req.user.id]);
       }

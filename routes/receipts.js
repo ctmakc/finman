@@ -128,7 +128,7 @@ router.post('/:id/create-transaction', async (req, res) => {
     const txResult = await run(
       `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
        VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
-      [req.user.id, account_id, receipt.total_amount, receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
+      [req.user.id, account_id, -Math.abs(receipt.total_amount), receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
     );
 
     // Обновляем баланс счёта

@@ -124,6 +124,21 @@ require('./services/authService');
 // Initialize database
 initDatabase();
 
+// Daily auto-payments processor (runs at startup + every 24h)
+const RecurringPayment = require('./models/recurringPayment');
+async function runAutoPayments() {
+  try {
+    const results = await RecurringPayment.processAutoPayments();
+    if (results.length > 0) {
+      console.log(`Auto-payments processed: ${results.length} payments`);
+    }
+  } catch (err) {
+    console.error('Auto-payment processing error:', err);
+  }
+}
+runAutoPayments();
+setInterval(runAutoPayments, 24 * 60 * 60 * 1000);
+
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '2.0.0' }));
 

@@ -69,7 +69,7 @@ router.post('/', authenticate, async (req, res) => {
         date: new Date().toISOString().split('T')[0],
         description: 'Opening balance',
         category: 'Opening balance',
-        amount: Math.abs(balance),
+        amount: balance,
         type: balance > 0 ? 'income' : 'expense'
       });
     }
