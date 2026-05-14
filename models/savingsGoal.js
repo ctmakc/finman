@@ -54,20 +54,24 @@ const SavingsGoal = {
     const goal = await this.findById(goalId);
     if (!goal) throw new Error('Goal not found');
 
-    // Добавляем запись о пополнении
-    await run(
-      `INSERT INTO goal_contributions (goal_id, amount, note, transaction_id) VALUES (?, ?, ?, ?)`,
-      [goalId, amount, note, transactionId]
-    );
-
-    // Обновляем текущую сумму
     const newAmount = goal.current_amount + amount;
     const isCompleted = newAmount >= goal.target_amount;
 
-    await run(
-      `UPDATE savings_goals SET current_amount = ?, is_completed = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [newAmount, isCompleted ? 1 : 0, isCompleted ? new Date().toISOString() : null, goalId]
-    );
+    await run('BEGIN TRANSACTION');
+    try {
+      await run(
+        `INSERT INTO goal_contributions (goal_id, amount, note, transaction_id) VALUES (?, ?, ?, ?)`,
+        [goalId, amount, note, transactionId]
+      );
+      await run(
+        `UPDATE savings_goals SET current_amount = ?, is_completed = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newAmount, isCompleted ? 1 : 0, isCompleted ? new Date().toISOString() : null, goalId]
+      );
+      await run('COMMIT');
+    } catch (err) {
+      try { await run('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
+      throw err;
+    }
 
     return this.findById(goalId);
   },
@@ -78,17 +82,21 @@ const SavingsGoal = {
     if (!goal) throw new Error('Goal not found');
     if (goal.current_amount < amount) throw new Error('Insufficient funds');
 
-    // Добавляем запись об снятии (отрицательная сумма)
-    await run(
-      `INSERT INTO goal_contributions (goal_id, amount, note) VALUES (?, ?, ?)`,
-      [goalId, -amount, note || 'Withdrawal']
-    );
-
-    // Обновляем текущую сумму
-    await run(
-      `UPDATE savings_goals SET current_amount = current_amount - ?, is_completed = 0, completed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [amount, goalId]
-    );
+    await run('BEGIN TRANSACTION');
+    try {
+      await run(
+        `INSERT INTO goal_contributions (goal_id, amount, note) VALUES (?, ?, ?)`,
+        [goalId, -amount, note || 'Withdrawal']
+      );
+      await run(
+        `UPDATE savings_goals SET current_amount = current_amount - ?, is_completed = 0, completed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [amount, goalId]
+      );
+      await run('COMMIT');
+    } catch (err) {
+      try { await run('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
+      throw err;
+    }
 
     return this.findById(goalId);
   },

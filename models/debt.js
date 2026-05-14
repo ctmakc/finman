@@ -73,21 +73,25 @@ const Debt = {
 
     const paymentDate = new Date().toISOString().split('T')[0];
 
-    // Добавляем запись о платеже
-    await run(
-      `INSERT INTO debt_payments (debt_id, amount, payment_type, note, transaction_id, payment_date)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [debtId, amount, paymentType, note, transactionId, paymentDate]
-    );
-
-    // Обновляем выплаченную сумму
     const newPaid = debt.paid_amount + amount;
     const isPaid = newPaid >= debt.amount;
 
-    await run(
-      `UPDATE debts SET paid_amount = ?, is_paid = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [newPaid, isPaid ? 1 : 0, isPaid ? new Date().toISOString() : null, debtId]
-    );
+    await run('BEGIN TRANSACTION');
+    try {
+      await run(
+        `INSERT INTO debt_payments (debt_id, amount, payment_type, note, transaction_id, payment_date)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [debtId, amount, paymentType, note, transactionId, paymentDate]
+      );
+      await run(
+        `UPDATE debts SET paid_amount = ?, is_paid = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newPaid, isPaid ? 1 : 0, isPaid ? new Date().toISOString() : null, debtId]
+      );
+      await run('COMMIT');
+    } catch (err) {
+      try { await run('ROLLBACK'); } catch (rbErr) { console.error('ROLLBACK failed:', rbErr); }
+      throw err;
+    }
 
     return this.findById(debtId);
   },
