@@ -33,7 +33,7 @@ router.get('/accounts/csv', async (req, res) => {
   try {
     const accounts = await query('SELECT name, account_number, bank_name, balance, currency, account_type, created_at FROM accounts WHERE user_id = ? AND is_active = 1', [req.user.id]);
     const headers = ['Name', 'Number', 'Bank', 'Balance', 'Currency', 'Type', 'Created'];
-    const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || 'UAH', a.account_type || '', a.created_at]);
+    const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || 'USD', a.account_type || '', a.created_at]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=accounts_' + new Date().toISOString().split('T')[0] + '.csv');
@@ -61,19 +61,46 @@ router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' 
   try {
     const { accountId } = req.query;
     if (!accountId) return res.status(400).json({ message: 'Account ID required' });
+
+    // Verify the account belongs to this user
+    const { get: dbGet } = require('../db/database');
+    const account = await dbGet('SELECT id, user_id FROM accounts WHERE id = ? AND user_id = ?', [accountId, req.user.id]);
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+
     const lines = req.body.split('\n').filter(l => l.trim()).slice(1);
     let imported = 0;
-    for (const line of lines) {
-      try {
-        const parts = line.split(',');
-        if (parts.length < 4) continue;
-        const [date, description, category, amount, type] = parts;
-        await run('INSERT INTO transactions (user_id, account_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [req.user.id, accountId, date, description.replace(/"/g, ''), category, Math.abs(parseFloat(amount)), type && type.trim() === 'income' ? 'income' : 'expense']);
-        imported++;
-      } catch (e) {}
+    let balanceDelta = 0;
+
+    await run('BEGIN TRANSACTION');
+    try {
+      for (const line of lines) {
+        try {
+          const parts = line.split(',');
+          if (parts.length < 4) continue;
+          const [date, description, category, rawAmount, rawType] = parts;
+          const txType = rawType && rawType.trim() === 'income' ? 'income' : 'expense';
+          const absAmount = Math.abs(parseFloat(rawAmount));
+          if (!absAmount || !date) continue;
+          const signedAmount = txType === 'income' ? absAmount : -absAmount;
+          await run(
+            'INSERT INTO transactions (user_id, account_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [req.user.id, accountId, date.trim(), (description || '').replace(/"/g, '').trim(), (category || '').trim(), signedAmount, txType]
+          );
+          balanceDelta += signedAmount;
+          imported++;
+        } catch (e) {}
+      }
+      // Update account balance once for all imported transactions
+      if (balanceDelta !== 0) {
+        await run('UPDATE accounts SET balance = balance + ? WHERE id = ?', [balanceDelta, accountId]);
+      }
+      await run('COMMIT');
+    } catch (e) {
+      await run('ROLLBACK');
+      throw e;
     }
-    res.json({ imported });
+
+    res.json({ imported, balanceDelta });
   } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
