@@ -314,11 +314,11 @@ async function loadFamilies() {
   container.innerHTML = families.map(family => `
     <div class="family-card" onclick="openFamilyDetails(${family.id})">
       <div class="family-header">
-        <h3>${escapeHtml(family.name)}</h3>
+        <h3>${esc(family.name)}</h3>
         <span class="role-badge role-${family.my_role}">${getRoleName(family.my_role)}</span>
       </div>
       <div class="family-info">
-        <span><i class="fas fa-user"></i> Owner: ${escapeHtml(family.owner_username)}</span>
+        <span><i class="fas fa-user"></i> Owner: ${esc(family.owner_username)}</span>
         <span><i class="fas fa-users"></i> ${family.member_count} member(s)</span>
       </div>
     </div>
@@ -347,7 +347,7 @@ async function openFamilyDetails(familyId) {
         <button class="btn-back" onclick="renderFamilyPage()">
           <i class="fas fa-arrow-left"></i> Back
         </button>
-        <h1>${escapeHtml(family.name)}</h1>
+        <h1>${esc(family.name)}</h1>
         <span class="role-badge role-${family.myRole}">${getRoleName(family.myRole)}</span>
       </header>
 
@@ -379,8 +379,8 @@ async function openFamilyDetails(familyId) {
                     ${member.full_name ? member.full_name[0].toUpperCase() : member.username[0].toUpperCase()}
                   </div>
                   <div class="member-details">
-                    <strong>${escapeHtml(member.full_name || member.username)}</strong>
-                    <span class="member-email">${escapeHtml(member.email)}</span>
+                    <strong>${esc(member.full_name || member.username)}</strong>
+                    <span class="member-email">${esc(member.email)}</span>
                   </div>
                 </div>
                 <div class="member-actions">
@@ -403,7 +403,7 @@ async function openFamilyDetails(familyId) {
                         <a onclick="kickMember(${family.id}, ${member.user_id})" class="danger">
                           <i class="fas fa-user-minus"></i> Delete
                         </a>
-                        <a onclick="showPermissionsModal(${member.user_id}, '${escapeHtml(member.username)}')">
+                        <a onclick="showPermissionsModal(${member.user_id}, '${esc(member.username)}')">
                           <i class="fas fa-key"></i> Permissions
                         </a>
                       </div>
@@ -565,7 +565,7 @@ function showPermissionsModal(userId, username) {
   modal.innerHTML = `
     <div class="modal modal-large">
       <div class="modal-header">
-        <h3>Permissions for ${escapeHtml(username)}</h3>
+        <h3>Permissions for ${esc(username)}</h3>
         <button class="btn-close" onclick="closeModal('permissions-modal')">&times;</button>
       </div>
       <div class="modal-body">
@@ -574,7 +574,7 @@ function showPermissionsModal(userId, username) {
           ${accounts.length === 0 ? '<p>No accounts</p>' : accounts.map(account => `
             <div class="permission-item" data-account-id="${account.id}">
               <div class="permission-account">
-                <strong>${escapeHtml(account.name)}</strong>
+                <strong>${esc(account.name)}</strong>
                 <span class="account-balance">${formatCurrency(account.balance, account.currency)}</span>
               </div>
               <div class="permission-checkboxes">
@@ -652,7 +652,7 @@ function closeModal(modalId) {
   if (modal) modal.remove();
 }
 
-function escapeHtml(text) {
+function esc(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;

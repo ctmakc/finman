@@ -395,8 +395,8 @@ async function fetchBankConnections() {
                     <i class="fas fa-university"></i>
                   </div>
                   <div class="bank-info">
-                    <h4>${bank.name}</h4>
-                    <p class="bank-auth-type">${bank.authType === 'api_key' ? '🔑 API Key' : bank.authType === 'oauth2' ? '🔐 OAuth2' : '🔒 ' + bank.authType}</p>
+                    <h4>${esc(bank.name)}</h4>
+                    <p class="bank-auth-type">${bank.authType === 'api_key' ? '🔑 API Key' : bank.authType === 'oauth2' ? '🔐 OAuth2' : '🔒 ' + esc(bank.authType)}</p>
                   </div>
                   <button class="btn btn-sm btn-primary connect-bank-btn" data-bank-id="${bank.id}" data-auth-type="${bank.authType}" data-requires-redirect="${bank.requiresRedirect}">
                     Connect

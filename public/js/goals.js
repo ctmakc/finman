@@ -11,7 +11,7 @@ async function renderGoalsPage() {
 function renderGoalStats(stats) { return `<div class="stat-card"><div class="stat-icon"><i class="fas fa-bullseye"></i></div><div class="stat-data"><div class="stat-value">${stats.activeGoals}</div><div class="stat-label">Active</div></div></div><div class="stat-card stat-ok"><div class="stat-icon"><i class="fas fa-coins"></i></div><div class="stat-data"><div class="stat-value">${formatCurrency(stats.totalSaved)}</div><div class="stat-label">Saved</div></div></div><div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-pie"></i></div><div class="stat-data"><div class="stat-value">${stats.overallProgress}%</div><div class="stat-label">Progress</div></div></div>`; }
 function renderGoalCard(g) {
   const p = g.progress || 0;
-  const dueDate = g.target_date ? `<small class="text-muted" style="font-size:12px">Target: ${g.target_date}</small>` : '';
+  const dueDate = g.target_date ? `<small class="text-muted" style="font-size:12px">Target: ${esc(g.target_date)}</small>` : '';
   return `<div class="card">
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-piggy-bank"></i> ${esc(g.name)}</h3>
