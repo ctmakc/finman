@@ -85,7 +85,19 @@ router.put('/read-all', async (req, res) => {
   }
 });
 
-// Удалить уведомление
+// Clear old notifications (must be before /:id to avoid shadowing)
+router.delete('/old', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    await Notification.deleteOld(req.user.id, days);
+    res.json({ message: 'Old notifications deleted' });
+  } catch (error) {
+    console.error(`Error:`, error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete a single notification
 router.delete('/:id', async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
@@ -95,18 +107,6 @@ router.delete('/:id', async (req, res) => {
 
     await Notification.delete(req.params.id);
     res.json({ message: 'Notification deleted' });
-  } catch (error) {
-    console.error(`Error:`, error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Очистить старые уведомления
-router.delete('/old', async (req, res) => {
-  try {
-    const days = parseInt(req.query.days) || 30;
-    await Notification.deleteOld(req.user.id, days);
-    res.json({ message: 'Old notifications deleted' });
   } catch (error) {
     console.error(`Error:`, error);
     res.status(500).json({ message: 'Server error' });

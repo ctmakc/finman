@@ -43,7 +43,28 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// Получение семьи по ID
+// Static routes must precede /:id to avoid shadowing
+router.get('/accessible-accounts', authenticate, async (req, res) => {
+  try {
+    const accounts = await AccountPermission.getAccessibleAccounts(req.user.id);
+    res.json(accounts);
+  } catch (error) {
+    console.error('Failed to get accounts:', error);
+    res.status(500).json({ error: true, message: 'Failed to get accounts' });
+  }
+});
+
+router.get('/accessible-budgets', authenticate, async (req, res) => {
+  try {
+    const budgets = await BudgetPermission.getAccessibleBudgets(req.user.id);
+    res.json(budgets);
+  } catch (error) {
+    console.error('Failed to get budgets:', error);
+    res.status(500).json({ error: true, message: 'Failed to get budgets' });
+  }
+});
+
+// Get family by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const family = await Family.findById(req.params.id);
@@ -356,16 +377,6 @@ router.delete('/accounts/:accountId/permissions/:userId', authenticate, async (r
   }
 });
 
-// Получение всех доступных счетов
-router.get('/accessible-accounts', authenticate, async (req, res) => {
-  try {
-    const accounts = await AccountPermission.getAccessibleAccounts(req.user.id);
-    res.json(accounts);
-  } catch (error) {
-    console.error('Failed to get accounts:', error);
-    res.status(500).json({ error: true, message: 'Failed to get accounts' });
-  }
-});
 
 // Массовая выдача прав участнику семьи
 router.post('/bulk-permissions', authenticate, async (req, res) => {
@@ -439,15 +450,5 @@ router.delete('/budgets/:budgetId/permissions/:userId', authenticate, async (req
   }
 });
 
-// Получение всех доступных бюджетов
-router.get('/accessible-budgets', authenticate, async (req, res) => {
-  try {
-    const budgets = await BudgetPermission.getAccessibleBudgets(req.user.id);
-    res.json(budgets);
-  } catch (error) {
-    console.error('Failed to get budgets:', error);
-    res.status(500).json({ error: true, message: 'Failed to get budgets' });
-  }
-});
 
 module.exports = router;

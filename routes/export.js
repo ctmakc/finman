@@ -17,10 +17,11 @@ router.get('/transactions/csv', async (req, res) => {
     if (accountId) { sql += ' AND t.account_id = ?'; params.push(accountId); }
     sql += ' ORDER BY t.date DESC';
     const transactions = await query(sql, params);
+    const csvEsc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const headers = ['Date', 'Description', 'Category', 'Amount', 'Type', 'Account', 'Currency'];
     const rows = transactions.map(t => [
-      t.date, '"' + (t.description || '').replace(/"/g, '""') + '"', t.category || '',
-      t.amount, t.type === 'income' ? 'income' : 'expense', t.account_name || '', t.currency || ''
+      csvEsc(t.date), csvEsc(t.description || ''), csvEsc(t.category || ''),
+      Math.abs(t.amount), t.type || 'expense', csvEsc(t.account_name || ''), csvEsc(t.currency || '')
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -33,7 +34,8 @@ router.get('/accounts/csv', async (req, res) => {
   try {
     const accounts = await query('SELECT name, account_number, bank_name, balance, currency, account_type, created_at FROM accounts WHERE user_id = ? AND is_active = 1', [req.user.id]);
     const headers = ['Name', 'Number', 'Bank', 'Balance', 'Currency', 'Type', 'Created'];
-    const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || 'USD', a.account_type || '', a.created_at]);
+    const csvEsc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const rows = accounts.map(a => [csvEsc(a.name), csvEsc(a.account_number || ''), csvEsc(a.bank_name || ''), a.balance, a.currency || 'USD', csvEsc(a.account_type || ''), csvEsc(a.created_at)]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=accounts_' + new Date().toISOString().split('T')[0] + '.csv');
