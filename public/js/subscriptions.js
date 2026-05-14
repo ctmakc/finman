@@ -45,14 +45,14 @@ const SubscriptionsModule = {
       <div class="card subscription-card" data-id="${sub.id}" style="border-left: 4px solid ${sub.color || '#5D5CDE'}">
         <div class="subscription-header">
           <div class="subscription-info">
-            <span class="subscription-icon">${sub.icon || '📦'}</span>
+            <span class="subscription-icon">${esc(sub.icon || '📦')}</span>
             <div>
               <h3>${esc(sub.name)}</h3>
               <small>${esc(sub.category || 'Uncategorized')}</small>
             </div>
           </div>
           <div class="subscription-amount">
-            <strong>${sub.amount.toLocaleString()} ${sub.currency}</strong>
+            <strong>${sub.amount.toLocaleString()} ${esc(sub.currency || '')}</strong>
             <small>/${this.getCycleLabel(sub.billing_cycle)}</small>
           </div>
         </div>

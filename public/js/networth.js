@@ -100,7 +100,7 @@ const NetWorthModule = {
       <div class="asset-item">
         <span class="asset-icon">${assetIcons[asset.type] || '📦'}</span>
         <div class="asset-info"><strong>${esc(asset.name)}</strong><small>${asset.type}</small></div>
-        <span class="asset-value">${asset.value.toLocaleString()} ${asset.currency}</span>
+        <span class="asset-value">${asset.value.toLocaleString()} ${esc(asset.currency || '')}</span>
         <button class="btn btn-sm btn-icon" onclick="NetWorthModule.editAsset(${asset.id})">✏️</button>
         <button class="btn btn-sm btn-icon btn-danger" onclick="NetWorthModule.deleteAsset(${asset.id})">🗑</button>
       </div>

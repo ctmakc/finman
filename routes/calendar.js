@@ -11,15 +11,15 @@ router.get('/events', async (req, res) => {
   try {
     const { start, end, type } = req.query;
 
-    let typeFilter = '';
-    if (type) typeFilter = `AND event_type = '${type}'`;
+    const typeFilter = type ? 'AND event_type = ?' : '';
+    const baseParams = type ? [req.user.id, start, end, type] : [req.user.id, start, end];
 
     // Пользовательские события
     const events = await query(
       `SELECT * FROM calendar_events
        WHERE user_id = ? AND event_date >= ? AND event_date <= ? ${typeFilter}
        ORDER BY event_date`,
-      [req.user.id, start, end]
+      baseParams
     );
 
     // Регулярные платежи

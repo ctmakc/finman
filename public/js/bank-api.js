@@ -712,7 +712,7 @@ async function fetchBankConnections() {
           </div>
           
           <form id="${modalId}-form" class="modal-body">
-            <p>Sync transactions for account <strong>${account.name}</strong>.</p>
+            <p>Sync transactions for account <strong>${esc(account.name)}</strong>.</p>
             
             <div class="form-group">
               <label for="${modalId}-start-date" class="form-label">Start date</label>
@@ -914,7 +914,7 @@ async function fetchBankConnections() {
                     <i class="fas ${getAccountIcon(account.account_type)}"></i>
                   </div>
                   <div class="account-selection-details">
-                    <h3 class="account-selection-name">${account.name}</h3>
+                    <h3 class="account-selection-name">${esc(account.name)}</h3>
                     <p class="account-selection-number">${account.account_number || 'No number'}</p>
                   </div>
                   <div class="account-selection-balance">
