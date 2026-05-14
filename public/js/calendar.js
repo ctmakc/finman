@@ -84,7 +84,7 @@ const CalendarModule = {
       container.innerHTML = upcoming.map(e => `
         <div class="upcoming-item" style="border-left: 3px solid ${e.color || '#5D5CDE'}">
           <span class="event-icon">${typeIcons[e.event_type] || '📅'}</span>
-          <div class="event-info"><strong>${esc(e.title)}</strong><small>${e.event_date}</small></div>
+          <div class="event-info"><strong>${esc(e.title)}</strong><small>${esc(e.event_date)}</small></div>
           ${e.amount ? `<span class="event-amount">${e.amount.toLocaleString()} $</span>` : ''}
         </div>
       `).join('');

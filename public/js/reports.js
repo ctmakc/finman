@@ -60,8 +60,8 @@ const ReportsModule = {
         ${this.reports.map(r => `
           <tr>
             <td>${esc(r.title)}</td>
-            <td>${r.report_type}</td>
-            <td>${r.period_start || ''} - ${r.period_end || ''}</td>
+            <td>${esc(r.report_type)}</td>
+            <td>${esc(r.period_start || '')} - ${esc(r.period_end || '')}</td>
             <td>${new Date(r.created_at).toLocaleDateString()}</td>
             <td><button class="btn btn-sm" onclick="ReportsModule.viewReport(${r.id})">👁️</button><button class="btn btn-sm btn-danger" onclick="ReportsModule.deleteReport(${r.id})">🗑</button></td>
           </tr>

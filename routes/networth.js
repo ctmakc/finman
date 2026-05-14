@@ -176,10 +176,10 @@ async function calculateNetWorth(userId) {
     totalAssets,
     totalLiabilities,
     assetsBreakdown: {
-      accounts: accountsTotal,
-      investments: investmentsTotal,
-      savings: goalsTotal,
-      manual: manualTotal
+      accounts: { total: accountsTotal },
+      investments: { total: investmentsTotal },
+      manualAssets: { total: manualTotal },
+      receivables: { total: goalsTotal }
     },
     liabilitiesBreakdown: {
       debts: debtsTotal
