@@ -1399,8 +1399,8 @@ document.addEventListener('DOMContentLoaded', () => {
               <select id="filter-category" class="form-control">
                 <option value="">All categories</option>
                 ${categories.map(category => `
-                  <option value="${category}" ${appState.filters.category === category ? 'selected' : ''}>
-                    ${category}
+                  <option value="${esc(category)}" ${appState.filters.category === category ? 'selected' : ''}>
+                    ${esc(category)}
                   </option>
                 `).join('')}
               </select>

@@ -290,7 +290,7 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-category" class="form-label">Category</label>
-              <input type="text" id="${modalId}-category" class="form-control" list="${modalId}-categories" value="${isEditing ? transactionData.category : ''}">
+              <input type="text" id="${modalId}-category" class="form-control" list="${modalId}-categories" value="${isEditing ? esc(transactionData.category || '') : ''}">
               <datalist id="${modalId}-categories">
                 <!-- Categories will be loaded dynamically -->
               </datalist>
@@ -298,7 +298,7 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-description" class="form-label">Description</label>
-              <input type="text" id="${modalId}-description" class="form-control" value="${isEditing ? transactionData.description : ''}">
+              <input type="text" id="${modalId}-description" class="form-control" value="${isEditing ? esc(transactionData.description || '') : ''}">
             </div>
             
             <div class="modal-footer">

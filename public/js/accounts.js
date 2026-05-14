@@ -118,7 +118,7 @@ async function fetchAccount(accountId) {
           <form id="${modalId}-form" class="modal-body">
             <div class="form-group">
               <label for="${modalId}-name" class="form-label">Account Name</label>
-              <input type="text" id="${modalId}-name" class="form-control" value="${isEditing ? accountData.name : ''}" required>
+              <input type="text" id="${modalId}-name" class="form-control" value="${isEditing ? esc(accountData.name || '') : ''}" required>
             </div>
 
             <div class="form-group">
@@ -133,12 +133,12 @@ async function fetchAccount(accountId) {
 
             <div class="form-group">
               <label for="${modalId}-bank" class="form-label">Bank</label>
-              <input type="text" id="${modalId}-bank" class="form-control" value="${isEditing ? accountData.bank_name || '' : ''}">
+              <input type="text" id="${modalId}-bank" class="form-control" value="${isEditing ? esc(accountData.bank_name || '') : ''}">
             </div>
 
             <div class="form-group">
               <label for="${modalId}-number" class="form-label">Account Number</label>
-              <input type="text" id="${modalId}-number" class="form-control" value="${isEditing ? accountData.account_number || '' : ''}">
+              <input type="text" id="${modalId}-number" class="form-control" value="${isEditing ? esc(accountData.account_number || '') : ''}">
             </div>
 
             <div class="form-group">

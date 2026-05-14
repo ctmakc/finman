@@ -6,6 +6,28 @@ const { query, get, run } = require('../db/database');
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
+// Статистика (must be before /:id to avoid shadowing)
+router.get('/stats/summary', async (req, res) => {
+  try {
+    const total = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ?', [req.user.id]);
+    const pending = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ? AND is_processed = 0', [req.user.id]);
+    const thisMonth = await get(
+      `SELECT COUNT(*) as count, SUM(total_amount) as total FROM receipts
+       WHERE user_id = ? AND receipt_date >= date('now', 'start of month')`,
+      [req.user.id]
+    );
+
+    res.json({
+      totalReceipts: total.count,
+      pendingReceipts: pending.count,
+      thisMonthCount: thisMonth.count,
+      thisMonthTotal: thisMonth.total || 0
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Получить все чеки
 router.get('/', async (req, res) => {
   try {
@@ -151,28 +173,6 @@ router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     res.json({ message: 'Receipt deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Статистика
-router.get('/stats/summary', async (req, res) => {
-  try {
-    const total = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ?', [req.user.id]);
-    const pending = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ? AND is_processed = 0', [req.user.id]);
-    const thisMonth = await get(
-      `SELECT COUNT(*) as count, SUM(total_amount) as total FROM receipts
-       WHERE user_id = ? AND receipt_date >= date('now', 'start of month')`,
-      [req.user.id]
-    );
-
-    res.json({
-      totalReceipts: total.count,
-      pendingReceipts: pending.count,
-      thisMonthCount: thisMonth.count,
-      thisMonthTotal: thisMonth.total || 0
-    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
