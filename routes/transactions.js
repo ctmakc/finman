@@ -432,8 +432,8 @@ router.post('/transfer', authenticate, async (req, res) => {
         ),
       ]);
       await Promise.all([
-        dbRun('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amt, fromAccountId]),
-        dbRun('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amt, toAccountId]),
+        dbRun('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [amt, fromAccountId, req.user.id]),
+        dbRun('UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?', [amt, toAccountId, req.user.id]),
       ]);
       await dbRun('COMMIT');
       res.status(201).json({ message: 'Transfer completed', fromTxId: r1.id, toTxId: r2.id });

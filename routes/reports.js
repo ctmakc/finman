@@ -146,30 +146,25 @@ async function generateMonthlyReport(userId, start, end) {
 }
 
 async function generateYearlyReport(userId, year) {
-  const start = `${year}-01-01`;
-  const end = `${year}-12-31`;
+  const rows = await query(
+    `SELECT CAST(strftime('%m', date) AS INTEGER) as month,
+            SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+            SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) as expenses
+     FROM transactions
+     WHERE user_id = ? AND strftime('%Y', date) = ?
+     GROUP BY month`,
+    [userId, String(year)]
+  );
 
-  const monthlyData = [];
-  for (let m = 1; m <= 12; m++) {
-    const monthStart = `${year}-${String(m).padStart(2, '0')}-01`;
-    const monthEnd = new Date(year, m, 0).toISOString().split('T')[0];
+  const byMonth = {};
+  rows.forEach(r => { byMonth[r.month] = r; });
 
-    const income = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?`,
-      [userId, monthStart, monthEnd]
-    );
-    const expenses = await get(
-      `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
-      [userId, monthStart, monthEnd]
-    );
-
-    monthlyData.push({
-      month: m,
-      income: income.total || 0,
-      expenses: expenses.total || 0,
-      savings: (income.total || 0) - (expenses.total || 0)
-    });
-  }
+  const monthlyData = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    const income = byMonth[m]?.income || 0;
+    const expenses = byMonth[m]?.expenses || 0;
+    return { month: m, income, expenses, savings: income - expenses };
+  });
 
   const totalIncome = monthlyData.reduce((s, m) => s + m.income, 0);
   const totalExpenses = monthlyData.reduce((s, m) => s + m.expenses, 0);

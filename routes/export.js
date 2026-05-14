@@ -94,7 +94,7 @@ router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' 
       }
       // Update account balance once for all imported transactions
       if (balanceDelta !== 0) {
-        await run('UPDATE accounts SET balance = balance + ? WHERE id = ?', [balanceDelta, accountId]);
+        await run('UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?', [balanceDelta, accountId, req.user.id]);
       }
       await run('COMMIT');
     } catch (e) {

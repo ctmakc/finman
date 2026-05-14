@@ -124,6 +124,9 @@ router.post('/:id/create-transaction', async (req, res) => {
       return res.status(400).json({ message: 'Account required' });
     }
 
+    const account = await get('SELECT id FROM accounts WHERE id = ? AND user_id = ?', [account_id, req.user.id]);
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+
     // Создаём транзакцию
     const txResult = await run(
       `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
@@ -132,7 +135,7 @@ router.post('/:id/create-transaction', async (req, res) => {
     );
 
     // Обновляем баланс счёта
-    await run('UPDATE accounts SET balance = balance - ? WHERE id = ?', [receipt.total_amount, account_id]);
+    await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [receipt.total_amount, account_id, req.user.id]);
 
     // Связываем чек с транзакцией
     await run('UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [txResult.id, req.params.id]);
