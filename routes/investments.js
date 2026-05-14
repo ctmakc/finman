@@ -170,7 +170,7 @@ router.post('/investments/:id/sell', async (req, res) => {
     const { quantity, price, fee, date } = req.body;
     
     if (!quantity || !price) {
-      return res.status(400).json({ message: 'Количество и цена обязательны' });
+      return res.status(400).json({ message: 'Количество и цена required' });
     }
 
     const result = await Investment.sell(req.params.id, quantity, price, fee, date);

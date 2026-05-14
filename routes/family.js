@@ -209,7 +209,7 @@ router.post('/:id/regenerate-code', authenticate, async (req, res) => {
     const newCode = await Family.regenerateInviteCode(req.params.id, req.user.id);
 
     if (!newCode) {
-      return res.status(403).json({ error: true, message: 'Недостаточно прав' });
+      return res.status(403).json({ error: true, message: 'Insufficient permissions' });
     }
 
     res.json({ success: true, inviteCode: newCode });
@@ -259,7 +259,7 @@ router.post('/:id/invite', authenticate, async (req, res) => {
     );
 
     if (!invite) {
-      return res.status(403).json({ error: true, message: 'Недостаточно прав' });
+      return res.status(403).json({ error: true, message: 'Insufficient permissions' });
     }
 
     res.json({ success: true, invite });

@@ -55,7 +55,7 @@ async function renderAnalyticsPage() {
                 ${byCategory.length ? byCategory.map(c => `
                   <div class="list-item">
                     <div class="list-item-content">
-                      <div class="list-item-title">${c.category || 'Uncategorized'}</div>
+                      <div class="list-item-title">${esc(c.category || 'Uncategorized')}</div>
                       <div class="list-item-subtitle">${c.count} transactions</div>
                     </div>
                     <div class="list-item-actions"><strong>${formatCurrency(c.total)}</strong></div>
@@ -124,8 +124,8 @@ async function renderAnalyticsPage() {
                 ${topExpenses.slice(0, 5).map(t => `
                   <div class="list-item">
                     <div class="list-item-content">
-                      <div class="list-item-title">${t.description || 'Unknown'}</div>
-                      <div class="list-item-subtitle">${t.category || 'Uncategorized'} · ${t.date || ''}</div>
+                      <div class="list-item-title">${esc(t.description || 'Unknown')}</div>
+                      <div class="list-item-subtitle">${esc(t.category || 'Uncategorized')} · ${t.date || ''}</div>
                     </div>
                     <div class="list-item-actions"><strong style="color:var(--danger)">${formatCurrency(Math.abs(t.amount))}</strong></div>
                   </div>`).join('')}

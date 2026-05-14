@@ -112,7 +112,7 @@ router.post('/', authenticate, async (req, res) => {
       type
     } = req.body;
 
-    // Проверка обязательных полей
+    // Проверка requiredх полей
     if (!accountId || !date || amount === undefined) {
       return res.status(400).json({
         error: true,
@@ -223,7 +223,7 @@ router.get('/:id', authenticate, async (req, res) => {
     console.error('Error при получении транзакции:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при получении транзакции' 
+      message: 'An error occurred при получении транзакции' 
     });
   }
 });

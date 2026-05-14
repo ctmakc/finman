@@ -86,7 +86,7 @@ router.post('/', authenticate, async (req, res) => {
 
     // Валидация
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: true, message: 'Название бюджета обязательно' });
+      return res.status(400).json({ error: true, message: 'Название бюджета required' });
     }
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: true, message: 'Сумма бюджета должна быть положительной' });
@@ -158,7 +158,7 @@ router.put('/:id', authenticate, async (req, res) => {
       const budget = await Budget.findById(id, req.user.id);
       res.json({ success: true, budget });
     } else {
-      res.status(400).json({ error: true, message: 'Не удалось обновить бюджет' });
+      res.status(400).json({ error: true, message: 'Failed to обновить бюджет' });
     }
   } catch (error) {
     console.error('Error при обновлении бюджета:', error);
@@ -191,7 +191,7 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
     console.error('Error при пересчете бюджета:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при пересчете бюджета'
+      message: 'An error occurred при пересчете бюджета'
     });
   }
 });
@@ -211,7 +211,7 @@ router.post('/recalculate-all', authenticate, async (req, res) => {
     console.error('Error при пересчете бюджетов:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при пересчете бюджетов'
+      message: 'An error occurred при пересчете бюджетов'
     });
   }
 });
@@ -234,7 +234,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (deleted) {
       res.json({ success: true, message: 'Budget deleted' });
     } else {
-      res.status(400).json({ error: true, message: 'Не удалось удалить бюджет' });
+      res.status(400).json({ error: true, message: 'Failed to удалить бюджет' });
     }
   } catch (error) {
     console.error('Error при удалении бюджета:', error);

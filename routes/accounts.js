@@ -42,7 +42,7 @@ router.post('/', authenticate, async (req, res) => {
       accountType
     } = req.body;
     
-    // Проверка обязательных полей
+    // Проверка requiredх полей
     if (!name) {
       return res.status(400).json({ 
         error: true, 
