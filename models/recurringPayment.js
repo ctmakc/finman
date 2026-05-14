@@ -222,17 +222,17 @@ class RecurringPayment {
         [today, nextDate, isActive, id]
       );
 
-      if (createTransaction) {
-        const Transaction = require('./transaction');
-        transaction = await Transaction.create({
-          accountId: payment.account_id,
-          userId: payment.user_id,
-          date: today,
-          description: payment.name,
-          category: payment.category || 'Recurring payment',
-          amount: payment.type === 'expense' ? -Math.abs(payment.amount) : Math.abs(payment.amount),
-          type: payment.type
-        });
+      if (createTransaction && payment.account_id) {
+        const txAmount = payment.type === 'expense' ? -Math.abs(payment.amount) : Math.abs(payment.amount);
+        const txResult = await run(
+          'INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [payment.account_id, payment.user_id, today, payment.name, payment.category || 'Recurring payment', txAmount, payment.type]
+        );
+        await run(
+          'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+          [txAmount, payment.account_id, payment.user_id]
+        );
+        transaction = { id: txResult.id, accountId: payment.account_id, userId: payment.user_id, amount: txAmount, type: payment.type };
       }
 
       await run('COMMIT');

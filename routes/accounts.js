@@ -65,15 +65,15 @@ router.post('/', authenticate, async (req, res) => {
       });
 
       if (balance && balance !== 0) {
-        await Transaction.create({
-          accountId: newAccount.id,
-          userId: req.user.id,
-          date: new Date().toISOString().split('T')[0],
-          description: 'Opening balance',
-          category: 'Opening balance',
-          amount: balance,
-          type: balance > 0 ? 'income' : 'expense'
-        });
+        const txDate = new Date().toISOString().split('T')[0];
+        await dbRun(
+          'INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [newAccount.id, req.user.id, txDate, 'Opening balance', 'Opening balance', balance, balance > 0 ? 'income' : 'expense']
+        );
+        await dbRun(
+          'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+          [balance, newAccount.id, req.user.id]
+        );
       }
 
       await dbRun('COMMIT');
