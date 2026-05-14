@@ -394,4 +394,57 @@ router.get('/stats/summary', authenticate, async (req, res) => {
   }
 });
 
+// Transfer between accounts
+router.post('/transfer', authenticate, async (req, res) => {
+  const { query: dbQuery, get: dbGet, run: dbRun } = require('../db/database');
+  try {
+    const { fromAccountId, toAccountId, amount, date, description } = req.body;
+
+    if (!fromAccountId || !toAccountId || !amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: true, message: 'fromAccountId, toAccountId, and positive amount are required' });
+    }
+    if (fromAccountId == toAccountId) {
+      return res.status(400).json({ error: true, message: 'Source and destination accounts must differ' });
+    }
+
+    const [from, to] = await Promise.all([
+      dbGet('SELECT id, user_id, balance FROM accounts WHERE id = ? AND user_id = ?', [fromAccountId, req.user.id]),
+      dbGet('SELECT id, user_id, balance FROM accounts WHERE id = ? AND user_id = ?', [toAccountId, req.user.id]),
+    ]);
+
+    if (!from) return res.status(404).json({ error: true, message: 'Source account not found' });
+    if (!to) return res.status(404).json({ error: true, message: 'Destination account not found' });
+
+    const amt = parseFloat(amount);
+    const txDate = date || new Date().toISOString().split('T')[0];
+    const note = description || 'Transfer';
+
+    await dbRun('BEGIN TRANSACTION');
+    try {
+      const [r1, r2] = await Promise.all([
+        dbRun(
+          `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, 'Transfer', ?, 'transfer')`,
+          [fromAccountId, req.user.id, txDate, note + ' (out)', -amt]
+        ),
+        dbRun(
+          `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, 'Transfer', ?, 'transfer')`,
+          [toAccountId, req.user.id, txDate, note + ' (in)', amt]
+        ),
+      ]);
+      await Promise.all([
+        dbRun('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amt, fromAccountId]),
+        dbRun('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amt, toAccountId]),
+      ]);
+      await dbRun('COMMIT');
+      res.status(201).json({ message: 'Transfer completed', fromTxId: r1.id, toTxId: r2.id });
+    } catch (e) {
+      await dbRun('ROLLBACK');
+      throw e;
+    }
+  } catch (error) {
+    console.error('Transfer error:', error);
+    res.status(500).json({ error: true, message: 'Transfer failed' });
+  }
+});
+
 module.exports = router;

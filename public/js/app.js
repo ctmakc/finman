@@ -239,15 +239,20 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
               <div class="form-group">
                 <label>Type</label>
-                <select id="qa-type" class="form-control">
+                <select id="qa-type" class="form-control" onchange="toggleTransferToField()">
                   <option value="expense">Expense</option>
                   <option value="income">Income</option>
+                  <option value="transfer">Transfer</option>
                 </select>
               </div>
             </div>
             <div class="form-group">
-              <label>Account</label>
+              <label id="qa-account-label">Account</label>
               <select id="qa-account" class="form-control" required></select>
+            </div>
+            <div class="form-group" id="qa-to-account-row" style="display:none">
+              <label>To Account</label>
+              <select id="qa-to-account" class="form-control"></select>
             </div>
             <div class="form-row">
               <div class="form-group">
@@ -419,13 +424,32 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => backdrop.querySelector('#confirm-ok').focus(), 50);
   };
 
+  function toggleTransferToField() {
+    const type = document.getElementById('qa-type').value;
+    const toRow = document.getElementById('qa-to-account-row');
+    const label = document.getElementById('qa-account-label');
+    if (type === 'transfer') {
+      toRow.style.display = '';
+      label.textContent = 'From Account';
+      // populate to-account
+      const fromId = document.getElementById('qa-account').value;
+      document.getElementById('qa-to-account').innerHTML = (appState.accounts || [])
+        .filter(a => String(a.id) !== String(fromId))
+        .map(a => `<option value="${a.id}">${esc(a.name)} (${a.currency})</option>`).join('');
+    } else {
+      toRow.style.display = 'none';
+      label.textContent = 'Account';
+    }
+  }
+
   let _qaDescBlurAttached = false;
   function openQuickAdd() {
     const modal = document.getElementById('quick-add-modal');
     if (!modal) return;
-    // Populate account select
-    const sel = document.getElementById('qa-account');
-    sel.innerHTML = (appState.accounts || []).map(a => `<option value="${a.id}">${esc(a.name)} (${a.currency})</option>`).join('') || '<option value="">No accounts</option>';
+    // Populate account selects
+    const opts = (appState.accounts || []).map(a => `<option value="${a.id}">${esc(a.name)} (${a.currency})</option>`).join('') || '<option value="">No accounts</option>';
+    document.getElementById('qa-account').innerHTML = opts;
+    document.getElementById('qa-to-account').innerHTML = opts;
     // Default date = today
     document.getElementById('qa-date').value = new Date().toISOString().split('T')[0];
     // Clear previous values
@@ -433,6 +457,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('qa-category').value = '';
     document.getElementById('qa-description').value = '';
     document.getElementById('qa-type').value = 'expense';
+    document.getElementById('qa-to-account-row').style.display = 'none';
+    document.getElementById('qa-account-label').textContent = 'Account';
     modal.classList.add('active');
     setTimeout(() => document.getElementById('qa-amount').focus(), 50);
     // Wire AI auto-categorize on description blur (once)
@@ -468,13 +494,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!accountId || !amount || !date) { showNotification('Please fill in all required fields', 'error'); return; }
 
     try {
-      const resp = await fetchWithAuth('/api/transactions', {
-        method: 'POST',
-        body: JSON.stringify({ accountId: parseInt(accountId), amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount), type, category, date, description })
-      });
+      let resp;
+      if (type === 'transfer') {
+        const toAccountId = document.getElementById('qa-to-account').value;
+        if (!toAccountId || toAccountId === accountId) { showNotification('Select a different destination account', 'error'); return; }
+        resp = await fetchWithAuth('/api/transactions/transfer', {
+          method: 'POST',
+          body: JSON.stringify({ fromAccountId: parseInt(accountId), toAccountId: parseInt(toAccountId), amount: Math.abs(amount), date, description })
+        });
+      } else {
+        resp = await fetchWithAuth('/api/transactions', {
+          method: 'POST',
+          body: JSON.stringify({ accountId: parseInt(accountId), amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount), type, category, date, description })
+        });
+      }
       if (!resp.ok) throw new Error('Failed');
       document.getElementById('quick-add-modal').classList.remove('active');
-      showNotification(`${type === 'expense' ? '−' : '+'}${amount.toLocaleString()} added`, 'success');
+      showNotification(type === 'transfer' ? `Transfer of ${formatCurrency(amount)} completed` : `${type === 'expense' ? '−' : '+'}${amount.toLocaleString()} added`, 'success');
       // Refresh current page data
       await fetchAccounts();
       if (appState.currentPage === 'dashboard') renderDashboard();
@@ -948,8 +984,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="transaction-description">${esc(t.description)}</div>
             <div class="transaction-category">${esc(t.category) || 'Uncategorized'}</div>
           </div>
-          <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">
-            ${t.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(t.amount))}
+          <div class="transaction-amount ${t.type === 'income' ? 'income' : t.type === 'transfer' ? '' : 'expense'}">
+            ${t.type === 'expense' ? '-' : t.type === 'transfer' ? '⇄' : '+'}${formatCurrency(Math.abs(t.amount))}
           </div>
         </div>`).join('')
       : '<p class="empty-hint">No transactions yet. <a href="#" class="add-transaction-link">Add one →</a></p>';

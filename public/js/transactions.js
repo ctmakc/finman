@@ -569,8 +569,8 @@ async function fetchTransactions(filters = {}) {
         <td>${esc(transaction.description || 'No description')}</td>
         <td>${esc(transaction.category || 'Uncategorized')}</td>
         <td>${transaction.account_name}</td>
-        <td class="text-right ${transaction.type === 'income' ? 'text-success' : 'text-error'}">
-          ${transaction.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(transaction.amount))}
+        <td class="text-right ${transaction.type === 'income' ? 'text-success' : transaction.type === 'transfer' ? 'text-info' : 'text-error'}">
+          ${transaction.type === 'income' ? '+' : transaction.type === 'transfer' ? '⇄' : '-'}${formatCurrency(Math.abs(transaction.amount))}
         </td>
         <td>
           <div class="table-actions">
