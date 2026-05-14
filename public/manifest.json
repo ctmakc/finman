@@ -1,7 +1,7 @@
 {
-  "name": "ФинМенеджер",
-  "short_name": "ФинМен",
-  "description": "Персональный финансовый менеджер",
+  "name": "Finman",
+  "short_name": "Finman",
+  "description": "AI-powered personal finance manager",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#5D5CDE",
@@ -58,7 +58,7 @@
     }
   ],
   "categories": ["finance", "utilities"],
-  "lang": "ru",
+  "lang": "en",
   "scope": "/",
   "prefer_related_applications": false
 }
