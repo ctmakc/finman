@@ -24,9 +24,9 @@ router.get('/events', async (req, res) => {
 
     // Регулярные платежи
     const recurring = await query(
-      `SELECT id, description as title, amount, 'recurring' as event_type, next_execution_date as event_date, '#FF9800' as color
+      `SELECT id, description as title, amount, 'recurring' as event_type, next_payment_date as event_date, '#FF9800' as color
        FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1 AND next_execution_date >= ? AND next_execution_date <= ?`,
+       WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
       [req.user.id, start, end]
     );
 
@@ -82,9 +82,9 @@ router.get('/upcoming', async (req, res) => {
     );
 
     const recurring = await query(
-      `SELECT id, description as title, amount, type, 'recurring' as event_type, next_execution_date as event_date
+      `SELECT id, description as title, amount, type, 'recurring' as event_type, next_payment_date as event_date
        FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1 AND next_execution_date >= ? AND next_execution_date <= ?`,
+       WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
       [req.user.id, today, weekLater]
     );
 
