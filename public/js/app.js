@@ -1724,17 +1724,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderLoginPage();
   }
   
-  // Format currency
-  function formatCurrency(amount, currency = 'USD') {
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2
-    });
-    
-    return formatter.format(amount);
-  }
-  
   // Format date
   function formatDate(dateString) {
     const date = new Date(dateString);

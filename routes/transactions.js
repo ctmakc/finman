@@ -51,7 +51,22 @@ const upload = multer({
   }
 });
 
-// Получение всех транзакций пользователя (с фильтрацией и пагинацией)
+// Get distinct categories used in the user's transactions
+router.get('/categories', authenticate, async (req, res) => {
+  try {
+    const { query: dbQuery } = require('../db/database');
+    const rows = await dbQuery(
+      `SELECT DISTINCT category FROM transactions WHERE user_id = ? AND category IS NOT NULL AND category != '' ORDER BY category`,
+      [req.user.id]
+    );
+    res.json(rows.map(r => r.category));
+  } catch (error) {
+    console.error('Error fetching transaction categories:', error);
+    res.status(500).json({ error: true, message: 'Failed to get categories' });
+  }
+});
+
+// Get all transactions for user (with filtering and pagination)
 router.get('/', authenticate, async (req, res) => {
   try {
     // Получение параметров запроса

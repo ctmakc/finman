@@ -54,16 +54,12 @@ async function fetchTransactions(filters = {}) {
     }
   }
   
-  // Fetch categories transactions
+  // Fetch distinct transaction categories
   async function fetchCategories() {
     try {
-      // Simple implementation - extract categories of existing transactions
-      const transactions = await fetchTransactions({ limit: 1000 });
-      
-      // Extract unique categories
-      const categories = [...new Set(transactions.map(t => t.category))].filter(Boolean);
-      
-      return categories.sort();
+      const response = await fetchWithAuth('/api/transactions/categories');
+      if (!response.ok) throw new Error('Failed');
+      return await response.json();
     } catch (error) {
       console.error('Error fetching categories:', error);
       return [];
