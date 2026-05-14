@@ -419,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal) return;
     // Populate account select
     const sel = document.getElementById('qa-account');
-    sel.innerHTML = (appState.accounts || []).map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('') || '<option value="">No accounts</option>';
+    sel.innerHTML = (appState.accounts || []).map(a => `<option value="${a.id}">${esc(a.name)} (${a.currency})</option>`).join('') || '<option value="">No accounts</option>';
     // Default date = today
     document.getElementById('qa-date').value = new Date().toISOString().split('T')[0];
     // Clear previous values
@@ -1324,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="">All accounts</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}" ${appState.filters.accountId == account.id ? 'selected' : ''}>
-                    ${account.name}
+                    ${esc(account.name)}
                   </option>
                 `).join('')}
               </select>
@@ -1516,17 +1516,17 @@ document.addEventListener('DOMContentLoaded', () => {
           <form id="profile-form" class="settings-form">
             <div class="form-group">
               <label for="settings-username" class="form-label">Username</label>
-              <input type="text" id="settings-username" class="form-control" value="${appState.user.username}" disabled>
+              <input type="text" id="settings-username" class="form-control" value="${esc(appState.user.username)}" disabled>
             </div>
-            
+
             <div class="form-group">
               <label for="settings-email" class="form-label">Email</label>
-              <input type="email" id="settings-email" class="form-control" value="${appState.user.email || ''}">
+              <input type="email" id="settings-email" class="form-control" value="${esc(appState.user.email || '')}">
             </div>
-            
+
             <div class="form-group">
               <label for="settings-fullname" class="form-label">Full name</label>
-              <input type="text" id="settings-fullname" class="form-control" value="${appState.user.fullName || ''}">
+              <input type="text" id="settings-fullname" class="form-control" value="${esc(appState.user.fullName || '')}">
             </div>
             
             <button type="submit" class="btn btn-primary">Save</button>
@@ -1571,7 +1571,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div style="margin-top:10px">
               <select id="import-account" class="form-control" style="max-width:280px;margin-bottom:8px">
                 <option value="">— Select account —</option>
-                ${appState.accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+                ${appState.accounts.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}
               </select>
               <button id="import-btn" class="btn btn-primary" disabled><i class="fas fa-upload"></i> Import</button>
               <span id="import-status" style="margin-left:10px;font-size:13px"></span>
