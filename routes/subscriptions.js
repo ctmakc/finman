@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const subscriptionDetector = require('../services/subscriptionDetector');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -59,6 +60,16 @@ router.get('/stats', async (req, res) => {
       upcomingCount: upcoming.length,
       upcoming
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Детектор регулярных списаний (кандидаты в подписки, которых ещё нет).
+router.get('/detect', async (req, res) => {
+  try {
+    const result = await subscriptionDetector.detectRecurring(req.user.id);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

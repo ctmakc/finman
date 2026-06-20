@@ -4249,3 +4249,15 @@ textarea:focus-visible, .chip:focus-visible, [tabindex]:focus-visible {
   .header { padding: var(--space-3) 0; }
   .nav-link { padding: var(--space-3) var(--space-3); }
 }
+
+/* ── Subscription detector ─────────────────────────────────────── */
+.sub-toolbar { margin-bottom: 14px; }
+.sub-detect-head { margin: 4px 0 10px; color: var(--fm-ink-2, #545A6B); }
+.sub-detect-head strong { color: var(--fm-ink, #11131B); }
+.sub-candidate {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 14px; margin-bottom: 8px;
+}
+.sub-candidate-info { display: flex; flex-direction: column; gap: 2px; }
+.sub-candidate-info strong { color: var(--fm-ink, #11131B); }
+.sub-candidate-info small { color: var(--fm-ink-3, #8A90A2); font-variant-numeric: tabular-nums; }

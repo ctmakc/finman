@@ -36,12 +36,18 @@ const SubscriptionsModule = {
     const container = document.getElementById('subscriptions-list');
     if (!container) return;
 
+    const toolbar = `
+      <div class="sub-toolbar">
+        <button class="btn btn-secondary" onclick="SubscriptionsModule.detect()">🔍 Найти подписки в тратах</button>
+      </div>
+      <div id="sub-detect-results"></div>`;
+
     if (this.subscriptions.length === 0) {
-      container.innerHTML = `<div class="empty-state"><p>Нет активных подписок</p></div>`;
+      container.innerHTML = toolbar + `<div class="empty-state"><p>Нет активных подписок</p></div>`;
       return;
     }
 
-    container.innerHTML = this.subscriptions.map(sub => `
+    container.innerHTML = toolbar + this.subscriptions.map(sub => `
       <div class="card subscription-card" data-id="${sub.id}" style="border-left: 4px solid ${sub.color || '#5D5CDE'}">
         <div class="subscription-header">
           <div class="subscription-info">
@@ -81,8 +87,74 @@ const SubscriptionsModule = {
   },
 
   getCycleLabel(cycle) {
-    const labels = { weekly: 'нед', monthly: 'мес', quarterly: 'квартал', yearly: 'год' };
+    const labels = { weekly: 'нед', biweekly: '2 нед', monthly: 'мес', quarterly: 'квартал', yearly: 'год' };
     return labels[cycle] || cycle;
+  },
+
+  esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  },
+
+  // Найти регулярные списания в транзакциях (кандидаты в подписки).
+  async detect() {
+    const box = document.getElementById('sub-detect-results');
+    if (box) box.innerHTML = '<div class="ai-loading">Ищу регулярные списания…</div>';
+    try {
+      const response = await fetch('/api/subscriptions/detect', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      this.candidates = data.candidates || [];
+      this.renderCandidates(data);
+    } catch (error) {
+      if (box) box.innerHTML = '<div class="ai-error">Не удалось проанализировать траты</div>';
+    }
+  },
+
+  renderCandidates(data) {
+    const box = document.getElementById('sub-detect-results');
+    if (!box) return;
+    const cands = (data && data.candidates) || [];
+    if (!cands.length) {
+      box.innerHTML = '<div class="empty-state"><p>Регулярных списаний не найдено 👍</p></div>';
+      return;
+    }
+    box.innerHTML = `
+      <div class="sub-detect-head">Найдено ${cands.length} — потенциально <strong>${(data.monthlyTotal || 0).toLocaleString()} ₴/мес</strong></div>
+      ${cands.map((c, i) => `
+        <div class="card sub-candidate">
+          <div class="sub-candidate-info">
+            <strong>${this.esc(c.description)}</strong>
+            <small>${c.amount.toLocaleString()} ₴ · ${this.getCycleLabel(c.billingCycle)} · ${c.occurrences}× · ~${c.avgGapDays} дн</small>
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="SubscriptionsModule.addDetected(${i})">+ Добавить</button>
+        </div>`).join('')}`;
+  },
+
+  async addDetected(index) {
+    const c = (this.candidates || [])[index];
+    if (!c) return;
+    try {
+      await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({
+          name: c.description,
+          amount: c.amount,
+          currency: c.currency,
+          billing_cycle: c.billingCycle,
+          category: c.category,
+          start_date: c.lastDate,
+        }),
+      });
+      await this.loadSubscriptions();
+      await this.loadStats();
+      await this.detect();
+    } catch (error) {
+      alert('Ошибка добавления подписки');
+    }
   },
 
   showAddModal() {
