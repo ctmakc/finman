@@ -160,6 +160,24 @@ router.get(
   })
 );
 
+// POST /api/ai/whatif — симуляция «что если»: cuts[{category,percent}] + extraMonthlySaving.
+router.post(
+  '/whatif',
+  wrap(async (req, res) => {
+    const body = req.body || {};
+    const scenario = {
+      cuts: Array.isArray(body.cuts) ? body.cuts : [],
+      extraMonthlySaving: body.extraMonthlySaving,
+    };
+    const out = await aiService.simulateScenario(req.user.id, scenario);
+    return ok(res, {
+      result: out.result,
+      narrative: out.narrative,
+      aiConfigured: provider.isConfigured(),
+    });
+  })
+);
+
 // GET /api/ai/conversations — список разговоров пользователя.
 router.get(
   '/conversations',

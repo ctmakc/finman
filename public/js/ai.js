@@ -337,11 +337,83 @@ const AiCfoModule = {
       </div>`;
   },
 
+  handleWhatif() {
+    const container = document.getElementById('ai-whatif');
+    if (!container) return;
+    container.innerHTML = `
+      <div class="ai-whatif-form">
+        <h4>🔮 Что если…</h4>
+        <div class="ai-whatif-row">
+          <input id="wi-category" class="form-control" type="text" placeholder="Категория (напр. Dining)" aria-label="Категория">
+          <input id="wi-percent" class="form-control ai-whatif-num" type="number" min="0" max="100" value="20" aria-label="Процент сокращения">
+          <span class="ai-whatif-unit">% урезать</span>
+        </div>
+        <div class="ai-whatif-row">
+          <input id="wi-extra" class="form-control ai-whatif-num" type="number" min="0" value="0" aria-label="Доп. сбережения в месяц">
+          <span class="ai-whatif-unit">доп. ₴/мес</span>
+          <button type="button" id="ai-whatif-run" class="btn btn-primary" onclick="AiCfoModule.handleWhatifRun()">Симулировать</button>
+        </div>
+        <div id="ai-whatif-result"></div>
+      </div>`;
+  },
+
+  async handleWhatifRun() {
+    if (this.loading) return;
+    const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+    const category = (val('wi-category') || '').trim();
+    const percent = Number(val('wi-percent') || 0);
+    const extra = Number(val('wi-extra') || 0);
+    const cuts = category ? [{ category, percent }] : [];
+    const out = document.getElementById('ai-whatif-result');
+    if (out) out.innerHTML = '<div class="ai-loading">Считаю сценарий…</div>';
+    this.setLoading(true);
+    try {
+      const response = await fetch('/api/ai/whatif', {
+        method: 'POST',
+        headers: this.authHeaders(),
+        body: JSON.stringify({ cuts, extraMonthlySaving: extra }),
+      });
+      const data = await this.parse(response);
+      this.renderWhatif(data);
+    } catch (err) {
+      if (out) out.innerHTML = `<div class="ai-error">${this.escape(err.message)}</div>`;
+    } finally {
+      this.setLoading(false);
+    }
+  },
+
+  renderWhatif(data) {
+    const out = document.getElementById('ai-whatif-result');
+    if (!out || !data) return;
+    const r = data.result || {};
+    const b = r.baseline || {};
+    const s = r.scenario || {};
+    const fmt = (n) => (n === null || n === undefined ? '—' : this.escape(String(n)));
+    let goals = '';
+    (r.goals || []).forEach((g) => {
+      const sooner = g.monthsSaved && g.monthsSaved > 0 ? ` — на ${this.escape(String(g.monthsSaved))} мес быстрее` : '';
+      goals += `<li>🎯 <strong>${this.escape(g.name)}</strong>: ${fmt(g.monthsBaseline)} → <strong>${fmt(g.monthsScenario)}</strong> мес${sooner}</li>`;
+    });
+    const ai = (data.aiConfigured && data.narrative)
+      ? `<div class="ai-plan-ai">${this.escape(data.narrative).replace(/\n/g, '<br>')}</div>` : '';
+    out.innerHTML = `
+      <div class="ai-whatif-card">
+        <div class="ai-whatif-ba">
+          <div class="ai-whatif-col"><span>Сейчас</span><strong>${fmt(b.monthlyNet)} ₴</strong><em>${fmt(b.savingsRate)}%</em></div>
+          <div class="ai-whatif-arrow">→</div>
+          <div class="ai-whatif-col ai-whatif-after"><span>Сценарий</span><strong>${fmt(s.monthlyNet)} ₴</strong><em>${fmt(s.savingsRate)}%</em></div>
+        </div>
+        ${s.monthlyFreed ? `<p class="ai-whatif-freed">Высвобождается <strong>${fmt(s.monthlyFreed)} ₴/мес</strong></p>` : ''}
+        ${goals ? `<ul class="ai-whatif-goals">${goals}</ul>` : ''}
+        ${ai}
+      </div>`;
+  },
+
   // --- rendering ---------------------------------------------------------
 
   setLoading(state) {
     this.loading = state;
-    ['ai-send-btn', 'ai-plan-btn', 'ai-insights-btn', 'ai-categorize-btn', 'ai-summary-btn'].forEach((id) => {
+    ['ai-send-btn', 'ai-plan-btn', 'ai-whatif-btn', 'ai-whatif-run', 'ai-insights-btn', 'ai-categorize-btn', 'ai-summary-btn'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.disabled = state;
     });
@@ -483,6 +555,7 @@ const AiCfoModule = {
           <h3>🤖 AI Финансовый директор</h3>
           <div class="ai-actions" role="group" aria-label="Действия ассистента">
             <button type="button" id="ai-plan-btn" class="btn btn-primary" onclick="AiCfoModule.handlePlan()">📋 Мой план</button>
+            <button type="button" id="ai-whatif-btn" class="btn btn-secondary" onclick="AiCfoModule.handleWhatif()">🔮 Что если</button>
             <button type="button" id="ai-insights-btn" class="btn btn-secondary" onclick="AiCfoModule.handleInsights()">Инсайты</button>
             <button type="button" id="ai-categorize-btn" class="btn btn-secondary" onclick="AiCfoModule.handleCategorize()">Авто-категоризация</button>
             <button type="button" id="ai-summary-btn" class="btn btn-secondary" onclick="AiCfoModule.handleSummary()">Сводка за месяц</button>
@@ -490,6 +563,7 @@ const AiCfoModule = {
           </div>
         </div>
         <div id="ai-plan" class="ai-plan"></div>
+        <div id="ai-whatif" class="ai-whatif"></div>
         <div id="ai-insights" class="ai-insights"></div>
         <div id="ai-categorize" class="ai-categorize"></div>
         <div id="ai-summary" class="ai-summary"></div>

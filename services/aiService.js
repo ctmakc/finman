@@ -980,9 +980,102 @@ async function buildFinancialPlan(userId, { now } = {}) {
   return { context: context.text, plan, planText };
 }
 
+// --------------------------------------------------------------------------
+// simulateScenario — «что если»: пользователь урезает категории на % и/или
+// откладывает доп. сумму в месяц; считаем влияние на расходы/сбережения и на
+// сроки достижения целей, плюс короткий ИИ-комментарий.
+//   scenario = { cuts: [{ category, percent }], extraMonthlySaving }
+// Возвращает { result, narrative }. narrative=null без провайдера / без изменений.
+// --------------------------------------------------------------------------
+async function simulateScenario(userId, scenario = {}, { now } = {}) {
+  const reference = now ? (now instanceof Date ? now : new Date(now)) : new Date();
+  const context = await buildFinancialContext(userId);
+  const [goals, topCategories] = await Promise.all([
+    getGoals(userId),
+    getTopSpendingCategories(userId),
+  ]);
+
+  const income = context.summary.recentIncome || 0;
+  const expense = context.summary.recentExpense || 0;
+  const net = context.summary.recentNetFlow || 0;
+
+  const catSpend = {};
+  topCategories.forEach((c) => { catSpend[c.category] = c.total; });
+
+  const cuts = Array.isArray(scenario.cuts) ? scenario.cuts : [];
+  const extraMonthlySaving = Math.max(0, Number(scenario.extraMonthlySaving) || 0);
+
+  let totalCut = 0;
+  const appliedCuts = cuts.map((cut) => {
+    const category = cut.category;
+    const percent = Math.max(0, Math.min(100, Number(cut.percent) || 0));
+    const currentSpend = money.round(catSpend[category] || 0);
+    const monthlySaved = money.round((currentSpend * percent) / 100);
+    totalCut = money.round(totalCut + monthlySaved);
+    return { category, percent, currentSpend, monthlySaved };
+  });
+
+  const monthlyFreed = money.round(totalCut + extraMonthlySaving);
+  const newExpense = money.round(expense - totalCut);
+  const newNet = money.round(net + monthlyFreed);
+  const baselineRate = income > 0 ? money.round((net / income) * 100) : 0;
+  const newRate = income > 0 ? money.round((newNet / income) * 100) : 0;
+
+  const goalImpact = goals
+    .filter((g) => !g.is_completed)
+    .map((g) => {
+      const remaining = money.sub(g.target_amount, g.current_amount || 0);
+      const monthsBaseline = net > 0 ? Math.ceil(remaining / net) : null;
+      const monthsScenario = newNet > 0 ? Math.ceil(remaining / newNet) : null;
+      const monthsToDate = g.target_date ? monthsBetween(reference, g.target_date) : null;
+      const requiredByDate = monthsToDate && monthsToDate > 0 ? money.round(remaining / monthsToDate) : null;
+      return {
+        name: g.name,
+        currency: g.currency,
+        remaining,
+        monthsBaseline,
+        monthsScenario,
+        monthsSaved: monthsBaseline !== null && monthsScenario !== null ? monthsBaseline - monthsScenario : null,
+        requiredByDate,
+        feasibleByDate: requiredByDate === null ? null : requiredByDate <= newNet,
+      };
+    });
+
+  const result = {
+    income,
+    baseline: { monthlyExpense: expense, monthlyNet: net, savingsRate: baselineRate },
+    scenario: { monthlyExpense: newExpense, monthlyNet: newNet, savingsRate: newRate, monthlyFreed },
+    cuts: appliedCuts,
+    extraMonthlySaving,
+    goals: goalImpact,
+  };
+
+  let narrative = null;
+  if (provider.isConfigured() && (appliedCuts.length || extraMonthlySaving)) {
+    const system = buildSystemPrompt(context.text);
+    const changes = appliedCuts
+      .map((c) => `cut ${c.category} by ${c.percent}% (saves ${c.monthlySaved})`)
+      .concat(extraMonthlySaving ? [`save an extra ${extraMonthlySaving}/month`] : [])
+      .join('; ');
+    const userMsg =
+      `WHAT-IF scenario: if I ${changes}, my monthly savings would change from ${net} to ${newNet} ` +
+      `(rate ${baselineRate}% -> ${newRate}%). In 2-3 short sentences, tell me the impact on my goals and ` +
+      `whether this is worth it. Use my real numbers, be encouraging and concrete.`;
+    const r = await provider.chat({
+      system,
+      messages: [{ role: 'user', content: userMsg }],
+      maxTokens: 500,
+    });
+    narrative = (r && r.text) || '';
+  }
+
+  return { result, narrative };
+}
+
 module.exports = {
   buildFinancialContext,
   buildFinancialPlan,
+  simulateScenario,
   buildSystemPrompt,
   analyzeSpending,
   chat,
