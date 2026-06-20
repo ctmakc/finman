@@ -1,0 +1,587 @@
+/* ==========================================================================
+   FINMAN — parts/ai.css
+   Screen-level styles for two signature surfaces:
+     (1) the AI-CFO ASSISTANT panel — the brand's headline feature
+     (2) the AUTH (login / register) screens — the product's front door
+   Tokens only (--fm-*/--space-*/--radius-*/--shadow-*). No hardcoded colors.
+
+   NOTE on cascade: the design-system base layer is APPENDED at the bottom of
+   style.css and thus wins over these @imported parts on equal specificity.
+   Where we must override a base rule (.form-control, .btn, .table-ish), we
+   scope under a screen root (.ai-cfo / .auth-card) to raise specificity.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. AI-CFO ASSISTANT PANEL
+   ========================================================================== */
+
+.ai-cfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  font-family: var(--fm-font-ui);
+  color: var(--fm-ink);
+}
+
+/* ---- Header: title + action chips --------------------------------------- */
+.ai-cfo .ai-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.ai-cfo .ai-header h3 {
+  margin: 0;
+  font-family: var(--fm-font-display);
+  font-weight: 600;
+  font-size: clamp(1.15rem, 1rem + 1vw, 1.45rem);
+  letter-spacing: -0.01em;
+  color: var(--fm-ink);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ai-cfo .ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The three quick-action buttons read as calm pill chips, not loud buttons. */
+.ai-cfo .ai-actions .btn-secondary {
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 0.84rem;
+  padding: 0.5rem 0.95rem;
+  background: var(--fm-primary-tint);
+  color: var(--fm-primary);
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: background-color var(--transition-speed) var(--fm-ease),
+              color var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease);
+}
+.ai-cfo .ai-actions .btn-secondary:hover:not(:disabled) {
+  background: var(--fm-primary-soft);
+  color: var(--fm-primary-contrast);
+  transform: translateY(-1px);
+}
+.ai-cfo .ai-actions .btn-secondary:active:not(:disabled) { transform: translateY(0); }
+.ai-cfo .ai-actions .btn-secondary:disabled { opacity: 0.5; cursor: progress; }
+
+.ai-cfo .ai-month-input {
+  width: auto;
+  min-width: 9.5rem;
+  padding: 0.46rem 0.7rem;
+  font-size: 0.84rem;
+  border-radius: var(--radius-pill);
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  font-feature-settings: var(--fm-num);
+}
+
+/* ---- Shared card scaffold for insight / categorize / summary cards ------- */
+.ai-insights-card,
+.ai-cat-suggest,
+.ai-summary-card {
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ai-insights-card h4,
+.ai-cat-suggest h4,
+.ai-summary-card h4 {
+  margin: 0;
+  font-family: var(--fm-font-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  color: var(--fm-ink);
+}
+
+/* Numbers inside any AI card align as tabular columns. */
+.ai-insights-summary,
+.ai-summary-stats,
+.ai-summary-top,
+.ai-cat-amt,
+.ai-cat-list li span:last-child {
+  font-feature-settings: var(--fm-num);
+}
+
+.ai-insights-summary,
+.ai-summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: 0.9rem;
+  color: var(--fm-ink-2);
+}
+.ai-insights-summary b,
+.ai-summary-stats b { color: var(--fm-ink); font-weight: 700; }
+
+/* ---- Insights: top-category breakdown list ------------------------------ */
+.ai-cat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ai-cat-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--fm-border);
+  font-size: 0.9rem;
+}
+.ai-cat-list li:last-child { border-bottom: 0; }
+.ai-cat-list li span:first-child { color: var(--fm-ink); font-weight: 500; }
+.ai-cat-list li span:last-child { color: var(--fm-ink-2); white-space: nowrap; }
+
+/* The model's narrative recommendation — the "voice" of the CFO. */
+.ai-insight-text,
+.ai-summary-text {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--fm-primary-tint);
+  border: 1px solid var(--fm-border);
+  border-left: 3px solid var(--fm-primary);
+  color: var(--fm-ink);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.ai-summary-top {
+  font-size: 0.88rem;
+  color: var(--fm-ink-2);
+}
+.ai-summary-top { font-weight: 500; }
+
+/* ---- Status notes: warning, soft note, error ---------------------------- */
+.ai-warning {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--fm-warning-tint);
+  color: var(--fm-warning);
+  border: 1px solid var(--fm-warning);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* "AI unconfigured" / soft hints — clearly labeled, never alarming. */
+.ai-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface-2);
+  color: var(--fm-ink-2);
+  border: 1px dashed var(--fm-border-strong);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.ai-note::before {
+  content: "\f0eb"; /* lightbulb */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  color: var(--fm-primary);
+  flex: none;
+  line-height: 1.45;
+}
+
+.ai-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--fm-negative-tint);
+  color: var(--fm-negative);
+  border: 1px solid var(--fm-negative);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* ---- Loading shimmer text ----------------------------------------------- */
+.ai-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  color: var(--fm-ink-2);
+  font-size: 0.9rem;
+}
+.ai-loading::before {
+  content: "";
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid var(--fm-primary-tint);
+  border-top-color: var(--fm-primary);
+  animation: aiSpin 0.7s linear infinite;
+  flex: none;
+}
+@keyframes aiSpin { to { transform: rotate(360deg); } }
+
+/* ---- Auto-categorize suggestion rows ------------------------------------ */
+.ai-cat-suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ai-cat-suggest-list > li {
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface-2);
+  transition: border-color var(--transition-speed) var(--fm-ease),
+              background-color var(--transition-speed) var(--fm-ease);
+}
+.ai-cat-suggest-list > li:hover { border-color: var(--fm-primary-soft); }
+.ai-cat-suggest-list label {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.ai-cat-suggest-list input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--fm-primary);
+  flex: none;
+  cursor: pointer;
+}
+.ai-cat-desc {
+  color: var(--fm-ink);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ai-cat-amt {
+  color: var(--fm-ink-2);
+  font-feature-settings: var(--fm-num);
+  white-space: nowrap;
+}
+.ai-cat-arrow { color: var(--fm-ink-3); }
+.ai-cat-name {
+  color: var(--fm-primary);
+  font-weight: 600;
+  background: var(--fm-primary-tint);
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.ai-cat-suggest #ai-apply-cat-btn { align-self: flex-start; margin-top: var(--space-1); }
+
+/* ==========================================================================
+   1b. CHAT — streaming-friendly message bubbles + "thinking" state
+   ========================================================================== */
+
+.ai-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: min(48vh, 30rem);
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--fm-surface-2);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  scroll-behavior: smooth;
+}
+.ai-messages:empty { display: none; }
+
+.ai-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 86%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  box-shadow: var(--shadow-sm);
+  animation: aiBubbleIn 0.28s var(--fm-ease) both;
+}
+@keyframes aiBubbleIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.ai-msg-role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+}
+.ai-msg-text { white-space: pre-wrap; word-break: break-word; }
+/* Amounts that appear mid-reply still line up. */
+.ai-msg-text { font-variant-numeric: tabular-nums; }
+
+/* User bubble: brand-filled, right-aligned. */
+.ai-msg-user {
+  align-self: flex-end;
+  background: var(--fm-primary);
+  color: var(--fm-primary-contrast);
+  border-bottom-right-radius: var(--radius-xs);
+}
+.ai-msg-user .ai-msg-role { color: var(--fm-primary-contrast); }
+
+/* Assistant bubble: calm surface, left-aligned, hairline border. */
+.ai-msg-assistant {
+  align-self: flex-start;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  border: 1px solid var(--fm-border);
+  border-bottom-left-radius: var(--radius-xs);
+}
+.ai-msg-assistant .ai-msg-role { color: var(--fm-primary); }
+
+/* Error bubble. */
+.ai-msg-error {
+  align-self: flex-start;
+  background: var(--fm-negative-tint);
+  color: var(--fm-negative);
+  border: 1px solid var(--fm-negative);
+}
+.ai-msg-error .ai-msg-role { color: var(--fm-negative); }
+
+/* "Thinking" state: while streaming, handleSend() creates an assistant bubble
+   whose .ai-msg-text is empty until the first chunk arrives. Show a tasteful
+   three-dot pulse in that gap, then it vanishes the moment text lands. */
+.ai-msg-assistant .ai-msg-text:empty::after {
+  content: "";
+  display: inline-flex;
+  width: 2.6rem;
+  height: 0.5rem;
+  background:
+    radial-gradient(circle 3px at 6px 50%, var(--fm-primary) 95%, transparent) 0 0 / 33.333% 100% no-repeat,
+    radial-gradient(circle 3px at 6px 50%, var(--fm-primary) 95%, transparent) 50% 0 / 33.333% 100% no-repeat,
+    radial-gradient(circle 3px at 6px 50%, var(--fm-primary) 95%, transparent) 100% 0 / 33.333% 100% no-repeat;
+  animation: aiThinking 1s var(--fm-ease) infinite;
+}
+@keyframes aiThinking {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+/* ---- Composer (input row) ----------------------------------------------- */
+.ai-input-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+.ai-input-row #ai-input {
+  flex: 1 1 auto;
+  border-radius: var(--radius-pill);
+  padding: 0.72rem 1.1rem;
+}
+.ai-input-row #ai-send-btn {
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 0.6rem 1.4rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   2. AUTH — login / register front door
+   ========================================================================== */
+
+.auth-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  font-family: var(--fm-font-ui);
+  color: var(--fm-ink);
+  background:
+    radial-gradient(120% 90% at 12% 0%, var(--fm-primary-tint) 0%, transparent 55%),
+    radial-gradient(110% 80% at 100% 100%, var(--fm-positive-tint) 0%, transparent 50%),
+    var(--fm-bg);
+  position: relative;
+  isolation: isolate;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 26rem;
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  animation: fmReveal 0.5s var(--fm-ease) both;
+}
+@keyframes fmReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- Brand header: display type + one-line trust promise ---------------- */
+.auth-header { text-align: center; display: flex; flex-direction: column; gap: var(--space-2); }
+.auth-header::before {
+  content: "\f155"; /* dollar-circle mark as a calm brand glyph */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 1.5rem;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto var(--space-1);
+  display: grid;
+  place-items: center;
+  color: var(--fm-primary-contrast);
+  background: linear-gradient(135deg, var(--fm-primary), var(--fm-primary-soft));
+  border-radius: var(--radius-md);
+  box-shadow: var(--fm-shadow-primary);
+}
+.auth-header h1 {
+  margin: 0;
+  font-family: var(--fm-font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+  color: var(--fm-ink);
+}
+.auth-header p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--fm-ink-2);
+  line-height: 1.45;
+}
+
+/* ---- Tabs: segmented control ------------------------------------------- */
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--fm-surface-2);
+  border-radius: var(--radius-pill);
+}
+.auth-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--fm-font-ui);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--fm-ink-2);
+  cursor: pointer;
+  transition: background-color var(--transition-speed) var(--fm-ease),
+              color var(--transition-speed) var(--fm-ease),
+              box-shadow var(--transition-speed) var(--fm-ease);
+}
+.auth-tab:hover { color: var(--fm-ink); }
+.auth-tab.active {
+  background: var(--fm-surface);
+  color: var(--fm-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Forms -------------------------------------------------------------- */
+.auth-form-container { display: flex; flex-direction: column; }
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.auth-form.hidden { display: none; }
+
+.auth-form .form-group { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; }
+
+/* Inputs get a touch more breathing room than the global default. */
+.auth-card .form-control {
+  padding: 0.78rem 0.95rem;
+  border-radius: var(--radius-md);
+  font-size: 0.96rem;
+}
+.auth-card .form-label { margin-bottom: 0; }
+
+.auth-card .btn-primary {
+  margin-top: var(--space-2);
+  padding: 0.85rem 1.2rem;
+  font-weight: 600;
+  font-size: 0.98rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--fm-shadow-primary);
+}
+.auth-card .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+
+/* Inline form error — hidden until the JS writes text into it. */
+.auth-error {
+  margin: 0;
+  color: var(--fm-negative);
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.auth-error:not(:empty) {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--fm-negative-tint);
+  border: 1px solid var(--fm-negative);
+}
+
+/* ---- Trust footer cue (CSS-only, appended after the card body) ---------- */
+.auth-card::after {
+  content: "\f023  \0414\0430\043d\043d\044b\0435 \0437\0430\0448\0438\0444\0440\043e\0432\0430\043d\044b \00b7 \043c\044b \043d\0435 \043f\0440\043e\0434\0430\0451\043c \0432\0430\0448\0443 \0438\043d\0444\043e\0440\043c\0430\0446\0438\044e";
+  font-family: "Font Awesome 6 Free", var(--fm-font-ui);
+  font-weight: 600;
+  font-size: 0.76rem;
+  text-align: center;
+  color: var(--fm-ink-3);
+  letter-spacing: 0.01em;
+}
+
+/* ==========================================================================
+   3. RESPONSIVE — mobile-first comfort
+   ========================================================================== */
+@media (max-width: 640px) {
+  .ai-cfo .ai-header { align-items: flex-start; }
+  .ai-cfo .ai-actions { width: 100%; }
+  .ai-cfo .ai-month-input { flex: 1 1 auto; }
+  .ai-msg { max-width: 94%; }
+  .ai-cat-suggest-list label {
+    grid-template-columns: auto 1fr auto;
+    grid-auto-rows: min-content;
+  }
+  .ai-cat-arrow { display: none; }
+  .ai-cat-name { grid-column: 2 / -1; justify-self: start; }
+
+  .auth-card { padding: var(--space-5); border-radius: var(--radius-md); }
+  .auth-header h1 { font-size: 1.4rem; }
+}
+
+/* ==========================================================================
+   4. MOTION — honor prefers-reduced-motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .ai-msg,
+  .auth-card,
+  .ai-cfo .ai-actions .btn-secondary,
+  .ai-card .btn { animation: none !important; }
+  .ai-loading::before,
+  .ai-msg-assistant .ai-msg-text:empty::after { animation-duration: 0.001ms; animation-iteration-count: 1; }
+  .ai-cfo .ai-actions .btn-secondary:hover:not(:disabled),
+  .auth-card .btn-primary:hover:not(:disabled) { transform: none; }
+}

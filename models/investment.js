@@ -329,6 +329,20 @@ const Investment = {
     return byType;
   },
 
+  // Последняя закэшированная цена символа (Wave-2 price-feeds).
+  // Возвращает строку investment_prices или null. Используется как
+  // офлайн-фолбэк/индикатор свежести в UI; current_price на активе
+  // обновляет services/priceService.refreshUserPrices.
+  async getLatestPrice(symbol, currency = 'USD') {
+    if (!symbol) return null;
+    return get(
+      `SELECT * FROM investment_prices
+       WHERE symbol = ? AND currency = ?
+       ORDER BY date DESC, id DESC LIMIT 1`,
+      [String(symbol).toUpperCase(), currency]
+    );
+  },
+
   // Получить историю цен
   async getPriceHistory(symbol, days = 30) {
     const startDate = new Date();

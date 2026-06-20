@@ -4,9 +4,35 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const Notification = require('../models/notification');
+const digestService = require('../services/digestService');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+// ==================== ЕЖЕНЕДЕЛЬНАЯ СВОДКА (wave-2) ====================
+
+// Отправить текущему пользователю его дайджест прямо сейчас.
+// Создаёт in-app уведомление всегда (force), email — только если включён
+// email_enabled и настроен RESEND_API_KEY (иначе тихий no-op).
+// Уважает настройки: weekly_summary как флаг (но через ручной триггер
+// строим всё равно, чтобы пользователь мог проверить), email_enabled — для письма.
+router.post('/test-digest', async (req, res) => {
+  try {
+    const result = await digestService.sendDigest(req.user.id, { force: true });
+    res.json({
+      success: true,
+      digest: result.digest,
+      subject: result.subject,
+      notified: result.notified,
+      notificationId: result.notificationId,
+      emailed: result.emailed,
+      email: result.email,
+    });
+  } catch (error) {
+    console.error('Ошибка:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
 
 // Получить уведомления
 router.get('/', async (req, res) => {

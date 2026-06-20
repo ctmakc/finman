@@ -2,9 +2,72 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, run } = require('../db/database');
+const backupService = require('../services/backupService');
+const { AppError } = require('../middleware/error');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+// ==================== ПОЛНЫЙ БЭКАП / ВОССТАНОВЛЕНИЕ (wave-2) ====================
+//
+// GET  /api/export/backup  — скачать полный JSON-бэкап всех данных пользователя
+// POST /api/export/restore — восстановить/слить данные из JSON-бэкапа
+// GET  /api/export/csv     — выгрузить ВСЕ данные одним CSV-файлом
+//
+// JSON — это формат для точного round-trip (export -> import). CSV — человеко-
+// читаемый «всё-в-одном» дамп.
+
+// Полный JSON-бэкап (скачивание файлом).
+router.get('/backup', async (req, res, next) => {
+  try {
+    const backup = await backupService.exportAll(req.user.id);
+    const stamp = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=finman_full_backup_${stamp}.json`
+    );
+    res.send(JSON.stringify(backup, null, 2));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Восстановление из JSON-бэкапа. Тело — сам объект бэкапа (или { backup: {...} }).
+router.post('/restore', express.json({ limit: '25mb' }), async (req, res, next) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== 'object') {
+      throw new AppError(400, 'INVALID_BACKUP', 'Request body must be a backup object');
+    }
+    // Поддерживаем как «голый» бэкап, так и обёртку { backup: {...} }.
+    const payload = body.tables ? body : body.backup;
+    const result = await backupService.importAll(req.user.id, payload);
+    res.json({
+      success: true,
+      message: 'Восстановление завершено',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// CSV «всё-в-одном» (скачивание файлом).
+router.get('/csv', async (req, res, next) => {
+  try {
+    const csv = await backupService.exportCsv(req.user.id);
+    const stamp = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=finman_all_data_${stamp}.csv`
+    );
+    res.send(csv);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get('/transactions/csv', async (req, res) => {
   try {

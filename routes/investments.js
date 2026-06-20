@@ -4,9 +4,43 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const Investment = require('../models/investment');
+const priceService = require('../services/priceService');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+// ==================== ЖИВЫЕ ЦЕНЫ (Wave-2 price-feeds) ====================
+
+// Обновить current_price всех активов пользователя по живым котировкам
+// (Stooq, бесплатно). Деградирует мягко: недоступные символы помечаются,
+// весь запрос не падает. После апдейта возвращаем свежую статистику с P&L.
+router.post('/refresh-prices', async (req, res) => {
+  try {
+    const summary = await priceService.refreshUserPrices(req.user.id);
+    const stats = await Investment.getUserStats(req.user.id);
+    res.json({ ...summary, stats });
+  } catch (error) {
+    console.error('Ошибка обновления цен:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Ошибка сервера' });
+  }
+});
+
+// Обновить цены активов конкретного портфеля (с проверкой владения).
+router.post('/portfolios/:id/refresh-prices', async (req, res) => {
+  try {
+    const portfolio = await Investment.findPortfolioById(req.params.id);
+    if (!portfolio || portfolio.user_id !== req.user.id) {
+      return res.status(404).json({ message: 'Портфель не найден' });
+    }
+
+    const summary = await priceService.refreshPortfolioPrices(req.params.id);
+    const stats = await Investment.calculatePortfolioValue(req.params.id);
+    res.json({ ...summary, stats });
+  } catch (error) {
+    console.error('Ошибка обновления цен:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Ошибка сервера' });
+  }
+});
 
 // ==================== ПОРТФЕЛИ ====================
 

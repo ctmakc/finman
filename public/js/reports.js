@@ -63,7 +63,7 @@ const ReportsModule = {
             <td>${r.report_type}</td>
             <td>${r.period_start || ''} - ${r.period_end || ''}</td>
             <td>${new Date(r.created_at).toLocaleDateString()}</td>
-            <td><button class="btn btn-sm" onclick="ReportsModule.viewReport(${r.id})">👁️</button><button class="btn btn-sm btn-danger" onclick="ReportsModule.deleteReport(${r.id})">🗑</button></td>
+            <td><button class="btn btn-sm" onclick="ReportsModule.viewReport(${r.id})">👁️</button><button class="btn btn-sm" title="Скачать PDF" onclick="ReportsModule.downloadPdf(${r.id})">⬇️ PDF</button><button class="btn btn-sm btn-danger" onclick="ReportsModule.deleteReport(${r.id})">🗑</button></td>
           </tr>
         `).join('')}
       </tbody>
@@ -105,6 +105,60 @@ const ReportsModule = {
       await this.loadReports();
     } catch (error) {
       alert('Ошибка генерации отчёта');
+    }
+  },
+
+  // wave-2 pdf-reports: сгенерировать настоящий PDF и сразу предложить скачать.
+  async generatePdfReport(reportType) {
+    const type = reportType || (document.getElementById('report-type') || {}).value || 'monthly';
+    const startEl = document.getElementById('period-start');
+    const endEl = document.getElementById('period-end');
+    const payload = {
+      report_type: type,
+      format: 'pdf',
+      period_start: startEl ? startEl.value : undefined,
+      period_end: endEl ? endEl.value : undefined
+    };
+
+    try {
+      const response = await fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('generate failed');
+      const result = await response.json();
+
+      const genModal = document.getElementById('generate-modal');
+      if (genModal) genModal.classList.remove('active');
+
+      await this.loadReports();
+      if (result && result.id) {
+        await this.downloadPdf(result.id);
+      }
+    } catch (error) {
+      alert('Ошибка генерации PDF-отчёта');
+    }
+  },
+
+  // Скачивает PDF отчёта по id (стрим из /:id/download) как файл в браузере.
+  async downloadPdf(id) {
+    try {
+      const response = await fetch(`/api/reports/${id}/download`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Ошибка скачивания PDF');
     }
   },
 
@@ -204,7 +258,7 @@ const ReportsModule = {
               <div class="form-group"><label>Начало периода</label><input type="date" id="period-start" class="form-control" required></div>
               <div class="form-group"><label>Конец периода</label><input type="date" id="period-end" class="form-control" required></div>
             </div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('generate-modal').classList.remove('active')">Отмена</button><button type="submit" class="btn btn-primary">Сгенерировать</button></div>
+            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('generate-modal').classList.remove('active')">Отмена</button><button type="button" class="btn" onclick="ReportsModule.generatePdfReport()">📄 PDF</button><button type="submit" class="btn btn-primary">Сгенерировать</button></div>
           </form>
         </div>
       </div>

@@ -1,0 +1,524 @@
+/* ==========================================================================
+   FINMAN — parts/finance.css
+   Screen styles for BUDGETS · GOALS · DEBTS — "calm fintech intelligence".
+
+   This part is @imported at the TOP of style.css, so it cascades FIRST (weak).
+   Legacy budget/goal/debt rules live mid-file and the design-system base layer
+   is appended last. To reliably override those, every selector here is scoped
+   under its page/list container (.budgets-list, .goals-page, .debts-page, the
+   .budget-card itself) so it wins on specificity — never by source order.
+
+   Only design tokens (--fm-*, --space-*, --radius-*, --shadow-*, type/motion)
+   are used; no hardcoded colors. All JS-bound class names are preserved.
+   ========================================================================== */
+
+/* ==========================================================================
+   Shared: page chrome for finance surfaces
+   ========================================================================== */
+.budgets-list,
+.goals-page .card-grid,
+.debts-page .card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-5);
+}
+
+.goals-page .page-header h1,
+.debts-page .page-header h1 {
+  font-family: var(--fm-font-display);
+  letter-spacing: -0.015em;
+  color: var(--fm-ink);
+}
+.goals-page .page-header h1 i,
+.debts-page .page-header h1 i { color: var(--fm-primary); }
+
+/* Tabular money everywhere on these surfaces (belt-and-braces vs base layer) */
+.budgets-list .progress-labels,
+.budgets-list .budget-remaining,
+.goals-page .progress-labels,
+.goals-page .stat-value,
+.debts-page .progress-labels,
+.debts-page .stat-value {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: var(--fm-num);
+}
+
+/* ==========================================================================
+   Stat overview cards (budgets overview + goals/debts stats-grid)
+   Refine the legacy heavy left-bar into a calm token card with a soft state
+   accent rail and tinted icon chip.
+   ========================================================================== */
+.budget-stats-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.budget-stats-overview .stat-card,
+.goals-page .stats-grid .stat-card,
+.debts-page .stats-grid .stat-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease),
+              border-color var(--transition-speed) var(--fm-ease);
+}
+.budget-stats-overview .stat-card:hover,
+.goals-page .stats-grid .stat-card:hover,
+.debts-page .stats-grid .stat-card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--fm-border-strong);
+  transform: translateY(-1px);
+}
+
+/* state accent as a top-left soft rail rather than a hard 4px border */
+.budget-stats-overview .stat-card::before,
+.goals-page .stats-grid .stat-card::before,
+.debts-page .stats-grid .stat-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--fm-border-strong);
+  opacity: 0.9;
+}
+.budget-stats-overview .stat-card.stat-ok::before,
+.goals-page .stats-grid .stat-card.stat-ok::before,
+.debts-page .stats-grid .stat-card.stat-ok::before   { background: var(--fm-positive); }
+.budget-stats-overview .stat-card.stat-warning::before { background: var(--fm-warning); }
+.budget-stats-overview .stat-card.stat-over::before,
+.debts-page .stats-grid .stat-card.stat-over::before  { background: var(--fm-negative); }
+
+.budget-stats-overview .stat-icon,
+.goals-page .stats-grid .stat-icon,
+.debts-page .stats-grid .stat-icon {
+  width: 2.9rem;
+  height: 2.9rem;
+  flex: none;
+  margin: 0;
+  border-radius: var(--radius-md);
+  background: var(--fm-primary-tint);
+  color: var(--fm-primary);
+  font-size: 1.1rem;
+}
+.budget-stats-overview .stat-card.stat-ok .stat-icon,
+.goals-page .stats-grid .stat-card.stat-ok .stat-icon,
+.debts-page .stats-grid .stat-card.stat-ok .stat-icon   { background: var(--fm-positive-tint); color: var(--fm-positive); }
+.budget-stats-overview .stat-card.stat-warning .stat-icon { background: var(--fm-warning-tint); color: var(--fm-warning); }
+.budget-stats-overview .stat-card.stat-over .stat-icon,
+.debts-page .stats-grid .stat-card.stat-over .stat-icon  { background: var(--fm-negative-tint); color: var(--fm-negative); }
+
+.budget-stats-overview .stat-value,
+.goals-page .stats-grid .stat-value,
+.debts-page .stats-grid .stat-value {
+  font-family: var(--fm-font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fm-ink);
+  line-height: 1.1;
+}
+.budget-stats-overview .stat-label,
+.goals-page .stats-grid .stat-label,
+.debts-page .stats-grid .stat-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--fm-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   BUDGET CARDS — progress with positive / at-risk / over states
+   ========================================================================== */
+.budgets-list .budget-card,
+.goals-page .card-grid > .card,
+.debts-page .card-grid > .card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-left: 1px solid var(--fm-border);   /* neutralize legacy 4px rail */
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease),
+              border-color var(--transition-speed) var(--fm-ease);
+}
+.budgets-list .budget-card:hover,
+.goals-page .card-grid > .card:hover,
+.debts-page .card-grid > .card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--fm-border-strong);
+  transform: translateY(-2px);
+}
+
+/* state as a calm top hairline accent (4px), keyed to status class */
+.budgets-list .budget-card::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: var(--fm-positive);
+  opacity: 0.95;
+}
+.budgets-list .budget-card.budget-ok::before      { background: var(--fm-positive); }
+.budgets-list .budget-card.budget-warning::before { background: var(--fm-warning); }
+.budgets-list .budget-card.budget-over::before    { background: var(--fm-negative); }
+
+.budgets-list .budget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+}
+.budgets-list .budget-name {
+  margin: 0;
+  font-family: var(--fm-font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fm-ink);
+}
+.budgets-list .budget-category {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-pill);
+  background: var(--fm-primary-tint);
+  color: var(--fm-primary);
+}
+.budgets-list .budget-actions { display: flex; gap: var(--space-2); flex: none; }
+.budgets-list .budget-actions .btn-icon,
+.budgets-list .budget-actions .btn-sm { padding: 0.4rem 0.6rem; }
+
+.budgets-list .budget-progress { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* ---- The progress track + fill (shared visual language for all 3 surfaces) */
+.budgets-list .progress-bar,
+.goals-page .progress-bar,
+.debts-page .progress-bar {
+  position: relative;
+  height: 10px;
+  background: var(--fm-surface-2);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin: 0;
+}
+.budgets-list .progress-fill,
+.goals-page .progress-fill,
+.debts-page .progress-fill {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  border-radius: var(--radius-pill);
+  background: var(--fm-positive);
+  transition: width 0.6s var(--fm-ease);
+}
+/* subtle sheen so the fill reads as a polished element, not a flat block */
+.budgets-list .progress-fill::after,
+.goals-page .progress-fill::after,
+.debts-page .progress-fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0));
+  pointer-events: none;
+}
+.budgets-list .progress-fill.progress-ok,
+.goals-page .progress-fill.progress-ok,
+.debts-page .progress-fill.progress-ok      { background: var(--fm-positive); }
+.budgets-list .progress-fill.progress-warning { background: var(--fm-warning); }
+.budgets-list .progress-fill.progress-over    { background: var(--fm-negative); }
+
+.budgets-list .progress-labels,
+.goals-page .progress-labels,
+.debts-page .progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: 0.86rem;
+  margin: 0;
+}
+.budgets-list .progress-labels .spent { font-weight: 700; color: var(--fm-ink); }
+.budgets-list .progress-labels .total { color: var(--fm-ink-3); }
+
+.budgets-list .budget-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.86rem;
+  padding-top: var(--space-3);
+  margin: 0;
+  border-top: 1px solid var(--fm-border);
+}
+.budgets-list .budget-remaining { font-weight: 600; color: var(--fm-positive); }
+.budgets-list .budget-remaining.negative { color: var(--fm-negative); }
+.budgets-list .budget-period {
+  color: var(--fm-ink-3);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+/* percentage chip (added additively in budgets.js render) */
+.budgets-list .budget-pct {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--fm-num);
+  border-radius: var(--radius-pill);
+  background: var(--fm-positive-tint);
+  color: var(--fm-positive);
+}
+.budgets-list .budget-card.budget-warning .budget-pct { background: var(--fm-warning-tint); color: var(--fm-warning); }
+.budgets-list .budget-card.budget-over .budget-pct    { background: var(--fm-negative-tint); color: var(--fm-negative); }
+
+/* ==========================================================================
+   GOALS — progress with a positive emerald-teal reading + reached state
+   ========================================================================== */
+.goals-page .card-grid > .card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+}
+.goals-page .card-grid > .card .card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--fm-font-display);
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--fm-ink);
+}
+.goals-page .card-grid > .card .card-title i { color: var(--fm-primary); }
+.goals-page .card-grid > .card .card-actions { display: flex; gap: var(--space-2); flex: none; }
+
+.goals-page .progress-fill { background: var(--fm-positive); }
+.goals-page .progress-labels { font-weight: 500; color: var(--fm-ink-2); }
+.goals-page .progress-labels span:last-child {
+  font-weight: 700;
+  color: var(--fm-positive);
+}
+
+.goals-page .card-grid > .card p { margin: 0; font-size: 0.9rem; color: var(--fm-ink-2); }
+.goals-page .card-grid > .card .text-success {
+  font-weight: 700;
+  color: var(--fm-positive) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* reached goal: a celebratory but quiet positive tint accent */
+.goals-page .card-grid > .card.goal-reached::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: var(--fm-positive);
+}
+.goals-page .card-grid > .card.goal-reached .progress-fill {
+  background: linear-gradient(90deg, var(--fm-positive), var(--fm-positive));
+}
+
+/* goal meta row (added additively in goals.js): target date / per-month hint */
+.goals-page .goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: 0.8rem;
+  color: var(--fm-ink-3);
+}
+.goals-page .goal-meta .goal-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.goals-page .goal-meta .goal-meta-item i { color: var(--fm-ink-3); }
+
+/* ==========================================================================
+   DEBTS — payoff progress, direction (I owe / owed to me), overdue state
+   ========================================================================== */
+.debts-page .stats-grid .stat-card .stat-value.text-success { color: var(--fm-positive) !important; }
+.debts-page .stats-grid .stat-card .stat-value.text-error   { color: var(--fm-negative) !important; }
+
+.debts-page .card-grid > .card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+}
+.debts-page .card-grid > .card .card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--fm-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--fm-ink);
+}
+.debts-page .card-grid > .card .card-actions { display: flex; gap: var(--space-2); flex: none; }
+
+/* direction arrows keyed to money semantics */
+.debts-page .card-grid > .card .card-title .text-error   { color: var(--fm-negative) !important; }
+.debts-page .card-grid > .card .card-title .text-success { color: var(--fm-positive) !important; }
+
+.debts-page .card-grid > .card .text-secondary {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--fm-ink-3);
+}
+
+/* default debt payoff fill = positive (paying down is good progress) */
+.debts-page .progress-fill { background: var(--fm-positive); }
+.debts-page .progress-labels span:first-child { font-weight: 600; color: var(--fm-ink); }
+.debts-page .progress-labels span:last-child  { color: var(--fm-ink-3); }
+
+.debts-page .card-grid > .card p { margin: 0; font-size: 0.88rem; color: var(--fm-ink-2); }
+.debts-page .card-grid > .card p.text-error,
+.debts-page .card-grid > .card .text-error { color: var(--fm-negative) !important; font-weight: 600; }
+.debts-page .card-grid > .card p.text-success,
+.debts-page .card-grid > .card .text-success {
+  color: var(--fm-positive) !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* overdue debt: warm negative accent on the card top + tinted wash */
+.debts-page .card-grid > .card.budget-over::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: var(--fm-negative);
+}
+.debts-page .card-grid > .card.budget-over {
+  border-color: var(--fm-negative-tint);
+  background:
+    linear-gradient(0deg, var(--fm-surface), var(--fm-surface)) padding-box,
+    var(--fm-negative-tint);
+}
+.debts-page .card-grid > .card.budget-over .progress-fill { background: var(--fm-warning); }
+
+/* overdue pill (added additively in debts.js) */
+.debts-page .debt-due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--fm-ink-3);
+}
+.debts-page .debt-due.overdue {
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--fm-negative-tint);
+  color: var(--fm-negative);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Empty states on finance surfaces — calmer, on-brand
+   ========================================================================== */
+.budgets-list .empty-state,
+.goals-page .empty-state,
+.debts-page .empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  background: var(--fm-surface);
+  border: 1px dashed var(--fm-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--fm-ink-3);
+}
+.budgets-list .empty-state i,
+.goals-page .empty-state i,
+.debts-page .empty-state i {
+  font-size: 2.6rem;
+  opacity: 0.55;
+  color: var(--fm-primary);
+}
+.budgets-list .empty-state h3,
+.goals-page .empty-state h3,
+.debts-page .empty-state h3 {
+  margin: 0;
+  font-family: var(--fm-font-display);
+  color: var(--fm-ink);
+}
+.budgets-list .empty-state p,
+.goals-page .empty-state p,
+.debts-page .empty-state p { margin: 0; max-width: 32ch; }
+
+/* ==========================================================================
+   Reduced motion — kill the progress sweep + card lifts
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .budgets-list .progress-fill,
+  .goals-page .progress-fill,
+  .debts-page .progress-fill,
+  .budgets-list .budget-card,
+  .goals-page .card-grid > .card,
+  .debts-page .card-grid > .card,
+  .budget-stats-overview .stat-card,
+  .goals-page .stats-grid .stat-card,
+  .debts-page .stats-grid .stat-card {
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   Responsive — comfortable one-handed on a phone
+   ========================================================================== */
+@media (max-width: 768px) {
+  .budgets-list,
+  .goals-page .card-grid,
+  .debts-page .card-grid { grid-template-columns: 1fr; }
+
+  .budget-stats-overview { grid-template-columns: 1fr 1fr; }
+
+  .budgets-list .budget-card,
+  .goals-page .card-grid > .card,
+  .debts-page .card-grid > .card { padding: var(--space-4); }
+
+  .budget-stats-overview .stat-value,
+  .goals-page .stats-grid .stat-value,
+  .debts-page .stats-grid .stat-value { font-size: 1.25rem; }
+}
+
+@media (max-width: 420px) {
+  .budget-stats-overview { grid-template-columns: 1fr; }
+  .goals-page .stats-grid,
+  .debts-page .stats-grid { grid-template-columns: 1fr; }
+}

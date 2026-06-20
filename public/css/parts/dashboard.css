@@ -1,0 +1,660 @@
+/* ==========================================================================
+   FINMAN — parts/dashboard.css
+   Screen-level styles for the "dashboard" surface.
+   Signature: "Your money, clarified" hero (net-worth thesis + cashflow +
+   live AI-CFO insight card) over a calm, disciplined widget/summary grid.
+   Tokens only — never hardcode colors. Both renderers are styled:
+     • app.js renderDashboard()  → .dashboard-summary/.dashboard-content/.dashboard-charts
+     • dashboard.js SmartDashboard → .smart-dashboard/.dashboard-grid/.dashboard-widget
+   This part is @imported at the TOP of style.css; where the base layer would
+   win on source order, specificity is raised intentionally.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. SIGNATURE HERO — "Your money, clarified"
+   -------------------------------------------------------------------------- */
+.fm-hero {
+  position: relative;
+  margin: 0 0 var(--space-6);
+  padding: clamp(var(--space-5), 4vw, var(--space-7));
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--fm-primary-tint) 0%, transparent 58%),
+    linear-gradient(180deg, var(--fm-surface) 0%, var(--fm-surface) 100%);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+/* A quiet brand seam along the leading edge — the one bold accent. */
+.fm-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--fm-primary), var(--fm-primary-soft));
+}
+
+.fm-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: clamp(var(--space-4), 3vw, var(--space-6));
+  align-items: stretch;
+}
+
+.fm-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.fm-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--fm-primary-tint);
+  color: var(--fm-primary-strong);
+  font-family: var(--fm-font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fm-hero-eyebrow i { font-size: 0.78em; }
+
+.fm-hero-title {
+  margin: 0;
+  color: var(--fm-ink-2);
+  font-family: var(--fm-font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* The thesis figure — large, tabular, display face. */
+.fm-hero-figure {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--fm-ink);
+  font-family: var(--fm-font-display);
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: 1;
+}
+.fm-hero-currency {
+  color: var(--fm-ink-3);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 500;
+}
+.fm-hero-amount {
+  font-size: clamp(2.4rem, 7vw, 4.25rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.fm-hero-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-family: var(--fm-font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.fm-hero-delta.up {
+  background: var(--fm-positive-tint);
+  color: var(--fm-positive);
+}
+.fm-hero-delta.down {
+  background: var(--fm-negative-tint);
+  color: var(--fm-negative);
+}
+.fm-hero-delta i { font-size: 0.82em; }
+
+/* Compact cashflow read */
+.fm-hero-cashflow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--fm-border);
+}
+.fm-cashflow-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.fm-cashflow-label {
+  color: var(--fm-ink-3);
+  font-family: var(--fm-font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.fm-cashflow-value {
+  font-family: var(--fm-font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--fm-ink);
+}
+.fm-cashflow-value.in { color: var(--fm-positive); }
+.fm-cashflow-value.out { color: var(--fm-negative); }
+
+/* AI-CFO insight card — the distinctive hero companion. */
+.fm-insight-card,
+.ai-insight-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--fm-primary-soft);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(140% 120% at 100% 0%, var(--fm-primary-tint) 0%, transparent 60%),
+    var(--fm-surface);
+  box-shadow: var(--fm-shadow-primary);
+  overflow: hidden;
+}
+
+.fm-insight-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fm-primary-strong);
+  font-family: var(--fm-font-ui);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.fm-insight-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--fm-positive);
+  box-shadow: 0 0 0 0 var(--fm-positive);
+  animation: fm-pulse 2.4s var(--fm-ease) infinite;
+}
+@keyframes fm-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(14, 155, 138, 0.45); }
+  70%  { box-shadow: 0 0 0 7px rgba(14, 155, 138, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(14, 155, 138, 0); }
+}
+
+.fm-insight-text {
+  margin: 0;
+  flex: 1;
+  color: var(--fm-ink);
+  font-family: var(--fm-font-ui);
+  font-size: 0.98rem;
+  font-weight: 450;
+  line-height: 1.5;
+}
+
+.fm-insight-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.fm-insight-foot .btn {
+  background: var(--fm-primary);
+  color: var(--fm-primary-contrast);
+  border-color: transparent;
+}
+.fm-insight-foot .btn:hover {
+  background: var(--fm-primary-strong);
+}
+
+/* --------------------------------------------------------------------------
+   2. CLASSIC DASHBOARD (app.js renderDashboard) — summary tiles
+   -------------------------------------------------------------------------- */
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.dashboard-summary .summary-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease);
+}
+.dashboard-summary .summary-card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.dashboard-summary .summary-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  font-size: 1.1rem;
+}
+.dashboard-summary .summary-card.income .summary-icon {
+  background: var(--fm-positive-tint);
+  color: var(--fm-positive);
+}
+.dashboard-summary .summary-card.expense .summary-icon {
+  background: var(--fm-negative-tint);
+  color: var(--fm-negative);
+}
+.dashboard-summary .summary-card.balance .summary-icon {
+  background: var(--fm-primary-tint);
+  color: var(--fm-primary);
+}
+
+.dashboard-summary .summary-data { min-width: 0; }
+.dashboard-summary .summary-data h3 {
+  margin: 0 0 var(--space-1);
+  color: var(--fm-ink-3);
+  font-family: var(--fm-font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.dashboard-summary .summary-amount {
+  color: var(--fm-ink);
+  font-family: var(--fm-font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.dashboard-summary .summary-card.income .summary-amount { color: var(--fm-positive); }
+.dashboard-summary .summary-card.expense .summary-amount { color: var(--fm-negative); }
+
+/* --------------------------------------------------------------------------
+   3. CLASSIC DASHBOARD — content sections (accounts + recent transactions)
+   -------------------------------------------------------------------------- */
+.dashboard-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.dashboard-content .dashboard-section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-content .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--fm-border);
+}
+.dashboard-content .section-header h2 {
+  margin: 0;
+  color: var(--fm-ink);
+  font-family: var(--fm-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.dashboard-content .section-footer {
+  margin-top: auto;
+  padding-top: var(--space-3);
+  text-align: center;
+}
+
+/* Recent transactions rows */
+.dashboard-content .transactions-list .transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+  border-bottom: 1px solid var(--fm-border);
+}
+.dashboard-content .transactions-list .transaction-item:last-child { border-bottom: 0; }
+.dashboard-content .transaction-category {
+  color: var(--fm-ink-3);
+  font-size: 0.8rem;
+}
+.dashboard-content .transaction-amount {
+  font-family: var(--fm-font-display);
+  font-weight: 600;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+.dashboard-content .transaction-amount.income { color: var(--fm-positive); }
+.dashboard-content .transaction-amount.expense { color: var(--fm-negative); }
+
+/* --------------------------------------------------------------------------
+   4. CHARTS row
+   -------------------------------------------------------------------------- */
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+.dashboard-charts .chart-container {
+  position: relative;
+  padding: var(--space-5);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface);
+  box-shadow: var(--shadow-sm);
+}
+.dashboard-charts .chart-container h2 {
+  margin: 0 0 var(--space-4);
+  color: var(--fm-ink);
+  font-family: var(--fm-font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+.dashboard-charts .chart-container canvas {
+  width: 100% !important;
+  height: 280px !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. SMART DASHBOARD (dashboard.js) — page chrome + widget grid
+   -------------------------------------------------------------------------- */
+.smart-dashboard { display: block; }
+
+.smart-dashboard .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.smart-dashboard .page-header h1 {
+  margin: 0;
+  color: var(--fm-ink);
+  font-family: var(--fm-font-display);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+.smart-dashboard .page-header .btn-group {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+/* Widget shell */
+.dashboard-grid .dashboard-widget {
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease),
+              border-color var(--transition-speed) var(--fm-ease);
+}
+.dashboard-grid .dashboard-widget:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--fm-border-strong);
+}
+.dashboard-grid .dashboard-widget.widget-sm { grid-column: span 4; }
+.dashboard-grid .dashboard-widget.widget-md { grid-column: span 6; }
+.dashboard-grid .dashboard-widget.widget-lg { grid-column: span 12; }
+
+.dashboard-grid .dashboard-widget.dragging {
+  opacity: 0.55;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--fm-primary-soft);
+  cursor: grabbing;
+}
+
+.dashboard-grid .widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.dashboard-grid .widget-header h3 {
+  margin: 0;
+  color: var(--fm-ink-2);
+  font-family: var(--fm-font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.dashboard-grid .widget-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.dashboard-grid .widget-content { min-height: 1px; }
+
+/* Widget primary value (tabular, display face) */
+.dashboard-grid .widget-value {
+  color: var(--fm-ink);
+  font-family: var(--fm-font-display);
+  font-size: 1.7rem;
+  font-weight: 600;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: 1.15;
+}
+.dashboard-grid .widget-value.positive { color: var(--fm-positive); }
+.dashboard-grid .widget-value.negative { color: var(--fm-negative); }
+.dashboard-grid .widget-subtitle {
+  margin-top: var(--space-1);
+  color: var(--fm-ink-3);
+  font-size: 0.8rem;
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Mini lists inside widgets (transactions / upcoming) */
+.dashboard-grid .mini-list { display: flex; flex-direction: column; }
+.dashboard-grid .mini-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--fm-border);
+  font-size: 0.88rem;
+}
+.dashboard-grid .mini-item:last-child { border-bottom: 0; }
+.dashboard-grid .mini-item span:first-child {
+  color: var(--fm-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dashboard-grid .mini-item .positive,
+.dashboard-grid .mini-item .income {
+  color: var(--fm-positive);
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+.dashboard-grid .mini-item .negative,
+.dashboard-grid .mini-item .expense {
+  color: var(--fm-negative);
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+
+/* Mini budgets / goals progress */
+.dashboard-grid .mini-budget,
+.dashboard-grid .mini-goal { padding: var(--space-2) 0; }
+.dashboard-grid .mini-budget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: 0.85rem;
+  color: var(--fm-ink-2);
+  font-feature-settings: var(--fm-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.dashboard-grid .progress-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--fm-surface-2);
+  overflow: hidden;
+}
+.dashboard-grid .progress-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--fm-primary);
+  transition: width var(--transition-speed) var(--fm-ease);
+}
+.dashboard-grid .progress-fill.progress-ok { background: var(--fm-positive); }
+
+/* Widget loading spinner placeholder */
+.dashboard-grid .widget-loading {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+}
+.dashboard-grid .spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--fm-border);
+  border-top-color: var(--fm-primary);
+  border-radius: var(--radius-pill);
+  animation: fm-spin 0.7s linear infinite;
+}
+@keyframes fm-spin { to { transform: rotate(360deg); } }
+
+/* Empty state + add-widget picker */
+.smart-dashboard .empty-state {
+  grid-column: 1 / -1;
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  color: var(--fm-ink-3);
+  border: 1px dashed var(--fm-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--fm-surface);
+}
+.widget-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+.widget-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-sm);
+  background: var(--fm-surface);
+  cursor: pointer;
+  transition: border-color var(--transition-speed) var(--fm-ease),
+              background var(--transition-speed) var(--fm-ease);
+}
+.widget-option:hover {
+  border-color: var(--fm-primary-soft);
+  background: var(--fm-primary-tint);
+}
+.widget-option strong { color: var(--fm-ink); font-family: var(--fm-font-ui); }
+.widget-option small { color: var(--fm-ink-3); }
+
+/* --------------------------------------------------------------------------
+   6. RESTRAINED REVEAL — gentle staggered fade-up on load
+   -------------------------------------------------------------------------- */
+.fm-hero,
+.dashboard-summary .summary-card,
+.dashboard-content .dashboard-section,
+.dashboard-charts .chart-container {
+  animation: fm-reveal 0.5s var(--fm-ease) both;
+}
+.dashboard-summary .summary-card:nth-child(2) { animation-delay: 0.06s; }
+.dashboard-summary .summary-card:nth-child(3) { animation-delay: 0.12s; }
+.dashboard-content .dashboard-section:nth-child(2) { animation-delay: 0.08s; }
+.dashboard-charts .chart-container:nth-child(2) { animation-delay: 0.08s; }
+
+@keyframes fm-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --------------------------------------------------------------------------
+   7. RESPONSIVE — hero stacks; widgets single-column on phones
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .fm-hero-grid { grid-template-columns: 1fr; }
+  .dashboard-grid .dashboard-widget,
+  .dashboard-grid .dashboard-widget.widget-sm,
+  .dashboard-grid .dashboard-widget.widget-md,
+  .dashboard-grid .dashboard-widget.widget-lg {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .fm-hero { padding: var(--space-5) var(--space-4); }
+  .fm-hero-amount { font-size: clamp(2.1rem, 12vw, 3rem); }
+  .dashboard-content,
+  .dashboard-charts { grid-template-columns: 1fr; }
+  .smart-dashboard .page-header { align-items: flex-start; }
+  .smart-dashboard .page-header .btn-group { width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   8. REDUCED MOTION — honor the user's setting
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .fm-hero,
+  .dashboard-summary .summary-card,
+  .dashboard-content .dashboard-section,
+  .dashboard-charts .chart-container {
+    animation: none;
+  }
+  .fm-insight-dot { animation: none; }
+  .dashboard-grid .spinner { animation-duration: 1.4s; }
+  .dashboard-summary .summary-card:hover,
+  .dashboard-grid .dashboard-widget:hover { transform: none; }
+}

@@ -201,6 +201,8 @@ function renderBudgetCards(budgets) {
                         budget.shouldNotify ? 'warning' : 'ok';
     const progressWidth = Math.min(budget.percentUsed, 100);
 
+    const pctLabel = Math.round(budget.percentUsed);
+
     return `
       <div class="budget-card budget-${statusClass}">
         <div class="budget-header">
@@ -209,21 +211,22 @@ function renderBudgetCards(budgets) {
             ${budget.category ? `<span class="budget-category">${budget.category}</span>` : ''}
           </div>
           <div class="budget-actions">
-            <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budget.id}">
+            <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budget.id}" aria-label="Редактировать бюджет">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="btn btn-sm btn-danger budget-delete-btn" data-id="${budget.id}">
+            <button class="btn btn-sm btn-danger budget-delete-btn" data-id="${budget.id}" aria-label="Удалить бюджет">
               <i class="fas fa-trash"></i>
             </button>
           </div>
         </div>
 
         <div class="budget-progress">
-          <div class="progress-bar">
+          <div class="progress-bar" role="progressbar" aria-valuenow="${pctLabel}" aria-valuemin="0" aria-valuemax="100" aria-label="Использовано бюджета ${pctLabel}%">
             <div class="progress-fill progress-${statusClass}" style="width: ${progressWidth}%"></div>
           </div>
           <div class="progress-labels">
             <span class="spent">${formatCurrency(budget.spent)}</span>
+            <span class="budget-pct">${pctLabel}%</span>
             <span class="total">из ${formatCurrency(budget.amount)}</span>
           </div>
         </div>

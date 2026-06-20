@@ -1,40 +1,145 @@
+/* ==========================================================================
+   FINMAN DESIGN SYSTEM — "calm fintech intelligence"
+   Screen-level partials are imported first so style.css base rules + the
+   design-system layer (bottom of this file) can still override where needed.
+   ========================================================================== */
+@import url("/css/parts/dashboard.css");
+@import url("/css/parts/transactions.css");
+@import url("/css/parts/finance.css");
+@import url("/css/parts/ai.css");
+
+/* --------------------------------------------------------------------------
+   TOKENS — LIGHT (default). All historical variable names are preserved and
+   re-pointed at the refined system so every existing rule upgrades for free.
+   New, explicitly-named tokens use the --fm-* / --space-* / --radius-* scheme
+   for downstream screen agents to consume.
+   -------------------------------------------------------------------------- */
 :root {
-    --primary-color: #5D5CDE;
-    --primary-light: #7978E9;
-    --primary-dark: #4847c3;
-    --accent-color: #FF5F5F;
-    --success-color: #38C172;
-    --warning-color: #F9A826;
-    --error-color: #E3342F;
-    --background-color: #FFFFFF;
-    --surface-color: #F8F9FA;
-    --card-color: #FFFFFF;
-    --text-primary: #212529;
-    --text-secondary: #6C757D;
-    --text-tertiary: #ADB5BD;
-    --border-color: #DEE2E6;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-    --border-radius-sm: 0.25rem;
-    --border-radius: 0.5rem;
-    --border-radius-lg: 1rem;
-    --font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    --transition-speed: 0.2s;
+    /* ---- Brand / primary (refined indigo→violet) ---- */
+    --fm-primary:        #5D5CDE;   /* the brand indigo, elevated */
+    --fm-primary-strong: #4B49C8;
+    --fm-primary-soft:   #7C7BEA;
+    --fm-primary-tint:   #ECECFB;   /* faint indigo wash for surfaces/chips */
+    --fm-primary-contrast:#FFFFFF;
+
+    /* ---- Secondary (calmer slate-violet) ---- */
+    --fm-secondary:      #5B6478;
+    --fm-secondary-tint: #EEF0F5;
+
+    /* ---- Semantic money colors ---- */
+    --fm-positive:       #0E9B8A;   /* money-in: confident emerald-teal */
+    --fm-positive-tint:  #DDF3EF;
+    --fm-negative:       #C76074;   /* money-out: muted rose (not alarming) */
+    --fm-negative-tint:  #F8E6EA;
+    --fm-warning:        #D98A1F;   /* warm amber */
+    --fm-warning-tint:   #FBEFD8;
+    --fm-info:           #5D5CDE;
+
+    /* ---- Neutral ramp ---- */
+    --fm-ink:            #1B1D2A;   /* near-navy ink, primary text */
+    --fm-ink-2:          #545A6B;   /* secondary text */
+    --fm-ink-3:          #8A90A2;   /* tertiary / muted */
+    --fm-bg:             #F6F7FB;   /* app background (cool off-white) */
+    --fm-surface:        #FFFFFF;   /* cards / panels */
+    --fm-surface-2:      #EFF1F7;   /* sunken / table heads */
+    --fm-border:         #E2E5EE;   /* hairline border */
+    --fm-border-strong:  #CBD0DD;
+
+    /* ---- Legacy aliases (kept so existing selectors keep working) ---- */
+    --primary-color:   var(--fm-primary);
+    --primary-light:   var(--fm-primary-soft);
+    --primary-dark:    var(--fm-primary-strong);
+    --accent-color:    var(--fm-negative);
+    --success-color:   var(--fm-positive);
+    --warning-color:   var(--fm-warning);
+    --error-color:     var(--fm-negative);
+    --background-color:var(--fm-bg);
+    --surface-color:   var(--fm-surface-2);
+    --card-color:      var(--fm-surface);
+    --text-primary:    var(--fm-ink);
+    --text-secondary:  var(--fm-ink-2);
+    --text-tertiary:   var(--fm-ink-3);
+    --border-color:    var(--fm-border);
+
+    /* ---- Elevation (low-spread, layered) ---- */
+    --shadow-sm: 0 1px 2px rgba(27, 29, 42, 0.06);
+    --shadow:    0 4px 14px -4px rgba(27, 29, 42, 0.10), 0 2px 4px -2px rgba(27, 29, 42, 0.06);
+    --shadow-lg: 0 18px 40px -12px rgba(27, 29, 42, 0.18), 0 6px 12px -6px rgba(27, 29, 42, 0.10);
+    --fm-shadow-primary: 0 12px 30px -8px rgba(93, 92, 222, 0.40);
+
+    /* ---- Radius scale ---- */
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-pill: 999px;
+    --border-radius-sm: var(--radius-xs);
+    --border-radius:    var(--radius-md);
+    --border-radius-lg: var(--radius-lg);
+
+    /* ---- Spacing scale (4px base) ---- */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 64px;
+
+    /* ---- Typography ---- */
+    --fm-font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --fm-font-ui:      'Inter', 'Segoe UI', Roboto, system-ui, sans-serif;
+    --font-family:     var(--fm-font-ui);
+    --fm-num: 'tnum' 1, 'lnum' 1;   /* tabular + lining figures for money */
+
+    /* ---- Motion ---- */
+    --transition-speed: 0.18s;
+    --fm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --fm-focus: 0 0 0 2px var(--fm-bg), 0 0 0 4px var(--fm-primary);
+
+    color-scheme: light;
   }
-  
+
+  /* --------------------------------------------------------------------------
+     TOKENS — DARK via OS preference (system mode keeps data-theme unset).
+     Deep-ink navy charcoal, NOT pure black.
+     -------------------------------------------------------------------------- */
   @media (prefers-color-scheme: dark) {
     :root {
-      --background-color: #181818;
-      --surface-color: #212121;
-      --card-color: #282828;
-      --text-primary: #F8F9FA;
-      --text-secondary: #CED4DA;
-      --text-tertiary: #ADB5BD;
-      --border-color: #3D3D3D;
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-      --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-      --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+      --fm-primary:        #7E7DF0;
+      --fm-primary-strong: #6664E6;
+      --fm-primary-soft:   #9A99F4;
+      --fm-primary-tint:   #23243A;
+      --fm-primary-contrast:#FFFFFF;
+
+      --fm-secondary:      #9AA2B8;
+      --fm-secondary-tint: #20222F;
+
+      --fm-positive:       #3CC9B3;
+      --fm-positive-tint:  #14322F;
+      --fm-negative:       #E58AA0;
+      --fm-negative-tint:  #38222A;
+      --fm-warning:        #E9A94A;
+      --fm-warning-tint:   #382A14;
+      --fm-info:           #7E7DF0;
+
+      --fm-ink:            #ECEEF6;
+      --fm-ink-2:          #AEB4C6;
+      --fm-ink-3:          #7B8298;
+      --fm-bg:             #0F1118;   /* deep near-navy charcoal */
+      --fm-surface:        #181B26;
+      --fm-surface-2:      #20232F;
+      --fm-border:         #2A2E3D;
+      --fm-border-strong:  #3A3F52;
+
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+      --shadow:    0 6px 18px -6px rgba(0, 0, 0, 0.55), 0 2px 6px -3px rgba(0, 0, 0, 0.45);
+      --shadow-lg: 0 22px 48px -14px rgba(0, 0, 0, 0.70), 0 8px 16px -8px rgba(0, 0, 0, 0.55);
+      --fm-shadow-primary: 0 14px 34px -10px rgba(126, 125, 240, 0.45);
+
+      color-scheme: dark;
     }
   }
   
@@ -3434,4 +3539,713 @@
   .forecast-arrow {
     transform: rotate(90deg);
   }
+}
+
+/* ==========================================================================
+   WAVE-2: explicit theme switching + mobile/bottom-nav polish (ADDITIVE)
+   --------------------------------------------------------------------------
+   public/js/theme.js sets `data-theme="light|dark"` on <html> for an explicit
+   choice, or removes it in 'system' mode (so the existing
+   @media (prefers-color-scheme: dark) block above keeps governing colors).
+   These rules only ADD an explicit override path; nothing above is changed.
+   ========================================================================== */
+
+/* Explicit LIGHT mode: pin the refined light palette even if the OS prefers
+   dark. Mirrors the :root defaults so light is first-class & deterministic. */
+html[data-theme="light"] {
+  --fm-primary:        #5D5CDE;
+  --fm-primary-strong: #4B49C8;
+  --fm-primary-soft:   #7C7BEA;
+  --fm-primary-tint:   #ECECFB;
+  --fm-secondary:      #5B6478;
+  --fm-secondary-tint: #EEF0F5;
+  --fm-positive:       #0E9B8A;
+  --fm-positive-tint:  #DDF3EF;
+  --fm-negative:       #C76074;
+  --fm-negative-tint:  #F8E6EA;
+  --fm-warning:        #D98A1F;
+  --fm-warning-tint:   #FBEFD8;
+  --fm-info:           #5D5CDE;
+  --fm-ink:            #1B1D2A;
+  --fm-ink-2:          #545A6B;
+  --fm-ink-3:          #8A90A2;
+  --fm-bg:             #F6F7FB;
+  --fm-surface:        #FFFFFF;
+  --fm-surface-2:      #EFF1F7;
+  --fm-border:         #E2E5EE;
+  --fm-border-strong:  #CBD0DD;
+  --shadow-sm: 0 1px 2px rgba(27, 29, 42, 0.06);
+  --shadow:    0 4px 14px -4px rgba(27, 29, 42, 0.10), 0 2px 4px -2px rgba(27, 29, 42, 0.06);
+  --shadow-lg: 0 18px 40px -12px rgba(27, 29, 42, 0.18), 0 6px 12px -6px rgba(27, 29, 42, 0.10);
+  --fm-shadow-primary: 0 12px 30px -8px rgba(93, 92, 222, 0.40);
+  color-scheme: light;
+}
+
+/* Explicit DARK mode: deep-ink navy charcoal, driven by the user's saved
+   choice regardless of OS setting. */
+html[data-theme="dark"] {
+  --fm-primary:        #7E7DF0;
+  --fm-primary-strong: #6664E6;
+  --fm-primary-soft:   #9A99F4;
+  --fm-primary-tint:   #23243A;
+  --fm-secondary:      #9AA2B8;
+  --fm-secondary-tint: #20222F;
+  --fm-positive:       #3CC9B3;
+  --fm-positive-tint:  #14322F;
+  --fm-negative:       #E58AA0;
+  --fm-negative-tint:  #38222A;
+  --fm-warning:        #E9A94A;
+  --fm-warning-tint:   #382A14;
+  --fm-info:           #7E7DF0;
+  --fm-ink:            #ECEEF6;
+  --fm-ink-2:          #AEB4C6;
+  --fm-ink-3:          #7B8298;
+  --fm-bg:             #0F1118;
+  --fm-surface:        #181B26;
+  --fm-surface-2:      #20232F;
+  --fm-border:         #2A2E3D;
+  --fm-border-strong:  #3A3F52;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow:    0 6px 18px -6px rgba(0, 0, 0, 0.55), 0 2px 6px -3px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 22px 48px -14px rgba(0, 0, 0, 0.70), 0 8px 16px -8px rgba(0, 0, 0, 0.55);
+  --fm-shadow-primary: 0 14px 34px -10px rgba(126, 125, 240, 0.45);
+  color-scheme: dark;
+}
+
+/* Smooth the swap between themes (cheap, only color-ish props). */
+html[data-theme] body,
+html[data-theme] .card,
+html[data-theme] .navbar,
+html[data-theme] .modal {
+  transition: background-color var(--transition-speed) ease,
+              color var(--transition-speed) ease,
+              border-color var(--transition-speed) ease;
+}
+
+/* ---- Theme toggle control (optional UI; safe if unused) ---- */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--surface-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease,
+              border-color var(--transition-speed) ease;
+}
+
+.theme-toggle:hover {
+  background: var(--card-color);
+  border-color: var(--primary-color);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.theme-toggle .theme-toggle-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Icon visibility follows the resolved theme: show the sun in dark mode
+   (tap to go light) and the moon in light mode. data-theme-mode is set by
+   theme.js. In system mode neither is forced, so default to the moon. */
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: inline; }
+html[data-theme="dark"] .theme-toggle .icon-sun { display: inline; }
+html[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+/* ---- Bottom navigation (mobile) ----
+   An OPT-IN mobile nav bar. Hidden on desktop; shown only on phones. Existing
+   .nav-list top menu is untouched — projects can render either or both. */
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Never let content scroll sideways on a phone. */
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Anything that could overflow horizontally gets a managed scroll instead
+     of pushing the whole page wide. */
+  .table-responsive,
+  .table-wrap,
+  .chart-container {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  img,
+  canvas,
+  svg,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Bottom nav becomes a fixed, thumb-reachable bar. */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    justify-content: space-around;
+    align-items: stretch;
+    background: var(--card-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+    padding: 0.25rem 0.25rem;
+    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-nav-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 48px;
+    padding: 0.35rem 0.25rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-align: center;
+    cursor: pointer;
+    transition: color var(--transition-speed) ease;
+  }
+
+  .bottom-nav-item .bottom-nav-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .bottom-nav-item.active,
+  .bottom-nav-item:hover {
+    color: var(--primary-color);
+  }
+
+  .bottom-nav-item:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+    border-radius: var(--border-radius-sm);
+  }
+
+  /* When a bottom nav is present, give page content room above it so the last
+     rows/buttons aren't hidden behind the bar. Opt-in via .has-bottom-nav. */
+  body.has-bottom-nav .main-content,
+  body.has-bottom-nav main,
+  body.has-bottom-nav .app-content {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Comfortable tap targets across the app on touch screens. */
+  .btn,
+  .nav-link,
+  .tab,
+  .icon-btn {
+    min-height: 44px;
+  }
+
+  /* Onboarding / AI / reports modals go full-width on small screens. */
+  .onboarding-modal,
+  .ai-panel,
+  .reports-panel,
+  .export-panel {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+  }
+
+  /* AI chat composer pinned to the bottom of its panel, easy to reach. */
+  .ai-composer {
+    position: sticky;
+    bottom: 0;
+    background: var(--card-color);
+    padding: 0.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* Filter/toolbar rows wrap instead of forcing horizontal scroll. */
+  .toolbar,
+  .filters,
+  .reports-controls,
+  .export-controls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* Extra-small phones: tighten widget grid + onboarding step layout. */
+@media (max-width: 480px) {
+  .dashboard-widgets,
+  .widget-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-steps {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .bottom-nav-item {
+    font-size: 0.65rem;
+  }
+
+  /* AI suggestion chips stack full-width for easy tapping. */
+  .ai-suggestions {
+    flex-direction: column;
+  }
+
+  .ai-suggestions .ai-suggestion {
+    width: 100%;
+  }
+}
+
+/* Respect reduced-motion: drop theme-swap transitions for users who ask. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] body,
+  html[data-theme] .card,
+  html[data-theme] .navbar,
+  html[data-theme] .modal,
+  .theme-toggle,
+  .bottom-nav-item {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   ============  FINMAN DESIGN-SYSTEM LAYER (cascades last)  ================
+   "calm fintech intelligence" — restyles existing component classes onto the
+   token system above. Everything here is ADDITIVE: it re-declares known
+   selectors so they win the cascade; no selectors were removed, so JS-bound
+   class names keep working. Screen agents fill css/parts/*.css.
+   ========================================================================== */
+
+/* ---- Typography foundation ---------------------------------------------- */
+body {
+  font-family: var(--fm-font-ui);
+  background: var(--fm-bg);
+  color: var(--fm-ink);
+  font-size: 15.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, .page-title, .card-title, .logo, .modal-title, .stats-value,
+.stat-value, .summary-amount, .account-balance, .widget-value {
+  font-family: var(--fm-font-display);
+  letter-spacing: -0.012em;
+}
+
+/* TABULAR figures everywhere amounts/numbers appear so columns align. */
+.account-balance, .summary-amount, .stats-value, .stat-value, .widget-value,
+.transaction-amount, .budget-remaining, .result-amount, .rate-value,
+.event-amount, .subscription-amount, .asset-value, .forecast-current,
+.forecast-projected, .convert-result, .fm-hero-figure, .fm-num,
+.table td, td.amount, .category-amount, .category-percent {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: var(--fm-num);
+}
+
+/* ---- App shell / header ------------------------------------------------- */
+.header {
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  padding: var(--space-4) 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--fm-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: saturate(140%) blur(8px);
+}
+.header-content { gap: var(--space-4); }
+.logo { font-size: 1.3rem; font-weight: 700; color: var(--fm-ink); letter-spacing: -0.02em; }
+.logo a { color: var(--fm-ink); display: inline-flex; align-items: center; gap: var(--space-2); }
+.logo a::before {
+  content: "";
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--fm-primary), var(--fm-primary-soft));
+  box-shadow: var(--fm-shadow-primary);
+  display: inline-block;
+}
+.user-info { display: flex; align-items: center; gap: var(--space-3); }
+.user-name { color: var(--fm-ink-2); font-weight: 500; font-size: 0.9rem; }
+
+/* ---- Navigation --------------------------------------------------------- */
+.navigation {
+  background: var(--fm-surface);
+  border-bottom: 1px solid var(--fm-border);
+  box-shadow: none;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+.nav-list { gap: var(--space-1); overflow-x: auto; scrollbar-width: none; }
+.nav-list::-webkit-scrollbar { display: none; }
+.nav-item { margin-right: 0; }
+.nav-link {
+  padding: var(--space-4) var(--space-3);
+  color: var(--fm-ink-2);
+  font-weight: 500;
+  font-size: 0.92rem;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  white-space: nowrap;
+  transition: color var(--transition-speed) var(--fm-ease),
+              background var(--transition-speed) var(--fm-ease),
+              border-color var(--transition-speed) var(--fm-ease);
+}
+.nav-link:hover { color: var(--fm-primary); background: var(--fm-primary-tint); }
+.nav-link.active { color: var(--fm-primary); border-bottom-color: var(--fm-primary); }
+
+.main { padding: var(--space-6) 0; }
+
+/* ---- Cards & elevation -------------------------------------------------- */
+.card, .stats-card, .stat-card {
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  transition: box-shadow var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease),
+              border-color var(--transition-speed) var(--fm-ease);
+}
+.card:hover { box-shadow: var(--shadow); border-color: var(--fm-border-strong); transform: translateY(-1px); }
+.card-title { font-size: 1.15rem; font-weight: 600; }
+.card-grid { gap: var(--space-5); }
+
+/* ---- Buttons ------------------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.65rem 1.2rem;
+  font-family: var(--fm-font-ui);
+  font-size: 0.93rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-speed) var(--fm-ease),
+              color var(--transition-speed) var(--fm-ease),
+              box-shadow var(--transition-speed) var(--fm-ease),
+              transform var(--transition-speed) var(--fm-ease),
+              border-color var(--transition-speed) var(--fm-ease);
+}
+.btn:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+.btn-primary {
+  background: var(--fm-primary);
+  color: var(--fm-primary-contrast);
+  box-shadow: var(--fm-shadow-primary);
+}
+.btn-primary:hover:not(:disabled) { background: var(--fm-primary-strong); transform: translateY(-1px); }
+.btn-secondary {
+  background: var(--fm-secondary-tint);
+  color: var(--fm-ink);
+  border-color: var(--fm-border);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--fm-surface-2); border-color: var(--fm-border-strong); transform: translateY(-1px); }
+.btn-success { background: var(--fm-positive); color: #fff; }
+.btn-success:hover:not(:disabled) { background: var(--fm-positive); filter: brightness(0.92); transform: translateY(-1px); }
+.btn-danger { background: var(--fm-negative); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: var(--fm-negative); filter: brightness(0.92); transform: translateY(-1px); }
+.btn-outline { background: transparent; border-color: var(--fm-border-strong); color: var(--fm-primary); }
+.btn-outline:hover:not(:disabled) { background: var(--fm-primary-tint); border-color: var(--fm-primary); color: var(--fm-primary); transform: translateY(-1px); }
+.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.82rem; }
+.btn-icon { border-radius: var(--radius-pill); width: 2.4rem; height: 2.4rem; padding: 0; }
+
+/* ---- Chips -------------------------------------------------------------- */
+.chip, .ai-suggestion, .tag-badge, .currency-tabs .tab, .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  background: var(--fm-secondary-tint);
+  color: var(--fm-ink-2);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transition-speed) var(--fm-ease),
+              color var(--transition-speed) var(--fm-ease);
+}
+.chip:hover, .ai-suggestion:hover, .tab-btn:hover { background: var(--fm-primary-tint); color: var(--fm-primary); }
+.chip.active, .tab-btn.active, .currency-tabs .tab.active {
+  background: var(--fm-primary); color: var(--fm-primary-contrast);
+}
+
+/* ---- Inputs ------------------------------------------------------------- */
+.form-label { font-weight: 600; font-size: 0.88rem; color: var(--fm-ink-2); margin-bottom: var(--space-2); }
+.form-control,
+input[type="text"], input[type="email"], input[type="password"], input[type="number"],
+input[type="date"], input[type="search"], select, textarea {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font-family: var(--fm-font-ui);
+  font-size: 0.95rem;
+  color: var(--fm-ink);
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-speed) var(--fm-ease),
+              box-shadow var(--transition-speed) var(--fm-ease);
+}
+.form-control:focus,
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--fm-primary);
+  box-shadow: 0 0 0 3px var(--fm-primary-tint);
+}
+.form-control::placeholder { color: var(--fm-ink-3); }
+
+/* ---- Tables ------------------------------------------------------------- */
+.table { border-collapse: separate; border-spacing: 0; }
+.table th {
+  font-family: var(--fm-font-ui);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fm-ink-3);
+  background: var(--fm-surface-2);
+  border-bottom: 1px solid var(--fm-border);
+}
+.table th:first-child { border-top-left-radius: var(--radius-sm); }
+.table th:last-child  { border-top-right-radius: var(--radius-sm); }
+.table td { border-bottom: 1px solid var(--fm-border); color: var(--fm-ink); }
+.table tbody tr:hover { background: var(--fm-primary-tint); }
+
+/* ---- Badges ------------------------------------------------------------- */
+.badge {
+  padding: 0.3em 0.7em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-pill);
+  background: var(--fm-secondary-tint);
+  color: var(--fm-ink-2);
+}
+.badge-primary { background: var(--fm-primary-tint); color: var(--fm-primary); }
+.badge-success { background: var(--fm-positive-tint); color: var(--fm-positive); }
+.badge-error   { background: var(--fm-negative-tint); color: var(--fm-negative); }
+.badge-warning { background: var(--fm-warning-tint);  color: var(--fm-warning); }
+
+/* ---- Alerts (soft, tinted — not solid blocks) --------------------------- */
+.alert {
+  padding: var(--space-4) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--fm-border);
+  border-left: 3px solid var(--fm-secondary);
+  background: var(--fm-secondary-tint);
+  color: var(--fm-ink);
+}
+.alert-success { background: var(--fm-positive-tint); border-left-color: var(--fm-positive); color: var(--fm-ink); }
+.alert-error,
+.alert-danger  { background: var(--fm-negative-tint); border-left-color: var(--fm-negative); color: var(--fm-ink); }
+.alert-warning { background: var(--fm-warning-tint);  border-left-color: var(--fm-warning);  color: var(--fm-ink); }
+.alert-info    { background: var(--fm-primary-tint);  border-left-color: var(--fm-primary);  color: var(--fm-ink); }
+
+/* ---- Modals ------------------------------------------------------------- */
+.modal-backdrop, .modal-overlay {
+  background: rgba(15, 17, 24, 0.55);
+  backdrop-filter: blur(3px);
+}
+.modal {
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.modal-header, .modal-footer { border-color: var(--fm-border); }
+.modal-title { font-size: 1.2rem; font-weight: 700; }
+
+/* ---- Status / money helpers -------------------------------------------- */
+.text-success, .transaction-amount.income { color: var(--fm-positive) !important; }
+.text-danger, .text-error, .transaction-amount.expense { color: var(--fm-negative) !important; }
+.text-warning { color: var(--fm-warning) !important; }
+.summary-card.income .summary-amount, .stat-card.income .stat-value { color: var(--fm-positive); }
+.summary-card.expense .summary-amount, .stat-card.expense .stat-value { color: var(--fm-negative); }
+
+/* ---- Dashboard summary cards (legacy app.js dashboard) ------------------ */
+.dashboard-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
+.summary-card {
+  display: flex; align-items: center; gap: var(--space-4);
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+.summary-icon {
+  width: 3rem; height: 3rem; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md); font-size: 1.2rem;
+  background: var(--fm-primary-tint); color: var(--fm-primary);
+}
+.summary-card.income .summary-icon  { background: var(--fm-positive-tint); color: var(--fm-positive); }
+.summary-card.expense .summary-icon { background: var(--fm-negative-tint); color: var(--fm-negative); }
+.summary-data h3 { font-family: var(--fm-font-ui); font-size: 0.82rem; font-weight: 600; color: var(--fm-ink-3); text-transform: uppercase; letter-spacing: 0.03em; margin: 0; }
+.summary-amount { font-size: 1.6rem; font-weight: 700; margin-top: var(--space-1); }
+
+/* ==========================================================================
+   SIGNATURE — Dashboard HERO: "Your money, clarified"
+   Markup + classes introduced in dashboard.js; base styling lives here so the
+   hero reads correctly even before parts/dashboard.css is filled.
+   ========================================================================== */
+.fm-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--fm-primary-tint) 0%, transparent 55%),
+    linear-gradient(135deg, var(--fm-surface) 0%, var(--fm-surface) 100%);
+  border: 1px solid var(--fm-border);
+  box-shadow: var(--shadow);
+}
+.fm-hero::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 100% at 100% 0%, var(--fm-primary) 0%, transparent 70%);
+  opacity: 0.08;
+  pointer-events: none;
+}
+.fm-hero > * { position: relative; z-index: 1; }
+.fm-hero-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--space-6);
+  align-items: stretch;
+}
+.fm-hero-eyebrow {
+  font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--fm-primary);
+  display: inline-flex; align-items: center; gap: var(--space-2);
+}
+.fm-hero-title {
+  font-family: var(--fm-font-display);
+  font-size: 1.05rem; font-weight: 500; color: var(--fm-ink-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+.fm-hero-figure {
+  font-family: var(--fm-font-display);
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  font-weight: 700;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  color: var(--fm-ink);
+}
+.fm-hero-figure .fm-hero-currency { color: var(--fm-ink-3); font-weight: 600; font-size: 0.5em; }
+.fm-hero-delta {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-weight: 600; font-size: 0.92rem;
+  padding: 0.3rem 0.7rem; border-radius: var(--radius-pill);
+}
+.fm-hero-delta.up   { background: var(--fm-positive-tint); color: var(--fm-positive); }
+.fm-hero-delta.down { background: var(--fm-negative-tint); color: var(--fm-negative); }
+
+/* Compact cashflow read */
+.fm-hero-cashflow { display: flex; gap: var(--space-5); margin-top: var(--space-5); flex-wrap: wrap; }
+.fm-cashflow-item { display: flex; flex-direction: column; gap: 2px; }
+.fm-cashflow-label { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fm-ink-3); }
+.fm-cashflow-value { font-family: var(--fm-font-display); font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fm-cashflow-value.in  { color: var(--fm-positive); }
+.fm-cashflow-value.out { color: var(--fm-negative); }
+
+/* The AI-CFO insight card — distinctive, the one bold object */
+.fm-insight-card, .ai-insight-card {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, var(--fm-primary) 0%, var(--fm-primary-strong) 100%);
+  color: #fff;
+  box-shadow: var(--fm-shadow-primary);
+  overflow: hidden;
+}
+.fm-insight-card::before {
+  content: "";
+  position: absolute; right: -30px; top: -30px;
+  width: 140px; height: 140px; border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+}
+.fm-insight-label {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: rgba(255,255,255,0.85);
+}
+.fm-insight-label .fm-insight-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 0 rgba(255,255,255,0.6);
+  animation: fmPulse 2.4s var(--fm-ease) infinite;
+}
+.fm-insight-text { font-size: 1.02rem; font-weight: 500; line-height: 1.45; position: relative; z-index: 1; }
+.fm-insight-foot { margin-top: auto; display: flex; gap: var(--space-3); align-items: center; }
+.fm-insight-card .btn {
+  background: rgba(255,255,255,0.16); color: #fff; border-color: rgba(255,255,255,0.28); box-shadow: none;
+}
+.fm-insight-card .btn:hover:not(:disabled) { background: rgba(255,255,255,0.26); }
+
+@keyframes fmPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+
+/* ---- Accessible focus rings (visible keyboard focus, both themes) -------- */
+a:focus-visible, button:focus-visible, .btn:focus-visible, .nav-link:focus-visible,
+.form-control:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, .chip:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--fm-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ---- Spinner re-tint ---------------------------------------------------- */
+.spinner { border-color: var(--fm-primary-tint); border-left-color: var(--fm-primary); }
+
+/* ---- Page-load reveal + hero count-up reveal (restrained) --------------- */
+@keyframes fmReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+#main-content > * { animation: fmReveal 0.4s var(--fm-ease) both; }
+.fm-hero { animation: fmReveal 0.5s var(--fm-ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  #main-content > *, .fm-hero, .fm-insight-label .fm-insight-dot, .btn, .card {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---- Responsive: hero stacks, comfortable on a phone -------------------- */
+@media (max-width: 768px) {
+  .fm-hero-grid { grid-template-columns: 1fr; gap: var(--space-5); }
+  .fm-hero { padding: var(--space-5); }
+  .header { padding: var(--space-3) 0; }
+  .nav-link { padding: var(--space-3) var(--space-3); }
 }

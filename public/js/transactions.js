@@ -540,27 +540,37 @@ async function fetchTransactions(filters = {}) {
   
   // Рендеринг списка транзакций
   function renderTransactionsList(transactions) {
-    return transactions.map(transaction => `
-      <tr data-transaction-id="${transaction.id}">
-        <td>${formatDate(transaction.date)}</td>
-        <td>${transaction.description || 'Без описания'}</td>
-        <td>${transaction.category || 'Без категории'}</td>
-        <td>${transaction.account_name}</td>
-        <td class="text-right ${transaction.type === 'income' ? 'text-success' : 'text-error'}">
-          ${formatCurrency(transaction.amount)}
+    return transactions.map(transaction => {
+      const isIncome = transaction.type === 'income';
+      const category = transaction.category || 'Без категории';
+      const description = transaction.description || 'Без описания';
+      return `
+      <tr data-transaction-id="${transaction.id}" class="tx-row tx-${isIncome ? 'income' : 'expense'}">
+        <td data-label="Дата" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
+        <td data-label="Описание" class="tx-cell tx-cell-desc">
+          <span class="tx-direction" aria-hidden="true"><i class="fas fa-arrow-${isIncome ? 'down' : 'up'}"></i></span>
+          <span class="tx-desc-text">${description}</span>
         </td>
-        <td>
+        <td data-label="Категория" class="tx-cell tx-cell-category">
+          <span class="chip tx-category-chip">${category}</span>
+        </td>
+        <td data-label="Счет" class="tx-cell tx-cell-account">${transaction.account_name}</td>
+        <td data-label="Сумма" class="text-right tx-cell tx-cell-amount transaction-amount ${isIncome ? 'income text-success' : 'expense text-error'}">
+          <span class="tx-amount-sign" aria-hidden="true">${isIncome ? '+' : '−'}</span>${formatCurrency(Math.abs(transaction.amount))}
+        </td>
+        <td data-label="Действия" class="tx-cell tx-cell-actions">
           <div class="table-actions">
-            <button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}">
+            <button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="Изменить транзакцию" title="Изменить">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}">
+            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}" aria-label="Удалить транзакцию" title="Удалить">
               <i class="fas fa-trash"></i>
             </button>
           </div>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
   
   // Рендеринг пагинации

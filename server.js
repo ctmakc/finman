@@ -54,6 +54,7 @@ const aiRoutes = require('./routes/ai');
 const billingRoutes = require('./routes/billing');
 const syncRoutes = require('./routes/sync');
 const anomaliesRoutes = require('./routes/anomalies');
+const onboardingRoutes = require('./routes/onboarding');
 
 // Настройка Express
 const app = express();
@@ -182,6 +183,7 @@ app.use('/api/ai', apiAuthMiddleware, requireTier('pro'), aiRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/anomalies', anomaliesRoutes);
+app.use('/api/onboarding', apiAuthMiddleware, onboardingRoutes);
 
 // Маршрут для всех остальных запросов (SPA) — НЕ перехватываем /api/*,
 // чтобы неизвестные API-роуты дошли до notFound + errorHandler.

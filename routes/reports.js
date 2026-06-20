@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const reportService = require('../services/reportService');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -33,9 +34,40 @@ router.get('/types', (req, res) => {
 });
 
 // Генерация отчёта
-router.post('/generate', async (req, res) => {
+router.post('/generate', async (req, res, next) => {
   try {
     const { report_type, period_start, period_end, format = 'json' } = req.body;
+
+    // wave-2 pdf-reports: реальная генерация PDF (monthly/annual) через сервис.
+    // Включается ТОЛЬКО при явном format === 'pdf' — старый JSON-контракт для
+    // остальных форматов сохраняется без изменений (additive). Возвращает { id };
+    // PDF скачивается отдельным эндпоинтом /:id/download.
+    if (format === 'pdf') {
+      try {
+        const generated = await reportService.generateReport(req.user.id, {
+          reportType: report_type,
+          periodStart: period_start,
+          periodEnd: period_end,
+        });
+        return res.json({
+          id: generated.id,
+          title: generated.title,
+          report_type: generated.reportType,
+          format: 'pdf',
+          download_url: `/api/reports/${generated.id}/download`,
+          data: generated.data,
+          generated_at: generated.data.generatedAt,
+        });
+      } catch (pdfErr) {
+        // Если pdfkit ещё не установлен (PDF_ENGINE_UNAVAILABLE) — пробрасываем
+        // ошибку в централизованный обработчик (503), не падая молча.
+        if (pdfErr && pdfErr.code === 'PDF_ENGINE_UNAVAILABLE') {
+          return next(pdfErr);
+        }
+        // Прочие ошибки PDF-генерации тоже отдаём как операционные.
+        return next(pdfErr);
+      }
+    }
 
     let reportData;
     let title;
@@ -89,6 +121,26 @@ router.post('/generate', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// wave-2 pdf-reports: стрим PDF отчёта на скачивание.
+// GET /api/reports/:id/download -> application/pdf (буфер начинается с '%PDF').
+router.get('/:id/download', async (req, res, next) => {
+  try {
+    const { report, pdf } = await reportService.getReportPdf(req.user.id, req.params.id);
+    const safeTitle = String(report.title || `report-${report.id}`)
+      .replace(/[^a-zA-Z0-9._-]+/g, '_')
+      .slice(0, 80);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${safeTitle || 'report'}.pdf"`
+    );
+    res.setHeader('Content-Length', pdf.length);
+    return res.status(200).end(pdf);
+  } catch (error) {
+    return next(error);
   }
 });
 

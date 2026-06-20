@@ -116,6 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="user-info">
             <span class="user-name">${appState.user.username}</span>
+            <button id="theme-toggle-btn" class="theme-toggle" type="button"
+                    aria-label="Переключить тему" title="Тема">
+              <span class="theme-toggle-icon icon-moon" aria-hidden="true"><i class="fas fa-moon"></i></span>
+              <span class="theme-toggle-icon icon-sun" aria-hidden="true"><i class="fas fa-sun"></i></span>
+            </button>
             <button id="logout-btn" class="btn btn-sm btn-outline">Выйти</button>
           </div>
         </div>
@@ -261,6 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Обработчик выхода из системы
     document.getElementById('logout-btn').addEventListener('click', logout);
+
+    // Переключатель темы (system -> light -> dark -> ...), persist через theme.js
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (themeBtn && typeof window !== 'undefined' && window.theme) {
+      themeBtn.addEventListener('click', () => window.theme.toggle());
+    }
   }
   
   // Навигация между страницами
@@ -695,9 +706,57 @@ document.addEventListener('DOMContentLoaded', () => {
       `).join('')
       : '<p>У вас еще нет транзакций. <a href="#" class="add-transaction-link">Добавить транзакцию</a></p>';
     
+    // ---- SIGNATURE HERO: "Your money, clarified" ----
+    const netWorth = statsData.totalBalance || 0;
+    const monthIn = statsData.monthlyIncome || 0;
+    const monthOut = statsData.monthlyExpense || 0;
+    const netFlow = monthIn - monthOut;
+    const flowUp = netFlow >= 0;
+    const aiInsight = (typeof getDashboardInsight === 'function')
+      ? getDashboardInsight(statsData)
+      : (flowUp
+          ? 'В этом месяце вы тратите меньше, чем зарабатываете — капитал растёт. Так держать.'
+          : 'Расходы в этом месяце превысили доходы. Загляните в категории, чтобы вернуть баланс.');
+
+    const heroHtml = `
+      <section class="fm-hero" aria-label="Ваши финансы">
+        <div class="fm-hero-grid">
+          <div class="fm-hero-main">
+            <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
+            <h1 class="fm-hero-title">Чистый капитал</h1>
+            <div class="fm-hero-figure" id="hero-networth"
+                 data-countup="${netWorth}" data-currency="₴">
+              <span class="fm-hero-currency">₴</span><span class="fm-hero-amount">${formatCurrency(netWorth).replace(/[^\d.,\s-]/g, '').trim()}</span>
+            </div>
+            <span class="fm-hero-delta ${flowUp ? 'up' : 'down'}">
+              <i class="fas fa-arrow-${flowUp ? 'up' : 'down'}"></i>
+              ${formatCurrency(Math.abs(netFlow))} за месяц
+            </span>
+            <div class="fm-hero-cashflow">
+              <div class="fm-cashflow-item">
+                <span class="fm-cashflow-label">Доходы</span>
+                <span class="fm-cashflow-value in">${formatCurrency(monthIn)}</span>
+              </div>
+              <div class="fm-cashflow-item">
+                <span class="fm-cashflow-label">Расходы</span>
+                <span class="fm-cashflow-value out">${formatCurrency(monthOut)}</span>
+              </div>
+            </div>
+          </div>
+          <aside class="fm-insight-card" aria-label="AI-инсайт">
+            <span class="fm-insight-label"><span class="fm-insight-dot"></span> AI-финдиректор</span>
+            <p class="fm-insight-text">${aiInsight}</p>
+            <div class="fm-insight-foot">
+              <button class="btn btn-sm" id="hero-ai-more" type="button">Спросить AI</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    `;
+
     mainContent.innerHTML = `
-      <h1 class="page-title">Обзор финансов</h1>
-      
+      ${heroHtml}
+
       <div class="dashboard-summary">
         <div class="summary-card income">
           <div class="summary-icon">
@@ -779,7 +838,22 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Инициализация графиков
     initCharts(statsData);
-    
+
+    // Count-up чистого капитала (restrained; respects reduced-motion)
+    animateHeroNetWorth();
+
+    // Кнопка hero «Спросить AI» — открыть AI-ассистента, если он есть
+    const heroAiBtn = document.getElementById('hero-ai-more');
+    if (heroAiBtn) {
+      heroAiBtn.addEventListener('click', () => {
+        if (typeof window !== 'undefined' && window.AIAssistant && typeof window.AIAssistant.open === 'function') {
+          window.AIAssistant.open();
+        } else if (typeof window !== 'undefined' && typeof window.toggleAIPanel === 'function') {
+          window.toggleAIPanel();
+        }
+      });
+    }
+
     // Обработчики событий
     document.getElementById('add-account-btn').addEventListener('click', () => {
       showAddAccountModal();
@@ -1257,7 +1331,40 @@ document.addEventListener('DOMContentLoaded', () => {
     
     return formatter.format(amount);
   }
-  
+
+  // Count-up анимация для hero-фигуры чистого капитала.
+  // Тихая и сдержанная; полностью отключается при prefers-reduced-motion.
+  function animateHeroNetWorth() {
+    const el = document.getElementById('hero-networth');
+    if (!el) return;
+    const amountEl = el.querySelector('.fm-hero-amount');
+    const target = parseFloat(el.getAttribute('data-countup')) || 0;
+    const fmt = (v) => {
+      try {
+        return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(v));
+      } catch (e) {
+        return String(Math.round(v));
+      }
+    };
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!amountEl) return;
+    if (reduce || target === 0) {
+      amountEl.textContent = fmt(target);
+      return;
+    }
+    const duration = 900;
+    const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    function step(now) {
+      const t = Math.min(1, (now - start) / duration);
+      amountEl.textContent = fmt(target * ease(t));
+      if (t < 1) requestAnimationFrame(step);
+      else amountEl.textContent = fmt(target);
+    }
+    requestAnimationFrame(step);
+  }
+
   // Форматирование даты
   function formatDate(dateString) {
     const date = new Date(dateString);
