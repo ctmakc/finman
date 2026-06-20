@@ -95,6 +95,8 @@ const authLimiter = rateLimit({
 
 // Настройка middleware
 app.use(cors(config.corsOptions));
+// Stripe webhook требует СЫРОЕ тело для проверки подписи — монтируем raw ДО json-парсера.
+app.use('/api/billing/webhook', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
@@ -214,6 +216,17 @@ if (require.main === module) {
     console.log(`Сервер запущен на порту ${PORT}`);
     console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
   });
+
+  // Опциональный фоновый планировщик банковской синхронизации (gated SYNC_ENABLED).
+  try {
+    const syncScheduler = require('./services/syncScheduler');
+    if (syncScheduler.isEnabled()) {
+      syncScheduler.start();
+      logger.info('Bank sync scheduler started');
+    }
+  } catch (e) {
+    logger.warn({ err: e }, 'Sync scheduler not started');
+  }
 
   // Graceful shutdown - закрытие БД при завершении процесса
   process.on('SIGTERM', () => {

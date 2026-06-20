@@ -1,0 +1,53 @@
+# Keep the build context small and the image clean/secure.
+
+# Deps — reinstalled inside the image from the lockfile.
+node_modules
+npm-debug.log*
+
+# Local SQLite database & uploads — these must NOT be baked into the image.
+# At runtime they live on the mounted named volume (/app/data).
+data
+uploads
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets — never copy real env files into the image.
+.env
+.env.local
+.env.*.local
+
+# VCS / CI / editor noise.
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.swp
+*.swo
+
+# Tests are not needed at runtime (run them in CI instead).
+test
+jest.config.js
+coverage
+
+# Mobile shells & their build artifacts (server image doesn't need them).
+android
+ios
+capacitor.config.json
+*.apk
+*.aab
+*.ipa
+
+# Logs & OS cruft.
+logs
+*.log
+.DS_Store
+Thumbs.db
+
+# Docker / deploy meta (no need to copy into the image).
+Dockerfile
+.dockerignore
+docker-compose.yml
+scripts/deploy.sh
+README.md

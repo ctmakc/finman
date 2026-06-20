@@ -2,14 +2,20 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const money = require('../lib/money');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
-// Прогноз баланса на N дней
+// Прогноз баланса на N дней.
+// УЛУЧШЕННАЯ МОДЕЛЬ (backward-compatible — старые поля сохранены, новые добавлены):
+//   - сезонность по дню недели и дню месяца на историческом дневном net (income-expense);
+//   - линейный тренд по дневному net через МНК;
+//   - доверительный коридор +/- 1 std остатков (модель vs факт), расширяющийся со временем.
 router.get('/balance', async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const horizon = Math.max(1, parseInt(days) || 30);
     const userId = req.user.id;
 
     // Текущий баланс
@@ -18,7 +24,26 @@ router.get('/balance', async (req, res) => {
       [userId]
     );
 
-    // Средние расходы за последние 3 месяца
+    // Период истории для обучения модели (по умолчанию 90 дней).
+    const HISTORY_DAYS = 90;
+    const historyStart = new Date();
+    historyStart.setDate(historyStart.getDate() - HISTORY_DAYS);
+    const historyStartStr = historyStart.toISOString().split('T')[0];
+
+    // Дневные суммы доходов/расходов из истории.
+    const dailyRows = await query(
+      `SELECT date,
+              SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END) AS income,
+              SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
+       FROM transactions
+       WHERE user_id = ? AND date >= ?
+       GROUP BY date
+       ORDER BY date ASC`,
+      [userId, historyStartStr]
+    );
+
+    // Средние расходы за последние 3 месяца (СОХРАНЯЕМ старое поведение для
+    // обратной совместимости полей summary.avgDaily*).
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const avgExpenses = await get(
@@ -30,8 +55,6 @@ router.get('/balance', async (req, res) => {
       )`,
       [userId, threeMonthsAgo.toISOString().split('T')[0]]
     );
-
-    // Средние доходы
     const avgIncome = await get(
       `SELECT AVG(daily_total) as avg FROM (
         SELECT date, SUM(amount) as daily_total
@@ -42,13 +65,18 @@ router.get('/balance', async (req, res) => {
       [userId, threeMonthsAgo.toISOString().split('T')[0]]
     );
 
-    // Регулярные платежи
+    // Регулярные платежи. Колонка даты в схеме — next_payment_date; читаем
+    // также next_execution_date для совместимости со старыми данными/кодом.
     const recurringPayments = await query(
-      `SELECT amount, type, frequency, next_execution_date
+      `SELECT amount, type, frequency, next_payment_date
        FROM recurring_payments
        WHERE user_id = ? AND is_active = 1`,
       [userId]
     );
+    for (const p of recurringPayments) {
+      // нормализуем имя поля, на которое опираются helper-функции
+      p.next_execution_date = p.next_payment_date || p.next_execution_date;
+    }
 
     // Подписки
     const subscriptions = await query(
@@ -58,22 +86,47 @@ router.get('/balance', async (req, res) => {
       [userId]
     );
 
-    // Прогнозируем на каждый день
-    const forecast = [];
-    let balance = currentBalance.total || 0;
+    // ---- Обучаем сезонно-трендовую модель на дневном net ----
+    const model = buildSeasonalTrendModel(dailyRows, HISTORY_DAYS);
+
     const dailyExpense = avgExpenses.avg || 0;
     const dailyIncome = avgIncome.avg || 0;
+
+    // Если истории мало — деградируем к плоской средней (как раньше).
+    const haveModel = model.samples >= 5;
+    const flatNet = dailyIncome - dailyExpense;
+
+    const forecast = [];
+    let balance = currentBalance.total || 0;
     const today = new Date();
 
-    for (let i = 0; i <= parseInt(days); i++) {
+    // Доверительный коридор: +/- z * std остатков, расширяется ~sqrt(шага).
+    const Z = 1; // 1 std (~68%)
+    const residualStd = haveModel ? model.residualStd : 0;
+
+    for (let i = 0; i <= horizon; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() + i);
       const dateStr = date.toISOString().split('T')[0];
 
-      let dayExpense = dailyExpense;
-      let dayIncome = dailyIncome;
+      // Базовый прогноз дневного net из модели (или плоский fallback).
+      const modeledNet = haveModel ? predictNet(model, i) : flatNet;
 
-      // Добавляем регулярные платежи
+      // Разносим net на income/expense для обратной совместимости полей.
+      // Fallback-режим: плоские средние. Модельный режим: средний поток
+      // доходов/расходов, скорректированный так, чтобы income - expense
+      // совпадал с прогнозом net модели.
+      let dayIncome = dailyIncome;
+      let dayExpense = dailyExpense;
+      if (haveModel) {
+        dayIncome = Math.max(0, model.avgIncome);
+        dayExpense = Math.max(0, model.avgExpense);
+        const drift = modeledNet - (dayIncome - dayExpense);
+        if (drift >= 0) dayIncome += drift;
+        else dayExpense += -drift;
+      }
+
+      // Добавляем регулярные платежи поверх базового прогноза.
       for (const payment of recurringPayments) {
         if (isPaymentDue(payment, dateStr)) {
           if (payment.type === 'expense') {
@@ -95,19 +148,29 @@ router.get('/balance', async (req, res) => {
         balance = balance + dayIncome - dayExpense;
       }
 
+      // Ширина коридора растёт как sqrt(дни) — накопление неопределённости.
+      const band = money.round(Z * residualStd * Math.sqrt(Math.max(1, i)));
+
       forecast.push({
         date: dateStr,
-        balance: Math.round(balance * 100) / 100,
-        income: Math.round(dayIncome * 100) / 100,
-        expense: Math.round(dayExpense * 100) / 100
+        balance: money.round(balance),
+        income: money.round(dayIncome),
+        expense: money.round(dayExpense),
+        // НОВЫЕ поля (доверительный коридор):
+        balanceLower: money.round(balance - band),
+        balanceUpper: money.round(balance + band),
+        confidenceBand: band
       });
     }
 
     // Статистика
     const endBalance = forecast[forecast.length - 1].balance;
-    const change = endBalance - (currentBalance.total || 0);
+    const change = money.round(endBalance - (currentBalance.total || 0));
     const lowestPoint = Math.min(...forecast.map(f => f.balance));
     const lowestDate = forecast.find(f => f.balance === lowestPoint)?.date;
+    // Худший сценарий по нижней границе коридора.
+    const worstCasePoint = Math.min(...forecast.map(f => f.balanceLower));
+    const worstCaseDate = forecast.find(f => f.balanceLower === worstCasePoint)?.date;
 
     res.json({
       forecast,
@@ -118,8 +181,20 @@ router.get('/balance', async (req, res) => {
         changePercent: currentBalance.total ? ((change / currentBalance.total) * 100).toFixed(1) : 0,
         lowestPoint,
         lowestDate,
-        avgDailyExpense: Math.round(dailyExpense * 100) / 100,
-        avgDailyIncome: Math.round(dailyIncome * 100) / 100
+        avgDailyExpense: money.round(dailyExpense),
+        avgDailyIncome: money.round(dailyIncome),
+        // НОВЫЕ поля модели/коридора:
+        model: haveModel ? 'seasonal_trend' : 'flat_average',
+        confidence: {
+          residualStd: money.round(residualStd),
+          // конечная ширина коридора (на горизонте прогноза)
+          endBand: forecast[forecast.length - 1].confidenceBand,
+          projectedLower: forecast[forecast.length - 1].balanceLower,
+          projectedUpper: forecast[forecast.length - 1].balanceUpper
+        },
+        trendPerDay: haveModel ? money.round(model.slope) : 0,
+        worstCasePoint: money.round(worstCasePoint),
+        worstCaseDate
       }
     });
   } catch (error) {
@@ -405,6 +480,141 @@ function predictNext(values) {
   const intercept = (sumY - slope * sumX) / n;
 
   return Math.max(0, slope * n + intercept);
+}
+
+// ==================== СЕЗОННО-ТРЕНДОВАЯ МОДЕЛЬ ====================
+//
+// buildSeasonalTrendModel(dailyRows, historyDays) -> {
+//   slope, intercept,            // линейный тренд по дневному net (МНК)
+//   weekdayFactor[7],            // аддитивная сезонность по дню недели
+//   monthdayFactor{1..31},       // аддитивная сезонность по дню месяца
+//   residualStd,                 // std остатков (модель vs факт) -> коридор
+//   samples, avgIncome, avgExpense, originIndex
+// }
+//
+// Идея: net(t) ≈ intercept + slope*t + weekdayFactor[dow] + monthdayFactor[dom].
+// Сезонные факторы — отклонения средних по группе от общего среднего.
+function buildSeasonalTrendModel(dailyRows, historyDays) {
+  const model = {
+    slope: 0,
+    intercept: 0,
+    weekdayFactor: new Array(7).fill(0),
+    monthdayFactor: {},
+    residualStd: 0,
+    samples: 0,
+    avgIncome: 0,
+    avgExpense: 0,
+    originIndex: 0
+  };
+
+  if (!Array.isArray(dailyRows) || dailyRows.length === 0) {
+    return model;
+  }
+
+  // Опорная дата = сегодня; индекс дня = смещение в днях (отрицательное в прошлом).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const points = dailyRows.map((r) => {
+    const d = new Date(r.date);
+    d.setHours(0, 0, 0, 0);
+    const dayIndex = Math.round((d - today) / (1000 * 60 * 60 * 24)); // <= 0
+    const income = Number(r.income) || 0;
+    const expense = Number(r.expense) || 0;
+    return {
+      t: dayIndex,
+      net: income - expense,
+      income,
+      expense,
+      dow: d.getDay(),
+      dom: d.getDate()
+    };
+  });
+
+  model.samples = points.length;
+  model.avgIncome = mean(points.map((p) => p.income));
+  model.avgExpense = mean(points.map((p) => p.expense));
+
+  // --- линейный тренд по net через МНК (x = t, y = net) ---
+  const n = points.length;
+  const xs = points.map((p) => p.t);
+  const ys = points.map((p) => p.net);
+  const meanX = mean(xs);
+  const meanY = mean(ys);
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - meanX) * (ys[i] - meanY);
+    den += (xs[i] - meanX) * (xs[i] - meanX);
+  }
+  model.slope = den !== 0 ? num / den : 0;
+  model.intercept = meanY - model.slope * meanX;
+
+  // --- детренд: остаток = net - (intercept + slope*t) ---
+  const detrended = points.map((p) => ({
+    ...p,
+    resid: p.net - (model.intercept + model.slope * p.t)
+  }));
+  const grandMeanResid = mean(detrended.map((p) => p.resid));
+
+  // --- сезонность по дню недели (аддитивные отклонения) ---
+  for (let dow = 0; dow < 7; dow++) {
+    const grp = detrended.filter((p) => p.dow === dow);
+    model.weekdayFactor[dow] = grp.length ? mean(grp.map((p) => p.resid)) - grandMeanResid : 0;
+  }
+
+  // --- сезонность по дню месяца ---
+  for (let dom = 1; dom <= 31; dom++) {
+    const grp = detrended.filter((p) => p.dom === dom);
+    model.monthdayFactor[dom] = grp.length ? mean(grp.map((p) => p.resid)) - grandMeanResid : 0;
+  }
+
+  // --- остатки модели (для доверительного коридора) ---
+  const residuals = detrended.map((p) => {
+    const fitted =
+      model.intercept +
+      model.slope * p.t +
+      grandMeanResid +
+      model.weekdayFactor[p.dow] +
+      (model.monthdayFactor[p.dom] || 0);
+    return p.net - fitted;
+  });
+  model._grandMeanResid = grandMeanResid;
+  model.residualStd = stdDevLocal(residuals);
+
+  return model;
+}
+
+// Прогноз дневного net на step дней вперёд (step >= 0; 0 = сегодня).
+function predictNet(model, step) {
+  const t = step; // опора в today => индекс будущего дня = +step
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + step);
+  const dow = date.getDay();
+  const dom = date.getDate();
+
+  const val =
+    model.intercept +
+    model.slope * t +
+    (model._grandMeanResid || 0) +
+    (model.weekdayFactor[dow] || 0) +
+    (model.monthdayFactor[dom] || 0);
+
+  return Number.isFinite(val) ? val : 0;
+}
+
+// Локальные стат-помощники (форкаст не тянет anomalyService).
+function mean(nums) {
+  if (!nums || !nums.length) return 0;
+  return nums.reduce((a, b) => a + (Number(b) || 0), 0) / nums.length;
+}
+function stdDevLocal(nums) {
+  const n = nums ? nums.length : 0;
+  if (n < 2) return 0;
+  const m = mean(nums);
+  const variance = nums.reduce((acc, x) => acc + Math.pow((Number(x) || 0) - m, 2), 0) / (n - 1);
+  return Math.sqrt(variance);
 }
 
 module.exports = router;

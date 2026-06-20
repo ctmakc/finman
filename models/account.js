@@ -1,4 +1,5 @@
 const { query, get, run } = require('../db/database');
+const money = require('../lib/money');
 
 class Account {
   // Создание счета
@@ -125,16 +126,30 @@ class Account {
     }
   }
   
-  // Обновление баланса счета
+  // Обновление баланса счета.
+  // Читаем текущий баланс и пересчитываем через money.add, чтобы хранимое
+  // значение всегда было округлено до 2 знаков и не накапливало float-дрейф
+  // (например, многократные 0.1 + 0.2 в SQLite REAL).
   static async updateBalance(id, userId, amount) {
     try {
-      const result = await run(
-        `UPDATE accounts 
-         SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ? AND user_id = ?`,
-        [amount, id, userId]
+      const account = await get(
+        `SELECT balance FROM accounts WHERE id = ? AND user_id = ?`,
+        [id, userId]
       );
-      
+
+      if (!account) {
+        return false;
+      }
+
+      const newBalance = money.add(account.balance, amount);
+
+      const result = await run(
+        `UPDATE accounts
+         SET balance = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [newBalance, id, userId]
+      );
+
       return result.changes > 0;
     } catch (error) {
       throw error;

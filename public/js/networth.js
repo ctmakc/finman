@@ -3,9 +3,32 @@ const NetWorthModule = {
   current: null,
   history: [],
   assets: [],
+  trend: null,
+
+  // Символы валют для отображения базовой валюты.
+  currencySymbols: {
+    UAH: '₴', USD: '$', EUR: '€', GBP: '£', PLN: 'zł', CZK: 'Kč',
+    CHF: 'CHF', CAD: 'C$', AUD: 'A$', JPY: '¥', CNY: '¥', TRY: '₺',
+    ILS: '₪', BTC: '₿', RUB: '₽'
+  },
+
+  // Символ базовой валюты текущего расчёта (по умолчанию ₴).
+  baseSymbol() {
+    const code = (this.current && this.current.baseCurrency) || 'UAH';
+    return this.currencySymbols[code] || code;
+  },
+
+  fmt(n) {
+    return Number(n || 0).toLocaleString();
+  },
 
   async init() {
-    await Promise.all([this.loadCurrent(), this.loadHistory(), this.loadAssets()]);
+    await Promise.all([
+      this.loadCurrent(),
+      this.loadHistory(),
+      this.loadAssets(),
+      this.loadTrend(),
+    ]);
   },
 
   async loadCurrent() {
@@ -32,6 +55,20 @@ const NetWorthModule = {
     }
   },
 
+  async loadTrend() {
+    try {
+      const response = await fetch('/api/networth/trend?period=year', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const body = await response.json();
+      // Foundation respond.ok -> { success, data }; защищаемся на случай legacy-формы.
+      this.trend = (body && body.data) ? body.data : body;
+      this.renderTrend();
+    } catch (error) {
+      console.error('Error loading trend:', error);
+    }
+  },
+
   async loadAssets() {
     try {
       const response = await fetch('/api/networth/assets', {
@@ -48,24 +85,58 @@ const NetWorthModule = {
     const container = document.getElementById('networth-summary');
     if (!container || !this.current) return;
 
+    const sym = this.baseSymbol();
     const change = this.history.length > 1 ? this.current.netWorth - this.history[0].net_worth : 0;
     const changePercent = this.history.length > 1 && this.history[0].net_worth ? (change / Math.abs(this.history[0].net_worth) * 100).toFixed(1) : 0;
+
+    // Предупреждение, если для части валют не нашлось курса (расчёт приблизительный).
+    const missing = (this.current.missingRates || []);
+    const missingWarning = missing.length
+      ? `<div class="networth-warning text-secondary" style="font-size:0.85em;margin-top:4px;">⚠️ Нет курса для: ${missing.join(', ')} — учтены 1:1, итог приблизительный</div>`
+      : '';
 
     container.innerHTML = `
       <div class="networth-main">
         <div class="networth-value">
-          <span class="label">Чистая стоимость</span>
-          <span class="value ${this.current.netWorth >= 0 ? 'positive' : 'negative'}">${this.current.netWorth.toLocaleString()} ₴</span>
-          ${change !== 0 ? `<span class="change ${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${change.toLocaleString()} ₴ (${changePercent}%)</span>` : ''}
+          <span class="label">Чистая стоимость (${(this.current.baseCurrency || 'UAH')})</span>
+          <span class="value ${this.current.netWorth >= 0 ? 'positive' : 'negative'}">${this.fmt(this.current.netWorth)} ${sym}</span>
+          ${change !== 0 ? `<span class="change ${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${this.fmt(change)} ${sym} (${changePercent}%)</span>` : ''}
+          ${missingWarning}
         </div>
       </div>
       <div class="networth-breakdown">
-        <div class="breakdown-item positive"><span class="label">Активы</span><span class="value">${this.current.totalAssets.toLocaleString()} ₴</span></div>
-        <div class="breakdown-item negative"><span class="label">Обязательства</span><span class="value">${this.current.totalLiabilities.toLocaleString()} ₴</span></div>
+        <div class="breakdown-item positive"><span class="label">Активы</span><span class="value">${this.fmt(this.current.totalAssets)} ${sym}</span></div>
+        <div class="breakdown-item negative"><span class="label">Обязательства</span><span class="value">${this.fmt(this.current.totalLiabilities)} ${sym}</span></div>
       </div>
     `;
 
     this.renderBreakdown();
+  },
+
+  // Небольшой тренд по снимкам (текстовый, рядом с графиком).
+  renderTrend() {
+    const container = document.getElementById('networth-trend');
+    if (!container) return;
+
+    const t = this.trend;
+    if (!t || !Array.isArray(t.points) || t.points.length < 2) {
+      container.innerHTML = '<p class="text-secondary" style="font-size:0.85em;">Тренд появится после нескольких снимков</p>';
+      return;
+    }
+
+    const sym = this.baseSymbol();
+    const ch = t.change || { amount: 0, percent: 0 };
+    const dir = ch.amount >= 0 ? 'positive' : 'negative';
+    const arrow = ch.amount >= 0 ? '▲' : '▼';
+    const sign = ch.amount >= 0 ? '+' : '';
+
+    container.innerHTML = `
+      <div class="networth-trend-line ${dir}" style="font-size:0.9em;">
+        <span>${arrow} ${sign}${this.fmt(ch.amount)} ${sym}</span>
+        <span class="text-secondary"> (${sign}${(ch.percent || 0)}%)</span>
+        <span class="text-secondary" style="margin-left:6px;">за ${t.points.length} снимк.</span>
+      </div>
+    `;
   },
 
   renderBreakdown() {
@@ -124,7 +195,7 @@ const NetWorthModule = {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       alert('Снимок сохранён');
-      await this.loadHistory();
+      await Promise.all([this.loadHistory(), this.loadTrend()]);
     } catch (error) {
       alert('Ошибка сохранения');
     }
@@ -187,7 +258,7 @@ const NetWorthModule = {
         <div id="networth-summary" class="card networth-summary"></div>
         <div class="grid-2">
           <div id="networth-details"></div>
-          <div class="card"><h3>📈 История</h3><div id="networth-chart"></div></div>
+          <div class="card"><h3>📈 История</h3><div id="networth-trend"></div><div id="networth-chart"></div></div>
         </div>
         <div class="card"><div class="card-header"><h3>🏠 Ручные активы</h3><button class="btn btn-sm" onclick="NetWorthModule.showAddAssetModal()">+ Добавить</button></div><div id="manual-assets"></div></div>
       </div>

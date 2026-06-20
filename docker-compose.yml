@@ -1,0 +1,52 @@
+# FINMAN — single-service compose with a PERSISTENT SQLite database.
+#
+# The SQLite file (data/finance.db) lives on the named volume `finman-data`
+# mounted at /app/data, so it survives `docker compose down` / restarts and
+# image rebuilds. DATABASE_PATH is pinned to that directory.
+#
+# Quick start:
+#   cp .env.example .env   # then fill in real secrets
+#   docker compose up -d --build
+#   curl http://localhost:3000/api/health
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: finman:latest
+    container_name: finman
+    restart: unless-stopped
+
+    # All configuration comes from .env (see .env.example for the full list).
+    env_file:
+      - .env
+
+    # Force the DB path onto the persistent volume regardless of what .env says,
+    # and default NODE_ENV to production for the container.
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      DATABASE_PATH: /app/data/finance.db
+
+    # Host:Container. Host port is overridable via PORT in .env; the container
+    # always listens on 3000 (matches Dockerfile EXPOSE + HEALTHCHECK).
+    ports:
+      - "${PORT:-3000}:3000"
+
+    # Persistent storage for the SQLite database.
+    volumes:
+      - finman-data:/app/data
+
+    # Container-level healthcheck mirrors the Dockerfile probe (kept here too
+    # so `docker compose ps` reports health even for pre-built images).
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  finman-data:
+    driver: local

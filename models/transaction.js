@@ -1,17 +1,22 @@
 const { query, get, run } = require('../db/database');
 const Account = require('./account');
+const money = require('../lib/money');
 
 class Transaction {
   // Создание транзакции
   static async create(transactionData) {
     try {
+      // Округляем сумму до копеек, чтобы и хранимая транзакция, и баланс
+      // счёта оставались точными до 2 знаков.
+      const amount = money.round(transactionData.amount);
+
       // Начать транзакцию
       await run('BEGIN TRANSACTION');
-      
+
       // Создать запись о транзакции
       const result = await run(
-        `INSERT INTO transactions 
-         (account_id, user_id, date, description, category, amount, type) 
+        `INSERT INTO transactions
+         (account_id, user_id, date, description, category, amount, type)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           transactionData.accountId,
@@ -19,22 +24,22 @@ class Transaction {
           transactionData.date,
           transactionData.description || '',
           transactionData.category || 'Прочее',
-          transactionData.amount,
-          transactionData.type || (transactionData.amount >= 0 ? 'income' : 'expense')
+          amount,
+          transactionData.type || (amount >= 0 ? 'income' : 'expense')
         ]
       );
-      
+
       // Обновить баланс счета
       await Account.updateBalance(
-        transactionData.accountId, 
-        transactionData.userId, 
-        transactionData.amount
+        transactionData.accountId,
+        transactionData.userId,
+        amount
       );
-      
+
       // Завершить транзакцию
       await run('COMMIT');
-      
-      return { id: result.id, ...transactionData };
+
+      return { id: result.id, ...transactionData, amount };
     } catch (error) {
       // Откатить транзакцию в случае ошибки
       await run('ROLLBACK');
@@ -52,10 +57,13 @@ class Transaction {
       
       // Обработка каждой транзакции
       for (const transaction of transactions) {
+        // Округляем сумму до копеек (см. create).
+        const amount = money.round(transaction.amount);
+
         // Создать запись о транзакции
         const result = await run(
-          `INSERT INTO transactions 
-           (account_id, user_id, date, description, category, amount, type) 
+          `INSERT INTO transactions
+           (account_id, user_id, date, description, category, amount, type)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             transaction.accountId,
@@ -63,21 +71,21 @@ class Transaction {
             transaction.date,
             transaction.description || '',
             transaction.category || 'Прочее',
-            transaction.amount,
-            transaction.type || (transaction.amount >= 0 ? 'income' : 'expense')
+            amount,
+            transaction.type || (amount >= 0 ? 'income' : 'expense')
           ]
         );
-        
+
         // Обновить баланс счета (только если транзакция новая)
         if (!transaction.skipBalanceUpdate) {
           await Account.updateBalance(
-            transaction.accountId, 
-            transaction.userId, 
-            transaction.amount
+            transaction.accountId,
+            transaction.userId,
+            amount
           );
         }
-        
-        results.push({ id: result.id, ...transaction });
+
+        results.push({ id: result.id, ...transaction, amount });
       }
       
       // Завершить транзакцию
@@ -109,79 +117,79 @@ class Transaction {
         sortOrder = 'DESC'
       } = options;
       
-      let query = `
+      let sql = `
         SELECT t.*, a.name as account_name
         FROM transactions t
         JOIN accounts a ON t.account_id = a.id
         WHERE t.user_id = ?
       `;
-      
+
       const params = [userId];
-      
+
       // Фильтрация по счету
       if (accountId) {
-        query += ` AND t.account_id = ?`;
+        sql += ` AND t.account_id = ?`;
         params.push(accountId);
       }
-      
+
       // Фильтрация по датам
       if (startDate) {
-        query += ` AND t.date >= ?`;
+        sql += ` AND t.date >= ?`;
         params.push(startDate);
       }
-      
+
       if (endDate) {
-        query += ` AND t.date <= ?`;
+        sql += ` AND t.date <= ?`;
         params.push(endDate);
       }
-      
+
       // Фильтрация по категории
       if (category) {
-        query += ` AND t.category = ?`;
+        sql += ` AND t.category = ?`;
         params.push(category);
       }
-      
+
       // Фильтрация по типу (доход/расход)
       if (type) {
-        query += ` AND t.type = ?`;
+        sql += ` AND t.type = ?`;
         params.push(type);
       }
-      
+
       // Фильтрация по сумме
       if (minAmount !== undefined) {
-        query += ` AND t.amount >= ?`;
+        sql += ` AND t.amount >= ?`;
         params.push(minAmount);
       }
-      
+
       if (maxAmount !== undefined) {
-        query += ` AND t.amount <= ?`;
+        sql += ` AND t.amount <= ?`;
         params.push(maxAmount);
       }
-      
+
       // Поиск по описанию
       if (search) {
-        query += ` AND (t.description LIKE ? OR t.category LIKE ?)`;
+        sql += ` AND (t.description LIKE ? OR t.category LIKE ?)`;
         const searchTerm = `%${search}%`;
         params.push(searchTerm, searchTerm);
       }
-      
+
       // Сортировка и пагинация
       const validSortColumns = ['date', 'amount', 'category', 'description', 'created_at'];
       const validSortOrders = ['ASC', 'DESC'];
-      
+
       const actualSortBy = validSortColumns.includes(sortBy) ? sortBy : 'date';
-      const actualSortOrder = validSortOrders.includes(sortOrder.toUpperCase()) 
-        ? sortOrder.toUpperCase() 
+      const actualSortOrder = validSortOrders.includes(sortOrder.toUpperCase())
+        ? sortOrder.toUpperCase()
         : 'DESC';
-      
-      query += ` ORDER BY t.${actualSortBy} ${actualSortOrder}`;
-      
+
+      sql += ` ORDER BY t.${actualSortBy} ${actualSortOrder}`;
+
       // Пагинация
       const offset = (page - 1) * limit;
-      query += ` LIMIT ? OFFSET ?`;
+      sql += ` LIMIT ? OFFSET ?`;
       params.push(limit, offset);
-      
-      const transactions = await query(query, params);
+
+      const transactions = await query(sql, params);
       
       return transactions;
     } catch (error) {
@@ -219,11 +227,13 @@ class Transaction {
       // Начать транзакцию
       await run('BEGIN TRANSACTION');
       
-      // Вычислить разницу для обновления баланса
+      // Вычислить разницу для обновления баланса (округлённую до копеек).
       let balanceDifference = 0;
-      
+      let newAmount;
+
       if (transactionData.amount !== undefined) {
-        balanceDifference = transactionData.amount - currentTransaction.amount;
+        newAmount = money.round(transactionData.amount);
+        balanceDifference = money.sub(newAmount, currentTransaction.amount);
       }
       
       // Подготовить поля для обновления
@@ -247,7 +257,7 @@ class Transaction {
       
       if (transactionData.amount !== undefined) {
         updateFields.push('amount = ?');
-        params.push(transactionData.amount);
+        params.push(newAmount);
       }
       
       if (transactionData.type) {
@@ -334,9 +344,9 @@ class Transaction {
         groupBy = 'month' // 'day', 'month', 'year', 'category'
       } = options;
       
-      let query = '';
+      let sql = '';
       const params = [userId];
-      
+
       // Базовые условия фильтрации
       let whereClause = 'WHERE t.user_id = ?';
       
@@ -357,9 +367,9 @@ class Transaction {
       
       // Статистика по категориям
       if (groupBy === 'category') {
-        query = `
-          SELECT 
-            t.category, 
+        sql = `
+          SELECT
+            t.category,
             t.type,
             SUM(t.amount) as total_amount,
             COUNT(*) as count
@@ -381,8 +391,8 @@ class Transaction {
           dateFormat = '%Y';
         }
         
-        query = `
-          SELECT 
+        sql = `
+          SELECT
             strftime('${dateFormat}', t.date) as period,
             t.type,
             SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,
@@ -394,7 +404,7 @@ class Transaction {
         `;
       }
       
-      const stats = await query(query, params);
+      const stats = await query(sql, params);
       return stats;
     } catch (error) {
       throw error;

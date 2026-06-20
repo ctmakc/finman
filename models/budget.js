@@ -1,4 +1,5 @@
 const { query, get, run } = require('../db/database');
+const money = require('../lib/money');
 
 class Budget {
   // Создание бюджета
@@ -96,10 +97,10 @@ class Budget {
 
   // Форматирование бюджета
   static formatBudget(budget) {
-    const spent = budget.spent || 0;
-    const amount = budget.amount || 0;
+    const spent = money.round(budget.spent || 0);
+    const amount = money.round(budget.amount || 0);
     const percentUsed = amount > 0 ? Math.round((spent / amount) * 100) : 0;
-    const remaining = amount - spent;
+    const remaining = money.sub(amount, spent);
 
     return {
       id: budget.id,
@@ -184,13 +185,13 @@ class Budget {
     }
   }
 
-  // Обновление суммы потраченного
+  // Обновление суммы потраченного (округляем до копеек перед записью)
   static async updateSpent(id, userId, spent) {
     try {
       const result = await run(
         `UPDATE budgets SET spent = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND user_id = ?`,
-        [spent, id, userId]
+        [money.round(spent), id, userId]
       );
 
       return result.changes > 0;
@@ -199,13 +200,26 @@ class Budget {
     }
   }
 
-  // Добавление к потраченному
+  // Добавление к потраченному.
+  // Читаем текущее значение и пересчитываем через money.add, чтобы хранимое
+  // spent не накапливало float-дрейф.
   static async addToSpent(id, userId, amount) {
     try {
+      const current = await get(
+        `SELECT spent FROM budgets WHERE id = ? AND user_id = ?`,
+        [id, userId]
+      );
+
+      if (!current) {
+        return false;
+      }
+
+      const newSpent = money.add(current.spent || 0, amount);
+
       const result = await run(
-        `UPDATE budgets SET spent = spent + ?, updated_at = CURRENT_TIMESTAMP
+        `UPDATE budgets SET spent = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND user_id = ?`,
-        [amount, id, userId]
+        [newSpent, id, userId]
       );
 
       return result.changes > 0;
@@ -245,7 +259,8 @@ class Budget {
         }
 
         const result = await get(sql, params);
-        await this.updateSpent(budget.id, userId, result.total);
+        // Округляем агрегат SUM (REAL может дать float-дрейф) перед записью.
+        await this.updateSpent(budget.id, userId, money.round(result.total));
       }
 
       return true;
@@ -341,8 +356,8 @@ class Budget {
       };
 
       for (const budget of budgets) {
-        stats.totalBudgetAmount += budget.amount;
-        stats.totalSpent += budget.spent;
+        stats.totalBudgetAmount = money.add(stats.totalBudgetAmount, budget.amount);
+        stats.totalSpent = money.add(stats.totalSpent, budget.spent);
 
         if (budget.isOverBudget) {
           stats.overBudgetCount++;
@@ -361,7 +376,7 @@ class Budget {
         });
       }
 
-      stats.totalRemaining = stats.totalBudgetAmount - stats.totalSpent;
+      stats.totalRemaining = money.sub(stats.totalBudgetAmount, stats.totalSpent);
       stats.overallPercentUsed = stats.totalBudgetAmount > 0
         ? Math.round((stats.totalSpent / stats.totalBudgetAmount) * 100)
         : 0;

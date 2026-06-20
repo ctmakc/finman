@@ -1,6 +1,8 @@
 // ==================== МОДЕЛЬ ДОЛГОВ И КРЕДИТОВ ====================
 
 const { query, get, run } = require('../db/database');
+const money = require('../lib/money');
+const { AppError } = require('../middleware/error');
 
 const Debt = {
   // Типы долгов
@@ -66,23 +68,51 @@ const Debt = {
     return this.findById(id);
   },
 
-  // Добавить платёж по долгу
-  async addPayment(debtId, amount, paymentType = 'principal', note = null, transactionId = null) {
+  // Добавить платёж по долгу.
+  // paymentDate — необязательный 6-й аргумент (роут передаёт его); по умолчанию
+  // сегодняшняя дата.
+  async addPayment(debtId, amount, paymentType = 'principal', note = null, transactionId = null, paymentDate = null) {
     const debt = await this.findById(debtId);
-    if (!debt) throw new Error('Долг не найден');
+    if (!debt) throw new AppError(404, 'DEBT_NOT_FOUND', 'Долг не найден');
 
-    const paymentDate = new Date().toISOString().split('T')[0];
+    // Сумма платежа должна быть положительной.
+    const payAmount = money.round(amount);
+    if (!(payAmount > 0)) {
+      throw new AppError(400, 'DEBT_INVALID_PAYMENT', 'Сумма платежа должна быть положительной');
+    }
+
+    // Только платежи по телу долга (principal) уменьшают paid_amount и могут
+    // привести к переплате. Платежи по процентам (interest и т.п.) не
+    // засчитываются в тело долга.
+    const isPrincipal = paymentType === 'principal';
+
+    const principal = money.round(debt.amount);
+    const currentPaid = money.round(debt.paid_amount || 0);
+
+    let newPaid = currentPaid;
+    if (isPrincipal) {
+      newPaid = money.add(currentPaid, payAmount);
+      // Запрещаем переплату тела долга.
+      if (newPaid > principal) {
+        throw new AppError(
+          400,
+          'DEBT_OVERPAY',
+          `Платёж превышает остаток долга (остаток: ${money.sub(principal, currentPaid)})`
+        );
+      }
+    }
+
+    const payDate = paymentDate || new Date().toISOString().split('T')[0];
 
     // Добавляем запись о платеже
     await run(
       `INSERT INTO debt_payments (debt_id, amount, payment_type, note, transaction_id, payment_date)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [debtId, amount, paymentType, note, transactionId, paymentDate]
+      [debtId, payAmount, paymentType, note, transactionId, payDate]
     );
 
-    // Обновляем выплаченную сумму
-    const newPaid = debt.paid_amount + amount;
-    const isPaid = newPaid >= debt.amount;
+    // Долг закрыт, когда выплачено тело целиком.
+    const isPaid = newPaid >= principal;
 
     await run(
       `UPDATE debts SET paid_amount = ?, is_paid = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -109,7 +139,7 @@ const Debt = {
     const debt = await this.findById(debtId);
     if (!debt) return null;
 
-    const remaining = debt.amount - debt.paid_amount;
+    const remaining = money.sub(debt.amount, debt.paid_amount);
 
     // Простой расчёт процентов
     let interestAmount = 0;
@@ -120,12 +150,14 @@ const Debt = {
       interestAmount = debt.amount * (debt.interest_rate / 100) * years;
     }
 
+    interestAmount = money.round(interestAmount);
+
     return {
       ...debt,
       remaining,
-      interestAmount: Math.round(interestAmount * 100) / 100,
-      totalWithInterest: Math.round((debt.amount + interestAmount) * 100) / 100,
-      remainingWithInterest: Math.round((remaining + interestAmount) * 100) / 100
+      interestAmount,
+      totalWithInterest: money.add(debt.amount, interestAmount),
+      remainingWithInterest: money.add(remaining, interestAmount)
     };
   },
 
@@ -149,26 +181,26 @@ const Debt = {
         stats.paidDebts++;
       } else {
         stats.activeDebts++;
-        const remaining = debt.amount - debt.paid_amount;
+        const remaining = money.sub(debt.amount, debt.paid_amount);
 
         switch (debt.type) {
           case 'i_owe':
           case 'credit':
           case 'mortgage':
           case 'loan':
-            stats.iOwe += debt.amount;
-            stats.remainingIPay += remaining;
-            if (debt.type !== 'i_owe') stats.credits += debt.amount;
+            stats.iOwe = money.add(stats.iOwe, debt.amount);
+            stats.remainingIPay = money.add(stats.remainingIPay, remaining);
+            if (debt.type !== 'i_owe') stats.credits = money.add(stats.credits, debt.amount);
             break;
           case 'owe_me':
-            stats.oweMe += debt.amount;
-            stats.remainingToPayMe += remaining;
+            stats.oweMe = money.add(stats.oweMe, debt.amount);
+            stats.remainingToPayMe = money.add(stats.remainingToPayMe, remaining);
             break;
         }
       }
     });
 
-    stats.balance = stats.oweMe - stats.iOwe;
+    stats.balance = money.sub(stats.oweMe, stats.iOwe);
 
     return stats;
   },

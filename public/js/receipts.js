@@ -108,7 +108,11 @@ const ReceiptsModule = {
     const imageData = document.getElementById('image-data').value;
     if (!imageData) { alert('Выберите изображение'); return; }
 
+    const submitBtn = document.querySelector('#upload-form button[type="submit"]');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Распознаём…'; }
+
     try {
+      // Синхронный режим: сервер вернёт распознанные поля сразу.
       const response = await fetch('/api/receipts/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
@@ -116,11 +120,68 @@ const ReceiptsModule = {
       });
       const result = await response.json();
       document.getElementById('upload-modal').classList.remove('active');
-      alert('Чек загружен! ID: ' + result.id);
-      setTimeout(() => this.loadReceipts(), 2000);
+
+      await this.loadReceipts();
+      await this.loadStats();
+
+      // Показываем РЕАЛЬНЫЕ распознанные поля и даём исправить перед сохранением.
+      if (result && result.id) {
+        if (result.ocr_status === 'completed') {
+          this.openReview(result.id, result);
+        } else {
+          alert('Не удалось распознать чек автоматически. Заполните данные вручную.');
+          this.openReview(result.id, result || {});
+        }
+      }
     } catch (error) {
+      console.error('Upload error:', error);
       alert('Ошибка загрузки');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Загрузить'; }
     }
+  },
+
+  // Открыть форму проверки/коррекции распознанных полей перед сохранением
+  // как транзакции. Переиспользуем manual-modal: предзаполняем распознанным.
+  openReview(id, data) {
+    const elId = document.getElementById('receipt-id');
+    const elMerchant = document.getElementById('receipt-merchant');
+    const elAmount = document.getElementById('receipt-amount');
+    const elDate = document.getElementById('receipt-date');
+    const elCategory = document.getElementById('receipt-category');
+    const title = document.getElementById('manual-modal-title');
+    if (!elId) { return; }
+
+    elId.value = id;
+    if (elMerchant) elMerchant.value = data.merchant || '';
+    if (elAmount) elAmount.value = (data.total_amount != null ? data.total_amount : '');
+    if (elDate) elDate.value = data.receipt_date || new Date().toISOString().split('T')[0];
+    if (elCategory) elCategory.value = data.category || '';
+    if (title) title.textContent = 'Проверьте распознанный чек';
+
+    // Подсказка пользователю об источнике данных.
+    const hint = document.getElementById('ocr-hint');
+    if (hint) {
+      const parts = [];
+      if (data.merchant) parts.push('магазин');
+      if (data.total_amount != null) parts.push('сумма');
+      if (data.receipt_date) parts.push('дата');
+      hint.textContent = parts.length
+        ? `Распознано: ${parts.join(', ')}. Проверьте и при необходимости поправьте.`
+        : 'Автораспознавание не дало результата — введите данные вручную.';
+      hint.style.display = 'block';
+    }
+
+    // Список позиций, если распознаны.
+    const itemsBox = document.getElementById('ocr-items');
+    if (itemsBox) {
+      const items = Array.isArray(data.items) ? data.items : [];
+      itemsBox.innerHTML = items.length
+        ? '<small>Позиции: ' + items.map(i => `${i.name} — ${i.price}`).join('; ') + '</small>'
+        : '';
+    }
+
+    document.getElementById('manual-modal').classList.add('active');
   },
 
   async edit(id) {
@@ -216,6 +277,8 @@ const ReceiptsModule = {
           <div class="modal-header"><h2 id="manual-modal-title">Добавить чек</h2><button class="modal-close" onclick="document.getElementById('manual-modal').classList.remove('active')">&times;</button></div>
           <form id="manual-form" onsubmit="event.preventDefault(); ReceiptsModule.saveManual()">
             <input type="hidden" id="receipt-id">
+            <div id="ocr-hint" class="ocr-hint" style="display:none;font-size:0.85em;color:#5D5CDE;margin-bottom:8px;"></div>
+            <div id="ocr-items" class="ocr-items" style="margin-bottom:8px;"></div>
             <div class="form-group"><label>Магазин</label><input type="text" id="receipt-merchant" class="form-control" required></div>
             <div class="form-row">
               <div class="form-group"><label>Сумма</label><input type="number" id="receipt-amount" class="form-control" step="0.01" required></div>

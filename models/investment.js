@@ -1,6 +1,7 @@
 // ==================== МОДЕЛЬ ИНВЕСТИЦИЙ ====================
 
 const { query, get, run } = require('../db/database');
+const money = require('../lib/money');
 
 const Investment = {
   // Типы активов
@@ -178,8 +179,8 @@ const Investment = {
       date: sellDate
     });
 
-    // Обновляем количество
-    const newQuantity = investment.quantity - quantity;
+    // Обновляем количество (округляем до 2 знаков, чтобы не копить float-дрейф)
+    const newQuantity = money.round(investment.quantity - quantity);
 
     if (newQuantity === 0) {
       await run('UPDATE investments SET quantity = 0, is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [investmentId]);
@@ -224,22 +225,38 @@ const Investment = {
 
   // ==================== АНАЛИТИКА ====================
 
-  // Рассчитать стоимость актива
+  // Суммарные комиссии по активу (по всем его транзакциям).
+  async getTotalFees(investmentId) {
+    const row = await get(
+      `SELECT COALESCE(SUM(fee), 0) as total_fees
+       FROM investment_transactions WHERE investment_id = ?`,
+      [investmentId]
+    );
+    return money.round(row ? row.total_fees : 0);
+  },
+
+  // Рассчитать стоимость актива.
+  // P&L учитывает комиссии: чистая прибыль = (рыночная стоимость - стоимость
+  // покупки) - суммарные комиссии по сделкам.
   async calculateValue(investmentId) {
     const investment = await this.findInvestmentById(investmentId);
     if (!investment) return null;
 
-    const currentValue = investment.quantity * investment.current_price;
-    const buyValue = investment.quantity * investment.buy_price;
-    const profitLoss = currentValue - buyValue;
-    const profitLossPercent = buyValue > 0 ? (profitLoss / buyValue) * 100 : 0;
+    const fees = await this.getTotalFees(investmentId);
+
+    const currentValue = money.mul(investment.quantity, investment.current_price);
+    const buyValue = money.mul(investment.quantity, investment.buy_price);
+    // Чистый P&L за вычетом комиссий.
+    const profitLoss = money.sub(money.sub(currentValue, buyValue), fees);
+    const profitLossPercent = buyValue > 0 ? money.round((profitLoss / buyValue) * 100) : 0;
 
     return {
       ...investment,
       currentValue,
       buyValue,
+      fees,
       profitLoss,
-      profitLossPercent: Math.round(profitLossPercent * 100) / 100
+      profitLossPercent
     };
   },
 
@@ -249,23 +266,28 @@ const Investment = {
 
     let totalValue = 0;
     let totalCost = 0;
+    let totalFees = 0;
     const holdings = [];
 
     for (const inv of investments) {
-      const value = inv.quantity * inv.current_price;
-      const cost = inv.quantity * inv.buy_price;
-      const profitLoss = value - cost;
-      const profitLossPercent = cost > 0 ? (profitLoss / cost) * 100 : 0;
+      const fees = await this.getTotalFees(inv.id);
+      const value = money.mul(inv.quantity, inv.current_price);
+      const cost = money.mul(inv.quantity, inv.buy_price);
+      // Чистый P&L за вычетом комиссий.
+      const profitLoss = money.sub(money.sub(value, cost), fees);
+      const profitLossPercent = cost > 0 ? money.round((profitLoss / cost) * 100) : 0;
 
-      totalValue += value;
-      totalCost += cost;
+      totalValue = money.add(totalValue, value);
+      totalCost = money.add(totalCost, cost);
+      totalFees = money.add(totalFees, fees);
 
       holdings.push({
         ...inv,
         currentValue: value,
         buyValue: cost,
+        fees,
         profitLoss,
-        profitLossPercent: Math.round(profitLossPercent * 100) / 100,
+        profitLossPercent,
         weight: 0 // Будет рассчитано после
       });
     }
@@ -275,15 +297,17 @@ const Investment = {
       h.weight = totalValue > 0 ? Math.round((h.currentValue / totalValue) * 10000) / 100 : 0;
     });
 
-    const totalProfitLoss = totalValue - totalCost;
-    const totalProfitLossPercent = totalCost > 0 ? (totalProfitLoss / totalCost) * 100 : 0;
+    // Чистая прибыль портфеля учитывает комиссии.
+    const totalProfitLoss = money.sub(money.sub(totalValue, totalCost), totalFees);
+    const totalProfitLossPercent = totalCost > 0 ? money.round((totalProfitLoss / totalCost) * 100) : 0;
 
     return {
       portfolioId,
-      totalValue: Math.round(totalValue * 100) / 100,
-      totalCost: Math.round(totalCost * 100) / 100,
-      totalProfitLoss: Math.round(totalProfitLoss * 100) / 100,
-      totalProfitLossPercent: Math.round(totalProfitLossPercent * 100) / 100,
+      totalValue: money.round(totalValue),
+      totalCost: money.round(totalCost),
+      totalFees: money.round(totalFees),
+      totalProfitLoss: money.round(totalProfitLoss),
+      totalProfitLossPercent,
       holdings,
       byType: this.groupByType(holdings)
     };
@@ -297,8 +321,8 @@ const Investment = {
       if (!byType[h.type]) {
         byType[h.type] = { value: 0, cost: 0, count: 0 };
       }
-      byType[h.type].value += h.currentValue;
-      byType[h.type].cost += h.buyValue;
+      byType[h.type].value = money.add(byType[h.type].value, h.currentValue);
+      byType[h.type].cost = money.add(byType[h.type].cost, h.buyValue);
       byType[h.type].count++;
     });
 
@@ -324,24 +348,28 @@ const Investment = {
 
     let totalValue = 0;
     let totalCost = 0;
+    let totalFees = 0;
     let portfolioStats = [];
 
     for (const portfolio of portfolios) {
       const stats = await this.calculatePortfolioValue(portfolio.id);
-      totalValue += stats.totalValue;
-      totalCost += stats.totalCost;
+      totalValue = money.add(totalValue, stats.totalValue);
+      totalCost = money.add(totalCost, stats.totalCost);
+      totalFees = money.add(totalFees, stats.totalFees || 0);
       portfolioStats.push({ ...portfolio, ...stats });
     }
 
-    const totalProfitLoss = totalValue - totalCost;
-    const totalProfitLossPercent = totalCost > 0 ? (totalProfitLoss / totalCost) * 100 : 0;
+    // Чистая прибыль по всем портфелям учитывает комиссии.
+    const totalProfitLoss = money.sub(money.sub(totalValue, totalCost), totalFees);
+    const totalProfitLossPercent = totalCost > 0 ? money.round((totalProfitLoss / totalCost) * 100) : 0;
 
     return {
       portfolioCount: portfolios.length,
-      totalValue: Math.round(totalValue * 100) / 100,
-      totalCost: Math.round(totalCost * 100) / 100,
-      totalProfitLoss: Math.round(totalProfitLoss * 100) / 100,
-      totalProfitLossPercent: Math.round(totalProfitLossPercent * 100) / 100,
+      totalValue: money.round(totalValue),
+      totalCost: money.round(totalCost),
+      totalFees: money.round(totalFees),
+      totalProfitLoss: money.round(totalProfitLoss),
+      totalProfitLossPercent,
       portfolios: portfolioStats
     };
   }

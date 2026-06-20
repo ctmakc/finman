@@ -35,8 +35,16 @@ const STATEFUL_MODULES = [
 ];
 
 function purgeModuleCache() {
+  // Под jest модули раздаёт собственный реестр, а не require.cache —
+  // ручная чистка require.cache в этом случае ни на что не влияет, и
+  // повторный makeApp() получал бы УЖЕ ЗАКРЫТЫЙ db-хендл от первого вызова
+  // (SQLITE_MISUSE: Database is closed). jest.resetModules() сбрасывает
+  // реестр jest, чтобы следующий require отдал свежие config/db/server.
+  if (typeof jest !== 'undefined' && typeof jest.resetModules === 'function') {
+    jest.resetModules();
+  }
   // Сбрасываем кэш для config/db/server и ВСЕХ роутов/моделей/middleware/lib,
-  // чтобы новый app биндился к новой БД.
+  // чтобы новый app биндился к новой БД (для запуска вне jest).
   for (const id of Object.keys(require.cache)) {
     if (
       id.startsWith(path.join(PROJECT_ROOT, 'routes')) ||

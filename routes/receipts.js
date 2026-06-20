@@ -2,6 +2,15 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const ocrService = require('../services/ocrService');
+
+// Foundation-инфраструктура (feature-detect: если чего-то нет — деградируем мягко).
+let logger;
+try {
+  logger = require('../lib/logger');
+} catch (_) {
+  logger = { info() {}, warn() {}, error() {} };
+}
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -47,7 +56,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Загрузить чек (base64 изображение)
+// Загрузить чек (base64 изображение) + РЕАЛЬНЫЙ OCR (tesseract.js)
 router.post('/upload', async (req, res) => {
   try {
     const { image_data, notes } = req.body;
@@ -56,25 +65,79 @@ router.post('/upload', async (req, res) => {
       return res.status(400).json({ message: 'Изображение обязательно' });
     }
 
+    // 1) Сразу сохраняем чек в статусе 'pending' — пользователь видит запись,
+    //    даже если OCR займёт время или упадёт.
     const result = await run(
       `INSERT INTO receipts (user_id, image_data, ocr_status, notes) VALUES (?, ?, 'pending', ?)`,
       [req.user.id, image_data, notes]
     );
+    const receiptId = result.id;
 
-    // Имитация OCR обработки (в реальном приложении здесь был бы вызов OCR API)
-    setTimeout(async () => {
-      try {
-        await processReceiptOCR(result.id);
-      } catch (e) {
-        console.error('OCR error:', e);
-      }
-    }, 1000);
+    // 2) Запускаем РЕАЛЬНЫЙ OCR. processImage никогда не бросает —
+    //    на ошибке вернёт ocr_status:'failed'. Делаем await, чтобы ответ
+    //    содержал актуальный статус (нет «вечного pending» как в фейке).
+    //    Если хочется неблокирующе — см. ниже опцию async=1.
+    const wantAsync = req.query.async === '1' || req.body.async === true;
 
-    res.status(201).json({ id: result.id, message: 'Чек загружен, обработка...' });
+    if (wantAsync) {
+      // Неблокирующий режим: отвечаем сразу, OCR в фоне (async-safe).
+      res.status(201).json({ id: receiptId, ocr_status: 'pending', message: 'Чек загружен, идёт распознавание...' });
+      // Не ждём промис — но ошибки гасим, чтобы не уронить процесс.
+      processAndStore(receiptId, image_data).catch((e) => {
+        logger.error({ err: e && e.message, receiptId }, 'Async OCR failed');
+      });
+      return;
+    }
+
+    // Синхронный режим (по умолчанию): дожидаемся OCR и возвращаем результат.
+    const ocr = await processAndStore(receiptId, image_data);
+    return res.status(201).json({
+      id: receiptId,
+      ocr_status: ocr.ocr_status,
+      merchant: ocr.merchant,
+      total_amount: ocr.total_amount,
+      currency: ocr.currency,
+      receipt_date: ocr.receipt_date,
+      category: ocr.category,
+      items: ocr.items,
+      message: ocr.ocr_status === 'completed' ? 'Чек распознан' : 'Не удалось распознать чек, заполните вручную'
+    });
   } catch (error) {
+    logger.error({ err: error && error.message }, 'Receipt upload failed');
     res.status(500).json({ message: error.message });
   }
 });
+
+/**
+ * Прогнать изображение через OCR и записать РЕАЛЬНЫЕ результаты в чек.
+ * Возвращает структуру OCR. Никогда не бросает из-за плохого изображения —
+ * processImage сам ловит ошибки и ставит ocr_status:'failed'. Падение может
+ * прийти только от БД (его обрабатывает вызывающий код / .catch фонового режима).
+ */
+async function processAndStore(receiptId, imageData) {
+  const ocr = await ocrService.processImage(imageData);
+
+  await run(
+    `UPDATE receipts
+       SET merchant = ?, total_amount = ?, currency = ?, receipt_date = ?,
+           category = ?, items = ?, ocr_raw = ?, ocr_status = ?,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [
+      ocr.merchant,
+      ocr.total_amount,
+      ocr.currency || 'UAH',
+      ocr.receipt_date,
+      ocr.category,
+      JSON.stringify(ocr.items || []),
+      ocr.ocr_raw,
+      ocr.ocr_status,
+      receiptId
+    ]
+  );
+
+  return ocr;
+}
 
 // Ручной ввод данных чека
 router.post('/manual', async (req, res) => {
@@ -93,7 +156,7 @@ router.post('/manual', async (req, res) => {
   }
 });
 
-// Обновить данные чека
+// Обновить данные чека (пользователь корректирует распознанное перед сохранением)
 router.put('/:id', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
@@ -175,28 +238,5 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
-// Имитация OCR обработки
-async function processReceiptOCR(receiptId) {
-  // В реальном приложении здесь был бы вызов Google Vision API, Tesseract или другого OCR сервиса
-  // Для демонстрации создаём случайные данные
-
-  const merchants = ['АТБ', 'Сільпо', 'Rozetka', 'Епіцентр', 'Comfy', 'WOG', 'OKKO'];
-  const categories = ['food', 'shopping', 'transport', 'entertainment', 'other'];
-
-  const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-  const amount = Math.floor(Math.random() * 2000) + 50;
-  const category = categories[Math.floor(Math.random() * categories.length)];
-
-  const items = [
-    { name: 'Товар 1', price: Math.floor(amount * 0.4), quantity: 1 },
-    { name: 'Товар 2', price: Math.floor(amount * 0.35), quantity: 2 },
-    { name: 'Товар 3', price: Math.floor(amount * 0.25), quantity: 1 }
-  ];
-
-  await run(
-    `UPDATE receipts SET merchant = ?, total_amount = ?, category = ?, receipt_date = ?, items = ?, ocr_status = 'completed', ocr_raw = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [merchant, amount, category, new Date().toISOString().split('T')[0], JSON.stringify(items), JSON.stringify({ simulated: true }), receiptId]
-  );
-}
-
 module.exports = router;
+module.exports.processAndStore = processAndStore;
