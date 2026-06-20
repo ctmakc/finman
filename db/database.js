@@ -926,7 +926,21 @@ function initDatabase() {
           reject(err);
         } else {
           console.log('База данных инициализирована успешно');
-          resolve();
+          // Применяем миграции (ADDITIVE: subscription_tier, stripe ids,
+          // ai_conversations, ai_messages и т.д.). require внутри, чтобы
+          // избежать циклической зависимости на этапе загрузки модуля.
+          const { runMigrations } = require('../lib/migrate');
+          runMigrations({ query, get, run })
+            .then((applied) => {
+              if (applied && applied.length) {
+                console.log('Применены миграции:', applied.join(', '));
+              }
+              resolve();
+            })
+            .catch((mErr) => {
+              console.error('Ошибка применения миграций:', mErr);
+              reject(mErr);
+            });
         }
       });
     });

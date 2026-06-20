@@ -14,6 +14,16 @@ const dotenv = require('dotenv');
 // Загрузка переменных окружения
 dotenv.config();
 
+// Foundation: shared infra
+const pinoHttp = require('pino-http');
+const logger = require('./lib/logger');
+const validateEnv = require('./lib/validateEnv');
+const { requireTier } = require('./middleware/requireTier');
+const { notFound, errorHandler } = require('./middleware/error');
+
+// Fail-fast в проде, предупреждение в dev по обязательным секретам.
+validateEnv();
+
 // Импорт маршрутов API
 const authRoutes = require('./routes/auth');
 const accountsRoutes = require('./routes/accounts');
@@ -38,9 +48,19 @@ const calendarRoutes = require('./routes/calendar');
 const widgetsRoutes = require('./routes/widgets');
 const forecastRoutes = require('./routes/forecast');
 
+// Foundation: новые роутеры (часть — стабы, заменяются feature-стримами)
+const healthRoutes = require('./routes/health');
+const aiRoutes = require('./routes/ai');
+const billingRoutes = require('./routes/billing');
+const syncRoutes = require('./routes/sync');
+const anomaliesRoutes = require('./routes/anomalies');
+
 // Настройка Express
 const app = express();
 const PORT = config.port;
+
+// Request logging (pino-http). В тестах logger в silent-режиме.
+app.use(pinoHttp({ logger }));
 
 // Security middleware
 app.use(helmet({
@@ -102,8 +122,13 @@ app.use(passport.session());
 // Настройка стратегий Passport (локально определены в authService.js)
 require('./services/authService');
 
-// Инициализация базы данных
-initDatabase();
+// Инициализация базы данных.
+// При прямом запуске (node server.js) инициализируем здесь.
+// При require из тестов харнес сам вызывает initDatabase() до запросов,
+// чтобы полностью контролировать жизненный цикл временной БД.
+if (require.main === module) {
+  initDatabase();
+}
 
 // Статические файлы
 app.use(express.static(path.join(__dirname, 'public')));
@@ -147,47 +172,74 @@ app.get('/api/protected', apiAuthMiddleware, (req, res) => {
   res.json({ message: 'This is protected data', user: req.user });
 });
 
-// Маршрут для всех остальных запросов (SPA)
-app.get('*', (req, res) => {
+// ==================== FOUNDATION: новые роутеры ====================
+// Health/Ready смонтированы на /api -> /api/health, /api/ready
+app.use('/api', healthRoutes);
+// AI: сначала аутентификация (заполняет req.user), затем гейт по тиру 'pro'.
+app.use('/api/ai', apiAuthMiddleware, requireTier('pro'), aiRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/sync', syncRoutes);
+app.use('/api/anomalies', anomaliesRoutes);
+
+// Маршрут для всех остальных запросов (SPA) — НЕ перехватываем /api/*,
+// чтобы неизвестные API-роуты дошли до notFound + errorHandler.
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Обработка ошибок
+// 404 для неизвестных API-маршрутов (форматируется errorHandler-ом).
+app.use(notFound);
+
+// Централизованный обработчик ошибок (AppError + unknown) — должен быть ПОСЛЕДНИМ.
+app.use(errorHandler);
+
+// Legacy fallback (на случай, если errorHandler делегирует дальше).
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: true, 
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal Server Error' 
-      : err.message 
+  res.status(500).json({
+    error: true,
+    message: process.env.NODE_ENV === 'production'
+      ? 'Internal Server Error'
+      : err.message
   });
 });
 
-// Запуск сервера
-const server = app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
-  console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
-});
+// Запуск сервера только при прямом запуске (node server.js).
+// При require (тест-харнес) экспортируем app без побочного listen.
+let server = null;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
+  });
 
-// Graceful shutdown - закрытие БД при завершении процесса
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
+  // Graceful shutdown - закрытие БД при завершении процесса
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      closeDatabase();
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully');
+    server.close(() => {
+      closeDatabase();
+      process.exit(0);
+    });
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
     closeDatabase();
-    process.exit(0);
+    process.exit(1);
   });
-});
+}
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    closeDatabase();
-    process.exit(0);
-  });
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  closeDatabase();
-  process.exit(1);
-});
+// Экспорт для тестов (supertest монтируется на app напрямую).
+module.exports = app;
+module.exports.app = app;
+module.exports.getServer = () => server;
