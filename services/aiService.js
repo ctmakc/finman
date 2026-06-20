@@ -878,8 +878,111 @@ async function monthlyNarrative(userId, month) {
   return { month: normMonth, stats, narrative, aiUsed };
 }
 
+// --------------------------------------------------------------------------
+// buildFinancialPlan — проактивный, структурированный финансовый ПЛАН (CFO-коучинг):
+// целевая норма сбережений, конкретные сокращения по категориям, график
+// финансирования целей, стратегия погашения долгов и топ-3 действия на месяц.
+// Это НЕ реактивный чат и НЕ просто аналитика — это план действий.
+// Возвращает { context, plan, planText }. planText=null если провайдер не настроен
+// (детерминированный каркас plan полезен и без сети). `now` опционален (для тестов).
+// --------------------------------------------------------------------------
+function monthsBetween(from, to) {
+  const a = from instanceof Date ? from : new Date(from);
+  const b = to instanceof Date ? to : new Date(to);
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+
+async function buildFinancialPlan(userId, { now } = {}) {
+  const reference = now ? (now instanceof Date ? now : new Date(now)) : new Date();
+  const context = await buildFinancialContext(userId);
+  const [goals, debts, , topCategories] = await Promise.all([
+    getGoals(userId),
+    getDebts(userId),
+    getBudgets(userId),
+    getTopSpendingCategories(userId),
+  ]);
+
+  const income = context.summary.recentIncome || 0;
+  const expense = context.summary.recentExpense || 0;
+  const net = context.summary.recentNetFlow || 0;
+  const currentSavingsRate = income > 0 ? money.round((net / income) * 100) : 0;
+  // Тянемся к 20% сбережений (или держим текущий, если он уже выше).
+  const targetSavingsRate = Math.max(currentSavingsRate, 20);
+  const targetMonthlySavings = money.round((income * targetSavingsRate) / 100);
+  const savingsGap = money.round(targetMonthlySavings - net); // >0 => нужно ужаться
+
+  // Финансирование целей: сколько в месяц нужно, чтобы успеть к target_date.
+  const goalPlans = goals
+    .filter((g) => !g.is_completed)
+    .map((g) => {
+      const remaining = money.sub(g.target_amount, g.current_amount || 0);
+      const months = g.target_date ? monthsBetween(reference, g.target_date) : null;
+      const monthlyNeeded = months && months > 0 ? money.round(remaining / months) : null;
+      return {
+        name: g.name,
+        currency: g.currency,
+        remaining,
+        targetDate: g.target_date || null,
+        monthsLeft: months,
+        monthlyNeeded,
+        onTrackHint: monthlyNeeded === null ? 'no-date' : (monthlyNeeded <= net ? 'affordable' : 'stretch'),
+      };
+    });
+
+  // Стратегия долгов: остаток = amount - paid_amount, по убыванию остатка.
+  const debtPlans = debts
+    .filter((d) => !d.is_paid)
+    .map((d) => ({
+      name: d.name,
+      type: d.type,
+      currency: d.currency,
+      remaining: money.round(money.sub(d.amount, d.paid_amount || 0)),
+      dueDate: d.due_date || null,
+    }))
+    .sort((a, b) => b.remaining - a.remaining);
+
+  const plan = {
+    monthlyIncome: income,
+    monthlyExpense: expense,
+    monthlyNet: net,
+    currentSavingsRate,
+    targetSavingsRate,
+    targetMonthlySavings,
+    savingsGap,
+    goals: goalPlans,
+    debts: debtPlans,
+    totalDebt: money.sum(debtPlans.map((d) => d.remaining)),
+    topCategories,
+  };
+
+  let planText = null;
+  if (provider.isConfigured()) {
+    const system = buildSystemPrompt(context.text);
+    const userMsg = [
+      'Build me a concrete, prioritized MONTHLY FINANCIAL PLAN based STRICTLY on my data above.',
+      'Structure it as short sections with bullet points:',
+      '1) Savings target — recommend a monthly savings amount and rate, and whether I am on track.',
+      '2) Where to cut — 2-3 SPECIFIC spending categories to trim, each with a concrete amount and a realistic new target.',
+      '3) Goals — for each savings goal, how much per month to hit it on time (or flag if the date is unrealistic).',
+      '4) Debt strategy — the order to pay off my debts and why.',
+      '5) Top 3 actions to take THIS month, most impactful first.',
+      'Use my real numbers and currency. Be specific, encouraging, and brief.',
+    ].join('\n');
+    const result = await provider.chat({
+      system,
+      messages: [{ role: 'user', content: userMsg }],
+      maxTokens: 1100,
+    });
+    planText = (result && result.text) || '';
+  }
+
+  return { context: context.text, plan, planText };
+}
+
 module.exports = {
   buildFinancialContext,
+  buildFinancialPlan,
   buildSystemPrompt,
   analyzeSpending,
   chat,

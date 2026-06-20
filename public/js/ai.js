@@ -281,11 +281,67 @@ const AiCfoModule = {
     }
   },
 
+  async loadPlan() {
+    const response = await fetch('/api/ai/plan', { headers: this.authHeaders() });
+    return this.parse(response);
+  },
+
+  async handlePlan() {
+    if (this.loading) return;
+    this.setLoading(true);
+    const container = document.getElementById('ai-plan');
+    if (container) container.innerHTML = '<div class="ai-loading">Составляю ваш финансовый план…</div>';
+    try {
+      const data = await this.loadPlan();
+      this.renderPlan(data);
+    } catch (err) {
+      if (container) container.innerHTML = `<div class="ai-error">${this.escape(err.message)}</div>`;
+    } finally {
+      this.setLoading(false);
+    }
+  },
+
+  renderPlan(data) {
+    const container = document.getElementById('ai-plan');
+    if (!container || !data) return;
+    const p = data.plan || {};
+    const cur = (p.goals && p.goals[0] && p.goals[0].currency) ||
+                (p.debts && p.debts[0] && p.debts[0].currency) || '';
+    const fmt = (n) => (n === null || n === undefined ? '—' : `${this.escape(String(n))} ${this.escape(cur)}`.trim());
+    const rows = [];
+    rows.push(`<div class="ai-plan-stat"><span>Норма сбережений</span><strong>${this.escape(String(p.currentSavingsRate))}%</strong></div>`);
+    rows.push(`<div class="ai-plan-stat"><span>Цель</span><strong>${this.escape(String(p.targetSavingsRate))}% · ${fmt(p.targetMonthlySavings)}/мес</strong></div>`);
+    if (typeof p.savingsGap === 'number' && p.savingsGap > 0) {
+      rows.push(`<div class="ai-plan-stat ai-plan-warn"><span>Нужно ужаться</span><strong>${fmt(p.savingsGap)}/мес</strong></div>`);
+    }
+    let goalsHtml = '';
+    (p.goals || []).forEach((g) => {
+      goalsHtml += `<li>🎯 <strong>${this.escape(g.name)}</strong> — ${fmt(g.remaining)} осталось` +
+        `${g.monthlyNeeded ? `, ${fmt(g.monthlyNeeded)}/мес` : ''}` +
+        `${g.monthsLeft ? ` (${this.escape(String(g.monthsLeft))} мес)` : ''}</li>`;
+    });
+    let debtsHtml = '';
+    (p.debts || []).forEach((d, i) => {
+      debtsHtml += `<li>${i === 0 ? '🔥' : '•'} <strong>${this.escape(d.name)}</strong> — ${fmt(d.remaining)}</li>`;
+    });
+    const aiHtml = (data.aiConfigured && data.planText)
+      ? `<div class="ai-plan-ai">${this.escape(data.planText).replace(/\n/g, '<br>')}</div>`
+      : '<div class="ai-plan-note">Подключите AI-провайдера (env AI_API_KEY), чтобы получить персональный план от CFO.</div>';
+    container.innerHTML = `
+      <div class="ai-plan-card">
+        <h4>📋 Ваш финансовый план</h4>
+        <div class="ai-plan-stats">${rows.join('')}</div>
+        ${goalsHtml ? `<div class="ai-plan-section"><h5>Цели</h5><ul>${goalsHtml}</ul></div>` : ''}
+        ${debtsHtml ? `<div class="ai-plan-section"><h5>Долги (сначала крупные)</h5><ul>${debtsHtml}</ul></div>` : ''}
+        ${aiHtml}
+      </div>`;
+  },
+
   // --- rendering ---------------------------------------------------------
 
   setLoading(state) {
     this.loading = state;
-    ['ai-send-btn', 'ai-insights-btn', 'ai-categorize-btn', 'ai-summary-btn'].forEach((id) => {
+    ['ai-send-btn', 'ai-plan-btn', 'ai-insights-btn', 'ai-categorize-btn', 'ai-summary-btn'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.disabled = state;
     });
@@ -426,12 +482,14 @@ const AiCfoModule = {
         <div class="ai-header">
           <h3>🤖 AI Финансовый директор</h3>
           <div class="ai-actions" role="group" aria-label="Действия ассистента">
+            <button type="button" id="ai-plan-btn" class="btn btn-primary" onclick="AiCfoModule.handlePlan()">📋 Мой план</button>
             <button type="button" id="ai-insights-btn" class="btn btn-secondary" onclick="AiCfoModule.handleInsights()">Инсайты</button>
             <button type="button" id="ai-categorize-btn" class="btn btn-secondary" onclick="AiCfoModule.handleCategorize()">Авто-категоризация</button>
             <button type="button" id="ai-summary-btn" class="btn btn-secondary" onclick="AiCfoModule.handleSummary()">Сводка за месяц</button>
             <input id="ai-summary-month" class="form-control ai-month-input" type="month" aria-label="Месяц для сводки" value="${this.escape(defaultMonth)}">
           </div>
         </div>
+        <div id="ai-plan" class="ai-plan"></div>
         <div id="ai-insights" class="ai-insights"></div>
         <div id="ai-categorize" class="ai-categorize"></div>
         <div id="ai-summary" class="ai-summary"></div>

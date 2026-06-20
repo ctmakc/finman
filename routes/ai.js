@@ -146,6 +146,20 @@ router.get(
   })
 );
 
+// GET /api/ai/plan — проактивный финансовый план (CFO-коучинг): целевые сбережения,
+// сокращения по категориям, финансирование целей, стратегия долгов, топ-3 действия.
+router.get(
+  '/plan',
+  wrap(async (req, res) => {
+    const result = await aiService.buildFinancialPlan(req.user.id);
+    return ok(res, {
+      plan: result.plan,
+      planText: result.planText,
+      aiConfigured: provider.isConfigured(),
+    });
+  })
+);
+
 // GET /api/ai/conversations — список разговоров пользователя.
 router.get(
   '/conversations',

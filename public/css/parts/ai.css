@@ -585,3 +585,56 @@
   .ai-cfo .ai-actions .btn-secondary:hover:not(:disabled),
   .auth-card .btn-primary:hover:not(:disabled) { transform: none; }
 }
+
+/* ── AI Money Plan ─────────────────────────────────────────────── */
+.ai-plan { margin-top: var(--fm-space-3, 12px); }
+.ai-plan-card {
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--fm-radius, 14px);
+  padding: clamp(16px, 3vw, 24px);
+  box-shadow: var(--fm-shadow-1, 0 1px 2px rgba(16,18,27,.06));
+}
+.ai-plan-card h4 {
+  margin: 0 0 14px;
+  font-family: var(--fm-font-display, inherit);
+  font-size: 1.15rem;
+  color: var(--fm-ink);
+}
+.ai-plan-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.ai-plan-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--fm-surface-2);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--fm-radius-sm, 10px);
+  padding: 10px 12px;
+}
+.ai-plan-stat span { font-size: .8rem; color: var(--fm-ink-3); }
+.ai-plan-stat strong { font-size: 1.05rem; color: var(--fm-ink); font-variant-numeric: tabular-nums; }
+.ai-plan-warn { border-color: var(--fm-warning); background: var(--fm-warning-tint); }
+.ai-plan-warn strong { color: var(--fm-warning); }
+.ai-plan-section { margin-top: 14px; }
+.ai-plan-section h5 {
+  margin: 0 0 8px; font-size: .82rem; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--fm-ink-3);
+}
+.ai-plan-section ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ai-plan-section li { color: var(--fm-ink-2); font-variant-numeric: tabular-nums; }
+.ai-plan-section li strong { color: var(--fm-ink); }
+.ai-plan-ai {
+  margin-top: 16px; padding: 14px 16px;
+  background: var(--fm-primary-tint);
+  border-left: 3px solid var(--fm-primary);
+  border-radius: var(--fm-radius-sm, 10px);
+  color: var(--fm-ink); line-height: 1.55; white-space: normal;
+}
+.ai-plan-note {
+  margin-top: 14px; padding: 12px 14px;
+  background: var(--fm-surface-2); border: 1px dashed var(--fm-border);
+  border-radius: var(--fm-radius-sm, 10px); color: var(--fm-ink-3); font-size: .9rem;
+}
