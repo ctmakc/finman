@@ -40,7 +40,10 @@ function fmMoney(value) {
 }
 
 // Инициализация графиков на дашборде
+let _lastChartStats = null;
+
 function initCharts(statsData) {
+    _lastChartStats = statsData; // кэш для перерисовки при смене темы
     // Инициализация графика доходов и расходов
     initIncomeExpenseChart(statsData.transactionsByMonth);
 
@@ -51,6 +54,7 @@ function initCharts(statsData) {
   // График доходов и расходов по месяцам
   function initIncomeExpenseChart(transactionsByMonth) {
     const ctx = document.getElementById('income-expense-chart').getContext('2d');
+    if (window.Chart && Chart.getChart) { const _ex = Chart.getChart(ctx.canvas); if (_ex) _ex.destroy(); }
 
     const ink2 = fmToken('--fm-ink-2', '#545A6B');
     const border = fmToken('--fm-border', '#E2E5EE');
@@ -138,6 +142,7 @@ function initCharts(statsData) {
   // График категорий расходов
   function initExpenseCategoriesChart(transactionsByCategory) {
     const ctx = document.getElementById('expense-categories-chart').getContext('2d');
+    if (window.Chart && Chart.getChart) { const _ex = Chart.getChart(ctx.canvas); if (_ex) _ex.destroy(); }
 
     const ink2 = fmToken('--fm-ink-2', '#545A6B');
     const surface = fmToken('--fm-surface', '#FFFFFF');
@@ -217,3 +222,13 @@ function initCharts(statsData) {
       }
     });
   }
+
+// Перерисовка графиков при смене темы: токены --fm-* меняются, поэтому
+// переинициализируем по последним данным (destroy+recreate уже встроены).
+if (typeof document !== 'undefined') {
+  document.addEventListener('fm:themechange', function () {
+    if (_lastChartStats) {
+      try { initCharts(_lastChartStats); } catch (e) { /* графиков может не быть на текущей странице */ }
+    }
+  });
+}

@@ -138,6 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
               </a>
             </li>
             <li class="nav-item">
+              <a href="#" class="nav-link" data-page="ai">
+                <i class="fas fa-robot"></i> AI-директор
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="#" class="nav-link" data-page="accounts">
                 <i class="fas fa-wallet"></i> Счета
               </a>
@@ -367,11 +372,26 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'settings':
         renderSettingsPage();
         break;
+      case 'ai':
+        mainContent.innerHTML = '<div id="ai-cfo-content"></div>';
+        if (window.AiCfoModule && typeof window.AiCfoModule.init === 'function') {
+          window.AiCfoModule.init();
+        }
+        break;
       default:
         renderSmartDashboard();
     }
   }
-  
+
+  // Глобальный вход в AI-директора — используется hero-кнопкой дашборда
+  // (#hero-ai-more) и любым другим CTA. navigateTo здесь в области видимости.
+  if (typeof window !== 'undefined') {
+    window.AIAssistant = {
+      open() { navigateTo('ai'); },
+      toggle() { navigateTo('ai'); },
+    };
+  }
+
   // HTTP-запрос с авторизацией
   async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');

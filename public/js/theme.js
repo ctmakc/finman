@@ -117,6 +117,16 @@
       // Expose the chosen mode too, so a toggle button can reflect state.
       el.setAttribute('data-theme-mode', currentMode);
     } catch (e) { /* ignore */ }
+    // Сообщаем подписчикам (например, charts.js), что палитра --fm-* сменилась,
+    // чтобы они перечитали токены и перерисовались.
+    try {
+      if (typeof root !== 'undefined' && root.document &&
+          typeof root.CustomEvent === 'function') {
+        root.document.dispatchEvent(
+          new root.CustomEvent('fm:themechange', { detail: { theme: getResolved() } })
+        );
+      }
+    } catch (e) { /* ignore */ }
     return getResolved();
   }
 
