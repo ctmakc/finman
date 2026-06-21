@@ -45,7 +45,7 @@ function initDatabase() {
           name TEXT NOT NULL,
           account_number TEXT,
           bank_name TEXT,
-          currency TEXT DEFAULT 'RUB',
+          currency TEXT DEFAULT 'UAH',
           balance REAL DEFAULT 0,
           account_type TEXT,
           is_active BOOLEAN DEFAULT 1,

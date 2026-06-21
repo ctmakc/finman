@@ -1,5 +1,15 @@
 // Функции для работы с транзакциями
 
+// Полное HTML-экранирование (включая кавычки — безопасно и в атрибутах).
+function escapeHtml(text) {
+  return String(text == null ? '' : text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Получение транзакций с учетом фильтров
 async function fetchTransactions(filters = {}) {
     try {
@@ -268,7 +278,7 @@ async function fetchTransactions(filters = {}) {
                 <option value="">Выберите счет</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
-                    ${account.name} (${formatCurrency(account.balance, account.currency)})
+                    ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
                   </option>
                 `).join('')}
               </select>
@@ -294,7 +304,7 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-category" class="form-label">Категория</label>
-              <input type="text" id="${modalId}-category" class="form-control" list="${modalId}-categories" value="${isEditing ? transactionData.category : ''}">
+              <input type="text" id="${modalId}-category" class="form-control" list="${modalId}-categories" value="${isEditing ? escapeHtml(transactionData.category) : ''}">
               <datalist id="${modalId}-categories">
                 <!-- Категории будут загружены динамически -->
               </datalist>
@@ -302,7 +312,7 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-description" class="form-label">Описание</label>
-              <input type="text" id="${modalId}-description" class="form-control" value="${isEditing ? transactionData.description : ''}">
+              <input type="text" id="${modalId}-description" class="form-control" value="${isEditing ? escapeHtml(transactionData.description) : ''}">
             </div>
             
             <div class="modal-footer">
@@ -329,7 +339,7 @@ async function fetchTransactions(filters = {}) {
     // Загрузка категорий
     fetchCategories().then(categories => {
       const categoriesDatalist = document.getElementById(`${modalId}-categories`);
-      categoriesDatalist.innerHTML = categories.map(category => `<option value="${category}">`).join('');
+      categoriesDatalist.innerHTML = categories.map(category => `<option value="${escapeHtml(category)}">`).join('');
     });
     
     // Функция закрытия модального окна
@@ -422,7 +432,7 @@ async function fetchTransactions(filters = {}) {
                 <option value="">Выберите счет</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}">
-                    ${account.name} (${formatCurrency(account.balance, account.currency)})
+                    ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
                   </option>
                 `).join('')}
               </select>
@@ -549,12 +559,12 @@ async function fetchTransactions(filters = {}) {
         <td data-label="Дата" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
         <td data-label="Описание" class="tx-cell tx-cell-desc">
           <span class="tx-direction" aria-hidden="true"><i class="fas fa-arrow-${isIncome ? 'down' : 'up'}"></i></span>
-          <span class="tx-desc-text">${description}</span>
+          <span class="tx-desc-text">${escapeHtml(description)}</span>
         </td>
         <td data-label="Категория" class="tx-cell tx-cell-category">
-          <span class="chip tx-category-chip">${category}</span>
+          <span class="chip tx-category-chip">${escapeHtml(category)}</span>
         </td>
-        <td data-label="Счет" class="tx-cell tx-cell-account">${transaction.account_name}</td>
+        <td data-label="Счет" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
         <td data-label="Сумма" class="text-right tx-cell tx-cell-amount transaction-amount ${isIncome ? 'income text-success' : 'expense text-error'}">
           <span class="tx-amount-sign" aria-hidden="true">${isIncome ? '+' : '−'}</span>${formatCurrency(Math.abs(transaction.amount))}
         </td>

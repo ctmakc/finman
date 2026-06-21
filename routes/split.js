@@ -4,9 +4,59 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const Split = require('../models/split');
+const { get } = require('../db/database');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+// ---- Guards владения (закрывают IDOR на всех :id-роутах) ----
+// :id = id группы -> грузим группу и сверяем владельца.
+async function ownGroup(req, res, next) {
+  try {
+    const group = await Split.findGroupById(req.params.id);
+    if (!group) return res.status(404).json({ message: 'Группа не найдена' });
+    if (Number(group.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Нет доступа к этой группе' });
+    }
+    req.group = group;
+    next();
+  } catch (error) {
+    console.error('Ошибка ownGroup:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+}
+
+// :id = id участника -> участник -> его группа -> владелец.
+async function ownMember(req, res, next) {
+  try {
+    const member = await get('SELECT group_id FROM split_members WHERE id = ?', [req.params.id]);
+    if (!member) return res.status(404).json({ message: 'Участник не найден' });
+    const group = await Split.findGroupById(member.group_id);
+    if (!group || Number(group.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Нет доступа' });
+    }
+    next();
+  } catch (error) {
+    console.error('Ошибка ownMember:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+}
+
+// :id = id расхода -> расход -> его группа -> владелец.
+async function ownExpense(req, res, next) {
+  try {
+    const expense = await get('SELECT group_id FROM split_expenses WHERE id = ?', [req.params.id]);
+    if (!expense) return res.status(404).json({ message: 'Расход не найден' });
+    const group = await Split.findGroupById(expense.group_id);
+    if (!group || Number(group.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Нет доступа' });
+    }
+    next();
+  } catch (error) {
+    console.error('Ошибка ownExpense:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+}
 
 // ==================== ГРУППЫ ====================
 
@@ -33,13 +83,9 @@ router.get('/stats', async (req, res) => {
 });
 
 // Получить группу по ID
-router.get('/groups/:id', async (req, res) => {
+router.get('/groups/:id', ownGroup, async (req, res) => {
   try {
-    const group = await Split.findGroupById(req.params.id);
-    if (!group) {
-      return res.status(404).json({ message: 'Группа не найдена' });
-    }
-    res.json(group);
+    res.json(req.group);
   } catch (error) {
     console.error('Ошибка:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
@@ -47,7 +93,7 @@ router.get('/groups/:id', async (req, res) => {
 });
 
 // Статистика группы
-router.get('/groups/:id/stats', async (req, res) => {
+router.get('/groups/:id/stats', ownGroup, async (req, res) => {
   try {
     const stats = await Split.getGroupStats(req.params.id);
     res.json(stats);
@@ -78,13 +124,8 @@ router.post('/groups', async (req, res) => {
 });
 
 // Обновить группу
-router.put('/groups/:id', async (req, res) => {
+router.put('/groups/:id', ownGroup, async (req, res) => {
   try {
-    const group = await Split.findGroupById(req.params.id);
-    if (!group || group.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Группа не найдена' });
-    }
-
     const updated = await Split.updateGroup(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
@@ -96,7 +137,7 @@ router.put('/groups/:id', async (req, res) => {
 // ==================== УЧАСТНИКИ ====================
 
 // Получить участников
-router.get('/groups/:id/members', async (req, res) => {
+router.get('/groups/:id/members', ownGroup, async (req, res) => {
   try {
     const members = await Split.getMembers(req.params.id);
     res.json(members);
@@ -107,7 +148,7 @@ router.get('/groups/:id/members', async (req, res) => {
 });
 
 // Добавить участника
-router.post('/groups/:id/members', async (req, res) => {
+router.post('/groups/:id/members', ownGroup, async (req, res) => {
   try {
     const { name, email } = req.body;
     if (!name) {
@@ -123,7 +164,7 @@ router.post('/groups/:id/members', async (req, res) => {
 });
 
 // Удалить участника
-router.delete('/members/:id', async (req, res) => {
+router.delete('/members/:id', ownMember, async (req, res) => {
   try {
     await Split.removeMember(req.params.id);
     res.json({ message: 'Участник удалён' });
@@ -136,7 +177,7 @@ router.delete('/members/:id', async (req, res) => {
 // ==================== РАСХОДЫ ====================
 
 // Получить расходы группы
-router.get('/groups/:id/expenses', async (req, res) => {
+router.get('/groups/:id/expenses', ownGroup, async (req, res) => {
   try {
     const expenses = await Split.getExpenses(req.params.id);
     res.json(expenses);
@@ -147,10 +188,10 @@ router.get('/groups/:id/expenses', async (req, res) => {
 });
 
 // Добавить расход
-router.post('/groups/:id/expenses', async (req, res) => {
+router.post('/groups/:id/expenses', ownGroup, async (req, res) => {
   try {
     const { paid_by, description, amount, split_type, date, category, shares } = req.body;
-    
+
     if (!paid_by || !description || !amount) {
       return res.status(400).json({ message: 'Заполните обязательные поля' });
     }
@@ -168,7 +209,7 @@ router.post('/groups/:id/expenses', async (req, res) => {
 });
 
 // Удалить расход
-router.delete('/expenses/:id', async (req, res) => {
+router.delete('/expenses/:id', ownExpense, async (req, res) => {
   try {
     await Split.deleteExpense(req.params.id);
     res.json({ message: 'Расход удалён' });
@@ -181,7 +222,7 @@ router.delete('/expenses/:id', async (req, res) => {
 // ==================== БАЛАНСЫ И РАСЧЁТЫ ====================
 
 // Получить балансы
-router.get('/groups/:id/balances', async (req, res) => {
+router.get('/groups/:id/balances', ownGroup, async (req, res) => {
   try {
     const balances = await Split.calculateBalances(req.params.id);
     res.json(balances);
@@ -192,7 +233,7 @@ router.get('/groups/:id/balances', async (req, res) => {
 });
 
 // Получить рекомендуемые переводы
-router.get('/groups/:id/settlements/suggested', async (req, res) => {
+router.get('/groups/:id/settlements/suggested', ownGroup, async (req, res) => {
   try {
     const settlements = await Split.calculateSettlements(req.params.id);
     res.json(settlements);
@@ -203,10 +244,10 @@ router.get('/groups/:id/settlements/suggested', async (req, res) => {
 });
 
 // Записать взаиморасчёт
-router.post('/groups/:id/settlements', async (req, res) => {
+router.post('/groups/:id/settlements', ownGroup, async (req, res) => {
   try {
     const { from_member, to_member, amount, date, note } = req.body;
-    
+
     if (!from_member || !to_member || !amount) {
       return res.status(400).json({ message: 'Заполните обязательные поля' });
     }
@@ -224,7 +265,7 @@ router.post('/groups/:id/settlements', async (req, res) => {
 });
 
 // Получить историю взаиморасчётов
-router.get('/groups/:id/settlements', async (req, res) => {
+router.get('/groups/:id/settlements', ownGroup, async (req, res) => {
   try {
     const settlements = await Split.getSettlements(req.params.id);
     res.json(settlements);

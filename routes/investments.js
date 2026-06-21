@@ -5,9 +5,42 @@ const router = express.Router();
 const passport = require('passport');
 const Investment = require('../models/investment');
 const priceService = require('../services/priceService');
+const { get } = require('../db/database');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+// ---- Guards владения (закрывают IDOR на sub-resource роутах) ----
+// :id = id портфеля.
+async function ownPortfolio(req, res, next) {
+  try {
+    const portfolio = await Investment.findPortfolioById(req.params.id);
+    if (!portfolio || Number(portfolio.user_id) !== Number(req.user.id)) {
+      return res.status(404).json({ message: 'Портфель не найден' });
+    }
+    req.portfolio = portfolio;
+    next();
+  } catch (error) {
+    console.error('Ошибка ownPortfolio:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+}
+
+// :id = id актива -> его портфель -> владелец.
+async function ownInvestment(req, res, next) {
+  try {
+    const inv = await get('SELECT portfolio_id FROM investments WHERE id = ?', [req.params.id]);
+    if (!inv) return res.status(404).json({ message: 'Актив не найден' });
+    const portfolio = await Investment.findPortfolioById(inv.portfolio_id);
+    if (!portfolio || Number(portfolio.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Нет доступа' });
+    }
+    next();
+  } catch (error) {
+    console.error('Ошибка ownInvestment:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+}
 
 // ==================== ЖИВЫЕ ЦЕНЫ (Wave-2 price-feeds) ====================
 
@@ -137,7 +170,7 @@ router.delete('/portfolios/:id', async (req, res) => {
 // ==================== АКТИВЫ ====================
 
 // Получить активы портфеля
-router.get('/portfolios/:id/investments', async (req, res) => {
+router.get('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
   try {
     const investments = await Investment.findByPortfolio(req.params.id);
     const withValues = await Promise.all(
@@ -151,7 +184,7 @@ router.get('/portfolios/:id/investments', async (req, res) => {
 });
 
 // Добавить актив
-router.post('/portfolios/:id/investments', async (req, res) => {
+router.post('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
   try {
     const { symbol, name, type, quantity, buy_price, currency, buy_date, notes, fee } = req.body;
     
@@ -172,7 +205,7 @@ router.post('/portfolios/:id/investments', async (req, res) => {
 });
 
 // Обновить актив
-router.put('/investments/:id', async (req, res) => {
+router.put('/investments/:id', ownInvestment, async (req, res) => {
   try {
     const updated = await Investment.updateInvestment(req.params.id, req.body);
     res.json(updated);
@@ -183,7 +216,7 @@ router.put('/investments/:id', async (req, res) => {
 });
 
 // Обновить цену
-router.put('/investments/:id/price', async (req, res) => {
+router.put('/investments/:id/price', ownInvestment, async (req, res) => {
   try {
     const { price } = req.body;
     if (!price) {
@@ -199,7 +232,7 @@ router.put('/investments/:id/price', async (req, res) => {
 });
 
 // Продать актив
-router.post('/investments/:id/sell', async (req, res) => {
+router.post('/investments/:id/sell', ownInvestment, async (req, res) => {
   try {
     const { quantity, price, fee, date } = req.body;
     
@@ -216,7 +249,7 @@ router.post('/investments/:id/sell', async (req, res) => {
 });
 
 // Получить транзакции актива
-router.get('/investments/:id/transactions', async (req, res) => {
+router.get('/investments/:id/transactions', ownInvestment, async (req, res) => {
   try {
     const transactions = await Investment.getTransactions(req.params.id);
     res.json(transactions);
@@ -227,7 +260,7 @@ router.get('/investments/:id/transactions', async (req, res) => {
 });
 
 // Получить транзакции портфеля
-router.get('/portfolios/:id/transactions', async (req, res) => {
+router.get('/portfolios/:id/transactions', ownPortfolio, async (req, res) => {
   try {
     const transactions = await Investment.getPortfolioTransactions(req.params.id);
     res.json(transactions);

@@ -38,6 +38,9 @@ router.post(
     if (!message || !String(message).trim()) {
       throw new AppError(400, 'EMPTY_MESSAGE', 'Field "message" is required');
     }
+    if (String(message).length > 8000) {
+      throw new AppError(400, 'MESSAGE_TOO_LONG', 'Сообщение слишком длинное (макс 8000 символов)');
+    }
     if (!provider.isConfigured()) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI provider not configured');
     }
@@ -61,6 +64,9 @@ router.post(
     const { conversationId, message } = req.body || {};
     if (!message || !String(message).trim()) {
       throw new AppError(400, 'EMPTY_MESSAGE', 'Field "message" is required');
+    }
+    if (String(message).length > 8000) {
+      throw new AppError(400, 'MESSAGE_TOO_LONG', 'Сообщение слишком длинное (макс 8000 символов)');
     }
     if (!provider.isConfigured()) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI provider not configured');
