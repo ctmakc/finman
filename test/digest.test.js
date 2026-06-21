@@ -40,7 +40,11 @@ function dbAll(db, sql, params = []) {
 }
 
 // Фиксированная «сегодняшняя» дата для детерминизма окна сводки.
-const NOW = new Date('2026-06-19T12:00:00Z');
+// NOW = реальное «сейчас», а даты сидов считаем относительно него, чтобы тест
+// был устойчив к смене суток (route-хендлеры используют реальный new Date(),
+// а не инъектируемый now — хардкод дат ломался на полночном переходе).
+const NOW = new Date();
+const dstr = (off) => new Date(NOW.getTime() - off * 86400000).toISOString().slice(0, 10);
 
 // Сеем финансовые данные в окне [NOW-7d, NOW] и предстоящие платежи.
 async function seedFinance(db, userId) {
@@ -52,15 +56,15 @@ async function seedFinance(db, userId) {
   );
   const accountId = acc.id;
 
-  // Окно: 2026-06-12 .. 2026-06-19
+  // Окно [NOW-7d, NOW]: берём offset 1..5 с запасом, чтобы time-of-day не выкинул граничные.
   const txs = [
-    ['2026-06-13', 'Salary', 'Income', 40000, 'income'],
-    ['2026-06-14', 'Silpo', 'Groceries', -1200, 'expense'],
-    ['2026-06-15', 'ATB', 'Groceries', -800, 'expense'],
-    ['2026-06-16', 'Netflix', 'Entertainment', -350, 'expense'],
-    ['2026-06-17', 'Uber', 'Transport', -500, 'expense'],
+    [dstr(5), 'Salary', 'Income', 40000, 'income'],
+    [dstr(4), 'Silpo', 'Groceries', -1200, 'expense'],
+    [dstr(3), 'ATB', 'Groceries', -800, 'expense'],
+    [dstr(2), 'Netflix', 'Entertainment', -350, 'expense'],
+    [dstr(1), 'Uber', 'Transport', -500, 'expense'],
     // ВНЕ окна (раньше начала) — не должно попасть в сводку.
-    ['2026-06-01', 'Old groceries', 'Groceries', -9999, 'expense'],
+    [dstr(40), 'Old groceries', 'Groceries', -9999, 'expense'],
   ];
   for (const [date, description, category, amount, type] of txs) {
     await dbRun(
@@ -91,7 +95,7 @@ async function seedFinance(db, userId) {
     db,
     `INSERT INTO recurring_payments
        (user_id, account_id, name, amount, type, frequency, start_date, next_payment_date, is_active)
-     VALUES (?, ?, 'Rent', 12000, 'expense', 'monthly', '2026-06-01', '2026-06-22', 1)`,
+     VALUES (?, ?, 'Rent', 12000, 'expense', 'monthly', '2026-06-01', '${dstr(-3)}', 1)`,
     [userId, accountId]
   );
   // Платёж далеко за окном — не должен попасть.
@@ -99,7 +103,7 @@ async function seedFinance(db, userId) {
     db,
     `INSERT INTO recurring_payments
        (user_id, account_id, name, amount, type, frequency, start_date, next_payment_date, is_active)
-     VALUES (?, ?, 'Insurance', 5000, 'expense', 'yearly', '2026-06-01', '2026-08-01', 1)`,
+     VALUES (?, ?, 'Insurance', 5000, 'expense', 'yearly', '2026-06-01', '${dstr(-45)}', 1)`,
     [userId, accountId]
   );
 
@@ -217,8 +221,8 @@ describe('digestService.buildDigest', () => {
 
     const d = await digestService.buildDigest(ctx.userId, { now: NOW });
 
-    expect(d.period.start).toBe('2026-06-12');
-    expect(d.period.end).toBe('2026-06-19');
+    expect(d.period.start).toBe(dstr(7));
+    expect(d.period.end).toBe(dstr(0));
 
     // income = 40000, расходы = 1200+800+350+500 = 2850 (старый -9999 вне окна).
     expect(d.income).toBe(40000);
