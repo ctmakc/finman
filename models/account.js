@@ -131,29 +131,15 @@ class Account {
   // значение всегда было округлено до 2 знаков и не накапливало float-дрейф
   // (например, многократные 0.1 + 0.2 в SQLite REAL).
   static async updateBalance(id, userId, amount) {
-    try {
-      const account = await get(
-        `SELECT balance FROM accounts WHERE id = ? AND user_id = ?`,
-        [id, userId]
-      );
-
-      if (!account) {
-        return false;
-      }
-
-      const newBalance = money.add(account.balance, amount);
-
-      const result = await run(
-        `UPDATE accounts
-         SET balance = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND user_id = ?`,
-        [newBalance, id, userId]
-      );
-
-      return result.changes > 0;
-    } catch (error) {
-      throw error;
-    }
+    // Атомарный инкремент (без read-modify-write -> нет потерянных обновлений
+    // при конкуренции). ROUND(...,2) держит баланс точным до копеек прямо в БД.
+    const result = await run(
+      `UPDATE accounts
+       SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+      [money.round(amount), id, userId]
+    );
+    return result.changes > 0;
   }
 }
 

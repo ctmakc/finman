@@ -1,19 +1,13 @@
-const { query, get, run } = require('../db/database');
+const { query, get, run, transaction } = require('../db/database');
 const Account = require('./account');
 const money = require('../lib/money');
 
 class Transaction {
   // Создание транзакции
   static async create(transactionData) {
-    try {
-      // Округляем сумму до копеек, чтобы и хранимая транзакция, и баланс
-      // счёта оставались точными до 2 знаков.
-      const amount = money.round(transactionData.amount);
-
-      // Начать транзакцию
-      await run('BEGIN TRANSACTION');
-
-      // Создать запись о транзакции
+    // Округляем сумму до копеек (хранимая транзакция и баланс — точные до 2 знаков).
+    const amount = money.round(transactionData.amount);
+    return transaction(async () => {
       const result = await run(
         `INSERT INTO transactions
          (account_id, user_id, date, description, category, amount, type)
@@ -28,75 +22,42 @@ class Transaction {
           transactionData.type || (amount >= 0 ? 'income' : 'expense')
         ]
       );
-
-      // Обновить баланс счета
       await Account.updateBalance(
         transactionData.accountId,
         transactionData.userId,
         amount
       );
-
-      // Завершить транзакцию
-      await run('COMMIT');
-
       return { id: result.id, ...transactionData, amount };
-    } catch (error) {
-      // Откатить транзакцию в случае ошибки
-      await run('ROLLBACK');
-      throw error;
-    }
+    });
   }
   
   // Создание нескольких транзакций (импорт)
   static async bulkCreate(transactions) {
-    try {
-      // Начать транзакцию
-      await run('BEGIN TRANSACTION');
-      
+    return transaction(async () => {
       const results = [];
-      
-      // Обработка каждой транзакции
-      for (const transaction of transactions) {
-        // Округляем сумму до копеек (см. create).
-        const amount = money.round(transaction.amount);
-
-        // Создать запись о транзакции
+      for (const tx of transactions) {
+        const amount = money.round(tx.amount);
         const result = await run(
           `INSERT INTO transactions
            (account_id, user_id, date, description, category, amount, type)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
-            transaction.accountId,
-            transaction.userId,
-            transaction.date,
-            transaction.description || '',
-            transaction.category || 'Прочее',
+            tx.accountId,
+            tx.userId,
+            tx.date,
+            tx.description || '',
+            tx.category || 'Прочее',
             amount,
-            transaction.type || (amount >= 0 ? 'income' : 'expense')
+            tx.type || (amount >= 0 ? 'income' : 'expense')
           ]
         );
-
-        // Обновить баланс счета (только если транзакция новая)
-        if (!transaction.skipBalanceUpdate) {
-          await Account.updateBalance(
-            transaction.accountId,
-            transaction.userId,
-            amount
-          );
+        if (!tx.skipBalanceUpdate) {
+          await Account.updateBalance(tx.accountId, tx.userId, amount);
         }
-
-        results.push({ id: result.id, ...transaction, amount });
+        results.push({ id: result.id, ...tx, amount });
       }
-      
-      // Завершить транзакцию
-      await run('COMMIT');
-      
       return results;
-    } catch (error) {
-      // Откатить транзакцию в случае ошибки
-      await run('ROLLBACK');
-      throw error;
-    }
+    });
   }
   
   // Получение транзакций пользователя (с фильтрацией и пагинацией)
@@ -224,114 +185,57 @@ class Transaction {
         throw new Error('Транзакция не найдена');
       }
       
-      // Начать транзакцию
-      await run('BEGIN TRANSACTION');
-      
-      // Вычислить разницу для обновления баланса (округлённую до копеек).
-      let balanceDifference = 0;
-      let newAmount;
+      return transaction(async () => {
+        // Вычислить разницу для обновления баланса (округлённую до копеек).
+        let balanceDifference = 0;
+        let newAmount;
+        if (transactionData.amount !== undefined) {
+          newAmount = money.round(transactionData.amount);
+          balanceDifference = money.sub(newAmount, currentTransaction.amount);
+        }
 
-      if (transactionData.amount !== undefined) {
-        newAmount = money.round(transactionData.amount);
-        balanceDifference = money.sub(newAmount, currentTransaction.amount);
-      }
-      
-      // Подготовить поля для обновления
-      let updateFields = [];
-      let params = [];
-      
-      if (transactionData.date) {
-        updateFields.push('date = ?');
-        params.push(transactionData.date);
-      }
-      
-      if (transactionData.description !== undefined) {
-        updateFields.push('description = ?');
-        params.push(transactionData.description);
-      }
-      
-      if (transactionData.category) {
-        updateFields.push('category = ?');
-        params.push(transactionData.category);
-      }
-      
-      if (transactionData.amount !== undefined) {
-        updateFields.push('amount = ?');
-        params.push(newAmount);
-      }
-      
-      if (transactionData.type) {
-        updateFields.push('type = ?');
-        params.push(transactionData.type);
-      }
-      
-      updateFields.push('updated_at = CURRENT_TIMESTAMP');
-      params.push(id);
-      params.push(userId);
-      
-      // Обновить транзакцию
-      const result = await run(
-        `UPDATE transactions 
-         SET ${updateFields.join(', ')} 
-         WHERE id = ? AND user_id = ?`,
-        params
-      );
-      
-      // Обновить баланс счета, если сумма изменилась
-      if (balanceDifference !== 0) {
-        await Account.updateBalance(
-          currentTransaction.account_id,
-          userId,
-          balanceDifference
+        const updateFields = [];
+        const params = [];
+        if (transactionData.date) { updateFields.push('date = ?'); params.push(transactionData.date); }
+        if (transactionData.description !== undefined) { updateFields.push('description = ?'); params.push(transactionData.description); }
+        if (transactionData.category) { updateFields.push('category = ?'); params.push(transactionData.category); }
+        if (transactionData.amount !== undefined) { updateFields.push('amount = ?'); params.push(newAmount); }
+        if (transactionData.type) { updateFields.push('type = ?'); params.push(transactionData.type); }
+        updateFields.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(id);
+        params.push(userId);
+
+        const result = await run(
+          `UPDATE transactions
+           SET ${updateFields.join(', ')}
+           WHERE id = ? AND user_id = ?`,
+          params
         );
-      }
-      
-      // Завершить транзакцию
-      await run('COMMIT');
-      
-      return result.changes > 0;
+
+        if (balanceDifference !== 0) {
+          await Account.updateBalance(currentTransaction.account_id, userId, balanceDifference);
+        }
+        return result.changes > 0;
+      });
     } catch (error) {
-      // Откатить транзакцию в случае ошибки
-      await run('ROLLBACK');
       throw error;
     }
   }
   
   // Удаление транзакции
   static async delete(id, userId) {
-    try {
-      // Получить транзакцию для обновления баланса
-      const transaction = await this.findById(id, userId);
-      
-      if (!transaction) {
-        throw new Error('Транзакция не найдена');
-      }
-      
-      // Начать транзакцию
-      await run('BEGIN TRANSACTION');
-      
-      // Удалить транзакцию
+    const row = await this.findById(id, userId);
+    if (!row) {
+      throw new Error('Транзакция не найдена');
+    }
+    return transaction(async () => {
       const result = await run(
         `DELETE FROM transactions WHERE id = ? AND user_id = ?`,
         [id, userId]
       );
-      
-      // Обновить баланс счета (вычесть сумму транзакции)
-      await Account.updateBalance(
-        transaction.account_id,
-        userId,
-        -transaction.amount
-      );
-      
-      // Завершить транзакцию
-      await run('COMMIT');
-      
+      await Account.updateBalance(row.account_id, userId, -row.amount);
       return result.changes > 0;
-    } catch (error) {
-      // Откатить транзакцию в случае ошибки
-      await run('ROLLBACK');
-      throw error;
-    }
+    });
   }
   
   // Получение статистики по транзакциям

@@ -15,6 +15,16 @@ if (!fs.existsSync(dbDir)){
 // Создание подключения к базе данных
 const db = new sqlite3.Database(dbPath);
 
+// Прочность под конкуренцией:
+//  - WAL: читатели не блокируют писателя (меньше SQLITE_BUSY);
+//  - busy_timeout: ждать освобождения вместо мгновенной ошибки;
+//  - foreign_keys: чтобы ON DELETE CASCADE реально работал.
+db.serialize(() => {
+  db.run('PRAGMA journal_mode = WAL');
+  db.run('PRAGMA busy_timeout = 5000');
+  db.run('PRAGMA foreign_keys = ON');
+});
+
 // Инициализация базы данных
 function initDatabase() {
   return new Promise((resolve, reject) => {
@@ -1004,11 +1014,35 @@ function closeDatabase() {
   });
 }
 
+// Сериализуем многооператорные транзакции через промис-очередь. На ОДНОМ
+// shared-соединении два параллельных BEGIN..COMMIT иначе переплетаются
+// (SQLite: "cannot start a transaction within a transaction") и корраптят
+// баланс. transaction(work) гарантирует: одновременно открыта максимум одна
+// транзакция; work() выполняется между BEGIN и COMMIT, при ошибке — ROLLBACK.
+let _txQueue = Promise.resolve();
+function transaction(work) {
+  const result = _txQueue.then(async () => {
+    await run('BEGIN');
+    try {
+      const r = await work();
+      await run('COMMIT');
+      return r;
+    } catch (err) {
+      try { await run('ROLLBACK'); } catch (_) { /* уже откатилось */ }
+      throw err;
+    }
+  });
+  // Очередь продолжается независимо от успеха/ошибки текущей транзакции.
+  _txQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 module.exports = {
   initDatabase,
   closeDatabase,
   query,
   get,
   run,
+  transaction,
   db
 };
