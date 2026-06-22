@@ -3,6 +3,7 @@ const router = express.Router();
 const passport = require('passport');
 const { query, run } = require('../db/database');
 const backupService = require('../services/backupService');
+const ledgerExport = require('../services/ledgerExport');
 const { AppError } = require('../middleware/error');
 
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -149,6 +150,24 @@ router.post('/full/json', express.json({ limit: '10mb' }), async (req, res) => {
     if (data.debts) for (const d of data.debts) { try { await run('INSERT INTO debts (user_id, name, type, amount, paid_amount, currency, start_date, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, d.name, d.type, d.amount, d.paid_amount || 0, d.currency, d.start_date, d.due_date]); results.debts++; } catch(e){} }
     res.json({ message: 'Импорт завершён', results });
   } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+});
+
+// Beancount (plain-text double-entry) export — anti-lock-in / Fava-friendly.
+// GET /api/export/beancount -> text/plain download of all accounts + txns.
+router.get('/beancount', async (req, res) => {
+  try {
+    const text = await ledgerExport.toBeancount(req.user.id);
+    const stamp = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=finman_${stamp}.beancount`
+    );
+    res.send(text);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
 });
 
 module.exports = router;

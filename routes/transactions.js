@@ -165,6 +165,57 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
+// Перевод между двумя счетами (двойная запись).
+// Создаёт две строки type='transfer' с общим transfer_id и атомарно двигает
+// оба баланса. Оба счёта должны принадлежать текущему пользователю.
+router.post('/transfer', authenticate, async (req, res, next) => {
+  try {
+    const { fromAccountId, toAccountId, amount, date, description } = req.body;
+
+    // Базовая валидация полей (детальная валидация суммы/одинакового счёта —
+    // в модели, она бросает AppError(400)).
+    if (!fromAccountId || !toAccountId || amount === undefined) {
+      return res.status(400).json({
+        error: true,
+        message: 'Необходимо указать счёт-источник, счёт-получатель и сумму',
+      });
+    }
+
+    // Оба счёта должны существовать и принадлежать пользователю.
+    const fromAccount = await Account.findById(fromAccountId, req.user.id);
+    const toAccount = await Account.findById(toAccountId, req.user.id);
+
+    if (!fromAccount || !toAccount) {
+      return res.status(404).json({
+        error: true,
+        message: 'Один из счетов не найден',
+      });
+    }
+
+    const result = await Transaction.createTransfer({
+      userId: req.user.id,
+      fromAccountId,
+      toAccountId,
+      amount,
+      date,
+      description,
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    // AppError (например, 400 за одинаковый счёт/неположительную сумму) —
+    // отдаём через глобальный errorHandler как { success:false, error:{...} }.
+    if (error && error.name === 'AppError') {
+      return next(error);
+    }
+    console.error('Ошибка при создании перевода:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при создании перевода',
+    });
+  }
+});
+
 // Получение транзакции по ID
 router.get('/:id', authenticate, async (req, res) => {
   try {

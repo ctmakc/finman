@@ -186,15 +186,15 @@ router.get('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
 // Добавить актив
 router.post('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
   try {
-    const { symbol, name, type, quantity, buy_price, currency, buy_date, notes, fee } = req.body;
-    
+    const { symbol, name, type, quantity, buy_price, current_price, currency, buy_date, notes, fee } = req.body;
+
     if (!symbol || !name || !type || !quantity || !buy_price || !buy_date) {
       return res.status(400).json({ message: 'Заполните обязательные поля' });
     }
 
     const investment = await Investment.addInvestment({
       portfolio_id: req.params.id,
-      symbol, name, type, quantity, buy_price, currency, buy_date, notes, fee
+      symbol, name, type, quantity, buy_price, current_price, currency, buy_date, notes, fee
     });
 
     res.status(201).json(investment);
@@ -268,6 +268,88 @@ router.get('/portfolios/:id/transactions', ownPortfolio, async (req, res) => {
     console.error('Ошибка:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
   }
+});
+
+// ==================== INVESTMENT DEPTH (события / аллокация / FIRE) ====================
+
+// Добавить событие по активу (dividend / fee / split). Guard ownInvestment
+// закрывает IDOR — чужой актив отдаёт 403/404 ещё до записи.
+router.post('/investments/:id/events', ownInvestment, async (req, res) => {
+  try {
+    const { type, amount, date, note } = req.body;
+    if (!type || !Object.values(Investment.EVENT_TYPES).includes(type)) {
+      return res.status(400).json({ message: 'Некорректный тип события' });
+    }
+    // split — информационное событие, сумма не обязательна; для денежных требуем amount.
+    if (type !== Investment.EVENT_TYPES.SPLIT) {
+      const n = Number(amount);
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: 'Сумма обязательна и должна быть > 0' });
+      }
+    }
+
+    const event = await Investment.addEvent({
+      investment_id: Number(req.params.id),
+      type,
+      amount: amount || 0,
+      date,
+      note
+    });
+    res.status(201).json(event);
+  } catch (error) {
+    console.error('Ошибка добавления события:', error);
+    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+  }
+});
+
+// Получить события актива.
+router.get('/investments/:id/events', ownInvestment, async (req, res) => {
+  try {
+    const events = await Investment.getEvents(Number(req.params.id));
+    res.json(events);
+  } catch (error) {
+    console.error('Ошибка получения событий:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Аллокация портфеля (% по типу актива и по символу). Guard ownPortfolio.
+router.get('/portfolios/:id/allocation', ownPortfolio, async (req, res) => {
+  try {
+    const allocation = await Investment.getAllocation(Number(req.params.id));
+    res.json(allocation);
+  } catch (error) {
+    console.error('Ошибка аллокации:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// FIRE-проекция: за сколько лет дорасти до target при текущей стоимости
+// портфеля + ежемесячных взносах под годовую ставку. Guard ownPortfolio.
+// Параметры в query: contribution=, rate=, target=.
+router.get('/portfolios/:id/fire', ownPortfolio, async (req, res) => {
+  try {
+    const stats = await Investment.calculatePortfolioValue(Number(req.params.id));
+    const contribution = Number(req.query.contribution) || 0;
+    const rate = Number(req.query.rate) || 0;
+    const target = Number(req.query.target) || 0;
+
+    const projection = Investment.fireProjection({
+      currentValue: stats.totalValue,
+      contribution,
+      rate,
+      target
+    });
+    res.json(projection);
+  } catch (error) {
+    console.error('Ошибка FIRE-проекции:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Типы событий по активу (для UI).
+router.get('/event-types', (req, res) => {
+  res.json(Investment.EVENT_TYPES);
 });
 
 // Типы активов

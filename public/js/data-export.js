@@ -89,6 +89,16 @@
       }
     },
 
+    async downloadBeancount() {
+      try {
+        const res = await fetch('/api/export/beancount', { headers: authHeaders() });
+        await downloadResponse(res, 'finman.beancount');
+        notify('Beancount-файл выгружен', 'success');
+      } catch (e) {
+        notify(e.message || 'Не удалось выгрузить Beancount', 'error');
+      }
+    },
+
     async restoreFromFile(file) {
       if (!file) {
         notify('Выберите файл резервной копии (.json)', 'error');
@@ -139,6 +149,7 @@
         '  <div class="data-export-actions">',
         '    <button type="button" id="btn-backup-json" class="btn btn-primary">Скачать резервную копию (JSON)</button>',
         '    <button type="button" id="btn-backup-csv" class="btn btn-secondary">Выгрузить всё в CSV</button>',
+        '    <button type="button" id="btn-backup-beancount" class="btn btn-secondary">Экспорт в Beancount</button>',
         '  </div>',
         '  <div class="data-export-restore">',
         '    <label for="restore-file">Восстановить из резервной копии:</label>',
@@ -155,6 +166,9 @@
 
       const csvBtn = byId('btn-backup-csv');
       if (csvBtn) csvBtn.addEventListener('click', () => this.downloadCsv());
+
+      const beancountBtn = byId('btn-backup-beancount');
+      if (beancountBtn) beancountBtn.addEventListener('click', () => this.downloadBeancount());
 
       const restoreBtn = byId('btn-restore');
       const fileInput = byId('restore-file');

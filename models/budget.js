@@ -1,4 +1,4 @@
-const { query, get, run } = require('../db/database');
+const { query, get, run, transaction } = require('../db/database');
 const money = require('../lib/money');
 
 class Budget {
@@ -7,8 +7,8 @@ class Budget {
     try {
       const result = await run(
         `INSERT INTO budgets
-         (user_id, name, category, amount, period, start_date, end_date, currency, notify_at_percent)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, name, category, amount, period, start_date, end_date, currency, notify_at_percent, rollover, carryover)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           budgetData.userId,
           budgetData.name,
@@ -18,7 +18,9 @@ class Budget {
           budgetData.startDate,
           budgetData.endDate || null,
           budgetData.currency || 'UAH',
-          budgetData.notifyAtPercent || 80
+          budgetData.notifyAtPercent || 80,
+          budgetData.rollover ? 1 : 0,
+          money.round(budgetData.carryover || 0)
         ]
       );
 
@@ -99,8 +101,15 @@ class Budget {
   static formatBudget(budget) {
     const spent = money.round(budget.spent || 0);
     const amount = money.round(budget.amount || 0);
-    const percentUsed = amount > 0 ? Math.round((spent / amount) * 100) : 0;
-    const remaining = money.sub(amount, spent);
+    // Envelope/rollover: перенесённый остаток из прошлых периодов (может быть
+    // отрицательным при перерасходе). effectiveLimit = amount + carryover.
+    const rollover = budget.rollover === 1 || budget.rollover === true;
+    const carryover = money.round(budget.carryover || 0);
+    const effectiveLimit = money.add(amount, carryover);
+    // percent/remaining/over-budget считаем относительно эффективного лимита,
+    // чтобы конвертный бюджет с переносом отражал реальный доступный остаток.
+    const percentUsed = effectiveLimit > 0 ? Math.round((spent / effectiveLimit) * 100) : 0;
+    const remaining = money.sub(effectiveLimit, spent);
 
     return {
       id: budget.id,
@@ -109,6 +118,9 @@ class Budget {
       category: budget.category,
       amount: amount,
       spent: spent,
+      rollover: rollover,
+      carryover: carryover,
+      effectiveLimit: effectiveLimit,
       remaining: remaining,
       percentUsed: percentUsed,
       period: budget.period,
@@ -117,7 +129,7 @@ class Budget {
       currency: budget.currency,
       notifyAtPercent: budget.notify_at_percent,
       isActive: budget.is_active === 1,
-      isOverBudget: spent > amount,
+      isOverBudget: spent > effectiveLimit,
       shouldNotify: percentUsed >= budget.notify_at_percent,
       createdAt: budget.created_at,
       updatedAt: budget.updated_at
@@ -165,6 +177,14 @@ class Budget {
       if (budgetData.isActive !== undefined) {
         updates.push('is_active = ?');
         params.push(budgetData.isActive ? 1 : 0);
+      }
+      if (budgetData.rollover !== undefined) {
+        updates.push('rollover = ?');
+        params.push(budgetData.rollover ? 1 : 0);
+      }
+      if (budgetData.carryover !== undefined) {
+        updates.push('carryover = ?');
+        params.push(money.round(budgetData.carryover));
       }
 
       if (updates.length === 0) {
@@ -382,6 +402,51 @@ class Budget {
         : 0;
 
       return stats;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Envelope / rollover: перенос остатка в carryover следующего периода.
+  // Для бюджетов с rollover=1 и периодом fromPeriod:
+  //   leftover = amount + carryover - spent (= effectiveLimit - spent);
+  //   новый carryover = leftover (может быть отрицательным при перерасходе),
+  //   spent сбрасывается в 0 для нового периода.
+  // Для бюджетов без rollover просто сбрасываем spent (carryover не трогаем,
+  // он остаётся 0). Всё считаем через lib/money и атомарно в transaction().
+  static async rollForward(userId, fromPeriod) {
+    try {
+      const rolled = [];
+
+      await transaction(async () => {
+        // Берём только rollover-бюджеты выбранного периода.
+        const rows = await query(
+          `SELECT * FROM budgets
+           WHERE user_id = ? AND is_active = 1 AND rollover = 1
+           AND period = ?`,
+          [userId, fromPeriod]
+        );
+
+        for (const row of rows) {
+          const amount = money.round(row.amount || 0);
+          const carryover = money.round(row.carryover || 0);
+          const spent = money.round(row.spent || 0);
+
+          // effectiveLimit = amount + carryover; остаток = effectiveLimit - spent.
+          const effectiveLimit = money.add(amount, carryover);
+          const leftover = money.sub(effectiveLimit, spent);
+
+          await run(
+            `UPDATE budgets SET carryover = ?, spent = 0, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND user_id = ?`,
+            [leftover, row.id, userId]
+          );
+
+          rolled.push({ id: row.id, carryover: leftover });
+        }
+      });
+
+      return rolled;
     } catch (error) {
       throw error;
     }

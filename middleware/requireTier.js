@@ -2,10 +2,10 @@
 // Порядок тиров: free < pro < family.
 // Читает req.user.subscription_tier; 402 PAYMENT_REQUIRED если уровень ниже требуемого.
 //
-// ВАЖНО (defensive): models/user.js (shared, нам редактировать нельзя) в findById
-// выбирает только фиксированный набор колонок и НЕ возвращает subscription_tier,
-// поэтому req.user.subscription_tier на реальных запросах будет undefined.
-// Чтобы гейт работал, если поле отсутствует — догружаем тир из БД по req.user.id.
+// PERF: models/user.js findById теперь выбирает subscription_tier (+ stripe ids),
+// поэтому req.user.subscription_tier обычно уже присутствует и мы НЕ делаем
+// лишний per-request запрос в БД. Если поле всё же отсутствует (старый токен/
+// нестандартный req.user) — догружаем тир из БД по req.user.id как fallback.
 
 const { AppError } = require('./error');
 

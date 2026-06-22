@@ -24,6 +24,17 @@ const Investment = {
     TRANSFER: 'transfer'
   },
 
+  // Типы событий по активу (investment depth — migration 015).
+  // Хранятся в investment_events, не меняют количество актива:
+  //  - dividend: полученные дивиденды (увеличивают чистый P&L);
+  //  - fee: дополнительные комиссии/налоги (уменьшают чистый P&L);
+  //  - split: информационное событие (для истории; на деньги не влияет).
+  EVENT_TYPES: {
+    DIVIDEND: 'dividend',
+    FEE: 'fee',
+    SPLIT: 'split'
+  },
+
   // ==================== ПОРТФЕЛИ ====================
 
   // Создание портфеля
@@ -223,6 +234,50 @@ const Investment = {
     );
   },
 
+  // ==================== СОБЫТИЯ ПО АКТИВУ (investment depth) ====================
+
+  // Добавить событие (dividend / fee / split) по активу.
+  // amount хранится как положительная величина; знак в P&L задаёт тип события.
+  async addEvent(data) {
+    const type = data.type;
+    if (!Object.values(this.EVENT_TYPES).includes(type)) {
+      throw new Error('Неизвестный тип события');
+    }
+    const date = data.date || new Date().toISOString().split('T')[0];
+    // Нормализуем сумму до 2 знаков и берём модуль (направление — от типа).
+    const amount = Math.abs(money.round(data.amount));
+    const result = await run(
+      `INSERT INTO investment_events (investment_id, type, amount, date, note)
+       VALUES (?, ?, ?, ?, ?)`,
+      [data.investment_id, type, amount, date, data.note || null]
+    );
+    return get('SELECT * FROM investment_events WHERE id = ?', [result.id]);
+  },
+
+  // Получить события актива (свежие сверху).
+  async getEvents(investmentId) {
+    return query(
+      'SELECT * FROM investment_events WHERE investment_id = ? ORDER BY date DESC, id DESC',
+      [investmentId]
+    );
+  },
+
+  // Агрегаты событий по активу: суммарные дивиденды и суммарные event-комиссии.
+  // split-события на деньги не влияют (информационные).
+  async getEventTotals(investmentId) {
+    const row = await get(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'dividend' THEN amount ELSE 0 END), 0) AS dividends,
+         COALESCE(SUM(CASE WHEN type = 'fee'      THEN amount ELSE 0 END), 0) AS event_fees
+       FROM investment_events WHERE investment_id = ?`,
+      [investmentId]
+    );
+    return {
+      dividends: money.round(row ? row.dividends : 0),
+      eventFees: money.round(row ? row.event_fees : 0)
+    };
+  },
+
   // ==================== АНАЛИТИКА ====================
 
   // Суммарные комиссии по активу (по всем его транзакциям).
@@ -246,9 +301,15 @@ const Investment = {
 
     const currentValue = money.mul(investment.quantity, investment.current_price);
     const buyValue = money.mul(investment.quantity, investment.buy_price);
-    // Чистый P&L за вычетом комиссий.
+    // Чистый P&L за вычетом комиссий по сделкам (как раньше — НЕ менять).
     const profitLoss = money.sub(money.sub(currentValue, buyValue), fees);
     const profitLossPercent = buyValue > 0 ? money.round((profitLoss / buyValue) * 100) : 0;
+
+    // Investment depth: дивиденды повышают чистый P&L, event-комиссии понижают.
+    const { dividends, eventFees } = await this.getEventTotals(investmentId);
+    // netProfitLoss = profitLoss + дивиденды - event-комиссии.
+    const netProfitLoss = money.sub(money.add(profitLoss, dividends), eventFees);
+    const netProfitLossPercent = buyValue > 0 ? money.round((netProfitLoss / buyValue) * 100) : 0;
 
     return {
       ...investment,
@@ -256,7 +317,12 @@ const Investment = {
       buyValue,
       fees,
       profitLoss,
-      profitLossPercent
+      profitLossPercent,
+      // Новые depth-поля (ADDITIVE):
+      dividends,
+      eventFees,
+      netProfitLoss,
+      netProfitLossPercent
     };
   },
 
@@ -267,19 +333,27 @@ const Investment = {
     let totalValue = 0;
     let totalCost = 0;
     let totalFees = 0;
+    let totalDividends = 0;
+    let totalEventFees = 0;
     const holdings = [];
 
     for (const inv of investments) {
       const fees = await this.getTotalFees(inv.id);
       const value = money.mul(inv.quantity, inv.current_price);
       const cost = money.mul(inv.quantity, inv.buy_price);
-      // Чистый P&L за вычетом комиссий.
+      // Чистый P&L за вычетом комиссий по сделкам (как раньше — НЕ менять).
       const profitLoss = money.sub(money.sub(value, cost), fees);
       const profitLossPercent = cost > 0 ? money.round((profitLoss / cost) * 100) : 0;
+
+      // Investment depth: дивиденды/event-комиссии по этому активу.
+      const { dividends, eventFees } = await this.getEventTotals(inv.id);
+      const netProfitLoss = money.sub(money.add(profitLoss, dividends), eventFees);
 
       totalValue = money.add(totalValue, value);
       totalCost = money.add(totalCost, cost);
       totalFees = money.add(totalFees, fees);
+      totalDividends = money.add(totalDividends, dividends);
+      totalEventFees = money.add(totalEventFees, eventFees);
 
       holdings.push({
         ...inv,
@@ -288,6 +362,9 @@ const Investment = {
         fees,
         profitLoss,
         profitLossPercent,
+        dividends,
+        eventFees,
+        netProfitLoss,
         weight: 0 // Будет рассчитано после
       });
     }
@@ -297,9 +374,13 @@ const Investment = {
       h.weight = totalValue > 0 ? Math.round((h.currentValue / totalValue) * 10000) / 100 : 0;
     });
 
-    // Чистая прибыль портфеля учитывает комиссии.
+    // Чистая прибыль портфеля учитывает комиссии по сделкам (как раньше).
     const totalProfitLoss = money.sub(money.sub(totalValue, totalCost), totalFees);
     const totalProfitLossPercent = totalCost > 0 ? money.round((totalProfitLoss / totalCost) * 100) : 0;
+
+    // Чистый P&L с учётом дивидендов и event-комиссий (investment depth).
+    const totalNetProfitLoss = money.sub(money.add(totalProfitLoss, totalDividends), totalEventFees);
+    const totalNetProfitLossPercent = totalCost > 0 ? money.round((totalNetProfitLoss / totalCost) * 100) : 0;
 
     return {
       portfolioId,
@@ -308,8 +389,110 @@ const Investment = {
       totalFees: money.round(totalFees),
       totalProfitLoss: money.round(totalProfitLoss),
       totalProfitLossPercent,
+      // Новые depth-агрегаты (ADDITIVE):
+      totalDividends: money.round(totalDividends),
+      totalEventFees: money.round(totalEventFees),
+      totalNetProfitLoss: money.round(totalNetProfitLoss),
+      totalNetProfitLossPercent,
       holdings,
       byType: this.groupByType(holdings)
+    };
+  },
+
+  // Аллокация портфеля: разбивка % стоимости по типу актива и по символу.
+  // Суммы весов в каждой группировке ~100% (если есть стоимость).
+  async getAllocation(portfolioId) {
+    const stats = await this.calculatePortfolioValue(portfolioId);
+    const totalValue = stats.totalValue;
+
+    const pct = (v) =>
+      totalValue > 0 ? money.round((v / totalValue) * 100) : 0;
+
+    // По типу актива.
+    const byTypeMap = {};
+    // По символу.
+    const bySymbolMap = {};
+
+    for (const h of stats.holdings) {
+      const t = h.type || 'other';
+      byTypeMap[t] = money.add(byTypeMap[t] || 0, h.currentValue);
+
+      const s = (h.symbol || '').toUpperCase() || '—';
+      bySymbolMap[s] = money.add(bySymbolMap[s] || 0, h.currentValue);
+    }
+
+    const byType = Object.entries(byTypeMap).map(([type, value]) => ({
+      type,
+      value: money.round(value),
+      percent: pct(value)
+    })).sort((a, b) => b.value - a.value);
+
+    const bySymbol = Object.entries(bySymbolMap).map(([symbol, value]) => ({
+      symbol,
+      value: money.round(value),
+      percent: pct(value)
+    })).sort((a, b) => b.value - a.value);
+
+    return {
+      portfolioId,
+      totalValue,
+      byType,
+      bySymbol
+    };
+  },
+
+  // Простая FIRE-проекция: за сколько лет текущая стоимость + ежемесячные
+  // взносы под заданную годовую доходность дорастут до целевой суммы.
+  // Формула будущей стоимости с регулярными взносами (помесячная капитализация):
+  //   FV = PV*(1+i)^n + PMT*(((1+i)^n - 1)/i),  i = годовая ставка / 12, n = месяцы.
+  // Решаем относительно n численно (помесячная симуляция) — устойчиво к i=0
+  // и не требует логарифмов с краевыми случаями. Возвращает { years, months, ... }.
+  // Если цель недостижима за горизонт — reachable=false, years=null.
+  fireProjection({ currentValue = 0, contribution = 0, rate = 0, target = 0 }) {
+    const pv = money.round(Number(currentValue) || 0);
+    const pmt = money.round(Number(contribution) || 0);
+    // rate приходит как доля (0.07) ИЛИ как проценты (7) — нормализуем: >1 => проценты.
+    let r = Number(rate);
+    if (!Number.isFinite(r) || r < 0) r = 0;
+    if (r > 1) r = r / 100;
+    const tgt = money.round(Number(target) || 0);
+
+    // Уже достигнуто.
+    if (tgt <= pv) {
+      return { reachable: true, years: 0, months: 0, finalValue: pv,
+        contributions: pmt, rate: r, target: tgt, currentValue: pv };
+    }
+    // Нечем расти — ни взносов, ни доходности, ни капитала под процент.
+    if (pmt <= 0 && r <= 0) {
+      return { reachable: false, years: null, months: null, finalValue: pv,
+        contributions: pmt, rate: r, target: tgt, currentValue: pv };
+    }
+
+    const i = r / 12;
+    const MAX_MONTHS = 100 * 12; // горизонт 100 лет
+    let balance = pv;
+    let months = 0;
+    while (balance < tgt && months < MAX_MONTHS) {
+      balance = balance * (1 + i) + pmt;
+      months += 1;
+    }
+
+    if (balance < tgt) {
+      return { reachable: false, years: null, months: null,
+        finalValue: money.round(balance), contributions: pmt, rate: r,
+        target: tgt, currentValue: pv };
+    }
+
+    const years = money.round(months / 12);
+    return {
+      reachable: true,
+      years,
+      months,
+      finalValue: money.round(balance),
+      contributions: pmt,
+      rate: r,
+      target: tgt,
+      currentValue: pv
     };
   },
 
@@ -363,6 +546,8 @@ const Investment = {
     let totalValue = 0;
     let totalCost = 0;
     let totalFees = 0;
+    let totalDividends = 0;
+    let totalEventFees = 0;
     let portfolioStats = [];
 
     for (const portfolio of portfolios) {
@@ -370,12 +555,18 @@ const Investment = {
       totalValue = money.add(totalValue, stats.totalValue);
       totalCost = money.add(totalCost, stats.totalCost);
       totalFees = money.add(totalFees, stats.totalFees || 0);
+      totalDividends = money.add(totalDividends, stats.totalDividends || 0);
+      totalEventFees = money.add(totalEventFees, stats.totalEventFees || 0);
       portfolioStats.push({ ...portfolio, ...stats });
     }
 
-    // Чистая прибыль по всем портфелям учитывает комиссии.
+    // Чистая прибыль по всем портфелям учитывает комиссии по сделкам (как раньше).
     const totalProfitLoss = money.sub(money.sub(totalValue, totalCost), totalFees);
     const totalProfitLossPercent = totalCost > 0 ? money.round((totalProfitLoss / totalCost) * 100) : 0;
+
+    // Чистый P&L с учётом дивидендов и event-комиссий (investment depth).
+    const totalNetProfitLoss = money.sub(money.add(totalProfitLoss, totalDividends), totalEventFees);
+    const totalNetProfitLossPercent = totalCost > 0 ? money.round((totalNetProfitLoss / totalCost) * 100) : 0;
 
     return {
       portfolioCount: portfolios.length,
@@ -384,6 +575,11 @@ const Investment = {
       totalFees: money.round(totalFees),
       totalProfitLoss: money.round(totalProfitLoss),
       totalProfitLossPercent,
+      // Новые depth-агрегаты (ADDITIVE):
+      totalDividends: money.round(totalDividends),
+      totalEventFees: money.round(totalEventFees),
+      totalNetProfitLoss: money.round(totalNetProfitLoss),
+      totalNetProfitLossPercent,
       portfolios: portfolioStats
     };
   }

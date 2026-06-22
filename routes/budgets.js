@@ -13,7 +13,17 @@ router.get('/', authenticate, async (req, res) => {
     const includeInactive = req.query.includeInactive === 'true';
     const budgets = await Budget.findByUserId(req.user.id, includeInactive);
 
-    res.json(budgets);
+    // Конверт-бюджеты: отдаём rollover (bool), carryover и effectiveLimit (amount+carryover).
+    const enriched = budgets.map((b) => {
+      const carryover = b.carryover || 0;
+      return {
+        ...b,
+        rollover: !!b.rollover,
+        carryover,
+        effectiveLimit: Math.round(((b.amount || 0) + carryover) * 100) / 100,
+      };
+    });
+    res.json(enriched);
   } catch (error) {
     console.error('Ошибка при получении бюджетов:', error);
     res.status(500).json({
@@ -82,7 +92,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Создание бюджета
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { name, category, amount, period, startDate, endDate, currency, notifyAtPercent } = req.body;
+    const { name, category, amount, period, startDate, endDate, currency, notifyAtPercent, rollover, carryover } = req.body;
 
     // Валидация
     if (!name || !name.trim()) {
@@ -109,12 +119,20 @@ router.post('/', authenticate, async (req, res) => {
       startDate: budgetStartDate,
       endDate: endDate || null,
       currency: currency || 'UAH',
-      notifyAtPercent: notifyAtPercent || 80
+      notifyAtPercent: notifyAtPercent || 80,
+      rollover: rollover ? true : false,
+      carryover: carryover !== undefined ? parseFloat(carryover) : 0
     });
 
+    const carryoverVal = budget.carryover || 0;
     res.status(201).json({
       success: true,
-      budget
+      budget: {
+        ...budget,
+        rollover: !!budget.rollover,
+        carryover: carryoverVal,
+        effectiveLimit: Math.round(((budget.amount || 0) + carryoverVal) * 100) / 100,
+      }
     });
   } catch (error) {
     console.error('Ошибка при создании бюджета:', error);
@@ -129,7 +147,7 @@ router.post('/', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, amount, period, startDate, endDate, currency, notifyAtPercent, isActive } = req.body;
+    const { name, category, amount, period, startDate, endDate, currency, notifyAtPercent, isActive, rollover, carryover } = req.body;
 
     // Проверка существования
     const existingBudget = await Budget.findById(id, req.user.id);
@@ -151,7 +169,9 @@ router.put('/:id', authenticate, async (req, res) => {
       endDate,
       currency,
       notifyAtPercent,
-      isActive
+      isActive,
+      rollover: rollover !== undefined ? (rollover ? true : false) : undefined,
+      carryover: carryover !== undefined ? parseFloat(carryover) : undefined
     });
 
     if (updated) {
@@ -212,6 +232,37 @@ router.post('/recalculate-all', authenticate, async (req, res) => {
     res.status(500).json({
       error: true,
       message: 'Произошла ошибка при пересчете бюджетов'
+    });
+  }
+});
+
+// Перенос остатка (envelope/rollover) в carryover следующего периода.
+// body: { period } — какой период переносим (по умолчанию monthly).
+router.post('/roll-forward', authenticate, async (req, res) => {
+  try {
+    const fromPeriod = req.body.period || 'monthly';
+
+    const validPeriods = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
+    if (!validPeriods.includes(fromPeriod)) {
+      return res.status(400).json({ error: true, message: 'Некорректный период' });
+    }
+
+    // Сначала актуализируем потраченное, чтобы перенести верный остаток.
+    await Budget.recalculateSpent(req.user.id);
+
+    const rolled = await Budget.rollForward(req.user.id, fromPeriod);
+    const budgets = await Budget.getActiveBudgets(req.user.id);
+
+    res.json({
+      success: true,
+      rolledCount: rolled.length,
+      budgets
+    });
+  } catch (error) {
+    console.error('Ошибка при переносе остатка бюджетов:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Произошла ошибка при переносе остатка'
     });
   }
 });

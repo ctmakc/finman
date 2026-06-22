@@ -550,29 +550,47 @@ async function fetchTransactions(filters = {}) {
   
   // Рендеринг списка транзакций
   function renderTransactionsList(transactions) {
+    // После рендера вставляем кнопку «Перевод» в тулбар транзакций (см.
+    // ensureTransferButton). renderTransactionsList вызывается из app.js при
+    // построении страницы, поэтому это самый надёжный additive-хук.
+    if (typeof ensureTransferButton === 'function') {
+      setTimeout(ensureTransferButton, 0);
+    }
     return transactions.map(transaction => {
-      const isIncome = transaction.type === 'income';
+      const isTransfer = transaction.type === 'transfer';
+      const isIncome = !isTransfer && transaction.type === 'income';
+      // Для перевода знак определяем по сумме строки (списание < 0, зачисление > 0).
+      const isInflow = isTransfer ? transaction.amount >= 0 : isIncome;
       const category = transaction.category || 'Без категории';
       const description = transaction.description || 'Без описания';
+      // Класс/иконка/цвет суммы — отдельно для переводов, чтобы показать их
+      // визуально иначе, чем доходы/расходы.
+      const rowClass = isTransfer ? 'tx-transfer' : (isIncome ? 'tx-income' : 'tx-expense');
+      const arrow = isTransfer ? 'right-arrow-left' : (isInflow ? 'down' : 'up');
+      const amountClass = isTransfer
+        ? 'transfer text-muted'
+        : (isIncome ? 'income text-success' : 'expense text-error');
+      const sign = isInflow ? '+' : '−';
       return `
-      <tr data-transaction-id="${transaction.id}" class="tx-row tx-${isIncome ? 'income' : 'expense'}">
+      <tr data-transaction-id="${transaction.id}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
         <td data-label="Дата" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
         <td data-label="Описание" class="tx-cell tx-cell-desc">
-          <span class="tx-direction" aria-hidden="true"><i class="fas fa-arrow-${isIncome ? 'down' : 'up'}"></i></span>
+          <span class="tx-direction" aria-hidden="true"><i class="fas fa-${isTransfer ? 'exchange-alt' : 'arrow-' + arrow}"></i></span>
           <span class="tx-desc-text">${escapeHtml(description)}</span>
+          ${isTransfer ? '<span class="chip tx-transfer-badge">Перевод</span>' : ''}
         </td>
         <td data-label="Категория" class="tx-cell tx-cell-category">
           <span class="chip tx-category-chip">${escapeHtml(category)}</span>
         </td>
         <td data-label="Счет" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
-        <td data-label="Сумма" class="text-right tx-cell tx-cell-amount transaction-amount ${isIncome ? 'income text-success' : 'expense text-error'}">
-          <span class="tx-amount-sign" aria-hidden="true">${isIncome ? '+' : '−'}</span>${formatCurrency(Math.abs(transaction.amount))}
+        <td data-label="Сумма" class="text-right tx-cell tx-cell-amount transaction-amount ${amountClass}">
+          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount))}
         </td>
         <td data-label="Действия" class="tx-cell tx-cell-actions">
           <div class="table-actions">
-            <button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="Изменить транзакцию" title="Изменить">
+            ${isTransfer ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="Изменить транзакцию" title="Изменить">
               <i class="fas fa-edit"></i>
-            </button>
+            </button>`}
             <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}" aria-label="Удалить транзакцию" title="Удалить">
               <i class="fas fa-trash"></i>
             </button>
@@ -581,6 +599,176 @@ async function fetchTransactions(filters = {}) {
       </tr>
     `;
     }).join('');
+  }
+
+  // Вставка кнопки «Перевод» в тулбар страницы транзакций (рядом с импортом).
+  // Идемпотентно: если кнопка уже есть — ничего не делает.
+  function ensureTransferButton() {
+    const toolbar = document.querySelector('.transactions-actions');
+    if (!toolbar || document.getElementById('transfer-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'transfer-btn';
+    btn.className = 'btn btn-sm btn-outline';
+    btn.innerHTML = '<i class="fas fa-exchange-alt"></i> Перевод';
+    btn.addEventListener('click', showTransferModal);
+    // Ставим перед кнопкой импорта, если она есть, иначе в конец тулбара.
+    const importBtn = document.getElementById('import-transactions-btn');
+    if (importBtn) {
+      toolbar.insertBefore(btn, importBtn);
+    } else {
+      toolbar.appendChild(btn);
+    }
+  }
+
+  // POST /api/transactions/transfer — двойная запись перевода между счетами.
+  async function createTransfer(transferData) {
+    try {
+      const response = await fetchWithAuth('/api/transactions/transfer', {
+        method: 'POST',
+        body: JSON.stringify(transferData)
+      });
+
+      if (!response.ok) {
+        let message = 'Ошибка создания перевода';
+        try {
+          const data = await response.json();
+          // Поддерживаем оба формата: { message } и { error: { message } }.
+          message = (data && data.error && data.error.message) || data.message || message;
+        } catch (_) { /* тело не JSON */ }
+        showNotification(message, 'error');
+        return null;
+      }
+
+      const result = await response.json();
+      showNotification('Перевод выполнен', 'success');
+      return result;
+    } catch (error) {
+      console.error('Ошибка создания перевода:', error);
+      showNotification('Произошла ошибка при создании перевода', 'error');
+      return null;
+    }
+  }
+
+  // Модальное окно создания перевода между двумя счетами.
+  function showTransferModal() {
+    const modalId = 'transfer-modal';
+    const accounts = (typeof appState !== 'undefined' && appState.accounts) ? appState.accounts : [];
+
+    const accountOptions = accounts.map(account => `
+      <option value="${account.id}">
+        ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+      </option>
+    `).join('');
+
+    const modalHtml = `
+      <div class="modal-backdrop" id="${modalId}-backdrop">
+        <div class="modal" id="${modalId}">
+          <div class="modal-header">
+            <h2 class="modal-title">Перевод между счетами</h2>
+            <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
+          </div>
+
+          <form id="${modalId}-form" class="modal-body">
+            <div class="form-group">
+              <label for="${modalId}-from" class="form-label">Со счёта</label>
+              <select id="${modalId}-from" class="form-control" required>
+                <option value="">Выберите счёт</option>
+                ${accountOptions}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="${modalId}-to" class="form-label">На счёт</label>
+              <select id="${modalId}-to" class="form-control" required>
+                <option value="">Выберите счёт</option>
+                ${accountOptions}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="${modalId}-amount" class="form-label">Сумма</label>
+              <input type="number" id="${modalId}-amount" class="form-control" step="0.01" min="0.01" required>
+            </div>
+
+            <div class="form-group">
+              <label for="${modalId}-date" class="form-label">Дата</label>
+              <input type="date" id="${modalId}-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+            </div>
+
+            <div class="form-group">
+              <label for="${modalId}-description" class="form-label">Описание</label>
+              <input type="text" id="${modalId}-description" class="form-control" value="Перевод">
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
+              <button type="submit" class="btn btn-primary">Перевести</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modalBackdrop = document.getElementById(`${modalId}-backdrop`);
+    const modalClose = document.getElementById(`${modalId}-close`);
+    const modalCancel = document.getElementById(`${modalId}-cancel`);
+    const modalForm = document.getElementById(`${modalId}-form`);
+
+    const closeModal = () => {
+      modalBackdrop.classList.add('closing');
+      setTimeout(() => {
+        if (modalBackdrop.parentNode) {
+          document.body.removeChild(modalBackdrop);
+        }
+      }, 300);
+    };
+
+    modalClose.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+    modalBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalBackdrop) closeModal();
+    });
+
+    modalForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const fromAccountId = document.getElementById(`${modalId}-from`).value;
+      const toAccountId = document.getElementById(`${modalId}-to`).value;
+      const amount = parseFloat(document.getElementById(`${modalId}-amount`).value);
+      const date = document.getElementById(`${modalId}-date`).value;
+      const description = document.getElementById(`${modalId}-description`).value;
+
+      if (!fromAccountId || !toAccountId) {
+        showNotification('Выберите оба счёта', 'error');
+        return;
+      }
+      if (fromAccountId === toAccountId) {
+        showNotification('Нельзя переводить на тот же счёт', 'error');
+        return;
+      }
+      if (!(amount > 0)) {
+        showNotification('Сумма перевода должна быть положительной', 'error');
+        return;
+      }
+
+      const result = await createTransfer({ fromAccountId, toAccountId, amount, date, description });
+
+      if (result) {
+        closeModal();
+        // Обновляем интерфейс в зависимости от текущей страницы.
+        if (typeof appState !== 'undefined') {
+          if (appState.currentPage === 'transactions') {
+            renderTransactionsPage();
+          } else if (appState.currentPage === 'dashboard') {
+            renderDashboard();
+          } else if (appState.currentPage === 'accounts') {
+            fetchAccounts().then(() => renderAccountsPage());
+          }
+        }
+      }
+    });
   }
   
   // Рендеринг пагинации

@@ -1,5 +1,40 @@
 // Функции для работы с бюджетами
 
+// Экранирование пользовательских данных при вставке в innerHTML (защита от XSS).
+function budgetEscapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Перенос остатка envelope/rollover-бюджетов в следующий период.
+async function rollForwardBudgets(period = 'monthly') {
+  try {
+    const response = await fetchWithAuth('/api/budgets/roll-forward', {
+      method: 'POST',
+      body: JSON.stringify({ period })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showNotification(data.message || 'Ошибка переноса остатка', 'error');
+      return null;
+    }
+
+    showNotification(`Перенесено бюджетов: ${data.rolledCount}`, 'success');
+    return data;
+  } catch (error) {
+    console.error('Ошибка переноса остатка:', error);
+    showNotification('Произошла ошибка', 'error');
+    return null;
+  }
+}
+
 // Получение всех бюджетов
 async function fetchBudgets() {
   try {
@@ -113,9 +148,14 @@ async function renderBudgetsPage() {
   mainContent.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Бюджеты</h1>
-      <button class="btn btn-primary" id="add-budget-btn">
-        <i class="fas fa-plus"></i> Новый бюджет
-      </button>
+      <div class="page-header-actions">
+        <button class="btn btn-outline" id="roll-forward-btn" title="Перенести остаток конвертных бюджетов в следующий период">
+          <i class="fas fa-forward"></i> Перенести остаток
+        </button>
+        <button class="btn btn-primary" id="add-budget-btn">
+          <i class="fas fa-plus"></i> Новый бюджет
+        </button>
+      </div>
     </div>
 
     ${stats ? renderBudgetStats(stats) : ''}
@@ -127,6 +167,17 @@ async function renderBudgetsPage() {
 
   // Обработчик добавления бюджета
   document.getElementById('add-budget-btn').addEventListener('click', showCreateBudgetModal);
+
+  // Перенос остатка конвертных (rollover) бюджетов в следующий период.
+  const rollBtn = document.getElementById('roll-forward-btn');
+  if (rollBtn) {
+    rollBtn.addEventListener('click', async () => {
+      if (confirm('Перенести остаток конвертных бюджетов в следующий период? Потраченное будет сброшено.')) {
+        const result = await rollForwardBudgets('monthly');
+        if (result) renderBudgetsPage();
+      }
+    });
+  }
 
   // Обработчики действий с бюджетами
   document.querySelectorAll('.budget-edit-btn').forEach(btn => {
@@ -238,6 +289,22 @@ function renderBudgetCards(budgets) {
           </span>
           <span class="budget-period">${getPeriodLabel(budget.period)}</span>
         </div>
+
+        ${budget.rollover ? `
+          <div class="budget-rollover">
+            <span class="budget-rollover-badge" title="Конвертный бюджет: остаток переносится">
+              <i class="fas fa-recycle"></i> Перенос
+            </span>
+            ${budget.carryover !== 0 ? `
+              <span class="budget-carryover ${budget.carryover < 0 ? 'negative' : ''}">
+                Перенос: ${budget.carryover >= 0 ? '+' : '−'}${formatCurrency(Math.abs(budget.carryover))}
+              </span>
+            ` : ''}
+            <span class="budget-effective-limit">
+              Лимит: ${formatCurrency(budget.effectiveLimit)}
+            </span>
+          </div>
+        ` : ''}
       </div>
     `;
   }).join('');
@@ -325,6 +392,14 @@ function showCreateBudgetModal() {
             <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="80">
           </div>
 
+          <div class="form-group form-group-checkbox">
+            <label class="form-check-label">
+              <input type="checkbox" id="${modalId}-rollover" class="form-check-input">
+              Переносить остаток (конвертный бюджет)
+            </label>
+            <small class="form-hint">Неизрасходованный остаток перейдёт в следующий период</small>
+          </div>
+
           <div class="modal-footer">
             <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
             <button type="submit" class="btn btn-primary">Создать</button>
@@ -361,7 +436,8 @@ function showCreateBudgetModal() {
       amount: parseFloat(document.getElementById(`${modalId}-amount`).value),
       currency: document.getElementById(`${modalId}-currency`).value,
       period: document.getElementById(`${modalId}-period`).value,
-      notifyAtPercent: parseInt(document.getElementById(`${modalId}-notify`).value)
+      notifyAtPercent: parseInt(document.getElementById(`${modalId}-notify`).value),
+      rollover: document.getElementById(`${modalId}-rollover`).checked
     };
 
     const result = await createBudget(budgetData);
@@ -394,12 +470,12 @@ async function showEditBudgetModal(id) {
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
             <label for="${modalId}-name" class="form-label">Название *</label>
-            <input type="text" id="${modalId}-name" class="form-control" value="${budget.name}" required>
+            <input type="text" id="${modalId}-name" class="form-control" value="${budgetEscapeHtml(budget.name)}" required>
           </div>
 
           <div class="form-group">
             <label for="${modalId}-category" class="form-label">Категория</label>
-            <input type="text" id="${modalId}-category" class="form-control" value="${budget.category || ''}">
+            <input type="text" id="${modalId}-category" class="form-control" value="${budgetEscapeHtml(budget.category || '')}">
           </div>
 
           <div class="form-row">
@@ -432,6 +508,16 @@ async function showEditBudgetModal(id) {
           <div class="form-group">
             <label for="${modalId}-notify" class="form-label">Уведомлять при (%)</label>
             <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="${budget.notifyAtPercent}">
+          </div>
+
+          <div class="form-group form-group-checkbox">
+            <label class="form-check-label">
+              <input type="checkbox" id="${modalId}-rollover" class="form-check-input" ${budget.rollover ? 'checked' : ''}>
+              Переносить остаток (конвертный бюджет)
+            </label>
+            ${budget.rollover && budget.carryover !== 0 ? `
+              <small class="form-hint">Текущий перенос: ${formatCurrency(budget.carryover)}</small>
+            ` : ''}
           </div>
 
           <div class="modal-footer">
@@ -470,7 +556,8 @@ async function showEditBudgetModal(id) {
       amount: parseFloat(document.getElementById(`${modalId}-amount`).value),
       currency: document.getElementById(`${modalId}-currency`).value,
       period: document.getElementById(`${modalId}-period`).value,
-      notifyAtPercent: parseInt(document.getElementById(`${modalId}-notify`).value)
+      notifyAtPercent: parseInt(document.getElementById(`${modalId}-notify`).value),
+      rollover: document.getElementById(`${modalId}-rollover`).checked
     };
 
     const result = await updateBudget(id, budgetData);

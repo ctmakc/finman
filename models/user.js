@@ -24,7 +24,8 @@ class User {
   static async findById(id) {
     try {
       const user = await get(
-        `SELECT id, username, email, full_name, created_at, updated_at 
+        `SELECT id, username, email, full_name, created_at, updated_at,
+                subscription_tier, stripe_customer_id, stripe_subscription_id
          FROM users WHERE id = ?`,
         [id]
       );

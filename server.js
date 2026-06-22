@@ -56,6 +56,11 @@ const syncRoutes = require('./routes/sync');
 const anomaliesRoutes = require('./routes/anomalies');
 const onboardingRoutes = require('./routes/onboarding');
 
+// Wave-2 feature routers (self-auth внутри роутера).
+const rulesRoutes = require('./routes/rules');
+const reconcileRoutes = require('./routes/reconcile');
+const apiV1Routes = require('./routes/apiV1');
+
 // Настройка Express
 const app = express();
 const PORT = config.port;
@@ -184,6 +189,12 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/anomalies', anomaliesRoutes);
 app.use('/api/onboarding', apiAuthMiddleware, onboardingRoutes);
+
+// Wave-2 feature routers — авторизация настроена ВНУТРИ каждого роутера
+// (rules/reconcile: passport-jwt; apiV1: passport-jwt для /tokens + patAuth для данных).
+app.use('/api/rules', rulesRoutes);
+app.use('/api/reconcile', reconcileRoutes);
+app.use('/api/v1', apiV1Routes);
 
 // Маршрут для всех остальных запросов (SPA) — НЕ перехватываем /api/*,
 // чтобы неизвестные API-роуты дошли до notFound + errorHandler.

@@ -1,6 +1,8 @@
+const crypto = require('crypto');
 const { query, get, run, transaction } = require('../db/database');
 const Account = require('./account');
 const money = require('../lib/money');
+const { AppError } = require('../middleware/error');
 
 class Transaction {
   // Создание транзакции
@@ -59,7 +61,59 @@ class Transaction {
       return results;
     });
   }
-  
+
+  // Двойная запись перевода между двумя счетами одного пользователя.
+  // Создаёт ДВЕ строки type='transfer' с общим transfer_id:
+  //   - со счёта-источника: amount = -amount, баланс(from) -= amount
+  //   - на счёт-получатель:  amount = +amount, баланс(to)   += amount
+  // Всё внутри transaction() -> атомарно (обе строки + оба баланса или ничего).
+  // Тип 'transfer' автоматически исключён из агрегатов income/expense
+  // (они фильтруют type IN ('income','expense')), поэтому переводы не искажают
+  // статистику доходов/расходов и не меняют чистый итог по пользователю.
+  static async createTransfer({ userId, fromAccountId, toAccountId, amount, date, description }) {
+    const amt = money.round(amount);
+
+    if (!(amt > 0)) {
+      throw new AppError(400, 'INVALID_AMOUNT', 'Сумма перевода должна быть положительной');
+    }
+    if (String(fromAccountId) === String(toAccountId)) {
+      throw new AppError(400, 'SAME_ACCOUNT', 'Нельзя переводить на тот же счёт');
+    }
+
+    const transferId = crypto.randomUUID();
+    const desc = description || 'Перевод';
+    const txDate = date || new Date().toISOString().split('T')[0];
+
+    return transaction(async () => {
+      // Строка-списание со счёта-источника.
+      const fromRow = await run(
+        `INSERT INTO transactions
+         (account_id, user_id, date, description, category, amount, type, transfer_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'transfer', ?)`,
+        [fromAccountId, userId, txDate, desc, 'Перевод', -amt, transferId]
+      );
+      await Account.updateBalance(fromAccountId, userId, -amt);
+
+      // Строка-зачисление на счёт-получатель.
+      const toRow = await run(
+        `INSERT INTO transactions
+         (account_id, user_id, date, description, category, amount, type, transfer_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'transfer', ?)`,
+        [toAccountId, userId, txDate, desc, 'Перевод', amt, transferId]
+      );
+      await Account.updateBalance(toAccountId, userId, amt);
+
+      return {
+        transferId,
+        amount: amt,
+        date: txDate,
+        description: desc,
+        from: { id: fromRow.id, accountId: fromAccountId, amount: -amt },
+        to: { id: toRow.id, accountId: toAccountId, amount: amt },
+      };
+    });
+  }
+
   // Получение транзакций пользователя (с фильтрацией и пагинацией)
   static async findByUserId(userId, options = {}) {
     try {
