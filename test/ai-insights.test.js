@@ -326,6 +326,38 @@ describe('GET /api/ai/insights/monthly (cached in ai_insights)', () => {
     expect(res.body.error.code).toBe('INVALID_MONTH');
   });
 
+  test('provider failure (quota/network) -> deterministic story, aiError reported, nothing cached', async () => {
+    const { AppError } = require('../middleware/error');
+    mockProvider._reply = () => {
+      throw new AppError(502, 'AI_REQUEST_FAILED', 'AI provider request failed (HTTP 429)');
+    };
+    const u = await dbRun(
+      ctx.db,
+      `INSERT INTO users (username, email, password, full_name) VALUES ('quota', 'quota@example.com', 'x', 'Quota')`
+    );
+    await seedFinance(ctx.db, u.id);
+    const jwt = require('jsonwebtoken');
+    const config = require('../config/config');
+    const token = jwt.sign({ id: u.id }, config.jwtSecret, { expiresIn: '1h' });
+
+    const monthly = await ctx.request.get('/api/ai/insights/monthly').set('Authorization', `Bearer ${token}`);
+    expect(monthly.status).toBe(200);
+    expect(monthly.body.data.aiUsed).toBe(false);
+    expect(monthly.body.data.aiError).toBe('AI_REQUEST_FAILED');
+    expect(monthly.body.data.insight.text).toContain('earned 12000 and spent 1400');
+    const rows = await dbAll(ctx.db, `SELECT id FROM ai_insights WHERE user_id = ?`, [u.id]);
+    expect(rows).toHaveLength(0);
+
+    // The weekly brief only calls the provider when the last 7 days hold transactions.
+    const accRow = await dbAll(ctx.db, `SELECT id FROM accounts WHERE user_id = ? LIMIT 1`, [u.id]);
+    await tx(ctx.db, u.id, accRow[0].id, TODAY, 'Dining', -80, 'expense', 'Lunch');
+    const weekly = await ctx.request.get('/api/ai/insights/weekly').set('Authorization', `Bearer ${token}`);
+    expect(weekly.status).toBe(200);
+    expect(weekly.body.data.aiUsed).toBe(false);
+    expect(weekly.body.data.aiError).toBe('AI_REQUEST_FAILED');
+    expect(weekly.body.data.brief).toContain('transactions');
+  });
+
   test('no provider -> deterministic story from digest numbers, aiUsed:false, nothing cached', async () => {
     mockProvider._configured = false;
     const u = await dbRun(

@@ -227,7 +227,7 @@ function deriveAlerts(digest) {
     alerts.push({
       type: 'anomaly',
       severity: 'medium',
-      message: `Unusual ${a.category} charge of ${a.amount} (${a.reason}).`,
+      message: `Unusual ${a.category} charge of ${a.amount} — ${a.reason}.`,
     });
   }
   if (digest.cashFlow && digest.cashFlow.projectedNet < 0) {
@@ -284,15 +284,25 @@ function digestToPrompt(digest) {
 // Deterministic fallbacks (no provider). Numbers only from the digest.
 // ---------------------------------------------------------------------------
 
+// "2026-10" -> "October 2026" (English copy for the new UI strings).
+function periodLabel(period) {
+  const m = /^(\d{4})-(\d{2})$/.exec(period || '');
+  if (!m) return period || '';
+  const names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const idx = parseInt(m[2], 10) - 1;
+  return names[idx] ? `${names[idx]} ${m[1]}` : period;
+}
+
 function fallbackMonthlyStory(digest) {
   const inc = digest.income.thisMonth;
   const sp = digest.spend.thisMonth;
+  const label = periodLabel(digest.period);
   const parts = [];
   if (!inc && !sp) {
-    parts.push(`No income or spending recorded for ${digest.period} yet.`);
+    parts.push(`No income or spending recorded for ${label} yet.`);
     return parts.join(' ');
   }
-  parts.push(`In ${digest.period} you earned ${inc} and spent ${sp}.`);
+  parts.push(`In ${label} you earned ${inc} and spent ${sp}.`);
   if (digest.spend.lastMonth) {
     parts.push(
       `Spending is ${digest.spend.deltaPct >= 0 ? 'up' : 'down'} ${Math.abs(digest.spend.deltaPct)}% versus last month (${digest.spend.lastMonth}).`
@@ -377,24 +387,32 @@ async function monthlyInsight(userOrId, opts = {}) {
     aiUsed: false,
   };
   let model = null;
+  let aiError = null;
 
   if (provider.isConfigured()) {
-    const result = await provider.chat({
-      system: `${GROUNDING_SYSTEM}\n\n${digestToPrompt(digest)}`,
-      messages: [
-        {
-          role: 'user',
-          content:
-            'Write a brief monthly financial story (3-4 sentences) for the period above. ' +
-            'Be specific with the digest numbers, highlight the single most important insight, ' +
-            'and end with one actionable tip.',
-        },
-      ],
-      maxTokens: 400,
-    });
-    insight.text = (result && result.text) || '';
-    insight.aiUsed = Boolean(insight.text);
-    model = (result && result.model) || null;
+    try {
+      const result = await provider.chat({
+        system: `${GROUNDING_SYSTEM}\n\n${digestToPrompt(digest)}`,
+        messages: [
+          {
+            role: 'user',
+            content:
+              'Write a brief monthly financial story (3-4 sentences) for the period above. ' +
+              'Be specific with the digest numbers, highlight the single most important insight, ' +
+              'and end with one actionable tip.',
+          },
+        ],
+        maxTokens: 400,
+      });
+      insight.text = (result && result.text) || '';
+      insight.aiUsed = Boolean(insight.text);
+      model = (result && result.model) || null;
+    } catch (err) {
+      // A provider outage (quota, network) must not take the dashboard down:
+      // fall back to the deterministic story and report the failure code.
+      aiError = (err && err.code) || 'AI_REQUEST_FAILED';
+      logger.warn({ err: err && err.message, userId }, 'monthlyInsight: provider failed, deterministic fallback');
+    }
   }
   if (!insight.text) {
     insight.text = fallbackMonthlyStory(digest);
@@ -411,7 +429,7 @@ async function monthlyInsight(userOrId, opts = {}) {
     );
   }
 
-  return { insight, cached: false, aiUsed: insight.aiUsed, model };
+  return { insight, cached: false, aiUsed: insight.aiUsed, model, aiError };
 }
 
 // ---------------------------------------------------------------------------
@@ -475,7 +493,9 @@ async function weeklyBrief(userOrId, opts = {}) {
 
   let brief = '';
   let aiUsed = false;
+  let aiError = null;
   if (provider.isConfigured() && transactions.length) {
+    try {
     const digest = await buildDigest(userId, { now });
     const weekData = {
       since,
@@ -505,6 +525,10 @@ async function weeklyBrief(userOrId, opts = {}) {
     });
     brief = (result && result.text) || '';
     aiUsed = Boolean(brief);
+    } catch (err) {
+      aiError = (err && err.code) || 'AI_REQUEST_FAILED';
+      logger.warn({ err: err && err.message, userId }, 'weeklyBrief: provider failed, deterministic fallback');
+    }
   }
   if (!brief) brief = fallbackWeeklyBrief(week);
 
@@ -517,6 +541,7 @@ async function weeklyBrief(userOrId, opts = {}) {
     topCategory,
     dailyTotals: week.dailyTotals,
     aiUsed,
+    aiError,
   };
 }
 
@@ -528,5 +553,5 @@ module.exports = {
   monthlyInsight,
   weeklyBrief,
   // test hooks
-  _internal: { fallbackMonthlyStory, fallbackWeeklyBrief, anchorForMonth, normalizeMonth },
+  _internal: { fallbackMonthlyStory, fallbackWeeklyBrief, anchorForMonth, normalizeMonth, periodLabel },
 };
