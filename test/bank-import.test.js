@@ -40,6 +40,9 @@ describe('csvImportService primitives', () => {
     expect(csv.parseDate('10/25/2026')).toBe('2026-10-25');
     expect(csv.parseDate('not a date')).toBeNull();
     expect(csv.parseDate('2026-13-40')).toBeNull();
+    expect(csv.parseDate('2026-02-31')).toBeNull();
+    expect(csv.parseDate('31/02/2026')).toBeNull();
+    expect(csv.parseDate('29/02/2028')).toBe('2028-02-29');
     expect(csv.parseDate('')).toBeNull();
   });
 
@@ -574,6 +577,32 @@ describe('HTTP /api/bank-api', () => {
       .send({ accountId: acc, rows: [{ date: '2026-10-01', description: 'ok', amount: 10 }, { date: 'bad', amount: 1 }] });
     expect(mixed.status).toBe(200);
     expect(mixed.body).toMatchObject({ inserted: 1, rejected: 1 });
+  });
+
+  test('POST /sync-accounts creates the accounts and stores their ids on the connection', async () => {
+    const bankApiService = require(path.join(PROJECT_ROOT, 'services', 'bankApiService.js'));
+    const original = bankApiService.getAccounts;
+    bankApiService.getAccounts = jest.fn(async () => [
+      { id: 'mono-a', name: 'Monobank 1234', accountNumber: 'mono-a', type: 'checking', balance: 1500.25, currency: 'UAH' }
+    ]);
+    try {
+      const conn = await ctx.request.post('/api/bank-api/connect/monobank/direct').set(auth).send({ apiKey: 'tok', skipVerify: true });
+      const res = await ctx.request.post(`/api/bank-api/sync-accounts/${conn.body.connectionId}`).set(auth).send({});
+      expect(res.status).toBe(200);
+      expect(res.body.accounts).toHaveLength(1);
+      expect(res.body.accounts[0]).toMatchObject({ name: 'Monobank 1234', balance: 1500.25, currency: 'UAH' });
+      const stored = await dbGet(ctx, `SELECT bank_id, account_ids, access_token FROM bank_connections WHERE id = ?`, [conn.body.connectionId]);
+      expect(stored.bank_id).toBe('monobank');
+      expect(JSON.parse(stored.account_ids)).toEqual([res.body.accounts[0].id]);
+      expect(stored.access_token).toBeTruthy();
+      const count = await dbGet(ctx, `SELECT COUNT(*) AS c FROM bank_connections WHERE user_id = ?`, [ctx.userId]);
+      expect(count.c).toBe(1);
+      // the commit route rejects an impossible calendar date even though it looks ISO
+      const bad = await ctx.request.post('/api/bank-api/import/commit').set(auth).send({ accountId, rows: [{ date: '2026-02-31', amount: 1 }] });
+      expect(bad.status).toBe(400);
+    } finally {
+      bankApiService.getAccounts = original;
+    }
   });
 
   test('POST /sync-transactions dedupes bank rows against what is already stored', async () => {

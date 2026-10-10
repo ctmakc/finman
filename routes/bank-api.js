@@ -245,7 +245,15 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
         result.push({ ...created, updated: false });
       }
     }
-    await BankConnection.createOrUpdate({ ...connection, userId: req.user.id, accountIds: result.map((a) => a.id) });
+    // The row comes back snake_case; createOrUpdate reads camelCase (bankId/accessToken/...).
+    await BankConnection.createOrUpdate({
+      userId: req.user.id,
+      bankId: connection.bank_id,
+      accessToken: connection.access_token,
+      refreshToken: connection.refresh_token || null,
+      expiresAt: connection.expires_at || null,
+      accountIds: result.map((a) => a.id)
+    });
     res.json({ success: true, accounts: result });
   } catch (error) {
     console.error('Error syncing accounts:', error);
@@ -374,6 +382,11 @@ router.post('/import/preview', authenticate, (req, res) => {
 });
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+// V8 turns "2026-02-31" into March 2nd, so check the calendar, not just the shape.
+function isCalendarDate(iso) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
+}
 
 // JSON: { accountId, rows:[{date, description, amount, category, type}], skipDuplicates=true, updateBalance=true }
 router.post('/import/commit', authenticate, async (req, res) => {
@@ -397,7 +410,7 @@ router.post('/import/commit', authenticate, async (req, res) => {
     rows.forEach((r, i) => {
       const date = String(r.date || '').trim();
       const amount = Number(r.amount);
-      if (!ISO_DATE.test(date) || Number.isNaN(new Date(date).getTime())) {
+      if (!ISO_DATE.test(date) || !isCalendarDate(date)) {
         errors.push({ index: i, message: `Row ${i + 1}: invalid date "${r.date}"` });
         return;
       }

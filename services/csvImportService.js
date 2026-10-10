@@ -125,6 +125,8 @@ function pad2(n) {
 
 function validYmd(y, m, d) {
   if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 1900 && y <= 2100)) return null;
+  // Real calendar check: "31/02/2026" must not become "2026-02-31".
+  if (new Date(Date.UTC(y, m - 1, d)).getUTCDate() !== d) return null;
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
 
