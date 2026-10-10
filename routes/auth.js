@@ -3,12 +3,49 @@ const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const config = require('../config/config');
+const { googleEnabled } = require('../services/authService');
+const { notifySignup } = require('../services/signupNotify');
 
 const router = express.Router();
 
 // Валидация токена (для frontend)
 router.get('/validate', passport.authenticate('jwt', { session: false }), (req, res) => {
   res.json({ valid: true, user: { id: req.user.id, username: req.user.username } });
+});
+
+// --- Вход через Google (портировано из прод-линейки) -----------------------
+
+// Фронтенд спрашивает, показывать ли кнопку, а не угадывает по env.
+router.get('/google/status', (req, res) => res.json({ enabled: googleEnabled() }));
+
+router.get('/google', (req, res, next) => {
+  if (!googleEnabled()) {
+    return res.status(503).json({ error: true, message: 'Вход через Google не настроен' });
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+});
+
+router.get('/google/callback', (req, res, next) => {
+  if (!googleEnabled()) {
+    return res.status(503).json({ error: true, message: 'Вход через Google не настроен' });
+  }
+  passport.authenticate('google', { session: false }, (err, user) => {
+    const fail = (reason) =>
+      res.redirect(config.google.successRedirect + '?auth_error=' + encodeURIComponent(reason));
+    if (err) { console.error('Google callback error:', err); return fail('google_failed'); }
+    if (!user) return fail('google_denied');
+    try {
+      // Тот же payload, что и у входа по паролю: { id }.
+      const token = jwt.sign({ id: user.id }, config.jwtSecret, {
+        expiresIn: config.jwtExpiration
+      });
+      // Токен уезжает во фрагменте URL — так он не попадает в серверные логи.
+      return res.redirect(config.google.successRedirect + '#token=' + encodeURIComponent(token));
+    } catch (e) {
+      console.error('Google callback token error:', e);
+      return fail('google_failed');
+    }
+  })(req, res, next);
 });
 
 // Регистрация
@@ -78,6 +115,12 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign({ id: newUser.id }, config.jwtSecret, {
       expiresIn: config.jwtExpiration
     });
+
+    // Уведомление оператора о регистрации (письмо владельцу; ответ не ждёт).
+    notifySignup(
+      { id: newUser.id, username: newUser.username, email: newUser.email, fullName: newUser.fullName },
+      'password'
+    );
     
     // Отправка токена и данных пользователя
     res.json({
