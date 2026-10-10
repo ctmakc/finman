@@ -184,7 +184,13 @@ app.get('/api/protected', apiAuthMiddleware, (req, res) => {
 // Health/Ready смонтированы на /api -> /api/health, /api/ready
 app.use('/api', healthRoutes);
 // AI: сначала аутентификация (заполняет req.user), затем гейт по тиру 'pro'.
-app.use('/api/ai', apiAuthMiddleware, requireTier('pro'), aiRoutes);
+// AI gate (PORT_PLAN A7): the Pro tier is required only while billing is configured;
+// without Stripe every authenticated user gets the AI CFO. Evaluated per request so
+// the gate follows the live env (tests and runtime config changes).
+const requireProForAi = requireTier('pro');
+const aiTierGate = (req, res, next) =>
+  (require('./services/billingService').isConfigured() ? requireProForAi(req, res, next) : next());
+app.use('/api/ai', apiAuthMiddleware, aiTierGate, aiRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/anomalies', anomaliesRoutes);

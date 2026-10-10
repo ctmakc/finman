@@ -481,16 +481,26 @@ async function chatStream(userId, conversationId, message, callbacks = {}) {
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({ role: m.role, content: m.content }));
 
-  const result = await provider.chat({
-    system,
-    messages: promptMessages,
-    maxTokens: 900,
-  });
-  const reply = (result && result.text) || '';
-
-  // Эмулируем стриминг: нарезаем готовый текст на чанки и отдаём по одному.
-  for (const piece of chunkText(reply, STREAM_CHUNK_SIZE)) {
-    onChunk(piece);
+  let reply = '';
+  if (typeof provider.chatStream === 'function') {
+    // Real token streaming. The provider itself falls back to chunking when the
+    // selected backend has no stream path, so callers see one contract.
+    const result = await provider.chatStream(
+      { system, messages: promptMessages, maxTokens: 900 },
+      onChunk
+    );
+    reply = (result && result.text) || '';
+  } else {
+    // Legacy provider contract (chat() only): emulate streaming by chunking the final text.
+    const result = await provider.chat({
+      system,
+      messages: promptMessages,
+      maxTokens: 900,
+    });
+    reply = (result && result.text) || '';
+    for (const piece of chunkText(reply, STREAM_CHUNK_SIZE)) {
+      onChunk(piece);
+    }
   }
 
   await AiConversation.addMessage(conversation.id, 'assistant', reply);

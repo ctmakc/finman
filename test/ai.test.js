@@ -308,7 +308,25 @@ describe('AI Financial CFO — provider/tier gating', () => {
     expect(res.body.error.code).toBe('AI_NOT_CONFIGURED');
   });
 
+  test('free tier WITHOUT billing configured -> AI open to every authenticated user (PORT_PLAN A7)', async () => {
+    mockProvider._configured = true;
+    ctx = await makeApp();
+    const orig = process.env.STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_SECRET_KEY;
+    try {
+      const res = await ctx.request
+        .post('/api/ai/chat')
+        .set('Authorization', 'Bearer ' + ctx.token)
+        .send({ message: 'hi' });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    } finally {
+      if (orig !== undefined) process.env.STRIPE_SECRET_KEY = orig;
+    }
+  });
+
   test('free tier -> 402 PAYMENT_REQUIRED (Foundation gate)', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     mockProvider._configured = true;
     ctx = await makeApp();
     // Не повышаем тариф — остаётся free.
@@ -319,6 +337,7 @@ describe('AI Financial CFO — provider/tier gating', () => {
       .send({ message: 'hi' });
 
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
     expect(res.body.error.code).toBe('PAYMENT_REQUIRED');
   });
 });

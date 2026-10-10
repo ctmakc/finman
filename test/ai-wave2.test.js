@@ -208,12 +208,14 @@ describe('AI Wave-2 — streaming chat (SSE)', () => {
   });
 
   test('stream: free tier -> 402', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     ctx = await makeApp();
     const res = await ctx.request
       .post('/api/ai/chat/stream')
       .set('Authorization', 'Bearer ' + ctx.token)
       .send({ message: 'hi' });
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
     expect(res.body.error.code).toBe('PAYMENT_REQUIRED');
   });
 });
@@ -421,12 +423,14 @@ describe('AI Wave-2 — auto-categorize', () => {
   });
 
   test('POST /api/ai/categorize: free tier -> 402', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     ctx = await makeApp();
     const res = await ctx.request
       .post('/api/ai/categorize')
       .set('Authorization', 'Bearer ' + ctx.token)
       .send({ accepted: [] });
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
   });
 });
 
@@ -540,10 +544,12 @@ describe('AI Wave-2 — monthly summary', () => {
   });
 
   test('GET /api/ai/summary: free tier -> 402', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     ctx = await makeApp();
     const res = await ctx.request
       .get('/api/ai/summary')
       .set('Authorization', 'Bearer ' + ctx.token);
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
   });
 });

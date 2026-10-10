@@ -47,10 +47,12 @@ describe('foundation HTTP', () => {
   });
 
   test('requireTier блокирует free-пользователя на pro-роуте (/api/ai) -> 402', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     const res = await ctx.request
       .get('/api/ai/anything')
       .set('Authorization', `Bearer ${ctx.token}`);
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
     expect(res.body.success).toBe(false);
     expect(res.body.error.code).toBe('PAYMENT_REQUIRED');
   });
