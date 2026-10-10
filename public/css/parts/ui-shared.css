@@ -1,0 +1,241 @@
+/* ==========================================================================
+   SHARED MODULE UI — designed empty states, per-currency money lists,
+   supported-banks chips, family page inside the app shell.
+   Imported from style.css: @import url("/css/parts/ui-shared.css");
+   ========================================================================== */
+
+/* ---- Empty states: same look as the accounts page (dashed card) ---------- */
+.empty-state.fm-empty,
+.bank-connections-container .empty-state,
+.family-page .empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-8, 3rem) var(--space-5, 1.5rem);
+  background: var(--fm-surface, var(--card-color));
+  border: 1px dashed var(--fm-border-strong, var(--border-color));
+  border-radius: var(--radius-lg, 14px);
+  color: var(--fm-ink-2, var(--text-secondary));
+}
+
+.empty-state.fm-empty .empty-state-icon,
+.bank-connections-container .empty-state .empty-state-icon,
+.family-page .empty-state .empty-state-icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--fm-primary-tint, rgba(93, 92, 222, 0.12));
+  color: var(--fm-primary, var(--primary-color));
+  font-size: 1.8rem;
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.empty-state.fm-empty .empty-state-icon i,
+.bank-connections-container .empty-state .empty-state-icon i,
+.family-page .empty-state .empty-state-icon i {
+  font-size: inherit;
+  margin: 0;
+  opacity: 1;
+}
+
+.empty-state.fm-empty h2,
+.bank-connections-container .empty-state h2,
+.family-page .empty-state h2 {
+  font-family: var(--fm-font-display, inherit);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--fm-ink, var(--text-primary));
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+
+.empty-state.fm-empty p,
+.bank-connections-container .empty-state p,
+.family-page .empty-state p {
+  max-width: 28rem;
+  margin: 0 0 var(--space-5, 1.5rem);
+  color: var(--fm-ink-2, var(--text-secondary));
+}
+
+.empty-state.fm-empty p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Per-currency money lists (never a silent cross-currency sum) -------- */
+.fm-money-list {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value .fm-money-list,
+.summary-amount .fm-money-list {
+  align-items: inherit;
+}
+
+.fm-money-list .fm-money + .fm-money {
+  font-size: 0.78em;
+  color: var(--fm-ink-2, var(--text-secondary));
+  font-weight: 500;
+}
+
+.fm-money.positive { color: var(--fm-positive, var(--success-color)); }
+.fm-money.negative { color: var(--fm-negative, var(--error-color)); }
+
+.fm-currency-note {
+  margin: 0 0 var(--space-4, 1rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-left: 3px solid var(--fm-warning, #d98a1f);
+  background: var(--fm-warning-tint, rgba(217, 138, 31, 0.1));
+  color: var(--fm-ink, var(--text-primary));
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.9rem;
+}
+
+/* ---- Goals / debts cards -------------------------------------------------- */
+.card.goal-reached,
+.card.debt-paid {
+  border-color: var(--fm-positive, var(--success-color));
+}
+
+.card.goal-reached .progress-fill,
+.card.debt-paid .progress-fill {
+  background: var(--fm-positive, var(--success-color));
+}
+
+.card.debt-overdue {
+  border-color: var(--fm-negative, var(--error-color));
+}
+
+.goal-remaining,
+.debt-remaining {
+  margin: var(--space-3, 0.75rem) 0 0;
+  color: var(--fm-ink-2, var(--text-secondary));
+  font-size: 0.92rem;
+}
+
+.goal-remaining strong,
+.debt-remaining strong {
+  color: var(--fm-ink, var(--text-primary));
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-due {
+  margin: var(--space-3, 0.75rem) 0 0;
+  font-size: 0.9rem;
+  color: var(--fm-ink-2, var(--text-secondary));
+}
+
+.debt-due.overdue {
+  color: var(--fm-negative, var(--error-color));
+  font-weight: 600;
+}
+
+.goal-meta {
+  display: flex;
+  gap: var(--space-3, 0.75rem);
+  margin-top: var(--space-3, 0.75rem);
+  font-size: 0.88rem;
+  color: var(--fm-ink-2, var(--text-secondary));
+}
+
+/* ---- Supported banks (rendered from GET /api/bank-api/banks) ------------- */
+.fm-banks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  margin-top: var(--space-3, 0.75rem);
+}
+
+.fm-bank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--fm-border, var(--border-color));
+  border-radius: var(--radius-pill, 999px);
+  background: var(--fm-surface-2, var(--fm-surface, var(--card-color)));
+  color: var(--fm-ink, var(--text-primary));
+  font-size: 0.9rem;
+}
+
+.fm-bank-chip small {
+  color: var(--fm-ink-2, var(--text-secondary));
+}
+
+/* ---- Family page rendered inside #main-content ---------------------------- */
+.family-page .header-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+.family-details-page .page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.family-details-page .page-header h1 {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.families-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4, 1rem);
+}
+
+.family-card:focus-visible,
+.report-type-card:focus-visible,
+.calendar-day:focus-visible {
+  outline: 2px solid var(--fm-primary, var(--primary-color));
+  outline-offset: 2px;
+}
+
+/* ---- Subscriptions / receipts / split toolbars --------------------------- */
+.sub-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.receipts-page .btn-group,
+.split-page .page-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+.ocr-hint {
+  font-size: 0.85em;
+  color: var(--fm-primary, var(--primary-color));
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.ocr-items {
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.image-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: var(--radius-md, 10px);
+}
+
+@media (max-width: 480px) {
+  .empty-state.fm-empty,
+  .bank-connections-container .empty-state,
+  .family-page .empty-state {
+    padding: var(--space-6, 2rem) var(--space-4, 1rem);
+  }
+}

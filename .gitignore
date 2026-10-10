@@ -45,3 +45,6 @@ ios/App/build/
 ios/App/Pods/
 *.xcworkspace
 *.ipa
+
+# Local screenshots (fe-logic verification)
+.shots/
