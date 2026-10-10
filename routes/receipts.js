@@ -11,17 +11,14 @@ router.get('/stats/summary', async (req, res) => {
   try {
     const total = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ?', [req.user.id]);
     const pending = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ? AND is_processed = 0', [req.user.id]);
-    const thisMonth = await get(
-      `SELECT COUNT(*) as count, SUM(total_amount) as total FROM receipts
-       WHERE user_id = ? AND receipt_date >= date('now', 'start of month')`,
-      [req.user.id]
-    );
+    const processed = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ? AND is_processed = 1', [req.user.id]);
+    const amountData = await get('SELECT SUM(total_amount) as total FROM receipts WHERE user_id = ?', [req.user.id]);
 
     res.json({
-      totalReceipts: total.count,
-      pendingReceipts: pending.count,
-      thisMonthCount: thisMonth.count,
-      thisMonthTotal: thisMonth.total || 0
+      total: total.count,
+      processed: processed.count,
+      pending: pending.count,
+      totalAmount: amountData.total || 0
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -149,18 +146,21 @@ router.post('/:id/create-transaction', async (req, res) => {
     const account = await get('SELECT id FROM accounts WHERE id = ? AND user_id = ?', [account_id, req.user.id]);
     if (!account) return res.status(404).json({ message: 'Account not found' });
 
-    // Создаём транзакцию
-    const txResult = await run(
-      `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
-       VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
-      [req.user.id, account_id, -Math.abs(receipt.total_amount), receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
-    );
-
-    // Обновляем баланс счёта
-    await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [receipt.total_amount, account_id, req.user.id]);
-
-    // Связываем чек с транзакцией
-    await run('UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [txResult.id, req.params.id]);
+    await run('BEGIN');
+    let txResult;
+    try {
+      txResult = await run(
+        `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
+         VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
+        [req.user.id, account_id, -Math.abs(receipt.total_amount), receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
+      );
+      await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [receipt.total_amount, account_id, req.user.id]);
+      await run('UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [txResult.id, req.params.id]);
+      await run('COMMIT');
+    } catch (innerErr) {
+      await run('ROLLBACK');
+      throw innerErr;
+    }
 
     res.json({ transaction_id: txResult.id, message: 'Transaction created' });
   } catch (error) {

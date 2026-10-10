@@ -5,12 +5,52 @@ const User = require('../models/user');
 const Organization = require('../models/organization');
 const config = require('../config/config');
 const { get } = require('../db/database');
+const { notifySignup } = require('../services/signupNotify');
 
 const router = express.Router();
 
 // Validate token (for frontend)
 router.get('/validate', passport.authenticate('jwt', { session: false }), (req, res) => {
   res.json({ valid: true, user: { id: req.user.id, username: req.user.username, orgId: req.user.orgId } });
+});
+
+// --- Google sign-in ---------------------------------------------------------
+const googleEnabled = () => !!(config.google && config.google.clientId && config.google.clientSecret);
+
+// Lets the frontend show or hide the button without guessing.
+router.get('/google/status', (req, res) => res.json({ enabled: googleEnabled() }));
+
+router.get('/google', (req, res, next) => {
+  if (!googleEnabled()) return res.status(503).json({ error: true, message: 'Google sign-in is not configured' });
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+});
+
+router.get('/google/callback', (req, res, next) => {
+  if (!googleEnabled()) return res.status(503).json({ error: true, message: 'Google sign-in is not configured' });
+  passport.authenticate('google', { session: false }, async (err, user) => {
+    const fail = (reason) => res.redirect(config.google.successRedirect + '?auth_error=' + encodeURIComponent(reason));
+    if (err) { console.error('Google callback error:', err); return fail('google_failed'); }
+    if (!user) return fail('google_denied');
+    try {
+      // Mirror the password flow: every user owns an organization.
+      let org = await Organization.findByOwner ? await Organization.findByOwner(user.id) : null;
+      if (!org) {
+        const membership = await get(
+          'SELECT org_id AS id FROM organization_members WHERE user_id = ? ORDER BY id LIMIT 1', [user.id]);
+        org = membership || await Organization.create({ name: user.full_name || user.username, ownerId: user.id });
+      }
+      const token = jwt.sign(
+        { id: user.id, orgId: org.id, role: 'owner' },
+        config.jwtSecret,
+        { expiresIn: config.jwtExpiration }
+      );
+      // Handed over in the fragment so the token never reaches server logs.
+      return res.redirect(config.google.successRedirect + '#token=' + encodeURIComponent(token));
+    } catch (e) {
+      console.error('Google callback token error:', e);
+      return fail('google_failed');
+    }
+  })(req, res, next);
 });
 
 // Register
@@ -54,6 +94,9 @@ router.post('/register', async (req, res) => {
       config.jwtSecret,
       { expiresIn: config.jwtExpiration }
     );
+
+    // Operator notice (email to the owner; never blocks the response).
+    notifySignup({ id: newUser.id, username: newUser.username, email: newUser.email, fullName: newUser.fullName }, 'password');
 
     res.json({
       token,

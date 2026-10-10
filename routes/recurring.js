@@ -1,6 +1,7 @@
 const express = require('express');
 const passport = require('passport');
 const RecurringPayment = require('../models/recurringPayment');
+const orgScope = require('../services/orgScope');
 const Account = require('../models/account');
 
 const router = express.Router();
@@ -12,7 +13,7 @@ const authenticate = passport.authenticate('jwt', { session: false });
 router.get('/', authenticate, async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
-    const payments = await RecurringPayment.findByUserId(req.user.id, includeInactive);
+    const payments = await RecurringPayment.findByUserId(req.user, includeInactive);
     res.json(payments);
   } catch (error) {
     console.error('Error fetching payments:', error);
@@ -23,7 +24,7 @@ router.get('/', authenticate, async (req, res) => {
 // Получение статистики
 router.get('/stats', authenticate, async (req, res) => {
   try {
-    const stats = await RecurringPayment.getStats(req.user.id);
+    const stats = await RecurringPayment.getStats(req.user);
     res.json(stats);
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -35,7 +36,7 @@ router.get('/stats', authenticate, async (req, res) => {
 router.get('/upcoming', authenticate, async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 7;
-    const payments = await RecurringPayment.getUpcoming(req.user.id, days);
+    const payments = await RecurringPayment.getUpcoming(req.user, days);
     res.json(payments);
   } catch (error) {
     console.error('Error fetching upcoming payments:', error);
@@ -46,7 +47,7 @@ router.get('/upcoming', authenticate, async (req, res) => {
 // Получение просроченных платежей
 router.get('/overdue', authenticate, async (req, res) => {
   try {
-    const payments = await RecurringPayment.getOverdue(req.user.id);
+    const payments = await RecurringPayment.getOverdue(req.user);
     res.json(payments);
   } catch (error) {
     console.error('Error fetching overdue payments:', error);
@@ -87,7 +88,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     // Проверка счета
-    const account = await Account.findById(accountId, req.user.id);
+    const account = await Account.findById(accountId, req.user);
     if (!account) {
       return res.status(404).json({ error: true, message: 'Account not found' });
     }
@@ -121,7 +122,7 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const payment = await RecurringPayment.findById(req.params.id);
 
-    if (!payment || payment.user_id !== req.user.id) {
+    if (!payment || !(await orgScope.inScope(payment.user_id, req.user))) {
       return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
@@ -137,7 +138,7 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const success = await RecurringPayment.update(
       req.params.id,
-      req.user.id,
+      req.user,
       req.body
     );
 
@@ -156,7 +157,7 @@ router.put('/:id', authenticate, async (req, res) => {
 // Удаление платежа
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const success = await RecurringPayment.delete(req.params.id, req.user.id);
+    const success = await RecurringPayment.delete(req.params.id, req.user);
 
     if (!success) {
       return res.status(404).json({ error: true, message: 'Payment not found' });
@@ -175,7 +176,7 @@ router.post('/:id/pay', authenticate, async (req, res) => {
     const createTransaction = req.body.createTransaction !== false;
     const result = await RecurringPayment.markAsPaid(
       req.params.id,
-      req.user.id,
+      req.user,
       createTransaction
     );
 
@@ -193,7 +194,7 @@ router.post('/:id/pay', authenticate, async (req, res) => {
 // Пропустить платеж
 router.post('/:id/skip', authenticate, async (req, res) => {
   try {
-    const result = await RecurringPayment.skip(req.params.id, req.user.id);
+    const result = await RecurringPayment.skip(req.params.id, req.user);
 
     if (!result.success) {
       return res.status(404).json({ error: true, message: result.message });
@@ -211,11 +212,11 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
   try {
     const payment = await RecurringPayment.findById(req.params.id);
 
-    if (!payment || payment.user_id !== req.user.id) {
+    if (!payment || !(await orgScope.inScope(payment.user_id, req.user))) {
       return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
-    await RecurringPayment.update(req.params.id, req.user.id, {
+    await RecurringPayment.update(req.params.id, req.user, {
       isActive: !payment.is_active
     });
 

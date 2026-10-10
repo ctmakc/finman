@@ -21,8 +21,11 @@ class BankConnection {
         refresh_token: connection.refresh_token ? decryptToken(connection.refresh_token) : null
       };
     } catch (error) {
-      console.error('Token decryption error:', error.message);
-      return connection; // Возвращаем как есть если не удалось расшифровать
+      // Do NOT fall back to the still-encrypted connection: callers would
+      // use ciphertext as a bearer token, producing silent auth failures
+      // that mask key/IV corruption. Fail loudly so callers skip it.
+      console.error('Token decryption failed for connection', connection.id, '-', error.message);
+      throw new Error(`Bank connection ${connection.id} token decryption failed`);
     }
   }
 
@@ -100,14 +103,21 @@ class BankConnection {
         [userId]
       );
 
-      // Расшифровка токенов и преобразование JSON строки account_ids
-      return connections.map(conn => {
-        const decrypted = this.decryptTokens(conn);
-        return {
-          ...decrypted,
-          accountIds: this.safeParseJSON(conn.account_ids, [])
-        };
-      });
+      // Decrypt + parse. A single undecryptable row must not break the whole
+      // list nor leak ciphertext downstream — skip it (logged in decryptTokens).
+      const result = [];
+      for (const conn of connections) {
+        try {
+          const decrypted = this.decryptTokens(conn);
+          result.push({
+            ...decrypted,
+            accountIds: this.safeParseJSON(conn.account_ids, [])
+          });
+        } catch (_) {
+          /* broken connection excluded; error already logged */
+        }
+      }
+      return result;
     } catch (error) {
       throw error;
     }

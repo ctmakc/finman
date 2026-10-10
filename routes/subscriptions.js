@@ -2,19 +2,27 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
+// Resolve the org member-id set + a placeholder string for the request.
+async function scopeOf(req) {
+  const ids = await orgScope.scopeUserIds(req.user);
+  return { ids, ph: orgScope.placeholders(ids.length) };
+}
+
 // Получить все подписки
 router.get('/', async (req, res) => {
   try {
+    const { ids, ph } = await scopeOf(req);
     const subscriptions = await query(
       `SELECT s.*, a.name as account_name
        FROM subscriptions s
        LEFT JOIN accounts a ON s.account_id = a.id
-       WHERE s.user_id = ? ORDER BY s.next_billing_date`,
-      [req.user.id]
+       WHERE s.user_id IN (${ph}) ORDER BY s.next_billing_date`,
+      ids
     );
 
     const enriched = subscriptions.map(s => ({
@@ -33,9 +41,10 @@ router.get('/', async (req, res) => {
 // Статистика подписок
 router.get('/stats', async (req, res) => {
   try {
+    const { ids, ph } = await scopeOf(req);
     const active = await query(
-      'SELECT * FROM subscriptions WHERE user_id = ? AND is_active = 1',
-      [req.user.id]
+      `SELECT * FROM subscriptions WHERE user_id IN (${ph}) AND is_active = 1`,
+      ids
     );
 
     let monthlyTotal = 0;
@@ -86,7 +95,8 @@ router.post('/', async (req, res) => {
 // Обновить подписку
 router.put('/:id', async (req, res) => {
   try {
-    const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const sub = await get(`SELECT * FROM subscriptions WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     const { name, description, amount, currency, billing_cycle, category, icon, color, reminder_days, auto_renew, account_id, url, notes, is_active } = req.body;
@@ -105,7 +115,8 @@ router.put('/:id', async (req, res) => {
 // Отменить/возобновить подписку
 router.post('/:id/toggle', async (req, res) => {
   try {
-    const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const sub = await get(`SELECT * FROM subscriptions WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     await run('UPDATE subscriptions SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [sub.is_active ? 0 : 1, req.params.id]);
@@ -119,7 +130,8 @@ router.post('/:id/toggle', async (req, res) => {
 // Записать платёж
 router.post('/:id/payment', async (req, res) => {
   try {
-    const sub = await get('SELECT * FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const sub = await get(`SELECT * FROM subscriptions WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     const { amount, payment_date, transaction_id, create_transaction, account_id } = req.body;
@@ -141,7 +153,7 @@ router.post('/:id/payment', async (req, res) => {
             'INSERT INTO transactions (user_id, account_id, type, amount, description, category, date) VALUES (?, ?, \'expense\', ?, ?, ?, ?)',
             [req.user.id, acctId, -Math.abs(paidAmount), sub.name, sub.category || 'subscriptions', paidDate]
           );
-          await run('UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?', [paidAmount, acctId, req.user.id]);
+          await run(`UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id IN (${ph})`, [paidAmount, acctId, ...ids]);
         }
       }
 
@@ -161,7 +173,8 @@ router.post('/:id/payment', async (req, res) => {
 // История платежей
 router.get('/:id/payments', async (req, res) => {
   try {
-    const sub = await get('SELECT id FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const sub = await get(`SELECT id FROM subscriptions WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
     const payments = await query(
       'SELECT * FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date DESC',
@@ -176,7 +189,8 @@ router.get('/:id/payments', async (req, res) => {
 // Удалить подписку
 router.delete('/:id', async (req, res) => {
   try {
-    await run('DELETE FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    await run(`DELETE FROM subscriptions WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     res.json({ message: 'Subscription deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

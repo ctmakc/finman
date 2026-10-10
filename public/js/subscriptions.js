@@ -42,7 +42,7 @@ const SubscriptionsModule = {
     }
 
     container.innerHTML = this.subscriptions.map(sub => `
-      <div class="card subscription-card" data-id="${sub.id}" style="border-left: 4px solid ${sub.color || '#5D5CDE'}">
+      <div class="card subscription-card" data-id="${sub.id}" style="border-left: 4px solid ${esc(sub.color || '#5D5CDE')}">
         <div class="subscription-header">
           <div class="subscription-info">
             <span class="subscription-icon">${esc(sub.icon || '📦')}</span>
@@ -57,7 +57,7 @@ const SubscriptionsModule = {
           </div>
         </div>
         <div class="subscription-details">
-          <span>Next payment: <strong>${sub.next_billing_date || 'Not set'}</strong></span>
+          <span>Next payment: <strong>${esc(sub.next_billing_date || 'Not set')}</strong></span>
           <span>${sub.daysUntilBilling !== null ? (sub.daysUntilBilling <= 0 ? '⚠️ Today/Overdue' : sub.daysUntilBilling + ' days') : ''}</span>
         </div>
         <div class="subscription-actions">

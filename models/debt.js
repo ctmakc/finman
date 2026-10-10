@@ -1,6 +1,7 @@
 // ==================== МОДЕЛЬ ДОЛГОВ И КРЕДИТОВ ====================
 
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 const Debt = {
   // Типы долгов
@@ -30,18 +31,22 @@ const Debt = {
   },
 
   // Получение всех долгов пользователя
-  async findByUser(userId, includePaid = false) {
+  async findByUser(scope, includePaid = false) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     const sql = includePaid
-      ? 'SELECT * FROM debts WHERE user_id = ? AND is_active = 1 ORDER BY due_date ASC, created_at DESC'
-      : 'SELECT * FROM debts WHERE user_id = ? AND is_active = 1 AND is_paid = 0 ORDER BY due_date ASC, created_at DESC';
-    return query(sql, [userId]);
+      ? `SELECT * FROM debts WHERE user_id IN (${ph}) AND is_active = 1 ORDER BY due_date ASC, created_at DESC`
+      : `SELECT * FROM debts WHERE user_id IN (${ph}) AND is_active = 1 AND is_paid = 0 ORDER BY due_date ASC, created_at DESC`;
+    return query(sql, ids);
   },
 
   // Получение долгов по типу
-  async findByType(userId, type) {
+  async findByType(scope, type) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     return query(
-      'SELECT * FROM debts WHERE user_id = ? AND type = ? AND is_active = 1 ORDER BY due_date ASC',
-      [userId, type]
+      `SELECT * FROM debts WHERE user_id IN (${ph}) AND type = ? AND is_active = 1 ORDER BY due_date ASC`,
+      [...ids, type]
     );
   },
 
@@ -134,8 +139,8 @@ const Debt = {
   },
 
   // Статистика по долгам
-  async getStats(userId) {
-    const debts = await this.findByUser(userId, true);
+  async getStats(scope) {
+    const debts = await this.findByUser(scope, true);
 
     const stats = {
       totalDebts: debts.length,
@@ -178,27 +183,31 @@ const Debt = {
   },
 
   // Получить просроченные долги
-  async getOverdue(userId) {
+  async getOverdue(scope) {
     const today = new Date().toISOString().split('T')[0];
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     return query(
       `SELECT * FROM debts
-       WHERE user_id = ? AND is_active = 1 AND is_paid = 0 AND due_date < ?
+       WHERE user_id IN (${ph}) AND is_active = 1 AND is_paid = 0 AND due_date < ?
        ORDER BY due_date ASC`,
-      [userId, today]
+      [...ids, today]
     );
   },
 
   // Получить скоро истекающие долги (в течение N дней)
-  async getUpcoming(userId, days = 7) {
+  async getUpcoming(scope, days = 7) {
     const today = new Date();
     const futureDate = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
 
     return query(
       `SELECT * FROM debts
-       WHERE user_id = ? AND is_active = 1 AND is_paid = 0
+       WHERE user_id IN (${ph}) AND is_active = 1 AND is_paid = 0
          AND due_date >= ? AND due_date <= ?
        ORDER BY due_date ASC`,
-      [userId, today.toISOString().split('T')[0], futureDate.toISOString().split('T')[0]]
+      [...ids, today.toISOString().split('T')[0], futureDate.toISOString().split('T')[0]]
     );
   },
 

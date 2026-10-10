@@ -6,7 +6,7 @@ class User {
   static async create(userData) {
     try {
       // Хеширование пароля
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      const hashedPassword = await bcrypt.hash(userData.password, 12);
       
       const result = await run(
         `INSERT INTO users (username, email, password, full_name) 
@@ -20,6 +20,44 @@ class User {
     }
   }
   
+  // Поиск по Google-идентификатору
+  static async findByGoogleId(googleId) {
+    try {
+      return await get('SELECT * FROM users WHERE google_id = ?', [googleId]);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Создание пользователя из Google-профиля.
+  // Пароль заполняется недостижимым случайным хешем: колонка NOT NULL,
+  // но войти по паролю в такой аккаунт нельзя — сравнение никогда не совпадёт.
+  static async createFromGoogle({ googleId, email, fullName, avatarUrl }) {
+    const crypto = require('crypto');
+    const unusable = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), 12);
+
+    let base = (email || '').split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '') || 'user';
+    let username = base;
+    for (let i = 0; i < 50; i++) {
+      const clash = await get('SELECT id FROM users WHERE username = ?', [username]);
+      if (!clash) break;
+      username = base + '-' + crypto.randomBytes(2).toString('hex');
+    }
+
+    const result = await run(
+      `INSERT INTO users (username, email, password, full_name, google_id, avatar_url)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [username, email, unusable, fullName || '', googleId, avatarUrl || null]
+    );
+    return { id: result.id, username, email, fullName, googleId };
+  }
+
+  // Привязка Google-аккаунта к существующему пользователю с тем же email
+  static async linkGoogle(userId, googleId, avatarUrl) {
+    await run('UPDATE users SET google_id = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?',
+      [googleId, avatarUrl || null, userId]);
+  }
+
   // Поиск пользователя по ID
   static async findById(id) {
     try {
@@ -80,7 +118,7 @@ class User {
       }
       
       if (userData.password) {
-        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        const hashedPassword = await bcrypt.hash(userData.password, 12);
         updateFields.push('password = ?');
         params.push(hashedPassword);
       }

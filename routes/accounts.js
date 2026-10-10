@@ -19,7 +19,7 @@ router.get('/', authenticate, async (req, res) => {
       const accounts = await AccountPermission.getAccessibleAccounts(req.user.id);
       res.json(accounts);
     } else {
-      const accounts = await Account.findByUserId(req.user.id);
+      const accounts = await Account.findByUserId(req.user);
       res.json({ own: accounts, shared: [], all: accounts });
     }
   } catch (error) {

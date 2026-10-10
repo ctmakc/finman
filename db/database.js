@@ -1,15 +1,23 @@
-const sqlite3 = require('sqlite3').verbose();
+// verbose() captures a stack trace per call — useful in dev, but a large
+// per-statement tax under test instrumentation. Skip it for NODE_ENV=test.
+const sqlite3 =
+  process.env.NODE_ENV === 'test'
+    ? require('sqlite3')
+    : require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const config = require('../config/config');
 
-// Путь к базе данных
-const dbPath = path.resolve(config.dbPath);
+// Путь к базе данных (":memory:" must be passed through verbatim)
+const isMemory = config.dbPath === ':memory:';
+const dbPath = isMemory ? ':memory:' : path.resolve(config.dbPath);
 
 // Создание директории для базы данных, если не существует
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)){
-  fs.mkdirSync(dbDir, { recursive: true });
+if (!isMemory) {
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
 }
 
 // Создание подключения к базе данных
@@ -1006,6 +1014,16 @@ function initDatabase() {
         db.run(sql, (err) => { if (err) console.error('Index error:', err.message); });
       }
 
+      // Migration: Google sign-in columns
+      db.run(`ALTER TABLE users ADD COLUMN google_id TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) console.error('Migration error (users.google_id):', err);
+      });
+      db.run(`ALTER TABLE users ADD COLUMN avatar_url TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) console.error('Migration error (users.avatar_url):', err);
+      });
+      db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL`,
+        (err) => { if (err) console.error('Index error (users.google_id):', err.message); });
+
       // Migration: add org_id to users if not exists
       db.run(`ALTER TABLE users ADD COLUMN org_id INTEGER REFERENCES organizations(id)`,
         (err) => {
@@ -1016,8 +1034,13 @@ function initDatabase() {
       // Migration: change default currency from RUB to USD
       // (new accounts will default to USD via application layer)
 
-      console.log('Database initialized successfully');
-      resolve();
+      // Resolve only once every statement queued above has executed.
+      // db.serialize() guarantees this final probe runs last, so its
+      // callback firing means the schema is actually ready.
+      db.get('SELECT 1', () => {
+        console.log('Database initialized successfully');
+        resolve();
+      });
     });
   });
 }

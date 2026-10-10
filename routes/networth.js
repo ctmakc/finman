@@ -2,14 +2,20 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
+async function scopeOf(req) {
+  const ids = await orgScope.scopeUserIds(req.user);
+  return { ids, ph: orgScope.placeholders(ids.length) };
+}
+
 // Получить текущий net worth
 router.get('/current', async (req, res) => {
   try {
-    const data = await calculateNetWorth(req.user.id);
+    const data = await calculateNetWorth(req.user);
     res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -35,9 +41,10 @@ router.get('/history', async (req, res) => {
         break;
     }
 
+    const { ids, ph } = await scopeOf(req);
     const snapshots = await query(
-      `SELECT * FROM networth_snapshots WHERE user_id = ? ${dateFilter} ORDER BY snapshot_date`,
-      [req.user.id]
+      `SELECT * FROM networth_snapshots WHERE user_id IN (${ph}) ${dateFilter} ORDER BY snapshot_date`,
+      ids
     );
 
     res.json(snapshots.map(s => ({
@@ -53,7 +60,7 @@ router.get('/history', async (req, res) => {
 // Создать snapshot
 router.post('/snapshot', async (req, res) => {
   try {
-    const data = await calculateNetWorth(req.user.id);
+    const data = await calculateNetWorth(req.user);
     const { notes } = req.body;
 
     const result = await run(
@@ -71,7 +78,8 @@ router.post('/snapshot', async (req, res) => {
 // Ручные активы
 router.get('/assets', async (req, res) => {
   try {
-    const assets = await query('SELECT * FROM manual_assets WHERE user_id = ? AND is_active = 1', [req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const assets = await query(`SELECT * FROM manual_assets WHERE user_id IN (${ph}) AND is_active = 1`, ids);
     res.json(assets);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -98,7 +106,8 @@ router.post('/assets', async (req, res) => {
 // Обновить актив
 router.put('/assets/:id', async (req, res) => {
   try {
-    const asset = await get('SELECT * FROM manual_assets WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const asset = await get(`SELECT * FROM manual_assets WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
     const { name, type, value, currency, purchase_date, purchase_price, description, is_active } = req.body;
@@ -117,7 +126,8 @@ router.put('/assets/:id', async (req, res) => {
 // Удалить актив
 router.delete('/assets/:id', async (req, res) => {
   try {
-    await run('DELETE FROM manual_assets WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    await run(`DELETE FROM manual_assets WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     res.json({ message: 'Asset deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -137,9 +147,12 @@ router.get('/asset-types', (req, res) => {
 });
 
 // Вспомогательная функция расчёта net worth
-async function calculateNetWorth(userId) {
-  // Счета (активы)
-  const accounts = await query('SELECT SUM(balance) as total FROM accounts WHERE user_id = ?', [userId]);
+async function calculateNetWorth(principal) {
+  const ids = await orgScope.scopeUserIds(principal);
+  const ph = orgScope.placeholders(ids.length);
+
+  // Счета (активы) — across the whole org
+  const accounts = await query(`SELECT SUM(balance) as total FROM accounts WHERE user_id IN (${ph})`, ids);
   const accountsTotal = accounts[0]?.total || 0;
 
   // Investments
@@ -147,23 +160,23 @@ async function calculateNetWorth(userId) {
     `SELECT SUM(i.quantity * i.current_price) as total
      FROM investments i
      JOIN investment_portfolios p ON i.portfolio_id = p.id
-     WHERE p.user_id = ? AND i.is_active = 1`,
-    [userId]
+     WHERE p.user_id IN (${ph}) AND i.is_active = 1`,
+    ids
   );
   const investmentsTotal = investments[0]?.total || 0;
 
   // Goals накопления
-  const goals = await query('SELECT SUM(current_amount) as total FROM savings_goals WHERE user_id = ? AND is_active = 1', [userId]);
+  const goals = await query(`SELECT SUM(current_amount) as total FROM savings_goals WHERE user_id IN (${ph}) AND is_active = 1`, ids);
   const goalsTotal = goals[0]?.total || 0;
 
   // Ручные активы
-  const manualAssets = await query('SELECT SUM(value) as total FROM manual_assets WHERE user_id = ? AND is_active = 1', [userId]);
+  const manualAssets = await query(`SELECT SUM(value) as total FROM manual_assets WHERE user_id IN (${ph}) AND is_active = 1`, ids);
   const manualTotal = manualAssets[0]?.total || 0;
 
   // Debts (обязательства)
   const debts = await query(
-    `SELECT SUM(amount - paid_amount) as total FROM debts WHERE user_id = ? AND is_active = 1 AND type IN ('i_owe', 'credit', 'mortgage', 'loan')`,
-    [userId]
+    `SELECT SUM(amount - paid_amount) as total FROM debts WHERE user_id IN (${ph}) AND is_active = 1 AND type IN ('i_owe', 'credit', 'mortgage', 'loan')`,
+    ids
   );
   const debtsTotal = debts[0]?.total || 0;
 
@@ -184,14 +197,14 @@ async function calculateNetWorth(userId) {
     liabilitiesBreakdown: {
       debts: debtsTotal
     },
-    change: await calculateChange(userId, netWorth)
+    change: await calculateChange(ids, ph, netWorth)
   };
 }
 
-async function calculateChange(userId, currentNetWorth) {
+async function calculateChange(ids, ph, currentNetWorth) {
   const lastSnapshot = await get(
-    'SELECT * FROM networth_snapshots WHERE user_id = ? ORDER BY snapshot_date DESC LIMIT 1',
-    [userId]
+    `SELECT * FROM networth_snapshots WHERE user_id IN (${ph}) ORDER BY snapshot_date DESC LIMIT 1`,
+    ids
   );
 
   if (!lastSnapshot) return { amount: 0, percent: 0 };

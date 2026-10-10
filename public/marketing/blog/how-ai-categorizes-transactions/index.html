@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Does AI Categorize Bank Transactions? (Explained)</title>
+  <meta name="description" content="A clear explanation of how AI categorizes transactions — features, learning from corrections, confidence — and where it still gets things wrong.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://finman.money/marketing/blog/how-ai-categorizes-transactions/"> <!-- nosemgrep -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="How Does AI Categorize Transactions?">
+  <meta property="og:description" content="Features, learning loops and confidence — the honest mechanics.">
+  <meta property="og:url" content="https://finman.money/marketing/blog/how-ai-categorizes-transactions/">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="stylesheet" href="/marketing/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "How Does AI Categorize Transactions?",
+    "description": "A clear explanation of how AI categorizes transactions — features, learning from corrections, confidence — and where it still gets things wrong.",
+    "author": {
+      "@type": "Organization",
+      "name": "Finman"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Finman",
+      "url": "https://finman.money"
+    },
+    "datePublished": "2026-05-16",
+    "url": "https://finman.money/marketing/blog/how-ai-categorizes-transactions/",
+    "keywords": [
+      "how does ai categorize transactions",
+      "ai transaction categorization",
+      "automatic categorization"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does AI categorize bank transactions?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "It predicts a category from features — normalised merchant name, amount and sign, recurrence pattern, account context, and your own past corrections — and updates from your corrections so similar future transactions are classified your way. This is fundamentally different from a fixed merchant-to-category lookup table."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Why does my finance app keep miscategorizing the same merchant?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Because it is likely rule-based, not learning. A real AI categorizer treats your correction as training data and stops repeating the mistake; a lookup-table app will repeat it indefinitely."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How accurate is AI transaction categorization?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "High for clear merchants and after the model has learned your corrections; weaker for generic payment processors (PayPal/Square) that mask the merchant and for genuinely ambiguous merchants. Good systems show a confidence level and flag uncertain items instead of guessing silently."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Finman learn from my corrections?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes — Finman’s categorization uses your corrections as a signal so similar future transactions are classified the way you intend, and it falls back gracefully when confidence is low."
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="/marketing/">💰 Finman</a>
+    <div class="nav-links">
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/" style="color:var(--accent);">Blog</a>
+      <a href="/marketing/compare/finman-vs-mint/">vs Mint</a>
+      <a href="/marketing/compare/finman-vs-ynab/">vs YNAB</a>
+    </div>
+    <div class="nav-cta">
+      <a href="/" class="btn btn-ghost">Log In</a>
+      <a href="/" class="btn btn-primary">Get Started Free</a>
+    </div>
+  </div>
+</nav>
+
+<div class="article-hero">
+  <div class="container">
+    <span class="article-tag">Explainer</span>
+    <h1>How Does AI Categorize Transactions?</h1>
+    <div class="article-meta">
+      <span>May 2026</span>
+      <span>6 min read</span>
+      <span>Keywords: how does ai categorize transactions, ai transaction categorization</span>
+    </div>
+  </div>
+</div>
+
+<article class="article-body">
+
+  <p>AI categorizes a transaction by predicting its category from features — the merchant string, amount, frequency, the account, and crucially your own past corrections — rather than by matching the merchant name against a fixed lookup table. The defining property of a real system is that it improves when you correct it; a fixed rule table does not.</p>
+
+  <h2>The signals a model actually uses</h2>
+
+  <ul>
+    <li><strong>Merchant string</strong> — normalised (e.g. &quot;SQ *BLUE BOTTLE&quot; → Blue Bottle), the strongest single signal.</li>
+    <li><strong>Amount and sign</strong> — a $4 debit and a $1,400 debit at the same merchant are often different categories.</li>
+    <li><strong>Recurrence</strong> — same merchant, similar amount, regular interval implies a subscription or bill.</li>
+    <li><strong>Your history</strong> — how *you* have categorized similar transactions before, which personalises the model to your life.</li>
+    <li><strong>Account context</strong> — a charge on a business card vs a personal card shifts the likely category.</li>
+  </ul>
+
+  <h2>Why &quot;learns from corrections&quot; is the test</h2>
+
+  <p>A rule-based categorizer maps strings to categories and never changes. A learning categorizer treats your correction as a labelled training signal, so the next similar transaction is classified your way. If you re-categorize the same merchant three times and it keeps getting it wrong, it is not AI — it is a lookup table with an AI label.</p>
+
+  <h2>Where it still fails</h2>
+
+  <ul>
+    <li>Generic processors (PayPal, Square) hide the real merchant, so the model is guessing from amount and history.</li>
+    <li>Ambiguous merchants that legitimately span categories (a superstore that sells groceries and electronics).</li>
+    <li>Cold start: a brand-new user with no correction history gets population-average guesses until the model personalises.</li>
+  </ul>
+
+  <p>A well-designed system handles this by exposing a <strong>confidence level</strong> and flagging low-confidence items for review rather than silently guessing — silent confident errors are worse than asking.</p>
+
+  <h2>Frequently Asked Questions</h2>
+  <h3>How does AI categorize bank transactions?</h3>
+  <p>It predicts a category from features — normalised merchant name, amount and sign, recurrence pattern, account context, and your own past corrections — and updates from your corrections so similar future transactions are classified your way. This is fundamentally different from a fixed merchant-to-category lookup table.</p>
+  <h3>Why does my finance app keep miscategorizing the same merchant?</h3>
+  <p>Because it is likely rule-based, not learning. A real AI categorizer treats your correction as training data and stops repeating the mistake; a lookup-table app will repeat it indefinitely.</p>
+  <h3>How accurate is AI transaction categorization?</h3>
+  <p>High for clear merchants and after the model has learned your corrections; weaker for generic payment processors (PayPal/Square) that mask the merchant and for genuinely ambiguous merchants. Good systems show a confidence level and flag uncertain items instead of guessing silently.</p>
+  <h3>Does Finman learn from my corrections?</h3>
+  <p>Yes — Finman’s categorization uses your corrections as a signal so similar future transactions are classified the way you intend, and it falls back gracefully when confidence is low.</p>
+
+  <div class="article-cta">
+    <h3>See categorization that actually learns</h3>
+    <p>Import a month of transactions and correct one merchant twice — watch it stick.</p>
+    <a href="/" class="btn btn-primary">Try Finman Free</a>
+  </div>
+
+  <p><strong>Related reading:</strong> <a href="/marketing/blog/ai-personal-finance-guide/">AI Personal Finance Guide</a> · <a href="/marketing/blog/best-ai-budgeting-app/">Best AI Budgeting App</a> · <a href="/marketing/blog/is-ai-safe-for-personal-finance/">Is AI Safe for Finance?</a></p>
+
+</article>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span style="font-size:20px;font-weight:800;color:#e2e8f0;">💰 Finman</span>
+      <p>Your AI-powered personal finance manager.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/">Blog</a>
+    </div>
+    <div class="footer-col">
+      <h4>More Articles</h4>
+      <a href="/marketing/blog/what-is-an-ai-cfo/">What Is an AI CFO?</a>
+      <a href="/marketing/blog/receipt-scanning-app-guide/">Receipt Scanning</a>
+      <a href="/marketing/blog/best-mint-alternatives/">Best Mint Alternatives</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© 2026 Finman. All rights reserved.</span></div>
+</footer>
+
+</body>
+</html>

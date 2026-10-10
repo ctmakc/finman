@@ -1,6 +1,7 @@
 // ==================== МОДЕЛЬ ЦЕЛЕЙ НАКОПЛЕНИЯ ====================
 
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 const SavingsGoal = {
   // Создание цели
@@ -21,11 +22,13 @@ const SavingsGoal = {
   },
 
   // Получение всех целей пользователя
-  async findByUser(userId, includeCompleted = false) {
+  async findByUser(scope, includeCompleted = false) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     const sql = includeCompleted
-      ? 'SELECT * FROM savings_goals WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC'
-      : 'SELECT * FROM savings_goals WHERE user_id = ? AND is_active = 1 AND is_completed = 0 ORDER BY created_at DESC';
-    return query(sql, [userId]);
+      ? `SELECT * FROM savings_goals WHERE user_id IN (${ph}) AND is_active = 1 ORDER BY created_at DESC`
+      : `SELECT * FROM savings_goals WHERE user_id IN (${ph}) AND is_active = 1 AND is_completed = 0 ORDER BY created_at DESC`;
+    return query(sql, ids);
   },
 
   // Обновление цели
@@ -144,8 +147,8 @@ const SavingsGoal = {
   },
 
   // Статистика по всем целям пользователя
-  async getStats(userId) {
-    const goals = await this.findByUser(userId, true);
+  async getStats(scope) {
+    const goals = await this.findByUser(scope, true);
 
     const stats = {
       totalGoals: goals.length,

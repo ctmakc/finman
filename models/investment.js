@@ -1,6 +1,7 @@
 // ==================== МОДЕЛЬ ИНВЕСТИЦИЙ ====================
 
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 const Investment = {
   // Типы активов
@@ -41,10 +42,12 @@ const Investment = {
   },
 
   // Получить портфели пользователя
-  async findPortfoliosByUser(userId) {
+  async findPortfoliosByUser(scope) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     return query(
-      'SELECT * FROM investment_portfolios WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC',
-      [userId]
+      `SELECT * FROM investment_portfolios WHERE user_id IN (${ph}) AND is_active = 1 ORDER BY created_at DESC`,
+      ids
     );
   },
 
@@ -319,8 +322,8 @@ const Investment = {
   },
 
   // Статистика пользователя
-  async getUserStats(userId) {
-    const portfolios = await this.findPortfoliosByUser(userId);
+  async getUserStats(scope) {
+    const portfolios = await this.findPortfoliosByUser(scope);
 
     let totalValue = 0;
     let totalCost = 0;

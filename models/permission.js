@@ -1,4 +1,5 @@
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 class AccountPermission {
   // Создание/обновление прав доступа к счету
@@ -90,15 +91,29 @@ class AccountPermission {
       [accountId, userId]
     );
 
-    if (!permission) return null;
+    if (permission) {
+      return {
+        isOwner: false,
+        canView: !!permission.can_view,
+        canEdit: !!permission.can_edit,
+        canDelete: !!permission.can_delete,
+        canAddTransactions: !!permission.can_add_transactions
+      };
+    }
 
-    return {
-      isOwner: false,
-      canView: !!permission.can_view,
-      canEdit: !!permission.can_edit,
-      canDelete: !!permission.can_delete,
-      canAddTransactions: !!permission.can_add_transactions
-    };
+    // Org membership grants full collaborator access to the org's accounts
+    // (consistent with org-scoped reads). Not owner, but a co-manager.
+    if (await orgScope.shareOrg(account.user_id, userId)) {
+      return {
+        isOwner: false,
+        canView: true,
+        canEdit: true,
+        canDelete: true,
+        canAddTransactions: true
+      };
+    }
+
+    return null;
   }
 
   // Проверка конкретного права
@@ -139,7 +154,7 @@ class AccountPermission {
       [userId]
     );
 
-    // Расшаренные счета
+    // Расшаренные счета (явные права ИЛИ общая организация)
     const sharedAccounts = await query(
       `SELECT a.*, 0 as is_owner, ap.can_view, ap.can_edit, ap.can_delete, ap.can_add_transactions,
               u.username as owner_username
@@ -150,10 +165,31 @@ class AccountPermission {
       [userId]
     );
 
+    const orgAccounts = await query(
+      `SELECT a.*, 0 as is_owner, 1 as can_view, 1 as can_edit, 1 as can_delete,
+              1 as can_add_transactions, u.username as owner_username
+       FROM accounts a
+       JOIN users u ON a.user_id = u.id
+       JOIN organization_members me ON me.user_id = ?
+       JOIN organization_members owner
+            ON owner.org_id = me.org_id AND owner.user_id = a.user_id
+       WHERE a.user_id != ? AND a.is_active = 1`,
+      [userId, userId]
+    );
+
+    // De-dupe: an account reachable via both explicit perm and org → once.
+    const seen = new Set(ownAccounts.map((a) => a.id));
+    const shared = [];
+    for (const acc of [...sharedAccounts, ...orgAccounts]) {
+      if (seen.has(acc.id)) continue;
+      seen.add(acc.id);
+      shared.push(acc);
+    }
+
     return {
       own: ownAccounts,
-      shared: sharedAccounts,
-      all: [...ownAccounts, ...sharedAccounts]
+      shared,
+      all: [...ownAccounts, ...shared]
     };
   }
 

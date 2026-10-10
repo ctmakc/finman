@@ -1,0 +1,8 @@
+# Semgrep ignore rules for Finman
+#
+# The html.security.audit.missing-integrity rule fires on <link rel="canonical">
+# tags because their href is an absolute https:// URL. Canonical tags are
+# metadata hints — they are never fetched as scripts/stylesheets — so SRI does
+# not apply. All actual CSS/JS assets in public/marketing/ are self-hosted
+# same-origin resources; SRI on same-origin links provides no security benefit.
+public/marketing/

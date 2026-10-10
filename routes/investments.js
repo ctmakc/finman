@@ -4,21 +4,22 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const Investment = require('../models/investment');
+const orgScope = require('../services/orgScope');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
-async function requirePortfolioOwner(portfolioId, userId) {
+async function requirePortfolioOwner(portfolioId, principal) {
   const portfolio = await Investment.findPortfolioById(portfolioId);
-  if (!portfolio || portfolio.user_id !== userId) return null;
+  if (!portfolio || !(await orgScope.inScope(portfolio.user_id, principal))) return null;
   return portfolio;
 }
 
-async function requireInvestmentOwner(investmentId, userId) {
+async function requireInvestmentOwner(investmentId, principal) {
   const inv = await Investment.findInvestmentById(investmentId);
   if (!inv) return null;
   const portfolio = await Investment.findPortfolioById(inv.portfolio_id);
-  if (!portfolio || portfolio.user_id !== userId) return null;
+  if (!portfolio || !(await orgScope.inScope(portfolio.user_id, principal))) return null;
   return inv;
 }
 
@@ -26,7 +27,7 @@ async function requireInvestmentOwner(investmentId, userId) {
 
 router.get('/portfolios', async (req, res) => {
   try {
-    const portfolios = await Investment.findPortfoliosByUser(req.user.id);
+    const portfolios = await Investment.findPortfoliosByUser(req.user);
     res.json(portfolios);
   } catch (error) {
     console.error(`Error:`, error);
@@ -36,7 +37,7 @@ router.get('/portfolios', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await Investment.getUserStats(req.user.id);
+    const stats = await Investment.getUserStats(req.user);
     res.json(stats);
   } catch (error) {
     console.error(`Error:`, error);
@@ -46,7 +47,7 @@ router.get('/stats', async (req, res) => {
 
 router.get('/portfolios/:id', async (req, res) => {
   try {
-    const portfolio = await requirePortfolioOwner(req.params.id, req.user.id);
+    const portfolio = await requirePortfolioOwner(req.params.id, req.user);
     if (!portfolio) return res.status(404).json({ message: 'Portfolio not found' });
     const stats = await Investment.calculatePortfolioValue(req.params.id);
     res.json({ ...portfolio, ...stats });
@@ -70,7 +71,7 @@ router.post('/portfolios', async (req, res) => {
 
 router.put('/portfolios/:id', async (req, res) => {
   try {
-    if (!await requirePortfolioOwner(req.params.id, req.user.id)) {
+    if (!await requirePortfolioOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Portfolio not found' });
     }
     const updated = await Investment.updatePortfolio(req.params.id, req.body);
@@ -83,7 +84,7 @@ router.put('/portfolios/:id', async (req, res) => {
 
 router.delete('/portfolios/:id', async (req, res) => {
   try {
-    if (!await requirePortfolioOwner(req.params.id, req.user.id)) {
+    if (!await requirePortfolioOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Portfolio not found' });
     }
     await Investment.deletePortfolio(req.params.id);
@@ -98,7 +99,7 @@ router.delete('/portfolios/:id', async (req, res) => {
 
 router.get('/portfolios/:id/investments', async (req, res) => {
   try {
-    if (!await requirePortfolioOwner(req.params.id, req.user.id)) {
+    if (!await requirePortfolioOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Portfolio not found' });
     }
     const investments = await Investment.findByPortfolio(req.params.id);
@@ -112,7 +113,7 @@ router.get('/portfolios/:id/investments', async (req, res) => {
 
 router.post('/portfolios/:id/investments', async (req, res) => {
   try {
-    if (!await requirePortfolioOwner(req.params.id, req.user.id)) {
+    if (!await requirePortfolioOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Portfolio not found' });
     }
     const { symbol, name, type, quantity, buy_price, currency, buy_date, notes, fee } = req.body;
@@ -129,7 +130,7 @@ router.post('/portfolios/:id/investments', async (req, res) => {
 
 router.put('/investments/:id', async (req, res) => {
   try {
-    if (!await requireInvestmentOwner(req.params.id, req.user.id)) {
+    if (!await requireInvestmentOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Investment not found' });
     }
     const updated = await Investment.updateInvestment(req.params.id, req.body);
@@ -142,7 +143,7 @@ router.put('/investments/:id', async (req, res) => {
 
 router.put('/investments/:id/price', async (req, res) => {
   try {
-    if (!await requireInvestmentOwner(req.params.id, req.user.id)) {
+    if (!await requireInvestmentOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Investment not found' });
     }
     const { price } = req.body;
@@ -157,7 +158,7 @@ router.put('/investments/:id/price', async (req, res) => {
 
 router.post('/investments/:id/sell', async (req, res) => {
   try {
-    if (!await requireInvestmentOwner(req.params.id, req.user.id)) {
+    if (!await requireInvestmentOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Investment not found' });
     }
     const { quantity, price, fee, date } = req.body;
@@ -172,7 +173,7 @@ router.post('/investments/:id/sell', async (req, res) => {
 
 router.get('/investments/:id/transactions', async (req, res) => {
   try {
-    if (!await requireInvestmentOwner(req.params.id, req.user.id)) {
+    if (!await requireInvestmentOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Investment not found' });
     }
     const transactions = await Investment.getTransactions(req.params.id);
@@ -185,7 +186,7 @@ router.get('/investments/:id/transactions', async (req, res) => {
 
 router.get('/portfolios/:id/transactions', async (req, res) => {
   try {
-    if (!await requirePortfolioOwner(req.params.id, req.user.id)) {
+    if (!await requirePortfolioOwner(req.params.id, req.user)) {
       return res.status(404).json({ message: 'Portfolio not found' });
     }
     const transactions = await Investment.getPortfolioTransactions(req.params.id);

@@ -44,6 +44,13 @@ function decryptToken(text) {
 }
 
 module.exports = {
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'https://app.finman.money/api/auth/google/callback',
+    // Where the browser lands after the callback issues a token.
+    successRedirect: process.env.GOOGLE_SUCCESS_REDIRECT || 'https://app.finman.money/',
+  },
   port: process.env.PORT || 3000,
   jwtSecret: process.env.JWT_SECRET || generateDevSecret('JWT_SECRET'),
   jwtExpiration: '24h',

@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const SavingsGoal = require('../models/savingsGoal');
+const orgScope = require('../services/orgScope');
 
 // Все маршруты требуют аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -13,7 +14,7 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
   try {
     const includeCompleted = req.query.includeCompleted === 'true';
-    const goals = await SavingsGoal.findByUser(req.user.id, includeCompleted);
+    const goals = await SavingsGoal.findByUser(req.user, includeCompleted);
     const goalsWithProgress = goals.map(g => SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(g) : g);
     res.json(goalsWithProgress);
   } catch (error) {
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
 // Stats
 router.get('/stats', async (req, res) => {
   try {
-    const goals = await SavingsGoal.findByUser(req.user.id, false);
+    const goals = await SavingsGoal.findByUser(req.user, false);
     const activeGoals = goals.length;
     const totalSaved = goals.reduce((s, g) => s + (parseFloat(g.current_amount) || 0), 0);
     const totalTarget = goals.reduce((s, g) => s + (parseFloat(g.target_amount) || 0), 0);
@@ -41,7 +42,7 @@ router.get('/stats', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
-    if (!goal || goal.user_id !== req.user.id) {
+    if (!goal || !(await orgScope.inScope(goal.user_id, req.user))) {
       return res.status(404).json({ message: 'Goal not found' });
     }
     res.json(SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(goal) : goal);
@@ -76,7 +77,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
-    if (!goal || goal.user_id !== req.user.id) {
+    if (!goal || !(await orgScope.inScope(goal.user_id, req.user))) {
       return res.status(404).json({ message: 'Goal not found' });
     }
 
@@ -92,7 +93,7 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/contribute', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
-    if (!goal || goal.user_id !== req.user.id) {
+    if (!goal || !(await orgScope.inScope(goal.user_id, req.user))) {
       return res.status(404).json({ message: 'Goal not found' });
     }
 
@@ -113,7 +114,7 @@ router.post('/:id/contribute', async (req, res) => {
 router.post('/:id/withdraw', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
-    if (!goal || goal.user_id !== req.user.id) {
+    if (!goal || !(await orgScope.inScope(goal.user_id, req.user))) {
       return res.status(404).json({ message: 'Goal not found' });
     }
 
@@ -134,7 +135,7 @@ router.post('/:id/withdraw', async (req, res) => {
 router.get('/:id/contributions', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
-    if (!goal || goal.user_id !== req.user.id) {
+    if (!goal || !(await orgScope.inScope(goal.user_id, req.user))) {
       return res.status(404).json({ message: 'Goal not found' });
     }
 
@@ -150,7 +151,7 @@ router.get('/:id/contributions', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
-    if (!goal || goal.user_id !== req.user.id) {
+    if (!goal || !(await orgScope.inScope(goal.user_id, req.user))) {
       return res.status(404).json({ message: 'Goal not found' });
     }
 

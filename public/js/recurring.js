@@ -437,7 +437,7 @@ function showAddRecurringModal(payment = null) {
 
           <div class="form-group">
             <label>Description</label>
-            <textarea id="rp-description" rows="2">${payment?.description || ''}</textarea>
+            <textarea id="rp-description" rows="2">${esc(payment?.description || '')}</textarea>
           </div>
         </form>
       </div>

@@ -11,7 +11,7 @@ const authenticate = passport.authenticate('jwt', { session: false });
 router.get('/', authenticate, async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
-    const budgets = await Budget.findByUserId(req.user.id, includeInactive);
+    const budgets = await Budget.findByUserId(req.user, includeInactive);
 
     res.json(budgets);
   } catch (error) {
@@ -27,9 +27,9 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/stats', authenticate, async (req, res) => {
   try {
     // Сначала пересчитаем потраченное
-    await Budget.recalculateSpent(req.user.id);
+    await Budget.recalculateSpent(req.user);
 
-    const stats = await Budget.getStats(req.user.id);
+    const stats = await Budget.getStats(req.user);
     res.json(stats);
   } catch (error) {
     console.error('Error fetching budget stats:', error);
@@ -44,9 +44,9 @@ router.get('/stats', authenticate, async (req, res) => {
 router.get('/active', authenticate, async (req, res) => {
   try {
     // Пересчитываем потраченное перед выдачей
-    await Budget.recalculateSpent(req.user.id);
+    await Budget.recalculateSpent(req.user);
 
-    const budgets = await Budget.getActiveBudgets(req.user.id);
+    const budgets = await Budget.getActiveBudgets(req.user);
     res.json(budgets);
   } catch (error) {
     console.error('Error fetching active budgets:', error);
@@ -60,7 +60,7 @@ router.get('/active', authenticate, async (req, res) => {
 // Получение бюджета по ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
-    const budget = await Budget.findById(req.params.id, req.user.id);
+    const budget = await Budget.findById(req.params.id, req.user);
 
     if (!budget) {
       return res.status(404).json({
@@ -132,7 +132,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const { name, category, amount, period, startDate, endDate, currency, notifyAtPercent, isActive } = req.body;
 
     // Проверка существования
-    const existingBudget = await Budget.findById(id, req.user.id);
+    const existingBudget = await Budget.findById(id, req.user);
     if (!existingBudget) {
       return res.status(404).json({ error: true, message: 'Budget not found' });
     }
@@ -142,7 +142,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
     }
 
-    const updated = await Budget.update(id, req.user.id, {
+    const updated = await Budget.update(id, req.user, {
       name: name?.trim(),
       category: category?.trim(),
       amount: amount ? parseFloat(amount) : undefined,
@@ -155,7 +155,7 @@ router.put('/:id', authenticate, async (req, res) => {
     });
 
     if (updated) {
-      const budget = await Budget.findById(id, req.user.id);
+      const budget = await Budget.findById(id, req.user);
       res.json({ success: true, budget });
     } else {
       res.status(400).json({ error: true, message: 'Failed to update budget' });
@@ -174,14 +174,14 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const budget = await Budget.findById(id, req.user.id);
+    const budget = await Budget.findById(id, req.user);
     if (!budget) {
       return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
-    await Budget.recalculateSpent(req.user.id, budget.category);
+    await Budget.recalculateSpent(req.user, budget.category);
 
-    const updatedBudget = await Budget.findById(id, req.user.id);
+    const updatedBudget = await Budget.findById(id, req.user);
 
     res.json({
       success: true,
@@ -199,9 +199,9 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
 // Пересчет всех бюджетов
 router.post('/recalculate-all', authenticate, async (req, res) => {
   try {
-    await Budget.recalculateSpent(req.user.id);
+    await Budget.recalculateSpent(req.user);
 
-    const budgets = await Budget.getActiveBudgets(req.user.id);
+    const budgets = await Budget.getActiveBudgets(req.user);
 
     res.json({
       success: true,
@@ -222,14 +222,14 @@ router.delete('/:id', authenticate, async (req, res) => {
     const { id } = req.params;
     const hardDelete = req.query.hard === 'true';
 
-    const existingBudget = await Budget.findById(id, req.user.id);
+    const existingBudget = await Budget.findById(id, req.user);
     if (!existingBudget) {
       return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
     const deleted = hardDelete
-      ? await Budget.hardDelete(id, req.user.id)
-      : await Budget.delete(id, req.user.id);
+      ? await Budget.hardDelete(id, req.user)
+      : await Budget.delete(id, req.user);
 
     if (deleted) {
       res.json({ success: true, message: 'Budget deleted' });

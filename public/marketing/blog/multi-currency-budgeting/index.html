@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Currency Budgeting — How Finman Handles Many Currencies</title>
+  <meta name="description" content="Why multi-currency budgeting breaks most apps, what conversion choices matter, and how Finman keeps a coherent picture across accounts in different currencies.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://finman.money/marketing/blog/multi-currency-budgeting/"> <!-- nosemgrep -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Multi-Currency Budgeting in Finman">
+  <meta property="og:description" content="Living between currencies turns most budgeting apps into a guessing game. Here is what actually has to work and how Finman handles it.">
+  <meta property="og:url" content="https://finman.money/marketing/blog/multi-currency-budgeting/">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="stylesheet" href="/marketing/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Multi-Currency Budgeting: Tracking Money Across Borders Without the Mess",
+    "description": "Why multi-currency budgeting breaks most apps, what conversion choices matter, and how Finman keeps a coherent picture across accounts in different currencies.",
+    "author": {
+      "@type": "Organization",
+      "name": "Finman"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Finman",
+      "url": "https://finman.money"
+    },
+    "datePublished": "2026-05-16",
+    "url": "https://finman.money/marketing/blog/multi-currency-budgeting/",
+    "keywords": [
+      "multi currency budgeting",
+      "multi currency finance app",
+      "budgeting in multiple currencies"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does multi-currency budgeting work in an app?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Proper multi-currency budgeting keeps each account and transaction in its native currency as the source of truth and converts only at the boundary where a combined view is needed — totals, net worth, or budgets that span currencies. In Finman every account carries its own currency, you pick a base currency for the unified roll-up, and converted aggregates are treated as estimates that move with exchange rates rather than fixed amounts."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Will my original transaction amounts stay exact?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Finman records each transaction in its account’s native currency without lossy up-front conversion, so the original amount is always preserved and auditable. Conversion is applied only to the combined view, never to the underlying record."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I budget across currencies without linking a bank?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Manual entry and CSV import populate accounts in any currency fully without bank linking, which matters because live aggregation coverage varies by region — multi-currency tracking still works, it just depends on you importing statements where sync is unavailable."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Finman give exchange-rate or tax advice?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Finman shows a coherent cross-currency picture and its AI CFO reasons over your real data, but converted totals are estimates and it is not an FX or tax adviser — those decisions belong to you and a professional."
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="/marketing/">💰 Finman</a>
+    <div class="nav-links">
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/" style="color:var(--accent);">Blog</a>
+      <a href="/marketing/compare/finman-vs-mint/">vs Mint</a>
+      <a href="/marketing/compare/finman-vs-ynab/">vs YNAB</a>
+    </div>
+    <div class="nav-cta">
+      <a href="/" class="btn btn-ghost">Log In</a>
+      <a href="/" class="btn btn-primary">Get Started Free</a>
+    </div>
+  </div>
+</nav>
+
+<div class="article-hero">
+  <div class="container">
+    <span class="article-tag">Feature</span>
+    <h1>Multi-Currency Budgeting: Tracking Money Across Borders Without the Mess</h1>
+    <div class="article-meta">
+      <span>May 2026</span>
+      <span>8 min read</span>
+      <span>Keywords: multi currency budgeting, multi currency finance app</span>
+    </div>
+  </div>
+</div>
+
+<article class="article-body">
+
+  <p>If you earn in one currency and spend in another — a remote worker paid in USD living in the EU, a family with accounts in two countries, someone slowly relocating — most budgeting apps quietly fall apart. They either force every account into one currency at one frozen rate, or they show you raw numbers in three currencies and leave the mental arithmetic to you at the worst possible moment.</p>
+
+  <p>Multi-currency budgeting done properly is not &quot;support for foreign symbols.&quot; It is a set of deliberate decisions about which currency a thing lives in, when conversion happens, and which rate is used. This article walks through those decisions and how Finman handles them so your budget stays one coherent picture instead of three disconnected ones.</p>
+
+  <div class="article-cta">
+    <h3>Keep one clear picture across currencies</h3>
+    <p>Finman tracks accounts in their native currency and rolls everything into a base view you choose. Free to start, no card required.</p>
+    <a href="/" class="btn btn-primary">Try Finman Free</a>
+  </div>
+
+  <h2>Why multi-currency is harder than it looks</h2>
+
+  <p>The difficulty is not the multiplication. It is that a single transaction has more than one true value depending on which question you are asking.</p>
+
+  <p>A €40 dinner charged to a USD card has at least three legitimate amounts: the €40 you actually spent, the dollar amount your bank settled at, and whatever that €40 is worth today if you are reporting net worth. An app that collapses these into one number throws away information you sometimes need.</p>
+  <p>Good multi-currency budgeting keeps the <strong>transaction in its native currency</strong> as the source of truth and converts only at the boundary where a combined view is required — a total, a budget, a net-worth roll-up. Convert too early and you can never recover the real figure; convert too late and nothing ever adds up.</p>
+
+  <h2>The decisions that define a multi-currency app</h2>
+
+  <h3>Native currency per account</h3>
+  <p>In Finman each account carries its own currency. A euro account stays in euros, a dollar account stays in dollars, and transactions inside each are recorded in that account’s currency without lossy up-front conversion. This keeps every original amount exact and auditable.</p>
+
+  <h3>A base currency for the combined view</h3>
+  <p>You choose a base currency for the unified picture — net worth, cross-account totals, budgets that span currencies. Per-account detail stays native; only the roll-up is converted, so you see both the real local figure and a coherent aggregate.</p>
+
+  <h3>Conversion is explicit, not hidden</h3>
+  <p>A converted total is an <strong>estimate that moves with exchange rates</strong>, and Finman treats it as one rather than pretending a euro balance is a fixed number of dollars. The native amounts never change; only the aggregate view re-expresses them.</p>
+
+  <h3>Budgets that survive currency boundaries</h3>
+  <p>A &quot;Groceries&quot; budget should not splinter just because you bought food in two countries this month. Finman categorizes spending consistently across accounts so a category budget reflects total behaviour, with conversion applied where the budget spans currencies.</p>
+
+  <h2>Where the AI CFO helps across currencies</h2>
+
+  <p>Cross-currency questions are exactly where generic advice is useless and grounded answers are valuable. Because Finman’s <strong>AI CFO</strong> reads your real accounts and transactions through tools, you can ask &quot;how much did I actually spend this month across all currencies?&quot; and it reasons over the native amounts and the converted roll-up rather than reciting a rule that assumes a single currency.</p>
+  <p>It can also surface the things that quietly cost cross-border users money — a subscription billed in a currency you no longer earn in, a category that looks fine locally but is heavy once converted — because it is reading your data, not a template.</p>
+
+  <h2>Honest limits</h2>
+
+  <ul>
+    <li><strong>Converted totals are estimates.</strong> They move with exchange rates and are not the price you will get if you actually move money — treat them as a coherent view, not a quote.</li>
+    <li><strong>Bank-sync coverage varies by region.</strong> For accounts in countries where live aggregation is limited, manual entry and CSV import keep multi-currency tracking fully working — it just depends on you importing statements.</li>
+    <li><strong>Finman is not an FX or tax adviser.</strong> It shows you a clear cross-currency picture; decisions about when to convert money or how it is taxed are yours, ideally with a professional.</li>
+  </ul>
+
+  <h2>A practical setup for cross-border life</h2>
+
+  <ul>
+    <li>Create each account in its real currency — do not force everything into one.</li>
+    <li>Pick the base currency you actually think in for the roll-up view.</li>
+    <li>Keep category names consistent across countries so budgets aggregate cleanly.</li>
+    <li>Use CSV import for any account in a region where live sync is unavailable.</li>
+    <li>Ask the AI CFO for a combined cross-currency spend summary monthly to catch silent leaks.</li>
+  </ul>
+
+  <h2>Frequently Asked Questions</h2>
+  <h3>How does multi-currency budgeting work in an app?</h3>
+  <p>Proper multi-currency budgeting keeps each account and transaction in its native currency as the source of truth and converts only at the boundary where a combined view is needed — totals, net worth, or budgets that span currencies. In Finman every account carries its own currency, you pick a base currency for the unified roll-up, and converted aggregates are treated as estimates that move with exchange rates rather than fixed amounts.</p>
+  <h3>Will my original transaction amounts stay exact?</h3>
+  <p>Yes. Finman records each transaction in its account’s native currency without lossy up-front conversion, so the original amount is always preserved and auditable. Conversion is applied only to the combined view, never to the underlying record.</p>
+  <h3>Can I budget across currencies without linking a bank?</h3>
+  <p>Yes. Manual entry and CSV import populate accounts in any currency fully without bank linking, which matters because live aggregation coverage varies by region — multi-currency tracking still works, it just depends on you importing statements where sync is unavailable.</p>
+  <h3>Does Finman give exchange-rate or tax advice?</h3>
+  <p>No. Finman shows a coherent cross-currency picture and its AI CFO reasons over your real data, but converted totals are estimates and it is not an FX or tax adviser — those decisions belong to you and a professional.</p>
+
+  <div class="article-cta">
+    <h3>Stop doing currency math in your head</h3>
+    <p>Add accounts in their real currencies and let Finman roll them into one clear view.</p>
+    <a href="/" class="btn btn-primary">Get Started Free</a>
+  </div>
+
+  <p><strong>Related reading:</strong> <a href="/marketing/blog/net-worth-tracker-guide/">Net Worth Tracker Guide</a> · <a href="/marketing/blog/finance-dashboard-explained/">Personal Finance Dashboard</a> · <a href="/marketing/blog/ai-personal-finance-guide/">AI Personal Finance Guide</a></p>
+
+</article>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span style="font-size:20px;font-weight:800;color:#e2e8f0;">💰 Finman</span>
+      <p>Your AI-powered personal finance manager.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/">Blog</a>
+    </div>
+    <div class="footer-col">
+      <h4>More Articles</h4>
+      <a href="/marketing/blog/bank-sync-vs-manual-entry/">Bank Sync vs Manual Entry</a>
+      <a href="/marketing/blog/subscription-tracking/">Subscription Tracking</a>
+      <a href="/marketing/blog/ai-cash-flow-forecasting/">AI Cash Flow Forecasting</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© 2026 Finman. All rights reserved.</span></div>
+</footer>
+
+</body>
+</html>

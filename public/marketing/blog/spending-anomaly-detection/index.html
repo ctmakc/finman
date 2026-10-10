@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spending Anomaly Detection — How Finman Flags Unusual Charges</title>
+  <meta name="description" content="How spending anomaly detection works: baselines, deviation, and context. What it catches, what it cannot, and how Finman surfaces unusual charges.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://finman.money/marketing/blog/spending-anomaly-detection/"> <!-- nosemgrep -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Spending Anomaly Detection in Finman">
+  <meta property="og:description" content="A duplicate charge or a quietly-tripled subscription hides in plain sight. Here is the mechanics of catching it automatically.">
+  <meta property="og:url" content="https://finman.money/marketing/blog/spending-anomaly-detection/">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="stylesheet" href="/marketing/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Spending Anomaly Detection: Catching the Charges You Would Have Missed",
+    "description": "How spending anomaly detection works: baselines, deviation, and context. What it catches, what it cannot, and how Finman surfaces unusual charges.",
+    "author": {
+      "@type": "Organization",
+      "name": "Finman"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Finman",
+      "url": "https://finman.money"
+    },
+    "datePublished": "2026-05-16",
+    "url": "https://finman.money/marketing/blog/spending-anomaly-detection/",
+    "keywords": [
+      "spending anomaly detection",
+      "unusual spending alerts",
+      "detect unusual charges"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does spending anomaly detection work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Spending anomaly detection builds a baseline of what is normal for you — per category and per recurring charge — from your transaction history, then flags transactions that depart from it: a charge far larger than usual for its category, a possible duplicate, or a recurring amount that changed without you choosing it. Finman computes these deviations from your real categorized data and uses its AI CFO to explain why each one stands out, rather than producing generic advice."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is anomaly detection the same as fraud detection?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Anomaly detection flags statistical oddities in your own spending behaviour; it is not a fraud or security system. A flagged charge may be perfectly legitimate, and an unflagged one is not certified safe — every flag is a prompt for you to review, not a verdict."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it work right away?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "It needs history to establish a baseline, so detection is weak in your first weeks and improves as your patterns build. Correcting categorizations early makes the baseline tighter and the flags more reliable."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does anomaly detection need a linked bank?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. It runs on whatever transactions are present, so manual entry and CSV import work fully — which matters because bank-sync coverage varies by region. Detection just only sees the data you have captured."
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="/marketing/">💰 Finman</a>
+    <div class="nav-links">
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/" style="color:var(--accent);">Blog</a>
+      <a href="/marketing/compare/finman-vs-mint/">vs Mint</a>
+      <a href="/marketing/compare/finman-vs-ynab/">vs YNAB</a>
+    </div>
+    <div class="nav-cta">
+      <a href="/" class="btn btn-ghost">Log In</a>
+      <a href="/" class="btn btn-primary">Get Started Free</a>
+    </div>
+  </div>
+</nav>
+
+<div class="article-hero">
+  <div class="container">
+    <span class="article-tag">Feature</span>
+    <h1>Spending Anomaly Detection: Catching the Charges You Would Have Missed</h1>
+    <div class="article-meta">
+      <span>May 2026</span>
+      <span>8 min read</span>
+      <span>Keywords: spending anomaly detection, unusual spending alerts</span>
+    </div>
+  </div>
+</div>
+
+<article class="article-body">
+
+  <p>The expensive mistakes are rarely the obvious ones. It is the subscription that crept from $9 to $19 to $29 over a year, the duplicate charge you scrolled past, the &quot;free trial&quot; that converted while you were not looking. None of these announce themselves. They just quietly become part of the noise of your statement.</p>
+
+  <p>Spending anomaly detection is the practice of pulling those quiet deviations out of the noise automatically, so you see them in days rather than discovering them a year and several hundred dollars later. This article explains what an anomaly actually is in statistical terms, how Finman decides what counts, and — just as important — what this kind of detection genuinely cannot do.</p>
+
+  <div class="article-cta">
+    <h3>Let the unusual charges find you</h3>
+    <p>Finman compares new spending against your own patterns and surfaces what does not fit. Free to start, no card required.</p>
+    <a href="/" class="btn btn-primary">Try Finman Free</a>
+  </div>
+
+  <h2>What counts as an anomaly</h2>
+
+  <p>An anomaly is not &quot;an expensive transaction.&quot; A $2,000 rent payment is not anomalous if you pay $2,000 in rent every month. An anomaly is a transaction that does not fit *your* established pattern.</p>
+
+  <p>That distinction is the entire discipline. Detection that flags every large number is useless — it trains you to ignore it within a week. Useful detection learns what normal looks like for you, per category and per merchant, and only raises a hand when something genuinely departs from it.</p>
+  <p>There are three departures worth catching: a charge that is <strong>far larger than usual for its category</strong>, a <strong>repeat of a charge</strong> that should have happened once, and a <strong>recurring amount that changed</strong> without you choosing it. Each needs a slightly different test.</p>
+
+  <h2>How Finman builds the baseline</h2>
+
+  <h3>Category-level normal</h3>
+  <p>Finman uses your categorized history — categorization that <strong>learns from your corrections</strong> — to establish a typical range for each category. &quot;Groceries&quot; has a normal weekly band; &quot;Dining&quot; has its own. A transaction far outside the band for its category is a candidate, not an automatic alarm.</p>
+
+  <h3>Recurring-amount drift</h3>
+  <p>Because Finman already tracks <strong>recurring charges and subscriptions</strong>, it knows the historical amount of each one. When a subscription that was $9 every month posts at $19, that is not a big number — it is a *changed* number, which is the more dangerous kind. Drift on a known recurring item is one of the highest-signal anomalies there is.</p>
+
+  <h3>Duplicate and near-duplicate charges</h3>
+  <p>Two charges from the same merchant for the same amount within a short window are flagged as a possible duplicate. It might be legitimate (you bought coffee twice) — the point is to put it in front of you, not to decide for you.</p>
+
+  <h3>Context from the AI CFO</h3>
+  <p>The grounded <strong>AI CFO</strong> turns a flag into a sentence you can act on. Ask &quot;anything weird this month?&quot; and it reads your real transactions and the detected deviations and explains *why* something stands out — &quot;this merchant usually charges $12, this one was $34&quot; — instead of dumping a raw list.</p>
+
+  <h2>Why grounding matters here specifically</h2>
+
+  <p>Anomaly detection is the feature most easily faked with a chatbot. A model with no access to your data can only produce generic advice — &quot;review your statements regularly.&quot; That is not detection; it is a fortune cookie.</p>
+  <p>Finman’s value is that the deviations are computed from your <strong>actual transaction history, categories and recurring records</strong>, and the language model only narrates pre-computed facts. It cannot claim a charge is unusual unless the data says so, which is exactly the property you want in software that is telling you to worry about money.</p>
+
+  <h2>What anomaly detection cannot do</h2>
+
+  <p>Being honest about the limits is what makes the alerts trustworthy when they do fire.</p>
+  <ul>
+    <li><strong>It is not fraud detection.</strong> It flags statistical oddities in your own behaviour, not criminal activity — a flagged charge may be entirely legitimate, and an unflagged one is not certified safe.</li>
+    <li><strong>It needs history.</strong> In your first weeks there is no baseline yet, so detection is weak until your patterns are established.</li>
+    <li><strong>Coverage depends on data freshness.</strong> Where bank-sync coverage is limited in your region, detection only sees what manual entry or CSV import has captured — it works fully, but only on the data present.</li>
+    <li><strong>It is a prompt to look, not a verdict.</strong> Every flag is a question for you to answer, not a decision the app has made.</li>
+  </ul>
+
+  <h2>Getting the most out of it</h2>
+
+  <ul>
+    <li>Correct miscategorized transactions early — the baseline is only as good as the categories under it.</li>
+    <li>Treat recurring-amount drift as the highest-priority flag; that is where silent money loss lives.</li>
+    <li>Ask the AI CFO for a monthly &quot;anything unusual?&quot; pass instead of waiting for a charge to surprise you.</li>
+    <li>When a flag is legitimate, dismiss it so the baseline keeps tightening.</li>
+  </ul>
+
+  <h2>Frequently Asked Questions</h2>
+  <h3>How does spending anomaly detection work?</h3>
+  <p>Spending anomaly detection builds a baseline of what is normal for you — per category and per recurring charge — from your transaction history, then flags transactions that depart from it: a charge far larger than usual for its category, a possible duplicate, or a recurring amount that changed without you choosing it. Finman computes these deviations from your real categorized data and uses its AI CFO to explain why each one stands out, rather than producing generic advice.</p>
+  <h3>Is anomaly detection the same as fraud detection?</h3>
+  <p>No. Anomaly detection flags statistical oddities in your own spending behaviour; it is not a fraud or security system. A flagged charge may be perfectly legitimate, and an unflagged one is not certified safe — every flag is a prompt for you to review, not a verdict.</p>
+  <h3>Does it work right away?</h3>
+  <p>It needs history to establish a baseline, so detection is weak in your first weeks and improves as your patterns build. Correcting categorizations early makes the baseline tighter and the flags more reliable.</p>
+  <h3>Does anomaly detection need a linked bank?</h3>
+  <p>No. It runs on whatever transactions are present, so manual entry and CSV import work fully — which matters because bank-sync coverage varies by region. Detection just only sees the data you have captured.</p>
+
+  <div class="article-cta">
+    <h3>Find the charge you would have missed</h3>
+    <p>Import a few months of history and ask Finman’s AI CFO what looks unusual.</p>
+    <a href="/" class="btn btn-primary">Get Started Free</a>
+  </div>
+
+  <p><strong>Related reading:</strong> <a href="/marketing/blog/subscription-tracking/">Subscription Tracking</a> · <a href="/marketing/blog/finance-dashboard-explained/">Personal Finance Dashboard</a> · <a href="/marketing/blog/ai-personal-finance-guide/">AI Personal Finance Guide</a></p>
+
+</article>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span style="font-size:20px;font-weight:800;color:#e2e8f0;">💰 Finman</span>
+      <p>Your AI-powered personal finance manager.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/">Blog</a>
+    </div>
+    <div class="footer-col">
+      <h4>More Articles</h4>
+      <a href="/marketing/blog/ai-cash-flow-forecasting/">AI Cash Flow Forecasting</a>
+      <a href="/marketing/blog/automatic-savings-goals/">Automatic Savings Goals</a>
+      <a href="/marketing/blog/receipt-scanning-app-guide/">Receipt Scanning Guide</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© 2026 Finman. All rights reserved.</span></div>
+</footer>
+
+</body>
+</html>

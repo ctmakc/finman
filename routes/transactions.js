@@ -90,7 +90,7 @@ router.get('/', authenticate, async (req, res) => {
     const parsedPage = Math.max(parseInt(page) || 1, 1);
 
     // Получение транзакций
-    const transactions = await Transaction.findByUserId(req.user.id, {
+    const transactions = await Transaction.findByUserId(req.user, {
       accountId,
       startDate,
       endDate,
@@ -224,8 +224,8 @@ router.post('/', authenticate, async (req, res) => {
 // Получение транзакции по ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
-    const transaction = await Transaction.findById(req.params.id, req.user.id);
-    
+    const transaction = await Transaction.findById(req.params.id, req.user);
+
     if (!transaction) {
       return res.status(404).json({ 
         error: true, 
@@ -255,16 +255,16 @@ router.put('/:id', authenticate, async (req, res) => {
     } = req.body;
     
     // Обновление транзакции
-    const success = await Transaction.update(req.params.id, req.user.id, {
+    const success = await Transaction.update(req.params.id, req.user, {
       date,
       description,
       category,
       amount,
       type
     });
-    
+
     if (success) {
-      const updatedTransaction = await Transaction.findById(req.params.id, req.user.id);
+      const updatedTransaction = await Transaction.findById(req.params.id, req.user);
       res.json(updatedTransaction);
     } else {
       res.status(404).json({ 
@@ -284,7 +284,7 @@ router.put('/:id', authenticate, async (req, res) => {
 // Удаление транзакции
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const success = await Transaction.delete(req.params.id, req.user.id);
+    const success = await Transaction.delete(req.params.id, req.user);
     
     if (success) {
       res.json({ 
@@ -377,7 +377,7 @@ router.get('/stats/summary', authenticate, async (req, res) => {
     } = req.query;
     
     // Получение статистики
-    const stats = await Transaction.getStats(req.user.id, {
+    const stats = await Transaction.getStats(req.user, {
       accountId,
       startDate,
       endDate,

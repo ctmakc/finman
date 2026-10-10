@@ -1,5 +1,8 @@
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
+// `scope` is req.user ({ id, orgId }) for org-shared access, or a bare
+// numeric user id from not-yet-migrated callers (own-data-only).
 class Account {
   // Создание счета
   static async create(accountData) {
@@ -25,28 +28,32 @@ class Account {
     }
   }
   
-  // Получение всех счетов пользователя
-  static async findByUserId(userId) {
+  // Получение всех счетов организации
+  static async findByUserId(scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const accounts = await query(
-        `SELECT * FROM accounts WHERE user_id = ? AND is_active = 1 ORDER BY name`,
-        [userId]
+        `SELECT * FROM accounts WHERE user_id IN (${ph}) AND is_active = 1 ORDER BY name`,
+        ids
       );
-      
+
       return accounts;
     } catch (error) {
       throw error;
     }
   }
-  
+
   // Получение счета по ID
-  static async findById(id, userId) {
+  static async findById(id, scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const account = await get(
-        `SELECT * FROM accounts WHERE id = ? AND user_id = ?`,
-        [id, userId]
+        `SELECT * FROM accounts WHERE id = ? AND user_id IN (${ph})`,
+        [id, ...ids]
       );
-      
+
       return account;
     } catch (error) {
       throw error;
@@ -54,8 +61,9 @@ class Account {
   }
   
   // Обновление счета
-  static async update(id, userId, accountData) {
+  static async update(id, scope, accountData) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
       let updateFields = [];
       let params = [];
       
@@ -95,46 +103,50 @@ class Account {
       }
       
       updateFields.push('updated_at = CURRENT_TIMESTAMP');
-      params.push(id);
-      params.push(userId);
-      
+      const ph = orgScope.placeholders(ids.length);
+      params.push(id, ...ids);
+
       const result = await run(
-        `UPDATE accounts SET ${updateFields.join(', ')} 
-         WHERE id = ? AND user_id = ?`,
+        `UPDATE accounts SET ${updateFields.join(', ')}
+         WHERE id = ? AND user_id IN (${ph})`,
         params
       );
-      
+
       return result.changes > 0;
     } catch (error) {
       throw error;
     }
   }
-  
+
   // Удаление счета (мягкое удаление)
-  static async delete(id, userId) {
+  static async delete(id, scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
-        `UPDATE accounts SET is_active = 0, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ? AND user_id = ?`,
-        [id, userId]
+        `UPDATE accounts SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id IN (${ph})`,
+        [id, ...ids]
       );
-      
+
       return result.changes > 0;
     } catch (error) {
       throw error;
     }
   }
-  
+
   // Обновление баланса счета
-  static async updateBalance(id, userId, amount) {
+  static async updateBalance(id, scope, amount) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
-        `UPDATE accounts 
-         SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ? AND user_id = ?`,
-        [amount, id, userId]
+        `UPDATE accounts
+         SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id IN (${ph})`,
+        [amount, id, ...ids]
       );
-      
+
       return result.changes > 0;
     } catch (error) {
       throw error;

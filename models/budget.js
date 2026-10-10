@@ -1,5 +1,8 @@
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
+// `scope` is req.user ({ id, orgId }) for org-shared access, or a bare
+// numeric user id from not-yet-migrated callers (own-data-only).
 class Budget {
   // Создание бюджета
   static async create(budgetData) {
@@ -28,13 +31,15 @@ class Budget {
   }
 
   // Получение всех бюджетов пользователя
-  static async findByUserId(userId, includeInactive = false) {
+  static async findByUserId(scope, includeInactive = false) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const sql = includeInactive
-        ? `SELECT * FROM budgets WHERE user_id = ? ORDER BY created_at DESC`
-        : `SELECT * FROM budgets WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC`;
+        ? `SELECT * FROM budgets WHERE user_id IN (${ph}) ORDER BY created_at DESC`
+        : `SELECT * FROM budgets WHERE user_id IN (${ph}) AND is_active = 1 ORDER BY created_at DESC`;
 
-      const budgets = await query(sql, [userId]);
+      const budgets = await query(sql, ids);
       return budgets.map(b => this.formatBudget(b));
     } catch (error) {
       throw error;
@@ -42,17 +47,19 @@ class Budget {
   }
 
   // Получение активных бюджетов для текущего периода
-  static async getActiveBudgets(userId) {
+  static async getActiveBudgets(scope) {
     try {
       const today = new Date().toISOString().split('T')[0];
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
 
       const budgets = await query(
         `SELECT * FROM budgets
-         WHERE user_id = ? AND is_active = 1
+         WHERE user_id IN (${ph}) AND is_active = 1
          AND start_date <= ?
          AND (end_date IS NULL OR end_date >= ?)
          ORDER BY category, name`,
-        [userId, today, today]
+        [...ids, today, today]
       );
 
       return budgets.map(b => this.formatBudget(b));
@@ -62,11 +69,13 @@ class Budget {
   }
 
   // Получение бюджета по ID
-  static async findById(id, userId) {
+  static async findById(id, scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const budget = await get(
-        `SELECT * FROM budgets WHERE id = ? AND user_id = ?`,
-        [id, userId]
+        `SELECT * FROM budgets WHERE id = ? AND user_id IN (${ph})`,
+        [id, ...ids]
       );
 
       return budget ? this.formatBudget(budget) : null;
@@ -76,16 +85,18 @@ class Budget {
   }
 
   // Получение бюджета по категории
-  static async findByCategory(userId, category) {
+  static async findByCategory(scope, category) {
     try {
       const today = new Date().toISOString().split('T')[0];
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
 
       const budget = await get(
         `SELECT * FROM budgets
-         WHERE user_id = ? AND category = ? AND is_active = 1
+         WHERE user_id IN (${ph}) AND category = ? AND is_active = 1
          AND start_date <= ?
          AND (end_date IS NULL OR end_date >= ?)`,
-        [userId, category, today, today]
+        [...ids, category, today, today]
       );
 
       return budget ? this.formatBudget(budget) : null;
@@ -124,8 +135,9 @@ class Budget {
   }
 
   // Обновление бюджета
-  static async update(id, userId, budgetData) {
+  static async update(id, scope, budgetData) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
       const updates = [];
       const params = [];
 
@@ -171,10 +183,11 @@ class Budget {
       }
 
       updates.push('updated_at = CURRENT_TIMESTAMP');
-      params.push(id, userId);
+      const ph = orgScope.placeholders(ids.length);
+      params.push(id, ...ids);
 
       const result = await run(
-        `UPDATE budgets SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
+        `UPDATE budgets SET ${updates.join(', ')} WHERE id = ? AND user_id IN (${ph})`,
         params
       );
 
@@ -185,12 +198,14 @@ class Budget {
   }
 
   // Обновление суммы потраченного
-  static async updateSpent(id, userId, spent) {
+  static async updateSpent(id, scope, spent) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
         `UPDATE budgets SET spent = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND user_id = ?`,
-        [spent, id, userId]
+         WHERE id = ? AND user_id IN (${ph})`,
+        [spent, id, ...ids]
       );
 
       return result.changes > 0;
@@ -200,12 +215,14 @@ class Budget {
   }
 
   // Добавление к потраченному
-  static async addToSpent(id, userId, amount) {
+  static async addToSpent(id, scope, amount) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
         `UPDATE budgets SET spent = spent + ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND user_id = ?`,
-        [amount, id, userId]
+         WHERE id = ? AND user_id IN (${ph})`,
+        [amount, id, ...ids]
       );
 
       return result.changes > 0;
@@ -215,37 +232,40 @@ class Budget {
   }
 
   // Пересчет потраченного на основе транзакций
-  static async recalculateSpent(userId, category = null) {
+  static async recalculateSpent(scope, category = null) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
+
       // Получаем активные бюджеты
       const budgets = category
-        ? [await this.findByCategory(userId, category)].filter(Boolean)
-        : await this.getActiveBudgets(userId);
+        ? [await this.findByCategory(scope, category)].filter(Boolean)
+        : await this.getActiveBudgets(scope);
 
       for (const budget of budgets) {
         // Определяем даты периода
         const { startDate, endDate } = this.getPeriodDates(budget);
 
-        // Считаем сумму расходов по категории за период
+        // Spend aggregates across the whole org (all member transactions).
         let sql, params;
 
         if (budget.category) {
           sql = `SELECT COALESCE(SUM(ABS(amount)), 0) as total
                  FROM transactions
-                 WHERE user_id = ? AND category = ? AND type = 'expense'
+                 WHERE user_id IN (${ph}) AND category = ? AND type = 'expense'
                  AND date >= ? AND date <= ?`;
-          params = [userId, budget.category, startDate, endDate];
+          params = [...ids, budget.category, startDate, endDate];
         } else {
           // Общий бюджет - все расходы
           sql = `SELECT COALESCE(SUM(ABS(amount)), 0) as total
                  FROM transactions
-                 WHERE user_id = ? AND type = 'expense'
+                 WHERE user_id IN (${ph}) AND type = 'expense'
                  AND date >= ? AND date <= ?`;
-          params = [userId, startDate, endDate];
+          params = [...ids, startDate, endDate];
         }
 
         const result = await get(sql, params);
-        await this.updateSpent(budget.id, userId, result.total);
+        await this.updateSpent(budget.id, scope, result.total);
       }
 
       return true;
@@ -298,12 +318,14 @@ class Budget {
   }
 
   // Удаление (деактивация) бюджета
-  static async delete(id, userId) {
+  static async delete(id, scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
         `UPDATE budgets SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND user_id = ?`,
-        [id, userId]
+         WHERE id = ? AND user_id IN (${ph})`,
+        [id, ...ids]
       );
 
       return result.changes > 0;
@@ -313,11 +335,13 @@ class Budget {
   }
 
   // Полное удаление бюджета
-  static async hardDelete(id, userId) {
+  static async hardDelete(id, scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
-        `DELETE FROM budgets WHERE id = ? AND user_id = ?`,
-        [id, userId]
+        `DELETE FROM budgets WHERE id = ? AND user_id IN (${ph})`,
+        [id, ...ids]
       );
 
       return result.changes > 0;
@@ -327,9 +351,9 @@ class Budget {
   }
 
   // Получение статистики по бюджетам
-  static async getStats(userId) {
+  static async getStats(scope) {
     try {
-      const budgets = await this.getActiveBudgets(userId);
+      const budgets = await this.getActiveBudgets(scope);
 
       const stats = {
         totalBudgets: budgets.length,
@@ -373,12 +397,14 @@ class Budget {
   }
 
   // Сброс потраченного для нового периода
-  static async resetForNewPeriod(userId, period) {
+  static async resetForNewPeriod(scope, period) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const result = await run(
         `UPDATE budgets SET spent = 0, updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = ? AND period = ? AND is_active = 1`,
-        [userId, period]
+         WHERE user_id IN (${ph}) AND period = ? AND is_active = 1`,
+        [...ids, period]
       );
 
       return result.changes;

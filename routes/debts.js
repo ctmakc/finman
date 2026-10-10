@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const Debt = require('../models/debt');
+const orgScope = require('../services/orgScope');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -12,7 +13,7 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
   try {
     const includeSettled = req.query.includeSettled === 'true';
-    const debts = await Debt.findByUser(req.user.id, includeSettled);
+    const debts = await Debt.findByUser(req.user, includeSettled);
     const debtsWithInfo = debts.map(d => Debt.calculateDebtInfo ? Debt.calculateDebtInfo(d) : d);
     res.json(debtsWithInfo);
   } catch (error) {
@@ -24,7 +25,7 @@ router.get('/', async (req, res) => {
 // Stats summary
 router.get('/stats', async (req, res) => {
   try {
-    const debts = await Debt.findByUser(req.user.id, false);
+    const debts = await Debt.findByUser(req.user, false);
     let iOwe = 0, theyOwe = 0;
     debts.forEach(d => {
       const amt = parseFloat(d.amount) || 0;
@@ -42,7 +43,7 @@ router.get('/stats', async (req, res) => {
 router.get('/upcoming', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
-    const debts = await Debt.getUpcoming(req.user.id, days);
+    const debts = await Debt.getUpcoming(req.user, days);
     res.json(debts);
   } catch (error) {
     console.error(`Error:`, error);
@@ -54,7 +55,7 @@ router.get('/upcoming', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
-    if (!debt || debt.user_id !== req.user.id) {
+    if (!debt || !(await orgScope.inScope(debt.user_id, req.user))) {
       return res.status(404).json({ message: 'Debt not found' });
     }
     res.json(Debt.calculateDebtInfo ? Debt.calculateDebtInfo(debt) : debt);
@@ -89,7 +90,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
-    if (!debt || debt.user_id !== req.user.id) {
+    if (!debt || !(await orgScope.inScope(debt.user_id, req.user))) {
       return res.status(404).json({ message: 'Debt not found' });
     }
 
@@ -105,7 +106,7 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/payment', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
-    if (!debt || debt.user_id !== req.user.id) {
+    if (!debt || !(await orgScope.inScope(debt.user_id, req.user))) {
       return res.status(404).json({ message: 'Debt not found' });
     }
 
@@ -126,7 +127,7 @@ router.post('/:id/payment', async (req, res) => {
 router.get('/:id/payments', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
-    if (!debt || debt.user_id !== req.user.id) {
+    if (!debt || !(await orgScope.inScope(debt.user_id, req.user))) {
       return res.status(404).json({ message: 'Debt not found' });
     }
 
@@ -142,7 +143,7 @@ router.get('/:id/payments', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
-    if (!debt || debt.user_id !== req.user.id) {
+    if (!debt || !(await orgScope.inScope(debt.user_id, req.user))) {
       return res.status(404).json({ message: 'Debt not found' });
     }
 

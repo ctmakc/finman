@@ -2,9 +2,32 @@ const express = require('express');
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
 const aiService = require('../services/aiService');
+const insights = require('../services/financialInsights');
 
 const router = express.Router();
 const auth = passport.authenticate('jwt', { session: false });
+
+// ─── Grounded digest + proactive alerts (org-scoped, deterministic) ───────────
+
+router.get('/digest', auth, async (req, res) => {
+  try {
+    const digest = await insights.buildDigest(req.user);
+    res.json({ digest, alerts: insights.deriveAlerts(digest) });
+  } catch (error) {
+    console.error('AI digest error:', error);
+    res.status(500).json({ error: true, message: 'Failed to build digest' });
+  }
+});
+
+router.get('/alerts', auth, async (req, res) => {
+  try {
+    const digest = await insights.buildDigest(req.user);
+    res.json({ alerts: insights.deriveAlerts(digest) });
+  } catch (error) {
+    console.error('AI alerts error:', error);
+    res.status(500).json({ error: true, message: 'Failed to build alerts' });
+  }
+});
 
 // ─── Status ───────────────────────────────────────────────────────────────────
 
@@ -151,10 +174,20 @@ router.post('/chat', auth, async (req, res) => {
     const org = await get('SELECT ai_provider, ai_model FROM organizations WHERE id = ?', [req.user.orgId]);
     const provider = org?.ai_provider || aiService.PROVIDER;
 
-    const systemPrompt = `You are a personal CFO assistant for a finance tracking app.
-You have access to the user's financial data via tools.
-Be concise, insightful, and actionable. Format numbers with currency symbols.
-Today's date: ${new Date().toISOString().slice(0, 10)}`;
+    // Ground the model in pre-computed org figures so it narrates facts
+    // instead of inventing numbers.
+    let digestBlock = '';
+    try {
+      digestBlock = insights.digestToPrompt(await insights.buildDigest(req.user));
+    } catch (e) {
+      console.error('digest grounding skipped:', e.message);
+    }
+
+    const systemPrompt = `${insights.GROUNDING_SYSTEM}
+You also have tools to fetch additional detail. Format numbers with currency symbols.
+Today's date: ${new Date().toISOString().slice(0, 10)}
+
+${digestBlock}`;
 
     let messages = [
       { role: 'system', content: systemPrompt },
@@ -324,12 +357,24 @@ router.get('/insights/monthly', auth, async (req, res) => {
 
     const dataContext = JSON.stringify({ month, totalIncome, totalSpent, spending, topExpenses, budgets });
 
+    let digestBlock = '';
+    try {
+      digestBlock = insights.digestToPrompt(await insights.buildDigest(req.user));
+    } catch (e) {
+      console.error('monthly digest grounding skipped:', e.message);
+    }
+
     const response = await aiService.chat([
       {
         role: 'user',
-        content: `You are a personal CFO. Write a brief monthly financial story (3-4 sentences) based on this data.
+        content: `${insights.GROUNDING_SYSTEM}
+Write a brief monthly financial story (3-4 sentences). Prefer the org-wide
+FINANCIAL DIGEST figures below; only use the supplementary Data for detail.
 Be specific with numbers. Highlight the most important insight. End with one actionable tip.
-Data: ${dataContext}`,
+
+${digestBlock}
+
+Supplementary data: ${dataContext}`,
       },
     ], null, provider);
 
@@ -382,11 +427,23 @@ router.get('/insights/weekly', auth, async (req, res) => {
     const totalSpent = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0);
     const totalEarned = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
 
+    let digestBlock = '';
+    try {
+      digestBlock = insights.digestToPrompt(await insights.buildDigest(req.user));
+    } catch (e) {
+      console.error('weekly digest grounding skipped:', e.message);
+    }
+
     const response = await aiService.chat([
       {
         role: 'user',
-        content: `Write a 2-3 sentence weekly spending brief. Be specific, casual, and friendly.
-Data: ${JSON.stringify({ since, totalSpent, totalEarned, dailyTotals, recentTransactions: transactions.slice(0, 10) })}`,
+        content: `${insights.GROUNDING_SYSTEM}
+Write a 2-3 sentence weekly spending brief. Be specific, casual, and friendly.
+Prefer the org-wide FINANCIAL DIGEST figures; use the week Data for recency.
+
+${digestBlock}
+
+Week data: ${JSON.stringify({ since, totalSpent, totalEarned, dailyTotals, recentTransactions: transactions.slice(0, 10) })}`,
       },
     ], null, provider);
 

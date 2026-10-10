@@ -1,5 +1,8 @@
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
+// `scope` is req.user ({ id, orgId }) for org-shared access, or a bare
+// numeric user id from not-yet-migrated callers (own-data-only).
 class RecurringPayment {
   // Создание регулярного платежа
   static async create(paymentData) {
@@ -67,59 +70,67 @@ class RecurringPayment {
   }
 
   // Получение всех платежей пользователя
-  static async findByUserId(userId, includeInactive = false) {
+  static async findByUserId(scope, includeInactive = false) {
     const activeCondition = includeInactive ? '' : 'AND rp.is_active = 1';
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
 
     return query(
       `SELECT rp.*, a.name as account_name, a.currency as account_currency
        FROM recurring_payments rp
        JOIN accounts a ON rp.account_id = a.id
-       WHERE rp.user_id = ? ${activeCondition}
+       WHERE rp.user_id IN (${ph}) ${activeCondition}
        ORDER BY rp.next_payment_date ASC`,
-      [userId]
+      ids
     );
   }
 
   // Получение платежей для напоминания (в ближайшие N дней)
-  static async getUpcoming(userId, days = 7) {
+  static async getUpcoming(scope, days = 7) {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
 
     return query(
       `SELECT rp.*, a.name as account_name, a.currency as account_currency
        FROM recurring_payments rp
        JOIN accounts a ON rp.account_id = a.id
-       WHERE rp.user_id = ?
+       WHERE rp.user_id IN (${ph})
          AND rp.is_active = 1
          AND rp.next_payment_date <= ?
          AND (rp.end_date IS NULL OR rp.end_date >= date('now'))
        ORDER BY rp.next_payment_date ASC`,
-      [userId, futureDate.toISOString().split('T')[0]]
+      [...ids, futureDate.toISOString().split('T')[0]]
     );
   }
 
   // Получение просроченных платежей
-  static async getOverdue(userId) {
+  static async getOverdue(scope) {
     const today = new Date().toISOString().split('T')[0];
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
 
     return query(
       `SELECT rp.*, a.name as account_name, a.currency as account_currency
        FROM recurring_payments rp
        JOIN accounts a ON rp.account_id = a.id
-       WHERE rp.user_id = ?
+       WHERE rp.user_id IN (${ph})
          AND rp.is_active = 1
          AND rp.next_payment_date < ?
          AND (rp.end_date IS NULL OR rp.end_date >= date('now'))
        ORDER BY rp.next_payment_date ASC`,
-      [userId, today]
+      [...ids, today]
     );
   }
 
   // Обновление платежа
-  static async update(id, userId, updateData) {
+  static async update(id, scope, updateData) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     const payment = await get(
-      `SELECT id FROM recurring_payments WHERE id = ? AND user_id = ?`,
-      [id, userId]
+      `SELECT id FROM recurring_payments WHERE id = ? AND user_id IN (${ph})`,
+      [id, ...ids]
     );
 
     if (!payment) return false;
@@ -168,10 +179,10 @@ class RecurringPayment {
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
-    values.push(id, userId);
+    values.push(id, ...ids);
 
     await run(
-      `UPDATE recurring_payments SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+      `UPDATE recurring_payments SET ${fields.join(', ')} WHERE id = ? AND user_id IN (${ph})`,
       values
     );
 
@@ -179,19 +190,23 @@ class RecurringPayment {
   }
 
   // Удаление платежа
-  static async delete(id, userId) {
+  static async delete(id, scope) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     const result = await run(
-      `DELETE FROM recurring_payments WHERE id = ? AND user_id = ?`,
-      [id, userId]
+      `DELETE FROM recurring_payments WHERE id = ? AND user_id IN (${ph})`,
+      [id, ...ids]
     );
     return result.changes > 0;
   }
 
   // Отметить платеж как выполненный и вычислить следующую дату
-  static async markAsPaid(id, userId, createTransaction = false) {
+  static async markAsPaid(id, scope, createTransaction = false) {
+    const scopeIds = await orgScope.scopeUserIds(scope);
+    const scopePh = orgScope.placeholders(scopeIds.length);
     const payment = await get(
-      `SELECT * FROM recurring_payments WHERE id = ? AND user_id = ?`,
-      [id, userId]
+      `SELECT * FROM recurring_payments WHERE id = ? AND user_id IN (${scopePh})`,
+      [id, ...scopeIds]
     );
 
     if (!payment) return { success: false, message: 'Payment not found' };
@@ -250,10 +265,12 @@ class RecurringPayment {
   }
 
   // Пропустить платеж (перенести на следующую дату)
-  static async skip(id, userId) {
+  static async skip(id, scope) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     const payment = await get(
-      `SELECT * FROM recurring_payments WHERE id = ? AND user_id = ?`,
-      [id, userId]
+      `SELECT * FROM recurring_payments WHERE id = ? AND user_id IN (${ph})`,
+      [id, ...ids]
     );
 
     if (!payment) return { success: false, message: 'Payment not found' };
@@ -344,7 +361,9 @@ class RecurringPayment {
   }
 
   // Получение статистики
-  static async getStats(userId) {
+  static async getStats(scope) {
+    const ids = await orgScope.scopeUserIds(scope);
+    const ph = orgScope.placeholders(ids.length);
     const stats = await get(
       `SELECT
          COUNT(*) as total,
@@ -352,12 +371,12 @@ class RecurringPayment {
          SUM(CASE WHEN type = 'expense' AND is_active = 1 THEN amount ELSE 0 END) as monthly_expenses,
          SUM(CASE WHEN type = 'income' AND is_active = 1 THEN amount ELSE 0 END) as monthly_income
        FROM recurring_payments
-       WHERE user_id = ?`,
-      [userId]
+       WHERE user_id IN (${ph})`,
+      ids
     );
 
-    const upcoming = await this.getUpcoming(userId, 7);
-    const overdue = await this.getOverdue(userId);
+    const upcoming = await this.getUpcoming(scope, 7);
+    const overdue = await this.getOverdue(scope);
 
     return {
       total: stats.total || 0,

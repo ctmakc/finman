@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Does Receipt Scanning Work? (Step by Step)</title>
+  <meta name="description" content="Receipt scanning works by photographing a receipt, reading it with vision AI / OCR, extracting merchant, date, total and line items, then matching it to a transaction. Here is each step.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://finman.money/marketing/blog/how-does-receipt-scanning-work/"> <!-- nosemgrep -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="How Does Receipt Scanning Work?">
+  <meta property="og:description" content="From photo to structured expense — the vision-AI pipeline explained.">
+  <meta property="og:url" content="https://finman.money/marketing/blog/how-does-receipt-scanning-work/">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="stylesheet" href="/marketing/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "How Does Receipt Scanning Work?",
+    "description": "Receipt scanning works by photographing a receipt, reading it with vision AI / OCR, extracting merchant, date, total and line items, then matching it to a transaction. Here is each step.",
+    "author": {
+      "@type": "Organization",
+      "name": "Finman"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Finman",
+      "url": "https://finman.money"
+    },
+    "datePublished": "2026-05-16",
+    "url": "https://finman.money/marketing/blog/how-does-receipt-scanning-work/",
+    "keywords": [
+      "how does receipt scanning work",
+      "receipt scanning",
+      "receipt ocr ai"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does receipt scanning work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "You photograph or upload a receipt; vision AI reads the image and extracts structured fields — merchant, date, subtotal, tax, total and line items; the app categorizes the expense and matches it to an existing transaction or creates a new one. Good apps surface the extracted values for a quick confirmation before saving."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is receipt scanning accurate?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Vision-AI receipt scanning is highly accurate for clear, well-lit receipts and far better than older OCR for crumpled or non-standard layouts. Accuracy drops on damaged, handwritten or unusual foreign receipts, so a review-before-save step matters."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does receipt scanning need an internet connection?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Most vision-AI receipt scanning runs the heavy image interpretation in the cloud, so a connection is usually needed at capture or sync time, though capture itself can often be queued offline and processed later."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does receipt scanning work in Finman?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Finman uses vision AI to read a photographed receipt, extract merchant, date and total, apply categorization that learns from your corrections, and reconcile it against existing transactions — showing the result for a quick confirm before it is recorded."
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="/marketing/">💰 Finman</a>
+    <div class="nav-links">
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/" style="color:var(--accent);">Blog</a>
+      <a href="/marketing/compare/finman-vs-mint/">vs Mint</a>
+      <a href="/marketing/compare/finman-vs-ynab/">vs YNAB</a>
+    </div>
+    <div class="nav-cta">
+      <a href="/" class="btn btn-ghost">Log In</a>
+      <a href="/" class="btn btn-primary">Get Started Free</a>
+    </div>
+  </div>
+</nav>
+
+<div class="article-hero">
+  <div class="container">
+    <span class="article-tag">Explainer</span>
+    <h1>How Does Receipt Scanning Work?</h1>
+    <div class="article-meta">
+      <span>May 2026</span>
+      <span>5 min read</span>
+      <span>Keywords: how does receipt scanning work, receipt scanning</span>
+    </div>
+  </div>
+</div>
+
+<article class="article-body">
+
+  <p>Receipt scanning works by photographing a paper or digital receipt, then using <strong>vision AI</strong> (a model that reads images, more capable than classic OCR) to extract the merchant, date, total, tax and often individual line items into structured fields. The app then categorizes the expense and, where possible, matches it to an existing transaction so it is not double-counted.</p>
+
+  <h2>The pipeline, step by step</h2>
+
+  <ul>
+    <li><strong>Capture</strong> — you photograph the receipt or upload an image/PDF. Lighting and a flat surface matter for accuracy.</li>
+    <li><strong>Read</strong> — a vision model interprets the layout and text, including faded or curled receipts, instead of relying on rigid OCR patterns.</li>
+    <li><strong>Extract</strong> — it pulls structured fields: merchant, date, subtotal, tax, total, and line items where legible.</li>
+    <li><strong>Categorize</strong> — the merchant and items are mapped to a spending category, ideally one that learns from your past corrections.</li>
+    <li><strong>Match or create</strong> — the expense is reconciled against an existing transaction (so a card charge and its receipt are one record), or logged as a new one.</li>
+  </ul>
+
+  <h2>Why vision AI beats classic OCR</h2>
+
+  <p>Traditional OCR reads characters but does not understand a receipt as a document — it struggles when the layout shifts, the paper is crumpled, or the total is not where it &quot;expects&quot;. A vision model reasons about the whole image: it knows which number is the total versus the tax versus the loyalty points, even on an unfamiliar format. That is why modern receipt capture is materially more reliable than the OCR apps of a few years ago.</p>
+
+  <h2>Where it still needs you</h2>
+
+  <p>Severely damaged receipts, handwritten amounts, and unusual foreign formats can still produce errors, so a good app shows the extracted values for a quick confirm rather than saving silently. In Finman, receipt capture uses vision AI to pull merchant, date and total, applies your learned categorization, and surfaces the result for review before it lands in your records.</p>
+
+  <h2>Frequently Asked Questions</h2>
+  <h3>How does receipt scanning work?</h3>
+  <p>You photograph or upload a receipt; vision AI reads the image and extracts structured fields — merchant, date, subtotal, tax, total and line items; the app categorizes the expense and matches it to an existing transaction or creates a new one. Good apps surface the extracted values for a quick confirmation before saving.</p>
+  <h3>Is receipt scanning accurate?</h3>
+  <p>Vision-AI receipt scanning is highly accurate for clear, well-lit receipts and far better than older OCR for crumpled or non-standard layouts. Accuracy drops on damaged, handwritten or unusual foreign receipts, so a review-before-save step matters.</p>
+  <h3>Does receipt scanning need an internet connection?</h3>
+  <p>Most vision-AI receipt scanning runs the heavy image interpretation in the cloud, so a connection is usually needed at capture or sync time, though capture itself can often be queued offline and processed later.</p>
+  <h3>How does receipt scanning work in Finman?</h3>
+  <p>Finman uses vision AI to read a photographed receipt, extract merchant, date and total, apply categorization that learns from your corrections, and reconcile it against existing transactions — showing the result for a quick confirm before it is recorded.</p>
+
+  <div class="article-cta">
+    <h3>Snap a receipt, skip the typing</h3>
+    <p>Capture a receipt with Finman and watch vision AI turn it into a clean expense.</p>
+    <a href="/" class="btn btn-primary">Try Finman Free</a>
+  </div>
+
+  <p><strong>Related reading:</strong> <a href="/marketing/blog/receipt-scanning-app-guide/">Receipt Scanning Guide</a> · <a href="/marketing/blog/how-ai-categorizes-transactions/">How AI Categorizes</a> · <a href="/marketing/blog/what-is-an-ai-cfo/">What Is an AI CFO?</a></p>
+
+</article>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span style="font-size:20px;font-weight:800;color:#e2e8f0;">💰 Finman</span>
+      <p>Your AI-powered personal finance manager.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="/marketing/features/">Features</a>
+      <a href="/marketing/blog/">Blog</a>
+    </div>
+    <div class="footer-col">
+      <h4>More Articles</h4>
+      <a href="/marketing/blog/ai-personal-finance-guide/">AI Personal Finance</a>
+      <a href="/marketing/blog/subscription-tracking/">Subscription Tracking</a>
+      <a href="/marketing/blog/is-my-financial-data-private-with-ai/">AI Data Privacy</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© 2026 Finman. All rights reserved.</span></div>
+</footer>
+
+</body>
+</html>

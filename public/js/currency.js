@@ -529,7 +529,7 @@ async function loadTags() {
       <div class="tags-grid">
         ${tags.map(tag => `
           <div class="tag-card" data-tag-id="${tag.id}">
-            <div class="tag-color" style="background-color: ${tag.color}"></div>
+            <div class="tag-color" style="background-color: ${esc(tag.color)}"></div>
             <div class="tag-info">
               <h4>${escapeHtml(tag.name)}</h4>
               <span class="tag-usage">${tag.usage_count || 0} transactions</span>
@@ -701,7 +701,7 @@ async function showTagStats(tagId) {
       <div class="modal">
         <div class="modal-header">
           <h2 class="modal-title">
-            <span class="tag-badge" style="background-color: ${tag.color}">${escapeHtml(tag.name)}</span>
+            <span class="tag-badge" style="background-color: ${esc(tag.color)}">${escapeHtml(tag.name)}</span>
             Statistics
           </h2>
           <button class="modal-close">&times;</button>
@@ -778,7 +778,7 @@ async function renderTagSelector(transactionId, containerId) {
       <label class="form-label">Tags</label>
       <div class="selected-tags" id="selected-tags-${containerId}">
         ${selectedTags.map(t => `
-          <span class="tag-badge" style="background-color: ${t.color}" data-tag-id="${t.id}">
+          <span class="tag-badge" style="background-color: ${esc(t.color)}" data-tag-id="${t.id}">
             ${escapeHtml(t.name)}
             <button type="button" class="tag-remove" onclick="removeTagFromSelector(${t.id}, '${containerId}')">&times;</button>
           </span>
@@ -790,7 +790,7 @@ async function renderTagSelector(transactionId, containerId) {
         <div class="tag-options hidden" id="tag-options-${containerId}">
           ${tags.filter(t => !selectedIds.includes(t.id)).map(t => `
             <div class="tag-option" data-tag-id="${t.id}" onclick="addTagToSelector(${t.id}, '${containerId}')">
-              <span class="tag-color-dot" style="background-color: ${t.color}"></span>
+              <span class="tag-color-dot" style="background-color: ${esc(t.color)}"></span>
               ${escapeHtml(t.name)}
             </div>
           `).join('')}

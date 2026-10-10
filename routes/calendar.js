@@ -2,22 +2,29 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const orgScope = require('../services/orgScope');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+async function scopeOf(req) {
+  const ids = await orgScope.scopeUserIds(req.user);
+  return { ids, ph: orgScope.placeholders(ids.length) };
+}
 
 // Получить события за период
 router.get('/events', async (req, res) => {
   try {
     const { start, end, type } = req.query;
 
+    const { ids, ph } = await scopeOf(req);
     const typeFilter = type ? 'AND event_type = ?' : '';
-    const baseParams = type ? [req.user.id, start, end, type] : [req.user.id, start, end];
+    const baseParams = type ? [...ids, start, end, type] : [...ids, start, end];
 
     // Пользовательские события
     const events = await query(
       `SELECT * FROM calendar_events
-       WHERE user_id = ? AND event_date >= ? AND event_date <= ? ${typeFilter}
+       WHERE user_id IN (${ph}) AND event_date >= ? AND event_date <= ? ${typeFilter}
        ORDER BY event_date`,
       baseParams
     );
@@ -26,32 +33,32 @@ router.get('/events', async (req, res) => {
     const recurring = await query(
       `SELECT id, name as title, amount, 'recurring' as event_type, next_payment_date as event_date, '#FF9800' as color
        FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
-      [req.user.id, start, end]
+       WHERE user_id IN (${ph}) AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
+      [...ids, start, end]
     );
 
     // Subscriptions
     const subscriptions = await query(
       `SELECT id, name as title, amount, 'subscription' as event_type, next_billing_date as event_date, color
        FROM subscriptions
-       WHERE user_id = ? AND is_active = 1 AND next_billing_date >= ? AND next_billing_date <= ?`,
-      [req.user.id, start, end]
+       WHERE user_id IN (${ph}) AND is_active = 1 AND next_billing_date >= ? AND next_billing_date <= ?`,
+      [...ids, start, end]
     );
 
     // Сроки долгов
     const debts = await query(
       `SELECT id, name as title, (amount - paid_amount) as amount, 'debt' as event_type, due_date as event_date, '#F44336' as color
        FROM debts
-       WHERE user_id = ? AND is_active = 1 AND is_paid = 0 AND due_date >= ? AND due_date <= ?`,
-      [req.user.id, start, end]
+       WHERE user_id IN (${ph}) AND is_active = 1 AND is_paid = 0 AND due_date >= ? AND due_date <= ?`,
+      [...ids, start, end]
     );
 
     // Goals
     const goals = await query(
       `SELECT id, name as title, target_amount as amount, 'goal' as event_type, target_date as event_date, color
        FROM savings_goals
-       WHERE user_id = ? AND is_active = 1 AND is_completed = 0 AND target_date >= ? AND target_date <= ?`,
-      [req.user.id, start, end]
+       WHERE user_id IN (${ph}) AND is_active = 1 AND is_completed = 0 AND target_date >= ? AND target_date <= ?`,
+      [...ids, start, end]
     );
 
     const allEvents = [
@@ -74,25 +81,26 @@ router.get('/upcoming', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    const { ids, ph } = await scopeOf(req);
     const events = await query(
       `SELECT * FROM calendar_events
-       WHERE user_id = ? AND event_date >= ? AND event_date <= ? AND is_completed = 0
+       WHERE user_id IN (${ph}) AND event_date >= ? AND event_date <= ? AND is_completed = 0
        ORDER BY event_date LIMIT 10`,
-      [req.user.id, today, weekLater]
+      [...ids, today, weekLater]
     );
 
     const recurring = await query(
       `SELECT id, name as title, amount, type, 'recurring' as event_type, next_payment_date as event_date
        FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
-      [req.user.id, today, weekLater]
+       WHERE user_id IN (${ph}) AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
+      [...ids, today, weekLater]
     );
 
     const subscriptions = await query(
       `SELECT id, name as title, amount, 'subscription' as event_type, next_billing_date as event_date
        FROM subscriptions
-       WHERE user_id = ? AND is_active = 1 AND next_billing_date >= ? AND next_billing_date <= ?`,
-      [req.user.id, today, weekLater]
+       WHERE user_id IN (${ph}) AND is_active = 1 AND next_billing_date >= ? AND next_billing_date <= ?`,
+      [...ids, today, weekLater]
     );
 
     const all = [...events, ...recurring, ...subscriptions]
@@ -125,7 +133,8 @@ router.post('/events', async (req, res) => {
 // Обновить событие
 router.put('/events/:id', async (req, res) => {
   try {
-    const event = await get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    const event = await get(`SELECT * FROM calendar_events WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     if (!event) return res.status(404).json({ message: 'Event not found' });
 
     const { title, description, event_type, amount, currency, event_date, end_date, is_recurring, recurrence_rule, reminder_enabled, reminder_days, color, is_completed } = req.body;
@@ -144,9 +153,10 @@ router.put('/events/:id', async (req, res) => {
 // Отметить выполненным
 router.post('/events/:id/complete', async (req, res) => {
   try {
+    const { ids, ph } = await scopeOf(req);
     await run(
-      'UPDATE calendar_events SET is_completed = 1, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      `UPDATE calendar_events SET is_completed = 1, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id IN (${ph})`,
+      [req.params.id, ...ids]
     );
     res.json({ message: 'Event completed' });
   } catch (error) {
@@ -157,7 +167,8 @@ router.post('/events/:id/complete', async (req, res) => {
 // Удалить событие
 router.delete('/events/:id', async (req, res) => {
   try {
-    await run('DELETE FROM calendar_events WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { ids, ph } = await scopeOf(req);
+    await run(`DELETE FROM calendar_events WHERE id = ? AND user_id IN (${ph})`, [req.params.id, ...ids]);
     res.json({ message: 'Event deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

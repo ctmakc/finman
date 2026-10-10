@@ -1,6 +1,16 @@
 const { query, get, run } = require('../db/database');
 const Account = require('./account');
+const orgScope = require('../services/orgScope');
 
+// Builds the scope passed to Account balance updates: org-aware when an
+// orgId is supplied (member acting on a shared account), else legacy
+// own-account behavior.
+function balanceScope(data) {
+  return data.orgId ? { id: data.userId, orgId: data.orgId } : data.userId;
+}
+
+// `scope` is req.user ({ id, orgId }) for org-shared access, or a bare
+// numeric user id from not-yet-migrated callers (own-data-only).
 class Transaction {
   // Создание транзакции
   static async create(transactionData) {
@@ -26,14 +36,14 @@ class Transaction {
       
       // Обновить баланс счета
       await Account.updateBalance(
-        transactionData.accountId, 
-        transactionData.userId, 
+        transactionData.accountId,
+        balanceScope(transactionData),
         transactionData.amount
       );
-      
+
       // Завершить транзакцию
       await run('COMMIT');
-      
+
       return { id: result.id, ...transactionData };
     } catch (error) {
       // Откатить транзакцию в случае ошибки
@@ -71,8 +81,8 @@ class Transaction {
         // Обновить баланс счета (только если транзакция новая)
         if (!transaction.skipBalanceUpdate) {
           await Account.updateBalance(
-            transaction.accountId, 
-            transaction.userId, 
+            transaction.accountId,
+            balanceScope(transaction),
             transaction.amount
           );
         }
@@ -92,7 +102,7 @@ class Transaction {
   }
   
   // Получение транзакций пользователя (с фильтрацией и пагинацией)
-  static async findByUserId(userId, options = {}) {
+  static async findByUserId(scope, options = {}) {
     try {
       const {
         accountId,
@@ -108,15 +118,18 @@ class Transaction {
         sortBy = 'date',
         sortOrder = 'DESC'
       } = options;
-      
+
+      const scopeIds = await orgScope.scopeUserIds(scope);
+      const scopePh = orgScope.placeholders(scopeIds.length);
+
       let sql = `
         SELECT t.*, a.name as account_name
         FROM transactions t
         JOIN accounts a ON t.account_id = a.id
-        WHERE t.user_id = ?
+        WHERE t.user_id IN (${scopePh})
       `;
-      
-      const params = [userId];
+
+      const params = [...scopeIds];
       
       // Фильтрация по счету
       if (accountId) {
@@ -190,27 +203,29 @@ class Transaction {
   }
   
   // Получение транзакции по ID
-  static async findById(id, userId) {
+  static async findById(id, scope) {
     try {
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
       const transaction = await get(
         `SELECT t.*, a.name as account_name
          FROM transactions t
          JOIN accounts a ON t.account_id = a.id
-         WHERE t.id = ? AND t.user_id = ?`,
-        [id, userId]
+         WHERE t.id = ? AND t.user_id IN (${ph})`,
+        [id, ...ids]
       );
-      
+
       return transaction;
     } catch (error) {
       throw error;
     }
   }
-  
+
   // Обновление транзакции
-  static async update(id, userId, transactionData) {
+  static async update(id, scope, transactionData) {
     try {
       // Получить текущую транзакцию
-      const currentTransaction = await this.findById(id, userId);
+      const currentTransaction = await this.findById(id, scope);
       
       if (!currentTransaction) {
         throw new Error('Transaction not found');
@@ -256,22 +271,23 @@ class Transaction {
       }
       
       updateFields.push('updated_at = CURRENT_TIMESTAMP');
-      params.push(id);
-      params.push(userId);
-      
+      const scopeIds = await orgScope.scopeUserIds(scope);
+      const scopePh = orgScope.placeholders(scopeIds.length);
+      params.push(id, ...scopeIds);
+
       // Обновить транзакцию
       const result = await run(
-        `UPDATE transactions 
-         SET ${updateFields.join(', ')} 
-         WHERE id = ? AND user_id = ?`,
+        `UPDATE transactions
+         SET ${updateFields.join(', ')}
+         WHERE id = ? AND user_id IN (${scopePh})`,
         params
       );
-      
+
       // Обновить баланс счета, если сумма изменилась
       if (balanceDifference !== 0) {
         await Account.updateBalance(
           currentTransaction.account_id,
-          userId,
+          scope,
           balanceDifference
         );
       }
@@ -288,28 +304,31 @@ class Transaction {
   }
   
   // Удаление транзакции
-  static async delete(id, userId) {
+  static async delete(id, scope) {
     try {
       // Получить транзакцию для обновления баланса
-      const transaction = await this.findById(id, userId);
-      
+      const transaction = await this.findById(id, scope);
+
       if (!transaction) {
         throw new Error('Transaction not found');
       }
-      
+
+      const ids = await orgScope.scopeUserIds(scope);
+      const ph = orgScope.placeholders(ids.length);
+
       // Начать транзакцию
       await run('BEGIN TRANSACTION');
-      
+
       // Удалить транзакцию
       const result = await run(
-        `DELETE FROM transactions WHERE id = ? AND user_id = ?`,
-        [id, userId]
+        `DELETE FROM transactions WHERE id = ? AND user_id IN (${ph})`,
+        [id, ...ids]
       );
-      
+
       // Обновить баланс счета (вычесть сумму транзакции)
       await Account.updateBalance(
         transaction.account_id,
-        userId,
+        scope,
         -transaction.amount
       );
       
@@ -325,7 +344,7 @@ class Transaction {
   }
   
   // Получение статистики по транзакциям
-  static async getStats(userId, options = {}) {
+  static async getStats(scope, options = {}) {
     try {
       const {
         accountId,
@@ -333,12 +352,15 @@ class Transaction {
         endDate,
         groupBy = 'month' // 'day', 'month', 'year', 'category'
       } = options;
-      
+
+      const scopeIds = await orgScope.scopeUserIds(scope);
+      const scopePh = orgScope.placeholders(scopeIds.length);
+
       let sql = '';
-      const params = [userId];
-      
+      const params = [...scopeIds];
+
       // Базовые условия фильтрации
-      let whereClause = 'WHERE t.user_id = ?';
+      let whereClause = `WHERE t.user_id IN (${scopePh})`;
       
       if (accountId) {
         whereClause += ' AND t.account_id = ?';
@@ -371,18 +393,12 @@ class Transaction {
       } 
       // Статистика по датам (день, месяц, год)
       else {
-        let dateFormat = '';
-        
-        if (groupBy === 'day') {
-          dateFormat = '%Y-%m-%d';
-        } else if (groupBy === 'month') {
-          dateFormat = '%Y-%m';
-        } else if (groupBy === 'year') {
-          dateFormat = '%Y';
-        }
-        
+        // Allowlist map — never interpolate caller input into SQL.
+        const DATE_FORMATS = { day: '%Y-%m-%d', month: '%Y-%m', year: '%Y' };
+        const dateFormat = DATE_FORMATS[groupBy] || DATE_FORMATS.month;
+
         sql = `
-          SELECT 
+          SELECT
             strftime('${dateFormat}', t.date) as period,
             t.type,
             SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,

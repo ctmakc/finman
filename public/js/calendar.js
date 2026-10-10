@@ -53,7 +53,7 @@ const CalendarModule = {
 
       html += `<div class="calendar-day ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-events' : ''}" onclick="CalendarModule.showDayEvents('${dateStr}')">
         <span class="day-number">${day}</span>
-        ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${e.color || '#5D5CDE'}" title="${esc(e.title)}"></div>`).join('')}
+        ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${esc(e.color || '#5D5CDE')}" title="${esc(e.title)}"></div>`).join('')}
         ${dayEvents.length > 3 ? `<small>+${dayEvents.length - 3}</small>` : ''}
       </div>`;
     }
@@ -82,7 +82,7 @@ const CalendarModule = {
       const typeIcons = { payment: '💳', income: '💰', reminder: '🔔', goal: '🎯', debt: '📋', subscription: '📦', recurring: '🔄' };
 
       container.innerHTML = upcoming.map(e => `
-        <div class="upcoming-item" style="border-left: 3px solid ${e.color || '#5D5CDE'}">
+        <div class="upcoming-item" style="border-left: 3px solid ${esc(e.color || '#5D5CDE')}">
           <span class="event-icon">${typeIcons[e.event_type] || '📅'}</span>
           <div class="event-info"><strong>${esc(e.title)}</strong><small>${esc(e.event_date)}</small></div>
           ${e.amount ? `<span class="event-amount">${e.amount.toLocaleString()} $</span>` : ''}
