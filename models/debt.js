@@ -202,7 +202,7 @@ const Debt = {
       }
     }
 
-    const payDate = paymentDate || new Date().toISOString().split('T')[0];
+    const payDate = paymentDate || dates.todayISO();
 
     // Добавляем запись о платеже
     await run(

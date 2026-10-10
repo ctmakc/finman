@@ -261,6 +261,7 @@ router.get('/goal/:id', async (req, res) => {
     if (!goal) {
       return res.status(404).json({ message: 'Цель не найдена' });
     }
+    const todayStr = dates.todayISO(dates.userTz(req.user));
 
     // История пополнений. В goal_contributions нет колонки date — есть created_at.
     const contributions = await query(
@@ -274,7 +275,7 @@ router.get('/goal/:id', async (req, res) => {
     if (contributions.length < 2) {
       // Недостаточно данных
       const daysToTarget = goal.target_date
-        ? Math.ceil((new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24))
+        ? dates.diffDays(todayStr, String(goal.target_date).slice(0, 10))
         : null;
 
       return res.json({
@@ -298,15 +299,13 @@ router.get('/goal/:id', async (req, res) => {
 
     // Прогноз даты достижения
     const daysNeeded = avgDaily > 0 ? Math.ceil(remaining / avgDaily) : null;
-    const projectedDate = daysNeeded
-      ? new Date(Date.now() + daysNeeded * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      : null;
+    const projectedDate = daysNeeded ? dates.addDaysISO(todayStr, daysNeeded) : null;
 
     // Проверка, успеваем ли к целевой дате
     let onTrack = null;
     let requiredDaily = null;
     if (goal.target_date) {
-      const daysToTarget = Math.ceil((new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24));
+      const daysToTarget = dates.diffDays(todayStr, String(goal.target_date).slice(0, 10));
       requiredDaily = daysToTarget > 0 ? remaining / daysToTarget : remaining;
       onTrack = avgDaily >= requiredDaily;
     }
@@ -337,6 +336,7 @@ router.get('/debt/:id', async (req, res) => {
     if (!debt) {
       return res.status(404).json({ message: 'Долг не найден' });
     }
+    const todayStr = dates.todayISO(dates.userTz(req.user));
 
     const remaining = debt.amount - debt.paid_amount;
 
@@ -364,9 +364,7 @@ router.get('/debt/:id', async (req, res) => {
     const avgDaily = debt.paid_amount / daysPassed;
 
     const daysNeeded = avgDaily > 0 ? Math.ceil(remaining / avgDaily) : null;
-    const projectedDate = daysNeeded
-      ? new Date(Date.now() + daysNeeded * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      : null;
+    const projectedDate = daysNeeded ? dates.addDaysISO(todayStr, daysNeeded) : null;
 
     res.json({
       debt,

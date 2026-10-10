@@ -160,7 +160,7 @@ router.get('/:type/data', async (req, res, next) => {
         data = await getRecentData(req.user.id);
         break;
       case 'chart_expenses':
-        data = await getChartExpensesData(req.user.id);
+        data = await getChartExpensesData(req.user.id, dates.userTz(req.user));
         break;
       case 'chart_balance':
         data = await getChartBalanceData(req.user.id);
@@ -538,13 +538,12 @@ async function getRecentData(userId) {
   return { transactions };
 }
 
-async function getChartExpensesData(userId) {
+async function getChartExpensesData(userId, tz) {
   const data = [];
+  const thisMonthStart = dates.startOfMonthISO(dates.todayISO(tz));
   for (let i = 5; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const start = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+    const start = dates.addMonthsISO(thisMonthStart, -i, 1);
+    const end = dates.endOfMonthISO(start);
 
     const result = await get(
       `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,

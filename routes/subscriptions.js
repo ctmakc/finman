@@ -141,14 +141,14 @@ router.post('/:id/payment', async (req, res) => {
     if (!sub) return res.status(404).json({ message: 'Подписка не найдена' });
 
     const { amount, payment_date, transaction_id } = req.body;
+    const todayStr = dates.todayISO(dates.userTz(req.user));
 
     await run(
       'INSERT INTO subscription_payments (subscription_id, amount, payment_date, transaction_id) VALUES (?, ?, ?, ?)',
-      [req.params.id, amount || sub.amount, payment_date || new Date().toISOString().split('T')[0], transaction_id]
+      [req.params.id, amount || sub.amount, payment_date || todayStr, transaction_id]
     );
 
-    // Обновить следующую дату оплаты
-    const todayStr = dates.todayISO(dates.userTz(req.user));
+    // Обновить следующую дату оплаты: дата оплаты + цикл, но не раньше сегодня.
     const nextBilling = Subscription.nextAfterPayment(payment_date || todayStr, sub.billing_cycle, todayStr);
     await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
 

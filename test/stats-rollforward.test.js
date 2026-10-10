@@ -67,6 +67,33 @@ describe('subscriptions: next_billing_date rolls forward', () => {
     expect(m.daysUntilBilling).toBeLessThan(0);
   });
 
+  test('POST /:id/payment -> 200, next_billing_date = оплата + цикл (не раньше сегодня)', async () => {
+    const created = await ctx.request
+      .post('/api/subscriptions')
+      .set(AUTH(ctx.token))
+      .send({ name: 'Paid one', amount: 9, billing_cycle: 'monthly', start_date: '2024-03-05' });
+    expect(created.status).toBe(201);
+    const res = await ctx.request
+      .post(`/api/subscriptions/${created.body.id}/payment`)
+      .set(AUTH(ctx.token))
+      .send({ amount: 9 });
+    expect(res.status).toBe(200);
+    const row = await db.get(`SELECT next_billing_date FROM subscriptions WHERE id = ?`, [created.body.id]);
+    expect(row.next_billing_date > today).toBe(true);
+    expect(row.next_billing_date).toBe(dates.rollForward(dates.addMonthsISO(today, 1), 'monthly', today));
+    const pay = await db.get(`SELECT payment_date FROM subscription_payments WHERE subscription_id = ?`, [created.body.id]);
+    expect(pay.payment_date).toBe(today);
+    // Старая дата оплаты -> следующая всё равно >= сегодня.
+    const old = await ctx.request
+      .post(`/api/subscriptions/${created.body.id}/payment`)
+      .set(AUTH(ctx.token))
+      .send({ amount: 9, payment_date: '2024-04-05' });
+    expect(old.status).toBe(200);
+    const row2 = await db.get(`SELECT next_billing_date FROM subscriptions WHERE id = ?`, [created.body.id]);
+    expect(row2.next_billing_date >= today).toBe(true);
+    expect(row2.next_billing_date.slice(8, 10)).toBe('05');
+  });
+
   test('billingInfo: сегодня -> 0 дней / isDueToday', () => {
     const Subscription = require('../models/subscription');
     expect(Subscription.billingInfo({ next_billing_date: today }, today)).toEqual({ daysUntilBilling: 0, isDueToday: true, isOverdue: false });
