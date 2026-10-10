@@ -15,12 +15,27 @@ optional AI assistant and Stripe-based subscription tiers.
 ```bash
 cp .env.example .env          # then edit: set JWT_SECRET / SESSION_SECRET / ENCRYPTION_KEY
 docker compose up -d --build  # build image + start detached
-curl http://localhost:3000/api/health
+curl http://127.0.0.1:3011/api/health
 ```
 
-The SQLite database is stored on the named Docker volume **`finman-data`**
-(mounted at `/app/data`), so it survives restarts, `docker compose down`, and
-image rebuilds.
+The container is named `finman`, listens on 3000 inside and is bound to
+**`127.0.0.1:3011`** on the host (a reverse proxy such as Caddy fronts it; the
+port is never exposed publicly). The SQLite database `finman.db` is stored on
+the named Docker volume **`finman-data`** (mounted at `/app/data`), so it
+survives restarts, `docker compose down`, and image rebuilds. The entrypoint
+chowns that directory to uid 1000 at start and drops to the `node` user, so a
+root-owned volume from an older image keeps working.
+
+Backups (online snapshot via `sqlite3 .backup` or `VACUUM INTO`, newest 14 kept
+under `/app/data/backups/`):
+
+```bash
+docker exec finman /app/scripts/backup-db.sh
+# host crontab — nightly at 03:15:
+# 15 3 * * * docker exec finman /app/scripts/backup-db.sh >> /var/log/finman-backup.log 2>&1
+```
+
+See `DEPLOY.md` for the staging deploy and the production cutover procedure.
 
 One-liner build + deploy + smoke test:
 
@@ -61,8 +76,9 @@ development they auto-generate (with a warning).
 | `JWT_SECRET` | **prod** | Signing secret for Passport-JWT auth tokens. |
 | `SESSION_SECRET` | **prod** | `express-session` cookie secret. |
 | `ENCRYPTION_KEY` | **prod** | AES-256 key (64 hex chars) for encrypting stored bank tokens. |
-| `DATABASE_PATH` | no | SQLite file path. Default `./data/finance.db`; Docker forces `/app/data/finance.db`. |
-| `CORS_ORIGIN` | no | Allowed browser origin in production (set to your domain). |
+| `DATABASE_PATH` | no | SQLite file path. Default `./data/finance.db` for local dev; Docker forces `/app/data/finman.db` (the production file name). `finance.db` is only a legacy local-dev fallback. |
+| `COOKIE_DOMAIN` | no | Domain attribute of the `finman.sid` session cookie (e.g. `.finman.money`). Unset = host-only. |
+| `CORS_ORIGIN` | no | Comma-separated allowed browser origins in production (e.g. `https://app.finman.money,https://finman.money`). `capacitor://localhost` and `http://localhost` (mobile shells) are always allowed. |
 | `LOG_LEVEL` | no | pino level (`info` default). |
 | `AI_PROVIDER` | no | `anthropic` \| `openai` \| `ollama` (default `anthropic`). |
 | `AI_API_KEY` | for AI | API key for the AI provider. Without it, AI endpoints return `503 AI_NOT_CONFIGURED`. |
@@ -176,9 +192,12 @@ routes/              REST endpoints (auth, accounts, transactions, … health, a
 services/            bank API sync, auth, CSV import, etc.
 public/              static frontend (HTML/CSS/JS, no build step)
 test/                Jest + Supertest suites (isolated temp DB per suite)
-Dockerfile           multi-stage production image (non-root, healthcheck)
-docker-compose.yml   app service + persistent finman-data volume
+Dockerfile           multi-stage production image (entrypoint drops to `node`, healthcheck)
+docker-entrypoint.sh chown data volume -> setpriv to uid 1000 -> node server.js
+docker-compose.yml   `finman` service, 127.0.0.1:3011, persistent finman-data volume
 scripts/deploy.sh    build + compose up + /api/health smoke test
+scripts/backup-db.sh online SQLite backup to /app/data/backups (keeps 14)
+DEPLOY.md            staging deploy + production cutover / rollback
 ```
 
 ---

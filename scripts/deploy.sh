@@ -11,7 +11,7 @@
 #   3. Polls http://localhost:<PORT>/api/health until the app is healthy.
 #
 # Env overrides:
-#   PORT          host port to probe (default: value from .env, else 3000)
+#   HOST_PORT     host port to probe (default: 3011 — compose binds 127.0.0.1:3011)
 #   HEALTH_RETRIES number of health poll attempts (default: 30)
 #   HEALTH_DELAY   seconds between attempts (default: 2)
 # ============================================================================
@@ -46,17 +46,13 @@ if [ ! -f .env ]; then
   fi
 fi
 
-# --- Determine the port to probe (PORT env > .env > 3000) ------------------
-PORT="${PORT:-}"
-if [ -z "${PORT}" ] && [ -f .env ]; then
-  # Read PORT from .env without sourcing the whole file.
-  PORT="$(grep -E '^PORT=' .env | tail -n1 | cut -d= -f2- | tr -d '[:space:]' || true)"
-fi
-PORT="${PORT:-3000}"
+# --- Determine the host port to probe --------------------------------------
+# docker-compose.yml binds 127.0.0.1:3011 -> container 3000 (prod parity).
+PORT="${HOST_PORT:-3011}"
 
 HEALTH_RETRIES="${HEALTH_RETRIES:-30}"
 HEALTH_DELAY="${HEALTH_DELAY:-2}"
-HEALTH_URL="http://localhost:${PORT}/api/health"
+HEALTH_URL="http://127.0.0.1:${PORT}/api/health"
 
 # --- Build & start ---------------------------------------------------------
 log "Building image and starting stack (${COMPOSE} up -d --build)..."
@@ -71,7 +67,7 @@ while [ "${attempt}" -le "${HEALTH_RETRIES}" ]; do
     log "Response:"
     curl -fsS "${HEALTH_URL}" || true
     echo
-    log "Deploy complete. FINMAN is up at http://localhost:${PORT}"
+    log "Deploy complete. FINMAN is up at http://127.0.0.1:${PORT}"
     exit 0
   fi
   printf '\033[1;33m[deploy]\033[0m health attempt %s/%s failed; retrying in %ss...\n' \
@@ -81,5 +77,5 @@ while [ "${attempt}" -le "${HEALTH_RETRIES}" ]; do
 done
 
 err "App did not become healthy after ${HEALTH_RETRIES} attempts. Recent logs:"
-${COMPOSE} logs --tail=50 app || true
+${COMPOSE} logs --tail=50 finman || true
 exit 1

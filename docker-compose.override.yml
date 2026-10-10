@@ -1,5 +1,0 @@
-# Deploy override: expose finman on host port 8095 (container stays on 3000).
-services:
-  app:
-    ports:
-      - "8095:3000"

@@ -1,16 +1,19 @@
 # FINMAN — single-service compose with a PERSISTENT SQLite database.
 #
-# The SQLite file (data/finance.db) lives on the named volume `finman-data`
-# mounted at /app/data, so it survives `docker compose down` / restarts and
-# image rebuilds. DATABASE_PATH is pinned to that directory.
+# Runtime parity with app.finman.money production:
+#   - service/container name `finman`
+#   - host binding 127.0.0.1:3011 -> container 3000 (Caddy proxies to 3011;
+#     the port is never exposed on a public interface)
+#   - named volume `finman-data` mounted at /app/data
+#   - DATABASE_PATH=/app/data/finman.db (the file the prod volume already holds)
 #
 # Quick start:
 #   cp .env.example .env   # then fill in real secrets
 #   docker compose up -d --build
-#   curl http://localhost:3000/api/health
+#   curl http://127.0.0.1:3011/api/health
 
 services:
-  app:
+  finman:
     build:
       context: .
       dockerfile: Dockerfile
@@ -26,15 +29,15 @@ services:
     # and default NODE_ENV to production for the container.
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-3000}
-      DATABASE_PATH: /app/data/finance.db
+      PORT: "3000"
+      DATABASE_PATH: /app/data/finman.db
 
-    # Host:Container. Host port is overridable via PORT in .env; the container
-    # always listens on 3000 (matches Dockerfile EXPOSE + HEALTHCHECK).
+    # Host:Container. Bound to loopback only — the reverse proxy (Caddy) on the
+    # host talks to 3011; the container always listens on 3000.
     ports:
-      - "${PORT:-3000}:3000"
+      - "127.0.0.1:3011:3000"
 
-    # Persistent storage for the SQLite database.
+    # Persistent storage for the SQLite database (+ /app/data/backups).
     volumes:
       - finman-data:/app/data
 

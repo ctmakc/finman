@@ -1,10 +1,17 @@
 # syntax=docker/dockerfile:1
 # ============================================================================
 # FINMAN — multi-stage production image
-#   Stage 1 (deps):  install PROD-only node_modules, rebuilding the sqlite3
-#                    native addon from source if no prebuilt binary matches.
-#   Stage 2 (runtime): slim image, copies node_modules + app, runs as non-root,
-#                    persists the SQLite DB under /app/data (mount a volume!).
+#   Stage 1 (deps):    install PROD-only node_modules, rebuilding the sqlite3
+#                      native addon from source if no prebuilt binary matches.
+#   Stage 2 (runtime): slim image, copies node_modules + app, persists the
+#                      SQLite DB under /app/data (named volume finman-data).
+#
+# Runtime user: the container STARTS as root so docker-entrypoint.sh can
+# chown/chmod the mounted data volume (the production volume `finman-data`
+# was created by a root container and is root-owned; a plain `USER node`
+# image cannot open finman.db there or create its -wal/-shm files). The
+# entrypoint then drops privileges with setpriv and runs node as uid 1000
+# (`node`). The app process itself never runs as root.
 # ============================================================================
 
 # ---- Stage 1: dependencies ------------------------------------------------
@@ -30,11 +37,19 @@ RUN npm ci --omit=dev --no-audit --no-fund \
 FROM node:22-slim AS runtime
 WORKDIR /app
 
+# DATABASE_PATH: /app/data/finman.db is the PRODUCTION file name (app.finman.money
+# lineage). The older wave2 default `finance.db` is still accepted when passed
+# explicitly via env, but the image defaults to finman.db so the existing prod
+# volume keeps its user data.
 ENV NODE_ENV=production \
     PORT=3000 \
-    DATABASE_PATH=/app/data/finance.db
+    DATABASE_PATH=/app/data/finman.db \
+    APP_UID=1000 \
+    APP_GID=1000
 
 # wget is used by the HEALTHCHECK below; node:22-slim ships without it.
+# setpriv (util-linux) is already present and is what the entrypoint uses to
+# drop from root to `node`.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends wget \
   && rm -rf /var/lib/apt/lists/*
@@ -46,13 +61,11 @@ COPY --from=deps /app/node_modules ./node_modules
 # data/ dir, mobile build output, tests and secrets out of the image.
 COPY . .
 
-# Persisted SQLite database lives here. Create it up front and hand ownership
-# to the non-root user so the app can write even on a fresh named volume.
-RUN mkdir -p /app/data \
-  && chown -R node:node /app
-
-# Drop privileges — never run the app as root.
-USER node
+# Persisted SQLite database lives here. Create it up front; the entrypoint
+# re-chowns it at start so a pre-existing root-owned volume also works.
+RUN mkdir -p /app/data /app/data/backups \
+  && chown -R node:node /app \
+  && chmod +x /app/docker-entrypoint.sh /app/scripts/backup-db.sh
 
 EXPOSE 3000
 
@@ -61,4 +74,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 
+# No USER directive on purpose — see header. The entrypoint drops to `node`.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "server.js"]
