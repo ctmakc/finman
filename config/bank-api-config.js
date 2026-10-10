@@ -1,275 +1,208 @@
-// Конфигурация для поддерживаемых банковских API
-// Пользователи могут добавлять свои API-ключи в настройках
+// config/bank-api-config.js — honest bank connectivity catalogue.
+//
+// Two kinds of entries:
+//   type: 'token'       — a real, documented personal API the app talks to
+//                          directly with a user-supplied token. Today: Monobank.
+//   type: 'file-import' — the bank has no free personal API (true for every
+//                          Canadian bank in 2026 — Plaid/Flinks are paid B2B
+//                          aggregators). The user downloads a CSV / OFX / QFX
+//                          statement from online banking and imports it with the
+//                          import wizard. `csvPreset` names the column layout in
+//                          services/csvImportService.js; `verified` says whether
+//                          that layout was confirmed against a real export.
+//
+// Nothing here is an OAuth stub: there is no bank in this file the app cannot
+// actually read from. Keys `regions` and `authTypes` are metadata, not banks.
 
-module.exports = {
-  // ==================== УКРАИНСКИЕ БАНКИ ====================
+const META_KEYS = new Set(['regions', 'authTypes', 'META_KEYS', 'listBanks', 'isBank']);
 
-  // Monobank API (публичный API, не требует OAuth)
+const banks = {
+  // ==================== TOKEN (real personal API) ====================
   monobank: {
     name: 'Monobank',
     country: 'UA',
     region: 'ukraine',
+    type: 'token',
     icon: 'monobank-icon.png',
     apiUrl: 'https://api.monobank.ua',
-    scopes: ['personal'],
-    authType: 'api_key', // Токен из приложения Monobank
+    docsUrl: 'https://api.monobank.ua/docs/',
+    authType: 'api_key',
     requiresRedirect: false,
-    tokenInstructions: 'Отримайте токен у додатку Monobank: Налаштування -> API для розробників',
+    tokenInstructions:
+      'Open the Monobank app → Settings → "API for developers" (or visit api.monobank.ua), ' +
+      'sign in with your phone and copy the personal token. The token is read-only.',
+    rateLimitNote: 'Monobank allows one statement request per account every 60 seconds and at most 31 days per request.',
     endpoints: {
-      userInfo: '/personal/client-info',
-      accounts: '/personal/client-info',
-      transactions: '/personal/statement/{account}/{from}/{to}'
-    }
+      clientInfo: '/personal/client-info',
+      statement: '/personal/statement/{account}/{from}/{to}'
+    },
+    formats: ['api', 'csv'],
+    csvPreset: 'monobank'
   },
 
-  // ПриватБанк API
-  privatbank: {
-    name: 'ПриватБанк',
-    country: 'UA',
-    region: 'ukraine',
-    icon: 'privatbank-icon.png',
-    apiUrl: 'https://api.privatbank.ua',
-    scopes: ['accounts', 'statements'],
-    authType: 'merchant', // Merchant ID + Password
-    requiresRedirect: false,
-    tokenInstructions: 'Отримайте Merchant ID та пароль у Приват24 для бізнесу',
-    endpoints: {
-      balance: '/p24api/balance',
-      statements: '/p24api/rest_fiz'
-    }
-  },
-
-  // ПУМБ API
-  pumb: {
-    name: 'ПУМБ',
-    country: 'UA',
-    region: 'ukraine',
-    icon: 'pumb-icon.png',
-    apiUrl: 'https://api.pumb.ua',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.PUMB_CLIENT_ID || '',
-    clientSecret: process.env.PUMB_CLIENT_SECRET || ''
-  },
-
-  // Ощадбанк API
-  oschadbank: {
-    name: 'Ощадбанк',
-    country: 'UA',
-    region: 'ukraine',
-    icon: 'oschadbank-icon.png',
-    apiUrl: 'https://api.oschadbank.ua',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.OSCHADBANK_CLIENT_ID || '',
-    clientSecret: process.env.OSCHADBANK_CLIENT_SECRET || ''
-  },
-
-  // ==================== КАНАДСКИЕ БАНКИ ====================
-
-  // TD Bank (через Plaid или direct API)
-  td_canada: {
-    name: 'TD Canada Trust',
-    country: 'CA',
-    region: 'canada',
-    icon: 'td-icon.png',
-    apiUrl: 'https://api.td.com',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.TD_CLIENT_ID || '',
-    clientSecret: process.env.TD_CLIENT_SECRET || '',
-    tokenInstructions: 'Register at TD Developer Portal: developer.td.com'
-  },
-
-  // RBC Royal Bank
+  // ==================== FILE IMPORT — Canada ====================
   rbc: {
     name: 'RBC Royal Bank',
     country: 'CA',
     region: 'canada',
-    icon: 'rbc-icon.png',
-    apiUrl: 'https://api.rbc.com',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.RBC_CLIENT_ID || '',
-    clientSecret: process.env.RBC_CLIENT_SECRET || '',
-    tokenInstructions: 'Register at RBC Developer Portal'
+    type: 'file-import',
+    formats: ['csv', 'qfx'],
+    csvPreset: 'rbc',
+    verified: false,
+    exportHint: 'RBC Online Banking → account → Download transactions → CSV or Quicken (QFX).'
   },
-
-  // Scotiabank
+  td_canada: {
+    name: 'TD Canada Trust',
+    country: 'CA',
+    region: 'canada',
+    type: 'file-import',
+    formats: ['csv', 'qfx'],
+    csvPreset: 'td',
+    verified: false,
+    exportHint: 'EasyWeb → Accounts → Account Activity → Download → Spreadsheet (.CSV) or Quicken (.QFX).'
+  },
   scotiabank: {
     name: 'Scotiabank',
     country: 'CA',
     region: 'canada',
-    icon: 'scotiabank-icon.png',
-    apiUrl: 'https://api.scotiabank.com',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.SCOTIABANK_CLIENT_ID || '',
-    clientSecret: process.env.SCOTIABANK_CLIENT_SECRET || ''
+    type: 'file-import',
+    formats: ['csv', 'qfx'],
+    csvPreset: 'scotiabank',
+    verified: false,
+    exportHint: 'Scotia OnLine → account → Download transactions → CSV or Quicken.'
   },
-
-  // BMO Bank of Montreal
   bmo: {
     name: 'BMO Bank of Montreal',
     country: 'CA',
     region: 'canada',
-    icon: 'bmo-icon.png',
-    apiUrl: 'https://api.bmo.com',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.BMO_CLIENT_ID || '',
-    clientSecret: process.env.BMO_CLIENT_SECRET || ''
+    type: 'file-import',
+    formats: ['csv', 'qfx'],
+    csvPreset: 'bmo',
+    verified: false,
+    exportHint: 'BMO Online Banking → account → Download transactions → CSV or Quicken.'
   },
-
-  // CIBC
   cibc: {
     name: 'CIBC',
     country: 'CA',
     region: 'canada',
-    icon: 'cibc-icon.png',
-    apiUrl: 'https://api.cibc.com',
-    scopes: ['accounts', 'transactions'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.CIBC_CLIENT_ID || '',
-    clientSecret: process.env.CIBC_CLIENT_SECRET || ''
+    type: 'file-import',
+    formats: ['csv', 'qfx'],
+    csvPreset: 'cibc',
+    verified: false,
+    exportHint: 'CIBC Online Banking → account → Download Transactions → CSV or Quicken (QFX).'
+  },
+  tangerine: {
+    name: 'Tangerine',
+    country: 'CA',
+    region: 'canada',
+    type: 'file-import',
+    formats: ['csv', 'ofx'],
+    csvPreset: 'tangerine',
+    verified: false,
+    exportHint: 'Tangerine → account → Download transactions → CSV or OFX.'
+  },
+  wealthsimple_cash: {
+    name: 'Wealthsimple Cash',
+    country: 'CA',
+    region: 'canada',
+    type: 'file-import',
+    formats: ['csv'],
+    csvPreset: 'wealthsimple',
+    verified: false,
+    exportHint: 'Wealthsimple → Activity → Export (CSV). The export covers every account; pick the Cash rows.'
+  },
+  eq_bank: {
+    name: 'EQ Bank',
+    country: 'CA',
+    region: 'canada',
+    type: 'file-import',
+    formats: ['csv'],
+    csvPreset: 'eqbank',
+    verified: false,
+    exportHint: 'EQ Bank → account → Transactions → Download CSV.'
   },
 
-  // ==================== МЕЖДУНАРОДНЫЕ СЕРВИСЫ ====================
-
-  // Revolut Business API
+  // ==================== FILE IMPORT — international ====================
   revolut: {
     name: 'Revolut',
     country: 'INTL',
     region: 'international',
-    icon: 'revolut-icon.png',
-    apiUrl: 'https://b2b.revolut.com/api/1.0',
-    scopes: ['accounts', 'transactions'],
-    authType: 'api_key',
-    requiresRedirect: false,
-    tokenInstructions: 'Get API key from Revolut Business: Settings -> API',
-    endpoints: {
-      accounts: '/accounts',
-      transactions: '/transactions'
-    }
+    type: 'file-import',
+    formats: ['csv'],
+    csvPreset: 'revolut',
+    verified: true,
+    exportHint: 'Revolut app → account → Statement → Excel (the file is CSV). One file per currency.'
   },
-
-  // Wise (TransferWise) API
   wise: {
     name: 'Wise',
     country: 'INTL',
     region: 'international',
-    icon: 'wise-icon.png',
-    apiUrl: 'https://api.transferwise.com',
-    scopes: ['accounts', 'transactions'],
-    authType: 'api_key',
-    requiresRedirect: false,
-    tokenInstructions: 'Get API token from Wise: Settings -> API tokens',
-    endpoints: {
-      profiles: '/v1/profiles',
-      accounts: '/v1/borderless-accounts',
-      transactions: '/v3/profiles/{profileId}/borderless-accounts/{accountId}/statement.json'
-    }
-  },
-
-  // PayPal API
-  paypal: {
-    name: 'PayPal',
-    country: 'INTL',
-    region: 'international',
-    icon: 'paypal-icon.png',
-    apiUrl: 'https://api.paypal.com',
-    sandboxUrl: 'https://api.sandbox.paypal.com',
-    scopes: ['openid', 'email', 'https://uri.paypal.com/services/reporting/search/read'],
-    authType: 'oauth2',
-    requiresRedirect: true,
-    clientId: process.env.PAYPAL_CLIENT_ID || '',
-    clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
-    tokenInstructions: 'Register at PayPal Developer Portal: developer.paypal.com'
-  },
-
-  // Plaid (агрегатор для множества банков)
-  plaid: {
-    name: 'Plaid (US/CA Banks)',
-    country: 'INTL',
-    region: 'international',
-    icon: 'plaid-icon.png',
-    apiUrl: 'https://production.plaid.com',
-    sandboxUrl: 'https://sandbox.plaid.com',
-    scopes: ['transactions', 'accounts', 'balance'],
-    authType: 'link_token', // Специальный тип для Plaid Link
-    requiresRedirect: true,
-    clientId: process.env.PLAID_CLIENT_ID || '',
-    secret: process.env.PLAID_SECRET || '',
-    tokenInstructions: 'Register at Plaid Dashboard: dashboard.plaid.com'
-  },
-
-  // ==================== ТЕСТОВЫЙ БАНК ====================
-
-  // Тестовый API (для разработки)
-  test: {
-    name: 'Тестовый банк',
-    country: 'TEST',
-    region: 'test',
-    icon: 'test-bank-icon.png',
-    apiUrl: 'http://localhost:3001',
-    scopes: ['all'],
-    authType: 'api_key',
-    requiresRedirect: false,
-    apiKey: 'test_api_key'
+    type: 'file-import',
+    formats: ['csv'],
+    csvPreset: 'wise',
+    verified: true,
+    exportHint: 'Wise → balance → Statements → CSV. One file per currency balance.'
   }
 };
 
-// Группировка банков по регионам для UI
+module.exports = banks;
+
+// Groups for the UI.
 module.exports.regions = {
-  ukraine: {
-    name: 'Украина',
-    flag: '🇺🇦',
-    banks: ['monobank', 'privatbank', 'pumb', 'oschadbank']
-  },
+  ukraine: { name: 'Ukraine', flag: '🇺🇦', banks: ['monobank'] },
   canada: {
     name: 'Canada',
     flag: '🇨🇦',
-    banks: ['td_canada', 'rbc', 'scotiabank', 'bmo', 'cibc']
+    banks: ['rbc', 'td_canada', 'scotiabank', 'bmo', 'cibc', 'tangerine', 'wealthsimple_cash', 'eq_bank']
   },
-  international: {
-    name: 'International',
-    flag: '🌍',
-    banks: ['revolut', 'wise', 'paypal', 'plaid']
+  international: { name: 'International', flag: '🌍', banks: ['revolut', 'wise'] }
+};
+
+// Connection kinds the UI knows how to render.
+module.exports.authTypes = {
+  api_key: {
+    name: 'Personal token',
+    description: 'Read-only token issued by the bank to the account holder',
+    requiresClientCredentials: false
   },
-  test: {
-    name: 'Test',
-    flag: '🧪',
-    banks: ['test']
+  file_import: {
+    name: 'Statement file',
+    description: 'CSV / OFX / QFX statement downloaded from online banking',
+    requiresClientCredentials: false
   }
 };
 
-// Типы авторизации
-module.exports.authTypes = {
-  oauth2: {
-    name: 'OAuth 2.0',
-    description: 'Стандартная OAuth2 авторизация через сайт банка',
-    requiresClientCredentials: true
-  },
-  api_key: {
-    name: 'API Key',
-    description: 'Авторизация по API-ключу/токену',
-    requiresClientCredentials: false
-  },
-  merchant: {
-    name: 'Merchant',
-    description: 'Авторизация по Merchant ID и паролю',
-    requiresClientCredentials: false
-  },
-  link_token: {
-    name: 'Link Token',
-    description: 'Авторизация через Plaid Link',
-    requiresClientCredentials: true
-  }
+module.exports.META_KEYS = META_KEYS;
+
+// True when `key` names a bank entry (not metadata / helpers).
+module.exports.isBank = function isBank(key) {
+  return Object.prototype.hasOwnProperty.call(banks, key) && !META_KEYS.has(key) && typeof banks[key] === 'object';
+};
+
+// Flat, UI-ready list of banks.
+module.exports.listBanks = function listBanks(filter = {}) {
+  return Object.keys(banks)
+    .filter((key) => module.exports.isBank(key))
+    .filter((key) => !filter.region || banks[key].region === filter.region)
+    .filter((key) => !filter.type || banks[key].type === filter.type)
+    .map((key) => {
+      const b = banks[key];
+      return {
+        id: key,
+        name: b.name,
+        country: b.country,
+        region: b.region,
+        type: b.type,
+        icon: b.icon || null,
+        authType: b.type === 'token' ? b.authType : 'file_import',
+        requiresRedirect: false,
+        formats: b.formats || [],
+        csvPreset: b.csvPreset || null,
+        verified: b.type === 'token' ? true : b.verified === true,
+        tokenInstructions: b.tokenInstructions || null,
+        exportHint: b.exportHint || null,
+        docsUrl: b.docsUrl || null,
+        rateLimitNote: b.rateLimitNote || null
+      };
+    });
 };
