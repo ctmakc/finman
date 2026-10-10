@@ -233,7 +233,11 @@ const CalendarModule = {
   }
 };
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'cal:day': (el) => CalendarModule.showDayEvents(el.dataset.date),
     'cal:add': (el) => { UI.closeModal('day-modal'); CalendarModule.showAddModal(el.dataset.date); },
@@ -243,4 +247,4 @@ if (typeof window !== 'undefined' && window.UI) {
     'cal:next': () => CalendarModule.nextMonth(),
     'cal:today': () => CalendarModule.goToday(),
   });
-}
+})();

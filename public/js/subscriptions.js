@@ -298,7 +298,11 @@ const SubscriptionsModule = {
   }
 };
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'subs:add': () => SubscriptionsModule.showAddModal(),
     'subs:save': () => SubscriptionsModule.save(),
@@ -308,4 +312,4 @@ if (typeof window !== 'undefined' && window.UI) {
     'subs:detect': () => SubscriptionsModule.detect(),
     'subs:add-detected': (el) => SubscriptionsModule.addDetected(Number(el.dataset.index)),
   });
-}
+})();

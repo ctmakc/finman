@@ -288,7 +288,11 @@ const NetWorthModule = {
   }
 };
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'nw:snapshot': () => NetWorthModule.saveSnapshot(),
     'nw:add-asset': () => NetWorthModule.showAddAssetModal(),
@@ -296,4 +300,4 @@ if (typeof window !== 'undefined' && window.UI) {
     'nw:delete-asset': (el) => NetWorthModule.deleteAsset(el.dataset.id),
     'nw:save-asset': () => NetWorthModule.saveAsset(),
   });
-}
+})();

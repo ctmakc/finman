@@ -186,7 +186,11 @@ async function deleteGoal(id) {
   } catch (e) { showNotification('Ошибка', 'error'); }
 }
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'goals:add': () => showAddGoalModal(),
     'goals:save': (form) => saveGoal(form),
@@ -196,4 +200,4 @@ if (typeof window !== 'undefined' && window.UI) {
   });
   window.showAddGoalModal = showAddGoalModal; window.showContributeModal = showContributeModal; window.saveGoal = saveGoal; window.contributeToGoal = contributeToGoal; window.deleteGoal = deleteGoal;
   window.goalProgress = goalProgress; window.goalsSummary = goalsSummary;
-}
+})();

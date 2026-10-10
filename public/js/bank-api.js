@@ -188,6 +188,76 @@ function showCreateCustomBankModal() {
 
 // ==================== ОСНОВНЫЕ ФУНКЦИИ ====================
 
+// Список поддерживаемых банков — ТОЛЬКО из API (GET /api/bank-api/banks;
+// пока его нет — /supported-banks). В интерфейсе никаких зашитых названий.
+async function fetchSupportedBanks() {
+  const parse = (data) => {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.banks)) return data.banks;
+    if (data && Array.isArray(data.data)) return data.data;
+    return [];
+  };
+  for (const url of ['/api/bank-api/banks', '/api/bank-api/supported-banks']) {
+    try {
+      const response = await fetchWithAuth(url);
+      if (!response.ok) continue;
+      const banks = parse(await response.json());
+      appState.supportedBanks = banks;
+      return banks;
+    } catch (error) {
+      console.error('Ошибка получения списка банков:', error);
+    }
+  }
+  return appState.supportedBanks || [];
+}
+
+// Текст «Поддерживаемые банки» на странице подключений: рендерим то, что
+// вернул API (страницу рисует app.js, поэтому дополняем её после отрисовки).
+function renderSupportedBanksCopy(banks) {
+  const card = document.querySelector('.bank-info-content');
+  if (!card) return;
+  const esc = (v) => (window.UI ? UI.esc(v) : String(v == null ? '' : v));
+  const list = (banks || []).filter(b => b && b.id !== 'test');
+  let box = card.querySelector('.fm-supported-banks');
+  if (!box) {
+    // Заменяем зашитый абзац «Поддерживаемые банки: …» из app.js.
+    const legacy = Array.from(card.querySelectorAll('p')).find(p => /Поддерживаемые банки/i.test(p.textContent));
+    box = document.createElement('div');
+    box.className = 'fm-supported-banks';
+    if (legacy) legacy.replaceWith(box); else card.appendChild(box);
+  }
+  if (!list.length) {
+    box.innerHTML = '<p>Список банков загружается с сервера. Пока доступен импорт выписок (CSV/OFX) со страницы транзакций.</p>';
+    return;
+  }
+  const authLabel = (b) => b.authType === 'api_key' ? 'токен' : b.authType === 'oauth2' ? 'OAuth' : (b.authType || '');
+  box.innerHTML = `
+    <p>Поддерживаемые банки:</p>
+    <div class="fm-banks">
+      ${list.map(b => `<span class="fm-bank-chip"><i class="fas fa-university"></i> ${esc(b.name)}${b.country ? ` <small>${esc(b.country)}</small>` : ''}${b.authType ? ` <small>· ${esc(authLabel(b))}</small>` : ''}</span>`).join('')}
+      <span class="fm-bank-chip"><i class="fas fa-file-import"></i> Импорт CSV/OFX</span>
+    </div>`;
+}
+
+// Страницу подключений рисует app.js (renderBankConnectionsPage). Дополняем
+// её данными API без правки app.js: оборачиваем глобальную функцию.
+if (typeof window !== 'undefined' && typeof window.renderBankConnectionsPage === 'function' && !window.renderBankConnectionsPage.__fmWrapped) {
+  const originalRenderBankConnectionsPage = window.renderBankConnectionsPage;
+  const wrapped = async function renderBankConnectionsPageWithBanks() {
+    const result = await originalRenderBankConnectionsPage.apply(this, arguments);
+    try {
+      renderSupportedBanksCopy(appState.supportedBanks || []);
+      const banks = await fetchSupportedBanks();
+      renderSupportedBanksCopy(banks);
+    } catch (error) {
+      console.error('Ошибка отрисовки списка банков:', error);
+    }
+    return result;
+  };
+  wrapped.__fmWrapped = true;
+  window.renderBankConnectionsPage = wrapped;
+}
+
 // Получение банков по регионам
 async function fetchBanksByRegion() {
   try {
@@ -372,6 +442,11 @@ async function fetchBankConnections() {
     // Загружаем банки по регионам если ещё не загружены
     if (!appState.banksByRegion || Object.keys(appState.banksByRegion).length === 0) {
       await fetchBanksByRegion();
+    }
+    // Нет регионов (API отдаёт плоский список) — показываем его одной группой.
+    if (!appState.banksByRegion || Object.keys(appState.banksByRegion).length === 0) {
+      const flat = await fetchSupportedBanks();
+      if (flat.length) appState.banksByRegion = { all: { name: 'Банки', flag: '🏦', banks: flat } };
     }
 
     // Создание модального окна

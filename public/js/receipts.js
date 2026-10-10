@@ -342,7 +342,11 @@ const ReceiptsModule = {
   }
 };
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'rcpt:upload-modal': () => ReceiptsModule.showUploadModal(),
     'rcpt:manual-modal': () => ReceiptsModule.showManualModal(),
@@ -353,4 +357,4 @@ if (typeof window !== 'undefined' && window.UI) {
     'rcpt:edit': (el) => ReceiptsModule.edit(el.dataset.id),
     'rcpt:delete': (el) => ReceiptsModule.delete(el.dataset.id),
   });
-}
+})();

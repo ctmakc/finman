@@ -214,7 +214,11 @@ async function deleteDebt(id) {
   } catch (e) { showNotification('Ошибка', 'error'); }
 }
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'debts:add': () => showAddDebtModal(),
     'debts:save': (form) => saveDebt(form),
@@ -224,4 +228,4 @@ if (typeof window !== 'undefined' && window.UI) {
   });
   window.showAddDebtModal = showAddDebtModal; window.saveDebt = saveDebt; window.showPaymentModal = showPaymentModal; window.makePayment = makePayment; window.deleteDebt = deleteDebt;
   window.debtProgress = debtProgress; window.debtsSummary = debtsSummary;
-}
+})();

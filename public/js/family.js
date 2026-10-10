@@ -266,19 +266,27 @@ async function fetchAccountPermissions(accountId) {
 }
 
 // ==================== UI ====================
+// The page renders into #main-content like every other module (app.js
+// navigateTo convention), so header, nav and theme toggle stay in place.
+// All handlers are delegated through UI.actions (no inline onclick).
+
+function familyContainer() {
+  return document.getElementById('main-content');
+}
 
 function renderFamilyPage() {
-  const app = document.getElementById('app');
+  const container = familyContainer();
+  if (!container) return;
 
-  app.innerHTML = `
+  container.innerHTML = `
     <div class="family-page">
       <header class="page-header">
         <h1><i class="fas fa-users"></i> Семейный доступ</h1>
         <div class="header-actions">
-          <button class="btn btn-primary" onclick="showCreateFamilyModal()">
+          <button type="button" class="btn btn-primary" data-action="family:create">
             <i class="fas fa-plus"></i> Создать семью
           </button>
-          <button class="btn btn-secondary" onclick="showJoinFamilyModal()">
+          <button type="button" class="btn btn-secondary" data-action="family:join">
             <i class="fas fa-sign-in-alt"></i> Присоединиться
           </button>
         </div>
@@ -286,7 +294,7 @@ function renderFamilyPage() {
 
       <div class="family-content">
         <div class="families-list" id="families-list">
-          <div class="loading"><i class="fas fa-spinner fa-spin"></i> Загрузка...</div>
+          <div class="loading"><div class="spinner"></div></div>
         </div>
       </div>
     </div>
@@ -298,27 +306,27 @@ function renderFamilyPage() {
 async function loadFamilies() {
   const families = await fetchFamilies();
   const container = document.getElementById('families-list');
+  if (!container) return;
 
   if (families.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <i class="fas fa-users"></i>
-        <h3>Нет семей</h3>
-        <p>Создайте семью или присоединитесь по коду приглашения</p>
-      </div>
-    `;
+    container.innerHTML = UI.emptyState({
+      icon: 'fa-users',
+      title: 'Нет семей',
+      text: 'Создайте семью или присоединитесь по коду приглашения — общие счета станут видны всем участникам.',
+      action: { label: 'Создать семью', action: 'family:create', icon: 'fa-plus' }
+    });
     return;
   }
 
   container.innerHTML = families.map(family => `
-    <div class="family-card" onclick="openFamilyDetails(${family.id})">
+    <div class="family-card" data-action="family:open" data-id="${Number(family.id)}" role="button" tabindex="0">
       <div class="family-header">
-        <h3>${escapeHtml(family.name)}</h3>
-        <span class="role-badge role-${family.my_role}">${getRoleName(family.my_role)}</span>
+        <h3>${UI.esc(family.name)}</h3>
+        <span class="role-badge role-${UI.esc(family.my_role)}">${UI.esc(getRoleName(family.my_role))}</span>
       </div>
       <div class="family-info">
-        <span><i class="fas fa-user"></i> Владелец: ${escapeHtml(family.owner_username)}</span>
-        <span><i class="fas fa-users"></i> ${family.member_count} участник(ов)</span>
+        <span><i class="fas fa-user"></i> Владелец: ${UI.esc(family.owner_username)}</span>
+        <span><i class="fas fa-users"></i> ${Number(family.member_count) || 0} участник(ов)</span>
       </div>
     </div>
   `).join('');
@@ -337,29 +345,32 @@ async function openFamilyDetails(familyId) {
   const family = await fetchFamilyDetails(familyId);
   if (!family) return;
 
-  const app = document.getElementById('app');
+  const container = familyContainer();
+  if (!container) return;
+  const esc = UI.esc;
+  const canManage = family.myRole === 'owner' || family.myRole === 'admin';
 
-  app.innerHTML = `
+  container.innerHTML = `
     <div class="family-details-page">
       <header class="page-header">
-        <button class="btn-back" onclick="renderFamilyPage()">
+        <button type="button" class="btn-back" data-action="family:back">
           <i class="fas fa-arrow-left"></i> Назад
         </button>
-        <h1>${escapeHtml(family.name)}</h1>
-        <span class="role-badge role-${family.myRole}">${getRoleName(family.myRole)}</span>
+        <h1>${esc(family.name)}</h1>
+        <span class="role-badge role-${esc(family.myRole)}">${esc(getRoleName(family.myRole))}</span>
       </header>
 
       <div class="family-details-content">
-        ${family.myRole === 'owner' || family.myRole === 'admin' ? `
+        ${canManage ? `
           <div class="invite-section">
             <h3><i class="fas fa-link"></i> Код приглашения</h3>
             <div class="invite-code-box">
-              <code id="invite-code">${family.invite_code}</code>
-              <button class="btn-icon" onclick="copyInviteCode()" title="Копировать">
+              <code id="invite-code">${esc(family.invite_code)}</code>
+              <button type="button" class="btn-icon" data-action="family:copy-code" title="Копировать" aria-label="Копировать код">
                 <i class="fas fa-copy"></i>
               </button>
               ${family.myRole === 'owner' ? `
-                <button class="btn-icon" onclick="regenerateCode(${family.id})" title="Обновить код">
+                <button type="button" class="btn-icon" data-action="family:regenerate" data-id="${Number(family.id)}" title="Обновить код" aria-label="Обновить код">
                   <i class="fas fa-sync"></i>
                 </button>
               ` : ''}
@@ -374,34 +385,34 @@ async function openFamilyDetails(familyId) {
               <div class="member-card">
                 <div class="member-info">
                   <div class="member-avatar">
-                    ${member.full_name ? member.full_name[0].toUpperCase() : member.username[0].toUpperCase()}
+                    ${esc((member.full_name || member.username || '?')[0].toUpperCase())}
                   </div>
                   <div class="member-details">
-                    <strong>${escapeHtml(member.full_name || member.username)}</strong>
-                    <span class="member-email">${escapeHtml(member.email)}</span>
+                    <strong>${esc(member.full_name || member.username)}</strong>
+                    <span class="member-email">${esc(member.email)}</span>
                   </div>
                 </div>
                 <div class="member-actions">
-                  <span class="role-badge role-${member.role}">${getRoleName(member.role)}</span>
+                  <span class="role-badge role-${esc(member.role)}">${esc(getRoleName(member.role))}</span>
                   ${family.myRole === 'owner' && member.role !== 'owner' ? `
                     <div class="dropdown">
-                      <button class="btn-icon dropdown-toggle" onclick="toggleDropdown(this)">
+                      <button type="button" class="btn-icon dropdown-toggle" data-action="family:menu" aria-haspopup="true" aria-expanded="false" aria-label="Действия с участником">
                         <i class="fas fa-ellipsis-v"></i>
                       </button>
                       <div class="dropdown-menu">
                         ${member.role === 'member' ? `
-                          <a onclick="promoteMember(${family.id}, ${member.user_id}, 'admin')">
+                          <a href="#" data-action="family:role" data-id="${Number(family.id)}" data-user="${Number(member.user_id)}" data-role="admin">
                             <i class="fas fa-arrow-up"></i> Сделать админом
                           </a>
                         ` : `
-                          <a onclick="promoteMember(${family.id}, ${member.user_id}, 'member')">
+                          <a href="#" data-action="family:role" data-id="${Number(family.id)}" data-user="${Number(member.user_id)}" data-role="member">
                             <i class="fas fa-arrow-down"></i> Снять админа
                           </a>
                         `}
-                        <a onclick="kickMember(${family.id}, ${member.user_id})" class="danger">
+                        <a href="#" data-action="family:kick" data-id="${Number(family.id)}" data-user="${Number(member.user_id)}" class="danger">
                           <i class="fas fa-user-minus"></i> Удалить
                         </a>
-                        <a onclick="showPermissionsModal(${member.user_id}, '${escapeHtml(member.username)}')">
+                        <a href="#" data-action="family:permissions" data-user="${Number(member.user_id)}" data-username="${esc(member.username)}">
                           <i class="fas fa-key"></i> Права доступа
                         </a>
                       </div>
@@ -415,11 +426,11 @@ async function openFamilyDetails(familyId) {
 
         <div class="family-actions">
           ${family.myRole !== 'owner' ? `
-            <button class="btn btn-danger" onclick="confirmLeaveFamily(${family.id})">
+            <button type="button" class="btn btn-danger" data-action="family:leave" data-id="${Number(family.id)}">
               <i class="fas fa-sign-out-alt"></i> Покинуть семью
             </button>
           ` : `
-            <button class="btn btn-danger" onclick="confirmDeleteFamily(${family.id})">
+            <button type="button" class="btn btn-danger" data-action="family:delete" data-id="${Number(family.id)}">
               <i class="fas fa-trash"></i> Удалить семью
             </button>
           `}
@@ -432,32 +443,25 @@ async function openFamilyDetails(familyId) {
 }
 
 function showCreateFamilyModal() {
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'create-family-modal';
-  modal.innerHTML = `
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Создать семью</h3>
-        <button class="btn-close" onclick="closeModal('create-family-modal')">&times;</button>
-      </div>
-      <div class="modal-body">
+  UI.modal({
+    id: 'create-family-modal',
+    title: 'Создать семью',
+    body: `
+      <form id="create-family-form" data-submit="family:create-submit">
         <div class="form-group">
-          <label>Название семьи</label>
-          <input type="text" id="family-name" placeholder="Например: Семья Ивановых" required>
+          <label for="family-name">Название семьи</label>
+          <input type="text" id="family-name" class="form-control" placeholder="Например: Семья Ивановых" required>
         </div>
         <div class="form-group">
-          <label>Описание (необязательно)</label>
-          <textarea id="family-description" placeholder="Краткое описание"></textarea>
+          <label for="family-description">Описание (необязательно)</label>
+          <textarea id="family-description" class="form-control" placeholder="Краткое описание"></textarea>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('create-family-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="submitCreateFamily()">Создать</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button>
+          <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+      </form>`
+  });
 }
 
 async function submitCreateFamily() {
@@ -471,34 +475,27 @@ async function submitCreateFamily() {
 
   const family = await createFamily(name, description);
   if (family) {
-    closeModal('create-family-modal');
+    UI.closeModal('create-family-modal');
     loadFamilies();
   }
 }
 
 function showJoinFamilyModal() {
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'join-family-modal';
-  modal.innerHTML = `
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Присоединиться к семье</h3>
-        <button class="btn-close" onclick="closeModal('join-family-modal')">&times;</button>
-      </div>
-      <div class="modal-body">
+  UI.modal({
+    id: 'join-family-modal',
+    title: 'Присоединиться к семье',
+    body: `
+      <form id="join-family-form" data-submit="family:join-submit">
         <div class="form-group">
-          <label>Код приглашения</label>
-          <input type="text" id="invite-code-input" placeholder="Введите код" maxlength="12" style="text-transform: uppercase;">
+          <label for="invite-code-input">Код приглашения</label>
+          <input type="text" id="invite-code-input" class="form-control" placeholder="Введите код" maxlength="12" autocapitalize="characters">
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('join-family-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="submitJoinFamily()">Присоединиться</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button>
+          <button type="submit" class="btn btn-primary">Присоединиться</button>
+        </div>
+      </form>`
+  });
 }
 
 async function submitJoinFamily() {
@@ -511,13 +508,16 @@ async function submitJoinFamily() {
 
   const family = await joinFamily(code);
   if (family) {
-    closeModal('join-family-modal');
+    UI.closeModal('join-family-modal');
     loadFamilies();
   }
 }
 
 function copyInviteCode() {
-  const code = document.getElementById('invite-code').textContent;
+  const el = document.getElementById('invite-code');
+  if (!el) return;
+  const code = el.textContent;
+  if (!navigator.clipboard) { showNotification('Код: ' + code, 'info'); return; }
   navigator.clipboard.writeText(code).then(() => {
     showNotification('Код скопирован', 'success');
   });
@@ -563,51 +563,35 @@ async function confirmDeleteFamily(familyId) {
 }
 
 function showPermissionsModal(userId, username) {
-  const accounts = appState.accounts || [];
+  const accounts = UI.accountsArray();
+  const esc = UI.esc;
 
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'permissions-modal';
-  modal.innerHTML = `
-    <div class="modal modal-large">
-      <div class="modal-header">
-        <h3>Права доступа для ${escapeHtml(username)}</h3>
-        <button class="btn-close" onclick="closeModal('permissions-modal')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="info-text">Выберите счета и права доступа:</p>
-        <div class="permissions-list">
-          ${accounts.length === 0 ? '<p>Нет счетов</p>' : accounts.map(account => `
-            <div class="permission-item" data-account-id="${account.id}">
-              <div class="permission-account">
-                <strong>${escapeHtml(account.name)}</strong>
-                <span class="account-balance">${formatCurrency(account.balance, account.currency)}</span>
-              </div>
-              <div class="permission-checkboxes">
-                <label>
-                  <input type="checkbox" class="perm-view" checked> Просмотр
-                </label>
-                <label>
-                  <input type="checkbox" class="perm-add"> Добавление
-                </label>
-                <label>
-                  <input type="checkbox" class="perm-edit"> Редактирование
-                </label>
-                <label>
-                  <input type="checkbox" class="perm-delete"> Удаление
-                </label>
-              </div>
+  UI.modal({
+    id: 'permissions-modal',
+    size: 'lg',
+    title: `Права доступа для ${username}`,
+    body: `
+      <p class="info-text">Выберите счета и права доступа:</p>
+      <div class="permissions-list">
+        ${accounts.length === 0 ? '<p>Нет счетов</p>' : accounts.map(account => `
+          <div class="permission-item" data-account-id="${Number(account.id)}">
+            <div class="permission-account">
+              <strong>${esc(account.name)}</strong>
+              <span class="account-balance">${esc(UI.money(account.balance, account.currency))}</span>
             </div>
-          `).join('')}
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('permissions-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="savePermissions(${userId})">Сохранить</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
+            <div class="permission-checkboxes">
+              <label><input type="checkbox" class="perm-view" checked> Просмотр</label>
+              <label><input type="checkbox" class="perm-add"> Добавление</label>
+              <label><input type="checkbox" class="perm-edit"> Редактирование</label>
+              <label><input type="checkbox" class="perm-delete"> Удаление</label>
+            </div>
+          </div>
+        `).join('')}
+      </div>`,
+    footer: `
+      <button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button>
+      <button type="button" class="btn btn-primary" data-action="family:save-permissions" data-user="${Number(userId)}">Сохранить</button>`
+  });
 }
 
 async function savePermissions(userId) {
@@ -630,43 +614,57 @@ async function savePermissions(userId) {
     }
   }
 
-  closeModal('permissions-modal');
+  UI.closeModal('permissions-modal');
   showNotification('Права сохранены', 'success');
 }
 
 function toggleDropdown(btn) {
   const menu = btn.nextElementSibling;
+  if (!menu) return;
   const isOpen = menu.classList.contains('show');
 
   // Закрываем все открытые dropdown
-  document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+  closeFamilyDropdowns();
 
   if (!isOpen) {
     menu.classList.add('show');
+    btn.setAttribute('aria-expanded', 'true');
   }
+}
+
+function closeFamilyDropdowns() {
+  document.querySelectorAll('.dropdown-menu.show').forEach(m => {
+    m.classList.remove('show');
+    const toggle = m.previousElementSibling;
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  });
 }
 
 // Закрытие dropdown при клике вне
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.dropdown')) {
-    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
-  }
+  if (!e.target.closest('.dropdown')) closeFamilyDropdowns();
 });
 
-function closeModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) modal.remove();
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function formatCurrency(amount, currency = 'UAH') {
-  return new Intl.NumberFormat('uk-UA', {
-    style: 'currency',
-    currency: currency
-  }).format(amount);
-}
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
+  UI.actions({
+    'family:create': () => showCreateFamilyModal(),
+    'family:create-submit': () => submitCreateFamily(),
+    'family:join': () => showJoinFamilyModal(),
+    'family:join-submit': () => submitJoinFamily(),
+    'family:open': (el) => openFamilyDetails(Number(el.dataset.id)),
+    'family:back': () => renderFamilyPage(),
+    'family:copy-code': () => copyInviteCode(),
+    'family:regenerate': (el) => regenerateCode(Number(el.dataset.id)),
+    'family:menu': (el, e) => { e.stopPropagation(); toggleDropdown(el); },
+    'family:role': (el) => { closeFamilyDropdowns(); promoteMember(Number(el.dataset.id), Number(el.dataset.user), el.dataset.role); },
+    'family:kick': (el) => { closeFamilyDropdowns(); kickMember(Number(el.dataset.id), Number(el.dataset.user)); },
+    'family:permissions': (el) => { closeFamilyDropdowns(); showPermissionsModal(Number(el.dataset.user), el.dataset.username); },
+    'family:save-permissions': (el) => savePermissions(Number(el.dataset.user)),
+    'family:leave': (el) => confirmLeaveFamily(Number(el.dataset.id)),
+    'family:delete': (el) => confirmDeleteFamily(Number(el.dataset.id)),
+  });
+})();

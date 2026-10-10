@@ -160,7 +160,11 @@ async function saveExpense(form) {
   } catch (e) { showNotification(e.message, 'error'); }
 }
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'split:add-group': () => showAddGroupModal(),
     'split:save-group': (form) => saveGroup(form),
@@ -170,4 +174,4 @@ if (typeof window !== 'undefined' && window.UI) {
     'split:save-expense': (form) => saveExpense(form),
   });
   window.showAddGroupModal = showAddGroupModal; window.saveGroup = saveGroup; window.openGroup = openGroup; window.showAddExpenseModal = showAddExpenseModal; window.saveExpense = saveExpense;
-}
+})();

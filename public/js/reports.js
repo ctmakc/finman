@@ -298,7 +298,11 @@ const ReportsModule = {
   }
 };
 
-if (typeof window !== 'undefined' && window.UI) {
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
   UI.actions({
     'reports:generate-modal': (el) => ReportsModule.showGenerateModal(el.dataset.type),
     'reports:generate': () => ReportsModule.generateReport(),
@@ -307,4 +311,4 @@ if (typeof window !== 'undefined' && window.UI) {
     'reports:pdf': (el) => ReportsModule.downloadPdf(el.dataset.id),
     'reports:delete': (el) => ReportsModule.deleteReport(el.dataset.id),
   });
-}
+})();
