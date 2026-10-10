@@ -183,6 +183,17 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
       }
     }
     
+    // Email уникален (UNIQUE в users): проверяем заранее -> 409, иначе был 500.
+    if (email) {
+      const taken = await User.findByEmail(email);
+      if (taken && taken.id !== req.user.id) {
+        return res.status(409).json({
+          error: true,
+          message: 'Этот email уже используется другим аккаунтом'
+        });
+      }
+    }
+
     // Обновление данных пользователя
     const success = await User.update(req.user.id, {
       email,
@@ -207,6 +218,13 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
       });
     }
   } catch (error) {
+    // Гонка двух одновременных PUT с одним email: UNIQUE сработал после pre-check.
+    if (error && /UNIQUE constraint failed: users\.email/.test(error.message || '')) {
+      return res.status(409).json({
+        error: true,
+        message: 'Этот email уже используется другим аккаунтом'
+      });
+    }
     console.error('Ошибка при обновлении данных пользователя:', error);
     res.status(500).json({ 
       error: true, 
