@@ -439,13 +439,20 @@ async function fetchTransactions(filters = {}) {
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-bank-type" class="form-label">Тип банка</label>
+              <label for="${modalId}-bank-type" class="form-label">Bank format</label>
               <select id="${modalId}-bank-type" class="form-control">
-                <option value="generic">Общий формат</option>
-                <option value="tinkoff">Тинькофф</option>
-                <option value="sberbank">Сбербанк</option>
-                <option value="vtb">ВТБ</option>
-                <option value="alfabank">Альфа-Банк</option>
+                <option value="generic">Auto-detect</option>
+                <option value="rbc">RBC Royal Bank</option>
+                <option value="td">TD Canada Trust</option>
+                <option value="scotiabank">Scotiabank</option>
+                <option value="bmo">BMO</option>
+                <option value="cibc">CIBC</option>
+                <option value="tangerine">Tangerine</option>
+                <option value="wealthsimple">Wealthsimple Cash</option>
+                <option value="eqbank">EQ Bank</option>
+                <option value="monobank">Monobank</option>
+                <option value="revolut">Revolut</option>
+                <option value="wise">Wise</option>
               </select>
             </div>
             
