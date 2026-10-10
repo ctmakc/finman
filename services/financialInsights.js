@@ -293,10 +293,12 @@ function periodLabel(period) {
   return names[idx] ? `${names[idx]} ${m[1]}` : period;
 }
 
-function fallbackMonthlyStory(digest) {
+// opts.complete = the month is already over (past period): projections become results.
+function fallbackMonthlyStory(digest, opts = {}) {
   const inc = digest.income.thisMonth;
   const sp = digest.spend.thisMonth;
   const label = periodLabel(digest.period);
+  const complete = Boolean(opts.complete);
   const parts = [];
   if (!inc && !sp) {
     parts.push(`No income or spending recorded for ${label} yet.`);
@@ -313,13 +315,18 @@ function fallbackMonthlyStory(digest) {
     parts.push(`Biggest increase: ${m.category} at ${m.thisMonth} (was ${m.lastMonth}).`);
   }
   if (inc > 0) {
-    parts.push(`Savings rate so far: ${(digest.savingsRate * 100).toFixed(0)}%.`);
+    parts.push(`Savings rate${complete ? '' : ' so far'}: ${(digest.savingsRate * 100).toFixed(0)}%.`);
   }
-  parts.push(
-    digest.cashFlow.projectedNet >= 0
-      ? `At this pace the month ends about ${digest.cashFlow.projectedNet} ahead.`
-      : `At this pace the month ends about ${Math.abs(digest.cashFlow.projectedNet)} short — trim the top category to close the gap.`
-  );
+  const net = digest.cashFlow.projectedNet;
+  if (complete) {
+    parts.push(net >= 0 ? `The month closed about ${net} ahead.` : `The month closed about ${Math.abs(net)} short.`);
+  } else {
+    parts.push(
+      net >= 0
+        ? `At this pace the month ends about ${net} ahead.`
+        : `At this pace the month ends about ${Math.abs(net)} short — trim the top category to close the gap.`
+    );
+  }
   return parts.join(' ');
 }
 
@@ -342,7 +349,7 @@ function fallbackWeeklyBrief(week) {
 // ---------------------------------------------------------------------------
 
 function normalizeMonth(month, now) {
-  if (typeof month === 'string' && /^\d{4}-\d{2}$/.test(month)) return month;
+  if (typeof month === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return month;
   return monthKey(now);
 }
 
@@ -415,7 +422,7 @@ async function monthlyInsight(userOrId, opts = {}) {
     }
   }
   if (!insight.text) {
-    insight.text = fallbackMonthlyStory(digest);
+    insight.text = fallbackMonthlyStory(digest, { complete: month !== monthKey(now) });
     insight.aiUsed = false;
   }
 
@@ -439,7 +446,8 @@ async function monthlyInsight(userOrId, opts = {}) {
 async function weeklyBrief(userOrId, opts = {}) {
   const userId = toUserId(userOrId);
   const now = opts.now || new Date();
-  const since = isoDate(new Date(now.getTime() - 7 * 864e5));
+  // Seven calendar days inclusive: today plus the six days before it.
+  const since = isoDate(new Date(now.getTime() - 6 * 864e5));
   const until = isoDate(now);
 
   const [transactions, dailyTotals] = await Promise.all([
@@ -496,35 +504,35 @@ async function weeklyBrief(userOrId, opts = {}) {
   let aiError = null;
   if (provider.isConfigured() && transactions.length) {
     try {
-    const digest = await buildDigest(userId, { now });
-    const weekData = {
-      since,
-      totalSpent,
-      totalEarned,
-      dailyTotals: week.dailyTotals,
-      recentTransactions: transactions.slice(0, 10).map((t) => ({
-        date: t.date,
-        amount: round2(t.amount),
-        type: t.type,
-        category: t.category,
-        description: t.description,
-      })),
-    };
-    const result = await provider.chat({
-      system: `${GROUNDING_SYSTEM}\n\n${digestToPrompt(digest)}`,
-      messages: [
-        {
-          role: 'user',
-          content:
-            'Write a 2-3 sentence weekly spending brief. Be specific, casual and friendly. ' +
-            'Use the FINANCIAL DIGEST for the month context and the week data below for recency.\n\n' +
-            `Week data: ${JSON.stringify(weekData)}`,
-        },
-      ],
-      maxTokens: 300,
-    });
-    brief = (result && result.text) || '';
-    aiUsed = Boolean(brief);
+      const digest = await buildDigest(userId, { now });
+      const weekData = {
+        since,
+        totalSpent,
+        totalEarned,
+        dailyTotals: week.dailyTotals,
+        recentTransactions: transactions.slice(0, 10).map((t) => ({
+          date: t.date,
+          amount: round2(t.amount),
+          type: t.type,
+          category: t.category,
+          description: t.description,
+        })),
+      };
+      const result = await provider.chat({
+        system: `${GROUNDING_SYSTEM}\n\n${digestToPrompt(digest)}`,
+        messages: [
+          {
+            role: 'user',
+            content:
+              'Write a 2-3 sentence weekly spending brief. Be specific, casual and friendly. ' +
+              'Use the FINANCIAL DIGEST for the month context and the week data below for recency.\n\n' +
+              `Week data: ${JSON.stringify(weekData)}`,
+          },
+        ],
+        maxTokens: 300,
+      });
+      brief = (result && result.text) || '';
+      aiUsed = Boolean(brief);
     } catch (err) {
       aiError = (err && err.code) || 'AI_REQUEST_FAILED';
       logger.warn({ err: err && err.message, userId }, 'weeklyBrief: provider failed, deterministic fallback');

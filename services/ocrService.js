@@ -476,6 +476,7 @@ async function processImage(input, options = {}) {
     logger.warn({ err: err && err.message }, 'OCR recognize failed');
     return {
       ocr_status: 'failed',
+      ocr_engine: 'tesseract',
       ocr_raw: null,
       merchant: null,
       total_amount: null,
@@ -508,6 +509,7 @@ async function processImage(input, options = {}) {
     logger.error({ err: err && err.message }, 'OCR parse failed');
     return {
       ocr_status: 'failed',
+      ocr_engine: 'tesseract',
       ocr_raw: rawText || null,
       merchant: null,
       total_amount: null,

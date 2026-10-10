@@ -172,8 +172,8 @@ router.get(
   '/insights/monthly',
   wrap(async (req, res) => {
     const q = req.query || {};
-    if (q.month !== undefined && !/^\d{4}-\d{2}$/.test(String(q.month))) {
-      throw new AppError(400, 'INVALID_MONTH', 'Query "month" must be YYYY-MM');
+    if (q.month !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(q.month))) {
+      throw new AppError(400, 'INVALID_MONTH', 'Query "month" must be YYYY-MM (month 01-12)');
     }
     const result = await insights.monthlyInsight(req.user.id, {
       month: q.month,
