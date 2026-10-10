@@ -132,6 +132,27 @@ describe('app.js shell helpers (node)', () => {
     expect(new Set(pages).size).toBe(pages.length);
   });
 
+  test('app.js globals are not redeclared by the feature modules (shadowing)', () => {
+    // All files are classic scripts sharing one global scope: a later
+    // `function x()` silently replaces app.js's x. (Regression: currency.js
+    // shadowed fetchCurrencySettings, so the base currency never applied and
+    // a failed /api/currency/settings left the app on the spinner.)
+    const names = [...read('js/app.js').matchAll(/^(?:async )?function ([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+    const dir = path.join(PUBLIC, 'js');
+    const modules = fs.readdirSync(dir).filter((f) => f.endsWith('.js') && f !== 'app.js');
+    const known = { formatCurrency: ['recurring.js', 'family.js'] }; // fe-logic removes these
+    const clashes = [];
+    for (const file of modules) {
+      const src = fs.readFileSync(path.join(dir, file), 'utf8');
+      for (const n of names) {
+        if (new RegExp('^(?:async )?function ' + n + '\\b', 'm').test(src) && !(known[n] || []).includes(file)) {
+          clashes.push(`${n} in ${file}`);
+        }
+      }
+    }
+    expect(clashes).toEqual([]);
+  });
+
   test('app.js own strings are English and no RUB default remains', () => {
     const src = read('js/app.js');
     expect(/[Ѐ-ӿ]/.test(src)).toBe(false);

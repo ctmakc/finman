@@ -214,7 +214,7 @@ async function initApp() {
   await Promise.all([
     fetchAccounts(),
     fetchSupportedBanks(),
-    fetchCurrencySettings()
+    loadBaseCurrencySettings()
   ]);
 
   navigateTo(resolvePageFromPath(window.location.pathname), { replace: true });
@@ -671,8 +671,9 @@ async function fetchSupportedBanks() {
   }
 }
 
-// Base currency for formatCurrency; falls back to CAD silently.
-async function fetchCurrencySettings() {
+// Base currency for formatCurrency; falls back to CAD silently. (Named to avoid
+// the global `fetchCurrencySettings` that currency.js declares later.)
+async function loadBaseCurrencySettings() {
   try {
     const response = await fetchWithAuth('/api/currency/settings');
     if (!response.ok) return null;
