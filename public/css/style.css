@@ -4261,3 +4261,24 @@ textarea:focus-visible, .chip:focus-visible, [tabindex]:focus-visible {
 .sub-candidate-info { display: flex; flex-direction: column; gap: 2px; }
 .sub-candidate-info strong { color: var(--fm-ink, #11131B); }
 .sub-candidate-info small { color: var(--fm-ink-3, #8A90A2); font-variant-numeric: tabular-nums; }
+
+/* --- Google sign-in (login page; token-based, light+dark follow the theme) --- */
+.auth-social { margin-bottom: 1rem; }
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: .6rem;
+  width: 100%; padding: .7rem 1rem; cursor: pointer;
+  border: 1px solid var(--fm-border-strong); border-radius: 8px;
+  background: var(--fm-surface); color: var(--fm-ink);
+  font-size: .95rem; font-weight: 500; text-decoration: none;
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.btn-google:hover { background: var(--fm-surface-2); box-shadow: var(--shadow-sm); }
+.btn-google:focus-visible { outline: 2px solid var(--fm-primary); outline-offset: 2px; }
+.btn-google svg { flex: none; }
+.auth-divider { position: relative; text-align: center; margin: 1rem 0 .25rem; }
+.auth-divider::before {
+  content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--fm-border);
+}
+.auth-divider span {
+  position: relative; padding: 0 .75rem; background: var(--fm-surface); color: var(--fm-ink-3); font-size: .85rem;
+}
