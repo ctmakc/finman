@@ -109,7 +109,7 @@ async function fetchTransactions(filters = {}) {
       monthlyTransactions.forEach(transaction => {
         if (transaction.type === 'income') {
           stats.monthlyIncome += transaction.amount;
-        } else {
+        } else if (transaction.type === 'expense') {
           stats.monthlyExpense += Math.abs(transaction.amount);
         }
         
@@ -560,7 +560,7 @@ async function fetchTransactions(filters = {}) {
       const isTransfer = transaction.type === 'transfer';
       const isIncome = !isTransfer && transaction.type === 'income';
       // Для перевода знак определяем по сумме строки (списание < 0, зачисление > 0).
-      const isInflow = isTransfer ? transaction.amount >= 0 : isIncome;
+      const isInflow = (isTransfer || transaction.type === 'opening') ? transaction.amount >= 0 : isIncome;
       const category = transaction.category || 'Без категории';
       const description = transaction.description || 'Без описания';
       // Класс/иконка/цвет суммы — отдельно для переводов, чтобы показать их

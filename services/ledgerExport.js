@@ -104,6 +104,8 @@ function assetAccount(account) {
 }
 
 function categoryAccount(type, category) {
+  // Начальный баланс счёта — не доход и не расход: Equity:Opening-Balances.
+  if (type === 'opening') return 'Equity:Opening-Balances';
   const root = type === 'income' ? 'Income' : 'Expenses';
   const comp = accountComponent(category, 'Uncategorized');
   return `${root}:${comp}`;

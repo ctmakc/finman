@@ -50,29 +50,17 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
     
-    // Создание счета
-    const newAccount = await Account.create({
+    // Создание счета: баланс пишется один раз + одна строка type='opening'
+    // в леджер (не доход и не расход) — атомарно.
+    const newAccount = await Account.createWithOpeningBalance({
       userId: req.user.id,
       name,
       accountNumber,
       bankName,
       currency,
-      balance: balance || 0,
+      balance: Number(balance) || 0,
       accountType
     });
-    
-    // Если указан начальный баланс, создать стартовую транзакцию
-    if (balance && balance !== 0) {
-      await Transaction.create({
-        accountId: newAccount.id,
-        userId: req.user.id,
-        date: new Date().toISOString().split('T')[0],
-        description: 'Начальный баланс',
-        category: 'Начальный баланс',
-        amount: balance,
-        type: balance > 0 ? 'income' : 'expense'
-      });
-    }
     
     res.status(201).json(newAccount);
   } catch (error) {
@@ -269,8 +257,15 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
     // Получаем владельца счета
     const { get } = require('../db/database');
     const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [req.params.id]);
+    if (!account) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
+      });
+    }
 
-    // Получение транзакций
+    // Получение транзакций (леджер владельца; транзакции контрибьюторов
+    // расшаренного счёта хранятся под user_id владельца — см. routes/transactions.js)
     const transactions = await Transaction.findByUserId(account.user_id, {
       accountId: req.params.id,
       startDate,
