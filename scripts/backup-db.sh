@@ -51,6 +51,12 @@ else
   ' "$DB_PATH" "$OUT"
 fi
 
+# `docker exec` runs as root by default; hand the snapshot to the DB file's owner
+# (uid 1000 / node) so the app user can read and rotate it.
+if [ "$(id -u)" = "0" ]; then
+  chown --reference="$DB_PATH" "$OUT" 2>/dev/null || true
+fi
+
 SIZE="$(wc -c < "$OUT" | tr -d ' ')"
 echo "[backup] wrote $OUT ($SIZE bytes)"
 
