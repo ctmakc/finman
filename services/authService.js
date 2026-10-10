@@ -64,7 +64,8 @@ async function googleVerify(accessToken, refreshToken, profile, done) {
       const existing = await User.findByEmail(email);
       if (existing) {
         await User.linkGoogle(existing.id, googleId, avatarUrl);
-        return done(null, existing);
+        // Отдаём свежую строку (с google_id/avatar_url), а не снимок до привязки.
+        return done(null, (await User.findById(existing.id)) || existing);
       }
     }
 

@@ -197,6 +197,27 @@ describe('Google sign-in: enabled with credentials', () => {
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
+  test('verify: password account registered with a MIXED-case email is linked, not duplicated', async () => {
+    const db = require('../db/database');
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('pw-mixed', 4);
+    await db.run("INSERT INTO users (username, email, password, full_name) VALUES ('mixedcase', 'Mixed.Case@Example.com', ?, 'Mixed')", [hash]);
+    const before = (await db.query('SELECT COUNT(*) AS n FROM users'))[0].n;
+
+    // Google всегда отдаёт email в нижнем регистре.
+    const { err, user } = await runVerify(authService.googleVerify, profile({
+      id: 'g-5005',
+      emails: [{ value: 'mixed.case@example.com' }],
+    }));
+    expect(err).toBeFalsy();
+    expect(user.username).toBe('mixedcase');
+    expect(user.google_id).toBe('g-5005');
+    const after = (await db.query('SELECT COUNT(*) AS n FROM users'))[0].n;
+    expect(after).toBe(before); // привязка, не второй аккаунт
+    await signupNotify.flush();
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
   test('verify: profile without email -> rejected, nothing created', async () => {
     const before = (await require('../db/database').query('SELECT COUNT(*) AS n FROM users'))[0].n;
     const { err, user, info } = await runVerify(authService.googleVerify, profile({ id: 'g-3003', emails: [] }));

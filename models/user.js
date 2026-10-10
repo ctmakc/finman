@@ -95,11 +95,13 @@ class User {
       [googleId, avatarUrl || null, userId]);
   }
 
-  // Поиск пользователя по email
+  // Поиск пользователя по email. Регистр не учитываем: /register хранит email
+  // как ввели, а Google отдаёт его в нижнем регистре — иначе вход через Google
+  // создавал бы второй аккаунт на тот же адрес вместо привязки.
   static async findByEmail(email) {
     try {
       const user = await get(
-        `SELECT * FROM users WHERE email = ?`,
+        `SELECT * FROM users WHERE email = ? COLLATE NOCASE`,
         [email]
       );
       
