@@ -12,7 +12,8 @@
 // Экспорт:
 //   isConfigured()                         -> boolean
 //   getFrom()                              -> string (адрес отправителя)
-//   sendEmail({ to, subject, html, text }) -> Promise<{ sent, skipped?, id?, reason?, error? }>
+//   sendEmail({ to, subject, html, text, from?, replyTo? }) -> Promise<{ sent, skipped?, id?, reason?, error? }>
+//     from/replyTo необязательны: from перекрывает MAIL_FROM для одного письма.
 
 'use strict';
 
@@ -45,7 +46,7 @@ function normalizeRecipients(to) {
 }
 
 // Отправка письма. Никогда не бросает — всегда резолвится объектом-результатом.
-async function sendEmail({ to, subject, html, text } = {}) {
+async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
   const recipients = normalizeRecipients(to);
 
   if (recipients.length === 0) {
@@ -63,10 +64,12 @@ async function sendEmail({ to, subject, html, text } = {}) {
   }
 
   const payload = {
-    from: getFrom(),
+    // Явный from (например, LEAD_NOTIFY_FROM у signupNotify) важнее MAIL_FROM.
+    from: from || getFrom(),
     to: recipients,
     subject: subject || '(без темы)',
   };
+  if (replyTo) payload.reply_to = replyTo;
   if (html) payload.html = html;
   // Resend требует html или text; если html нет — гарантируем text.
   if (text || !html) payload.text = text || '';
