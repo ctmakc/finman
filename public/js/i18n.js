@@ -17,14 +17,14 @@
 //   onChange(cb) -> subscribe to language changes; returns unsubscribe.
 //   available()  -> list of available language codes.
 //
-// Default language: uk (with en, ru). Persisted to localStorage.
+// Default language: en (with uk, ru). Persisted to localStorage.
 
 (function (root) {
   'use strict';
 
   var STORAGE_KEY = 'finman_lang';
-  var DEFAULT_LANG = 'uk';
-  var SUPPORTED = ['uk', 'en', 'ru'];
+  var DEFAULT_LANG = 'en';
+  var SUPPORTED = ['en', 'uk', 'ru'];
 
   // Dictionaries: in the browser they come from window.FINMAN_LOCALES
   // (populated by the locale script tags). In node/tests the caller may
@@ -179,15 +179,12 @@
   }
 
   // ---- bootstrap: pick stored or browser language, then translate ----
+  // English-first: only an explicit, stored choice overrides the default.
+  // The browser language is deliberately not sniffed (the uk/ru dictionaries
+  // cover a fraction of the UI until the module-translation wave lands).
   function detectInitialLang() {
     var stored = readStored();
     if (stored && isSupported(stored)) return stored;
-    try {
-      if (typeof root !== 'undefined' && root.navigator && root.navigator.language) {
-        var nav = String(root.navigator.language).slice(0, 2).toLowerCase();
-        if (isSupported(nav)) return nav;
-      }
-    } catch (e) { /* ignore */ }
     return DEFAULT_LANG;
   }
 
