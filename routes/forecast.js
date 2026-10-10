@@ -3,6 +3,19 @@ const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
 const money = require('../lib/money');
+const dates = require('../lib/dates');
+const { cashflowOnly } = require('../lib/txFilter');
+
+// Фильтр денежного потока (без переводов и начального баланса): иначе
+// стартовый баланс счёта выглядит как доход и прогноз даёт «+116.8 % за 30 дней».
+const CF = cashflowOnly();
+
+// Процент с защитой от абсурда: |x| <= 999, не-число -> null.
+function capPercent(v, max = 999) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(-max, Math.min(max, Math.round(n * 10) / 10));
+}
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -17,6 +30,7 @@ router.get('/balance', async (req, res) => {
     const { days = 30 } = req.query;
     const horizon = Math.max(1, parseInt(days) || 30);
     const userId = req.user.id;
+    const todayStr = dates.todayISO(dates.userTz(req.user));
 
     // Текущий баланс
     const currentBalance = await get(
@@ -26,43 +40,40 @@ router.get('/balance', async (req, res) => {
 
     // Период истории для обучения модели (по умолчанию 90 дней).
     const HISTORY_DAYS = 90;
-    const historyStart = new Date();
-    historyStart.setDate(historyStart.getDate() - HISTORY_DAYS);
-    const historyStartStr = historyStart.toISOString().split('T')[0];
+    const historyStartStr = dates.addDaysISO(todayStr, -HISTORY_DAYS);
 
-    // Дневные суммы доходов/расходов из истории.
+    // Дневные суммы доходов/расходов из истории (только денежный поток).
     const dailyRows = await query(
       `SELECT date,
               SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END) AS income,
               SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
        FROM transactions
-       WHERE user_id = ? AND date >= ?
+       WHERE user_id = ? AND date >= ?${CF.sql}
        GROUP BY date
        ORDER BY date ASC`,
-      [userId, historyStartStr]
+      [userId, historyStartStr, ...CF.params]
     );
 
     // Средние расходы за последние 3 месяца (СОХРАНЯЕМ старое поведение для
     // обратной совместимости полей summary.avgDaily*).
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const threeMonthsAgoStr = dates.addMonthsISO(todayStr, -3);
     const avgExpenses = await get(
       `SELECT AVG(daily_total) as avg FROM (
         SELECT date, SUM(amount) as daily_total
         FROM transactions
-        WHERE user_id = ? AND type = 'expense' AND date >= ?
+        WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
         GROUP BY date
       )`,
-      [userId, threeMonthsAgo.toISOString().split('T')[0]]
+      [userId, threeMonthsAgoStr, ...CF.params]
     );
     const avgIncome = await get(
       `SELECT AVG(daily_total) as avg FROM (
         SELECT date, SUM(amount) as daily_total
         FROM transactions
-        WHERE user_id = ? AND type = 'income' AND date >= ?
+        WHERE user_id = ? AND type = 'income' AND date >= ?${CF.sql}
         GROUP BY date
       )`,
-      [userId, threeMonthsAgo.toISOString().split('T')[0]]
+      [userId, threeMonthsAgoStr, ...CF.params]
     );
 
     // Регулярные платежи. Колонка даты в схеме — next_payment_date; читаем
@@ -98,16 +109,13 @@ router.get('/balance', async (req, res) => {
 
     const forecast = [];
     let balance = currentBalance.total || 0;
-    const today = new Date();
 
     // Доверительный коридор: +/- z * std остатков, расширяется ~sqrt(шага).
     const Z = 1; // 1 std (~68%)
     const residualStd = haveModel ? model.residualStd : 0;
 
     for (let i = 0; i <= horizon; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = dates.addDaysISO(todayStr, i);
 
       // Базовый прогноз дневного net из модели (или плоский fallback).
       const modeledNet = haveModel ? predictNet(model, i) : flatNet;
@@ -178,7 +186,8 @@ router.get('/balance', async (req, res) => {
         currentBalance: currentBalance.total || 0,
         projectedBalance: endBalance,
         change,
-        changePercent: currentBalance.total ? ((change / currentBalance.total) * 100).toFixed(1) : 0,
+        // Процент к текущему балансу; при балансе ~0 бессмысленен -> null, иначе |x| <= 999.
+        changePercent: Math.abs(currentBalance.total || 0) >= 1 ? capPercent((change / currentBalance.total) * 100) : null,
         lowestPoint,
         lowestDate,
         avgDailyExpense: money.round(dailyExpense),
@@ -207,10 +216,10 @@ router.get('/expenses', async (req, res) => {
   try {
     const { days = 30 } = req.query;
     const userId = req.user.id;
+    const todayStr = dates.todayISO(dates.userTz(req.user));
 
-    // Средние расходы по категориям за последние 3 месяца
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    // Средние расходы по категориям за последние 3 месяца (только денежный поток)
+    const threeMonthsAgoStr = dates.addMonthsISO(todayStr, -3);
 
     const categoryAvg = await query(
       `SELECT category,
@@ -218,10 +227,10 @@ router.get('/expenses', async (req, res) => {
               COUNT(DISTINCT date) as days,
               SUM(amount) / COUNT(DISTINCT date) as daily_avg
        FROM transactions
-       WHERE user_id = ? AND type = 'expense' AND date >= ?
+       WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
        GROUP BY category
        ORDER BY total DESC`,
-      [userId, threeMonthsAgo.toISOString().split('T')[0]]
+      [userId, threeMonthsAgoStr, ...CF.params]
     );
 
     const projections = categoryAvg.map(cat => ({
@@ -253,10 +262,10 @@ router.get('/goal/:id', async (req, res) => {
       return res.status(404).json({ message: 'Цель не найдена' });
     }
 
-    // История пополнений
+    // История пополнений. В goal_contributions нет колонки date — есть created_at.
     const contributions = await query(
-      `SELECT date, amount FROM goal_contributions
-       WHERE goal_id = ? ORDER BY date`,
+      `SELECT date(created_at) as date, amount FROM goal_contributions
+       WHERE goal_id = ? ORDER BY created_at`,
       [goal.id]
     );
 
@@ -332,8 +341,9 @@ router.get('/debt/:id', async (req, res) => {
     const remaining = debt.amount - debt.paid_amount;
 
     // История платежей
+    // В debt_payments дата платежа — payment_date (колонки date нет).
     const payments = await query(
-      `SELECT date, amount FROM debt_payments WHERE debt_id = ? ORDER BY date`,
+      `SELECT payment_date as date, amount FROM debt_payments WHERE debt_id = ? ORDER BY payment_date`,
       [debt.id]
     );
 
@@ -374,22 +384,22 @@ router.get('/debt/:id', async (req, res) => {
 router.get('/trends', async (req, res) => {
   try {
     const userId = req.user.id;
+    const todayStr = dates.todayISO(dates.userTz(req.user));
+    const thisMonthStart = dates.startOfMonthISO(todayStr);
 
-    // Данные за последние 6 месяцев
+    // Данные за последние 6 месяцев (только денежный поток)
     const months = [];
     for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-      const end = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+      const start = dates.addMonthsISO(thisMonthStart, -i, 1);
+      const end = dates.endOfMonthISO(start);
 
       const income = await get(
-        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?`,
-        [userId, start, end]
+        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?${CF.sql}`,
+        [userId, start, end, ...CF.params]
       );
       const expense = await get(
-        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
-        [userId, start, end]
+        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
+        [userId, start, end, ...CF.params]
       );
 
       months.push({
@@ -412,9 +422,9 @@ router.get('/trends', async (req, res) => {
     res.json({
       months,
       trends: {
-        income: { direction: incomesTrend > 0 ? 'up' : 'down', percent: Math.abs(incomesTrend).toFixed(1) },
-        expense: { direction: expensesTrend > 0 ? 'up' : 'down', percent: Math.abs(expensesTrend).toFixed(1) },
-        savings: { direction: savingsTrend > 0 ? 'up' : 'down', percent: Math.abs(savingsTrend).toFixed(1) }
+        income: { direction: incomesTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(incomesTrend)) ?? 0) },
+        expense: { direction: expensesTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(expensesTrend)) ?? 0) },
+        savings: { direction: savingsTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(savingsTrend)) ?? 0) }
       },
       prediction: {
         nextMonthIncome: Math.round(nextMonthIncome),

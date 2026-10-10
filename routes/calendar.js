@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const { todayISO, userTz, addDaysISO, startOfMonthISO, endOfMonthISO } = require('../lib/dates');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -9,24 +10,30 @@ router.use(authenticate);
 // Получить события за период
 router.get('/events', async (req, res) => {
   try {
-    const { start, end, type } = req.query;
+    const { type } = req.query;
+    // Без start/end — текущий месяц в часовом поясе пользователя.
+    const today = todayISO(userTz(req.user));
+    const start = req.query.start || startOfMonthISO(today);
+    const end = req.query.end || endOfMonthISO(today);
 
-    let typeFilter = '';
-    if (type) typeFilter = `AND event_type = '${type}'`;
+    // Фильтр по типу — параметром, не интерполяцией.
+    const typeFilter = type ? 'AND event_type = ?' : '';
+    const eventParams = type ? [req.user.id, start, end, type] : [req.user.id, start, end];
 
     // Пользовательские события
     const events = await query(
       `SELECT * FROM calendar_events
        WHERE user_id = ? AND event_date >= ? AND event_date <= ? ${typeFilter}
        ORDER BY event_date`,
-      [req.user.id, start, end]
+      eventParams
     );
 
-    // Регулярные платежи
+    // Регулярные платежи. Схема: recurring_payments.name / next_payment_date
+    // (колонок description-as-title и next_execution_date нет -> SQLITE_ERROR).
     const recurring = await query(
-      `SELECT id, description as title, amount, 'recurring' as event_type, next_execution_date as event_date, '#FF9800' as color
+      `SELECT id, name as title, amount, 'recurring' as event_type, next_payment_date as event_date, '#FF9800' as color
        FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1 AND next_execution_date >= ? AND next_execution_date <= ?`,
+       WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
       [req.user.id, start, end]
     );
 
@@ -71,8 +78,8 @@ router.get('/events', async (req, res) => {
 // Предстоящие события (7 дней)
 router.get('/upcoming', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = todayISO(userTz(req.user));
+    const weekLater = addDaysISO(today, 7);
 
     const events = await query(
       `SELECT * FROM calendar_events
@@ -82,9 +89,9 @@ router.get('/upcoming', async (req, res) => {
     );
 
     const recurring = await query(
-      `SELECT id, description as title, amount, type, 'recurring' as event_type, next_execution_date as event_date
+      `SELECT id, name as title, amount, type, 'recurring' as event_type, next_payment_date as event_date
        FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1 AND next_execution_date >= ? AND next_execution_date <= ?`,
+       WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ?`,
       [req.user.id, today, weekLater]
     );
 

@@ -14,6 +14,8 @@ const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
 const { ok } = require('../lib/respond');
+const dates = require('../lib/dates');
+const { cashflowOnly } = require('../lib/txFilter');
 const { AppError } = require('../middleware/error');
 
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -125,25 +127,25 @@ router.get('/:type/data', async (req, res, next) => {
         data = await getNetWorthData(req.user.id);
         break;
       case 'cashflow':
-        data = await getCashflowData(req.user.id, period);
+        data = await getCashflowData(req.user.id, period, dates.userTz(req.user));
         break;
       case 'budget':
         data = await getBudgetData(req.user.id);
         break;
       case 'expenses':
-        data = await getExpensesData(req.user.id, period);
+        data = await getExpensesData(req.user.id, period, dates.userTz(req.user));
         break;
       case 'income':
-        data = await getIncomeData(req.user.id, period);
+        data = await getIncomeData(req.user.id, period, dates.userTz(req.user));
         break;
       case 'goals':
         data = await getGoalsData(req.user.id);
         break;
       case 'upcoming':
-        data = await getUpcomingData(req.user.id);
+        data = await getUpcomingData(req.user.id, dates.userTz(req.user));
         break;
       case 'top_categories':
-        data = await getTopCategoriesData(req.user.id, period);
+        data = await getTopCategoriesData(req.user.id, period, dates.userTz(req.user));
         break;
       case 'subscriptions':
         data = await getSubscriptionsData(req.user.id);
@@ -342,21 +344,24 @@ router.delete('/:id', async (req, res, next) => {
 
 // ==================== ФУНКЦИИ ДАННЫХ ВИДЖЕТОВ ====================
 
-function monthStart() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+// Границы периодов — в часовом поясе пользователя (tz), не в UTC.
+function monthStart(tz) {
+  return dates.startOfMonthISO(dates.todayISO(tz));
 }
 
-function periodStart(period) {
-  const now = new Date();
+function periodStart(period, tz) {
+  const today = dates.todayISO(tz);
   if (period === 'year') {
-    return new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+    return `${today.slice(0, 4)}-01-01`;
   }
   if (period === 'week') {
-    return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    return dates.addDaysISO(today, -7);
   }
-  return monthStart();
+  return monthStart(tz);
 }
+
+// Единый фильтр денежного потока: без переводов и начального баланса.
+const CF = cashflowOnly();
 
 async function getBalanceData(userId) {
   const result = await get('SELECT SUM(balance) as total FROM accounts WHERE user_id = ?', [userId]);
@@ -381,15 +386,15 @@ async function getNetWorthData(userId) {
   return { netWorth, assets: accountsTotal + assetsTotal, liabilities };
 }
 
-async function getCashflowData(userId, period) {
-  const start = periodStart(period);
+async function getCashflowData(userId, period, tz) {
+  const start = periodStart(period, tz);
   const income = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ?`,
-    [userId, start]
+    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ?${CF.sql}`,
+    [userId, start, ...CF.params]
   );
   const expense = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?`,
-    [userId, start]
+    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
+    [userId, start, ...CF.params]
   );
   const incomeTotal = (income && income.total) || 0;
   const expenseTotal = (expense && expense.total) || 0;
@@ -409,20 +414,20 @@ async function getBudgetData(userId) {
   return { budgets, count: budgets.length };
 }
 
-async function getExpensesData(userId, period) {
-  const start = periodStart(period);
+async function getExpensesData(userId, period, tz) {
+  const start = periodStart(period, tz);
   const result = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?`,
-    [userId, start]
+    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
+    [userId, start, ...CF.params]
   );
   return { total: (result && result.total) || 0, period };
 }
 
-async function getIncomeData(userId, period) {
-  const start = periodStart(period);
+async function getIncomeData(userId, period, tz) {
+  const start = periodStart(period, tz);
   const result = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ?`,
-    [userId, start]
+    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ?${CF.sql}`,
+    [userId, start, ...CF.params]
   );
   return { total: (result && result.total) || 0, period };
 }
@@ -440,9 +445,9 @@ async function getGoalsData(userId) {
   };
 }
 
-async function getUpcomingData(userId) {
-  const today = new Date().toISOString().split('T')[0];
-  const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+async function getUpcomingData(userId, tz) {
+  const today = dates.todayISO(tz);
+  const weekLater = dates.addDaysISO(today, 7);
 
   // ВАЖНО: колонка recurring_payments — next_payment_date (а не *_execution_date).
   const recurring = await query(
@@ -463,16 +468,16 @@ async function getUpcomingData(userId) {
   return { items };
 }
 
-async function getTopCategoriesData(userId, period) {
-  const start = periodStart(period);
+async function getTopCategoriesData(userId, period, tz) {
+  const start = periodStart(period, tz);
   const rows = await query(
     `SELECT COALESCE(category, 'Без категории') as category, SUM(amount) as total, COUNT(*) as count
      FROM transactions
-     WHERE user_id = ? AND type = 'expense' AND date >= ?
+     WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
      GROUP BY category
      ORDER BY total DESC
      LIMIT 5`,
-    [userId, start]
+    [userId, start, ...CF.params]
   );
   const grand = rows.reduce((s, r) => s + (r.total || 0), 0);
   return {
@@ -542,8 +547,8 @@ async function getChartExpensesData(userId) {
     const end = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
 
     const result = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
-      [userId, start, end]
+      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
+      [userId, start, end, ...CF.params]
     );
     data.push({ month: start.substring(0, 7), amount: (result && result.total) || 0 });
   }
