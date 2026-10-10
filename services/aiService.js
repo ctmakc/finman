@@ -13,6 +13,8 @@ const money = require('../lib/money');
 const provider = require('../lib/ai/provider');
 const { AppError } = require('../middleware/error');
 const AiConversation = require('../models/aiConversation');
+const insights = require('./financialInsights');
+const logger = require('../lib/logger');
 
 // Сколько последних транзакций и сообщений тянуть в контекст.
 const RECENT_TX_LIMIT = 30;
@@ -218,7 +220,18 @@ async function buildFinancialContext(userId) {
       : null,
   };
 
-  context.text = renderContextText(context);
+  // PORT_PLAN A8: the deterministic FINANCIAL DIGEST comes first in the grounding block,
+  // so the CFO's numbers (deltas, anomalies, projections) are pre-computed, never guessed.
+  context.digest = null;
+  context.digestText = '';
+  try {
+    context.digest = await insights.buildDigest(userId);
+    context.digestText = insights.digestToPrompt(context.digest);
+  } catch (err) {
+    logger.warn({ err: err && err.message, userId }, 'aiService: digest grounding skipped');
+  }
+  context.snapshotText = renderContextText(context);
+  context.text = [context.digestText, context.snapshotText].filter(Boolean).join('\n\n');
   return context;
 }
 
@@ -300,6 +313,7 @@ function renderContextText(ctx) {
 
 function buildSystemPrompt(contextText) {
   return [
+    insights.GROUNDING_SYSTEM,
     'You are the user\'s personal AI Financial CFO inside a personal-finance app.',
     'Speak like a pragmatic, friendly chief financial officer: concise, specific, actionable.',
     'CRITICAL GROUNDING RULES:',
