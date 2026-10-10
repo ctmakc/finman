@@ -555,9 +555,14 @@ function getFrequencyLabel(frequency) {
   return labels[frequency] || frequency;
 }
 
+// «1 дек.» для текущего года, «1 дек. 2025» — для любого другого: иначе
+// просроченный с прошлого года платёж выглядит как будущий.
 function formatDateShort(dateStr) {
   const date = new Date(dateStr);
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  if (Number.isNaN(date.getTime())) return UI.esc(dateStr || '');
+  const opts = { day: 'numeric', month: 'short' };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return date.toLocaleDateString('ru-RU', opts);
 }
 
 // HTML-экранирование и форматирование денег — общие (lib/ui.js). Раньше здесь

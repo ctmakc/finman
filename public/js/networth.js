@@ -136,15 +136,20 @@ const NetWorthModule = {
     const container = document.getElementById('networth-details');
     if (!container || !this.current) return;
 
+    // networthService returns plain numbers per group; the legacy shape was { total }.
     const ab = this.current.assetsBreakdown || {};
-    const row = (label, group) => `<div class="breakdown-row"><span>${label}</span><span>${this.fmt((group && group.total) || 0)}</span></div>`;
+    const lb = this.current.liabilitiesBreakdown || {};
+    const val = (g) => (g && typeof g === 'object') ? Number(g.total) || 0 : Number(g) || 0;
+    const row = (label, group) => group === undefined ? '' : `<div class="breakdown-row"><span>${label}</span><span>${this.fmt(val(group))}</span></div>`;
     container.innerHTML = `
       <div class="card"><h3>📊 Разбивка активов <small class="text-secondary">(${UI.esc(this.base())})</small></h3>
         <div class="breakdown-list">
           ${row('Счета', ab.accounts)}
           ${row('Инвестиции', ab.investments)}
-          ${row('Ручные активы', ab.manualAssets)}
+          ${row('Накопления (цели)', ab.savings)}
+          ${row('Ручные активы', ab.manual !== undefined ? ab.manual : ab.manualAssets)}
           ${row('Вам должны', ab.receivables)}
+          ${row('Долги', lb.debts)}
         </div>
       </div>
     `;

@@ -125,6 +125,9 @@
   function moneyList(totals, opts) {
     opts = opts || {};
     var codes = Object.keys(totals || {});
+    // Zero rows only add noise next to a real amount; keep one when all are zero.
+    var nonZero = codes.filter(function (c) { return Number(totals[c]) !== 0; });
+    if (nonZero.length && nonZero.length < codes.length) codes = nonZero;
     if (!codes.length) return '<span class="fm-money-list"><span class="fm-money">' + esc(money(0, opts.fallbackCurrency)) + '</span></span>';
     return '<span class="fm-money-list">' + codes.map(function (code) {
       var v = totals[code];

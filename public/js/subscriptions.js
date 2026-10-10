@@ -85,7 +85,7 @@ const SubscriptionsModule = {
         </div>
         <div class="subscription-details">
           <span>Следующий платёж: <strong>${UI.esc(sub.next_billing_date || 'Не указан')}</strong></span>
-          <span>${sub.daysUntilBilling != null ? (sub.daysUntilBilling <= 0 ? '⚠️ Сегодня/Просрочен' : sub.daysUntilBilling + ' дн.') : ''}</span>
+          <span>${this.dueLabel(sub.daysUntilBilling)}</span>
         </div>
         <div class="subscription-actions">
           <button type="button" class="btn btn-sm" data-action="subs:pay" data-id="${sub.id}">✓ Оплачено</button>
@@ -106,6 +106,15 @@ const SubscriptionsModule = {
       <div class="stat-card"><div class="stat-value">${UI.moneyList(t.monthly)}</div><div class="stat-label">В месяц</div></div>
       <div class="stat-card"><div class="stat-value">${UI.moneyList(t.yearly)}</div><div class="stat-label">В год</div></div>
     `;
+  },
+
+  // "Сегодня" / "через N дн." / "просрочен на N дн." — without guessing.
+  dueLabel(days) {
+    if (days == null || !Number.isFinite(Number(days))) return '';
+    const d = Number(days);
+    if (d === 0) return '⚠️ Сегодня';
+    if (d < 0) return `⚠️ Просрочен на ${-d} дн.`;
+    return `через ${d} дн.`;
   },
 
   getCycleLabel(cycle) {
