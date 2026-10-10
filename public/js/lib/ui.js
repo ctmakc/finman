@@ -195,6 +195,24 @@
     return uniqueCurrencies(accountsArray().map(function (acc) { return acc.currency; }));
   }
 
+  // Same as accountCurrencies(), but fetches /api/accounts when appState has
+  // nothing yet (e.g. deep link straight into analytics/forecast).
+  var accountsPromise = null;
+  function loadAccountCurrencies() {
+    var known = accountCurrencies();
+    if (known.length) return Promise.resolve(known);
+    if (!accountsPromise) {
+      accountsPromise = authFetch('/api/accounts')
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (d) {
+          var arr = Array.isArray(d) ? d : (d && (d.all || d.data)) || [];
+          return uniqueCurrencies(arr.map(function (a) { return a.currency; }));
+        })
+        .catch(function () { return []; });
+    }
+    return accountsPromise;
+  }
+
   // ---------- delegated actions (no inline handlers -> CSP-safe) ----------
   var registry = {};
   var wired = false;
@@ -412,6 +430,7 @@
     monthlyFactor: monthlyFactor,
     accountsArray: accountsArray,
     accountCurrencies: accountCurrencies,
+    loadAccountCurrencies: loadAccountCurrencies,
     authFetch: authFetch,
     actions: actions,
     openModal: openModal,
