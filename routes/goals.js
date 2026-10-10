@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const SavingsGoal = require('../models/savingsGoal');
+const { todayISO, userTz } = require('../lib/dates');
 
 // Все маршруты требуют аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -14,8 +15,8 @@ router.get('/', async (req, res) => {
   try {
     const includeCompleted = req.query.includeCompleted === 'true';
     const goals = await SavingsGoal.findByUser(req.user.id, includeCompleted);
-    const goalsWithProgress = goals.map(g => SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(g) : g);
-    res.json(goalsWithProgress);
+    const today = todayISO(userTz(req.user));
+    res.json(goals.map(g => SavingsGoal.calculateProgress(g, today)));
   } catch (error) {
     console.error('Ошибка получения целей:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
 // Получить статистику
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await SavingsGoal.getUserStats(req.user.id);
+    const stats = await SavingsGoal.getUserStats(req.user.id, todayISO(userTz(req.user)));
     res.json(stats);
   } catch (error) {
     console.error('Ошибка получения статистики:', error);
@@ -40,7 +41,7 @@ router.get('/:id', async (req, res) => {
     if (!goal || goal.user_id !== req.user.id) {
       return res.status(404).json({ message: 'Цель не найдена' });
     }
-    res.json(SavingsGoal.calculateProgress ? SavingsGoal.calculateProgress(goal) : goal);
+    res.json(SavingsGoal.calculateProgress(goal, todayISO(userTz(req.user))));
   } catch (error) {
     console.error('Ошибка получения цели:', error);
     res.status(500).json({ message: 'Ошибка сервера' });

@@ -1,8 +1,89 @@
 // ==================== МОДЕЛЬ ЦЕЛЕЙ НАКОПЛЕНИЯ ====================
 
 const { query, get, run } = require('../db/database');
+const money = require('../lib/money');
+const dates = require('../lib/dates');
 
 const SavingsGoal = {
+  // Синхронный расчёт прогресса по строке цели (для списков/карточек).
+  // Фронт (public/js/goals.js) читает: progress (0..100), remaining,
+  // current_amount, target_amount, target_date. Дополнительно: percent (alias),
+  // daysLeft, monthlyRequired, isReached.
+  calculateProgress(goal, today = null) {
+    if (!goal) return goal;
+    const target = Number(goal.target_amount) || 0;
+    const current = Number(goal.current_amount) || 0;
+    const rawPercent = target > 0 ? (current / target) * 100 : 0;
+    const percent = Math.round(Math.min(100, Math.max(0, rawPercent)) * 100) / 100;
+    const remaining = Math.max(0, money.sub(target, current));
+
+    const todayStr = today || dates.todayISO();
+    let daysLeft = null;
+    let monthlyRequired = null;
+    if (goal.target_date) {
+      daysLeft = dates.diffDays(todayStr, String(goal.target_date).slice(0, 10));
+      if (remaining > 0 && daysLeft !== null && daysLeft > 0) {
+        const months = Math.max(1, Math.ceil(daysLeft / 30));
+        monthlyRequired = money.div(remaining, months);
+      }
+    }
+
+    return {
+      ...goal,
+      progress: percent,
+      percent,
+      remaining,
+      isReached: remaining <= 0 || !!goal.is_completed,
+      daysLeft,
+      monthlyRequired
+    };
+  },
+
+  // Агрегированная статистика для /api/goals/stats.
+  // Фронт читает activeGoals, totalSaved, overallProgress; остальное — для
+  // виджетов/AI: totalTarget, totalRemaining, completedGoals, nextDeadline.
+  async getUserStats(userId, today = null) {
+    const todayStr = today || dates.todayISO();
+    const goals = await this.findByUser(userId, true);
+    const active = goals.filter((g) => !g.is_completed);
+
+    let totalTarget = 0;
+    let totalSaved = 0;
+    let totalRemaining = 0;
+    for (const g of active) {
+      totalTarget = money.add(totalTarget, g.target_amount);
+      totalSaved = money.add(totalSaved, g.current_amount);
+      totalRemaining = money.add(totalRemaining, Math.max(0, money.sub(g.target_amount, g.current_amount)));
+    }
+    const overallProgress =
+      totalTarget > 0 ? Math.round(Math.min(100, (totalSaved / totalTarget) * 100) * 100) / 100 : 0;
+
+    // Ближайший дедлайн среди активных целей с датой >= сегодня.
+    const dated = active
+      .filter((g) => g.target_date && String(g.target_date).slice(0, 10) >= todayStr)
+      .sort((a, b) => String(a.target_date).localeCompare(String(b.target_date)));
+    const nextDeadline = dated.length
+      ? {
+          id: dated[0].id,
+          name: dated[0].name,
+          target_date: String(dated[0].target_date).slice(0, 10),
+          daysLeft: dates.diffDays(todayStr, String(dated[0].target_date).slice(0, 10)),
+          remaining: Math.max(0, money.sub(dated[0].target_amount, dated[0].current_amount))
+        }
+      : null;
+
+    return {
+      totalGoals: goals.length,
+      activeGoals: active.length,
+      completedGoals: goals.length - active.length,
+      totalTarget,
+      totalSaved,
+      totalRemaining,
+      overallProgress,
+      nextDeadline
+    };
+  },
+
   // Создание цели
   async create(data) {
     const result = await run(

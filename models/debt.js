@@ -2,9 +2,109 @@
 
 const { query, get, run } = require('../db/database');
 const money = require('../lib/money');
+const dates = require('../lib/dates');
 const { AppError } = require('../middleware/error');
 
+// Типы, по которым должен Я (в отличие от owe_me — должны мне).
+const I_OWE_TYPES = ['i_owe', 'credit', 'mortgage', 'loan'];
+
 const Debt = {
+  I_OWE_TYPES,
+
+  // Синхронный расчёт полей для карточки долга (public/js/debts.js читает
+  // progress, remaining, isOverdue, paid_amount, amount, due_date).
+  calculateDebtInfo(debt, today = null) {
+    if (!debt) return debt;
+    const todayStr = today || dates.todayISO();
+    const principal = money.round(debt.amount);
+    const paid = money.round(debt.paid_amount || 0);
+    const remaining = Math.max(0, money.sub(principal, paid));
+    const rawPercent = principal > 0 ? (paid / principal) * 100 : 0;
+    const progress = Math.round(Math.min(100, Math.max(0, rawPercent)) * 100) / 100;
+    const due = debt.due_date ? String(debt.due_date).slice(0, 10) : null;
+    const daysUntilDue = due ? dates.diffDays(todayStr, due) : null;
+    const isPaid = !!debt.is_paid || remaining <= 0;
+    return {
+      ...debt,
+      remaining,
+      progress,
+      percent: progress,
+      isPaid,
+      isOverdue: !isPaid && due !== null && due < todayStr,
+      daysUntilDue,
+      isIOwe: I_OWE_TYPES.includes(debt.type)
+    };
+  },
+
+  // Агрегат для /api/debts/stats. Фронт читает totalIOwe, totalOwedToMe,
+  // netBalance; остальное — активные/оплаченные, выплачено, остаток, что
+  // к оплате в ближайшие 30 дней (monthlyPaymentsDue) и ближайший срок (nextDue).
+  async getUserStats(userId, today = null) {
+    const todayStr = today || dates.todayISO();
+    const in30 = dates.addDaysISO(todayStr, 30);
+    const debts = await this.findByUser(userId, true);
+
+    const stats = {
+      totalDebts: debts.length,
+      activeDebts: 0,
+      paidDebts: 0,
+      totalOwed: 0, // тело активных долгов (все типы)
+      totalPaid: 0, // выплачено по активным
+      totalRemaining: 0, // остаток по активным (все типы)
+      totalIOwe: 0, // остаток моих долгов
+      totalOwedToMe: 0, // остаток долгов мне
+      netBalance: 0, // totalOwedToMe - totalIOwe
+      monthlyPaymentsDue: 0, // остаток по долгам со сроком в ближайшие 30 дней
+      overdueCount: 0,
+      nextDue: null
+    };
+
+    let next = null;
+    for (const d of debts) {
+      if (d.is_paid) {
+        stats.paidDebts += 1;
+        continue;
+      }
+      stats.activeDebts += 1;
+      const info = this.calculateDebtInfo(d, todayStr);
+      stats.totalOwed = money.add(stats.totalOwed, d.amount);
+      stats.totalPaid = money.add(stats.totalPaid, d.paid_amount || 0);
+      stats.totalRemaining = money.add(stats.totalRemaining, info.remaining);
+      if (info.isIOwe) {
+        stats.totalIOwe = money.add(stats.totalIOwe, info.remaining);
+      } else if (d.type === 'owe_me') {
+        stats.totalOwedToMe = money.add(stats.totalOwedToMe, info.remaining);
+      }
+      if (info.isOverdue) stats.overdueCount += 1;
+      if (info.isIOwe && d.due_date) {
+        const due = String(d.due_date).slice(0, 10);
+        if (due >= todayStr && due <= in30) {
+          stats.monthlyPaymentsDue = money.add(stats.monthlyPaymentsDue, info.remaining);
+        }
+        if (due >= todayStr && (!next || due < next.due_date)) {
+          next = { id: d.id, name: d.name, due_date: due, remaining: info.remaining, daysUntilDue: info.daysUntilDue };
+        }
+      }
+    }
+    stats.netBalance = money.sub(stats.totalOwedToMe, stats.totalIOwe);
+    stats.nextDue = next;
+
+    // Обратная совместимость с getStats() (AI/дайджест читают эти имена).
+    stats.iOwe = stats.totalIOwe;
+    stats.oweMe = stats.totalOwedToMe;
+    stats.balance = stats.netBalance;
+    stats.remainingIPay = stats.totalIOwe;
+    stats.remainingToPayMe = stats.totalOwedToMe;
+
+    return stats;
+  },
+
+  // Роут /api/debts/upcoming зовёт именно это имя.
+  async getUpcomingPayments(userId, days = 30) {
+    const rows = await this.getUpcoming(userId, days);
+    return rows.map((d) => this.calculateDebtInfo(d));
+  },
+
   // Типы долгов
   TYPES: {
     I_OWE: 'i_owe',         // Я должен кому-то
@@ -207,7 +307,7 @@ const Debt = {
 
   // Получить просроченные долги
   async getOverdue(userId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = dates.todayISO();
     return query(
       `SELECT * FROM debts
        WHERE user_id = ? AND is_active = 1 AND is_paid = 0 AND due_date < ?
@@ -218,15 +318,15 @@ const Debt = {
 
   // Получить скоро истекающие долги (в течение N дней)
   async getUpcoming(userId, days = 7) {
-    const today = new Date();
-    const futureDate = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+    const today = dates.todayISO();
+    const futureDate = dates.addDaysISO(today, days);
 
     return query(
       `SELECT * FROM debts
        WHERE user_id = ? AND is_active = 1 AND is_paid = 0
          AND due_date >= ? AND due_date <= ?
        ORDER BY due_date ASC`,
-      [userId, today.toISOString().split('T')[0], futureDate.toISOString().split('T')[0]]
+      [userId, today, futureDate]
     );
   },
 
