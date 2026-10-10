@@ -156,7 +156,9 @@ function detectDuplicates(transactions, cfg) {
 
   for (const txs of groups.values()) {
     if (txs.length < 2) continue;
-    const sorted = [...txs].sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Tie-break по id: при равных датах «оригинал» — более ранняя запись.
+    // (С индексом transactions(user_id, date DESC) SQLite иначе отдаёт равные даты новыми вперёд.)
+    const sorted = [...txs].sort((a, b) => (new Date(a.date) - new Date(b.date)) || (a.id - b.id));
 
     for (let i = 1; i < sorted.length; i++) {
       const prev = sorted[i - 1];
@@ -265,7 +267,7 @@ async function detectForUser(userId, opts = {}) {
     `SELECT id, account_id, user_id, date, description, category, amount, type
      FROM transactions
      WHERE user_id = ? AND date >= ?
-     ORDER BY date ASC`,
+     ORDER BY date ASC, id ASC`,
     [userId, sinceDate]
   );
 
