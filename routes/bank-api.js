@@ -321,52 +321,56 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
       existingAccounts.map(acc => [acc.account_number, acc])
     );
 
-    // Создание счетов в системе
+    // Создание счетов в системе — одной транзакцией БД (несколько
+    // create/update + запись подключения либо все, либо ничего).
     const createdAccounts = [];
+    const { transaction } = require('../db/database');
 
-    for (const bankAccount of bankAccounts) {
-      // Проверка, существует ли счет с таким номером
-      const existingAccount = existingAccountsMap.get(bankAccount.accountNumber);
+    await transaction(async () => {
+      for (const bankAccount of bankAccounts) {
+        // Проверка, существует ли счет с таким номером
+        const existingAccount = existingAccountsMap.get(bankAccount.accountNumber);
       
-      if (existingAccount) {
-        // Обновить существующий счет
-        await Account.update(existingAccount.id, req.user.id, {
-          name: bankAccount.name,
-          bankName: bankApiConfig[connection.bank_id].name,
-          currency: bankAccount.currency,
-          balance: bankAccount.balance,
-          accountType: bankAccount.type
-        });
+        if (existingAccount) {
+          // Обновить существующий счет
+          await Account.update(existingAccount.id, req.user.id, {
+            name: bankAccount.name,
+            bankName: bankApiConfig[connection.bank_id].name,
+            currency: bankAccount.currency,
+            balance: bankAccount.balance,
+            accountType: bankAccount.type
+          });
         
-        createdAccounts.push({
-          ...existingAccount,
-          name: bankAccount.name,
-          balance: bankAccount.balance,
-          updated: true
-        });
-      } else {
-        // Создать новый счет
-        const newAccount = await Account.create({
-          userId: req.user.id,
-          name: bankAccount.name,
-          accountNumber: bankAccount.accountNumber,
-          bankName: bankApiConfig[connection.bank_id].name,
-          currency: bankAccount.currency,
-          balance: bankAccount.balance,
-          accountType: bankAccount.type
-        });
+          createdAccounts.push({
+            ...existingAccount,
+            name: bankAccount.name,
+            balance: bankAccount.balance,
+            updated: true
+          });
+        } else {
+          // Создать новый счет
+          const newAccount = await Account.create({
+            userId: req.user.id,
+            name: bankAccount.name,
+            accountNumber: bankAccount.accountNumber,
+            bankName: bankApiConfig[connection.bank_id].name,
+            currency: bankAccount.currency,
+            balance: bankAccount.balance,
+            accountType: bankAccount.type
+          });
         
-        createdAccounts.push({...newAccount, updated: false});
+          createdAccounts.push({...newAccount, updated: false});
+        }
       }
-    }
     
-    // Обновить список счетов в подключении
-    const accountIds = createdAccounts.map(acc => acc.id);
+      // Обновить список счетов в подключении
+      const accountIds = createdAccounts.map(acc => acc.id);
     
-    await BankConnection.createOrUpdate({
-      ...connection,
-      userId: req.user.id,
-      accountIds
+      await BankConnection.createOrUpdate({
+        ...connection,
+        userId: req.user.id,
+        accountIds
+      });
     });
     
     res.json({
