@@ -5,13 +5,18 @@
 //   - decodeImageInput(input) -> Buffer|input               // base64 / data-URL -> Buffer
 //   - parseReceiptText(rawText) -> { merchant, total_amount, currency, receipt_date, items }
 //   - categorizeReceipt(text) -> string                      // эвристика категории
-//   - processImage(input, { lang }) -> Promise<{ ocr_status, ocr_raw, merchant, total_amount, currency, receipt_date, category, items }>
+//   - processImage(input, { lang, vision }) -> Promise<{ ocr_status, ocr_engine, ocr_raw, merchant, total_amount, currency, receipt_date, category, items }>
+//     (LLM vision first when a configured provider supports it, tesseract fallback; vision:false forces tesseract)
 //
 // Дизайн: парсер (parseReceiptText) — чистая функция без сети/wasm, что делает его
 // полностью тестируемым. recognizeBuffer тонко оборачивает tesseract; в тестах его
 // мокают, чтобы не тянуть wasm/трафик в CI.
 
 const money = require('../lib/money');
+// PORT_PLAN A14: LLM vision (google / gemini-oauth / openai) is tried first when a configured
+// provider supports it; tesseract stays the offline fallback. Required lazily-safe: the
+// provider module has no side effects and is mocked in tests.
+const provider = require('../lib/ai/provider');
 
 let logger;
 try {
@@ -285,12 +290,179 @@ function categorizeReceipt(text) {
   return 'other';
 }
 
+// --- LLM vision (PORT_PLAN A14) -------------------------------------------
+
+const VISION_PROMPT =
+  'This is a photo or scan of a purchase receipt. Extract the data and answer with ONLY a JSON object, ' +
+  'no markdown and no commentary, with exactly these keys: ' +
+  '"total" (number: the final amount paid), ' +
+  '"currency" (ISO 4217 code such as UAH, USD, EUR, PLN, GBP, or null if unknown), ' +
+  '"date" (YYYY-MM-DD or null), ' +
+  '"merchant" (store name or null), ' +
+  '"items" (array of {"name": string, "price": number}; empty array if unreadable). ' +
+  'Never invent values: use null when a field is not visible.';
+
+const MIME_FROM_DATA_URL = /^data:(image\/[a-z0-9.+-]+);base64,/i;
+
+/**
+ * Determine the image MIME type from a data-URL prefix or the buffer's magic bytes.
+ * Falls back to image/jpeg (the most common phone photo format).
+ */
+function detectMimeType(input, buffer) {
+  if (typeof input === 'string') {
+    const m = input.match(MIME_FROM_DATA_URL);
+    if (m) return m[1].toLowerCase();
+  }
+  if (Buffer.isBuffer(buffer) && buffer.length >= 12) {
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return 'image/png';
+    if (buffer[0] === 0xff && buffer[1] === 0xd8) return 'image/jpeg';
+    if (buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return 'image/gif';
+  }
+  return 'image/jpeg';
+}
+
+/**
+ * Parse the model's answer into { total_amount, currency, receipt_date, merchant, items }.
+ * Tolerates ```json fences and prose around the object. Returns null when no JSON object
+ * can be read — the caller then falls back to tesseract.
+ */
+function parseVisionJson(text) {
+  if (!text) return null;
+  let raw = String(text).trim();
+  raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  const first = raw.indexOf('{');
+  const last = raw.lastIndexOf('}');
+  if (first === -1 || last === -1 || last <= first) return null;
+  let obj;
+  try {
+    obj = JSON.parse(raw.slice(first, last + 1));
+  } catch (_) {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object') return null;
+
+  let total = null;
+  if (typeof obj.total === 'number' && Number.isFinite(obj.total)) total = money.round(obj.total);
+  else if (typeof obj.total === 'string') {
+    const n = parseAmount(obj.total);
+    if (Number.isFinite(n)) total = money.round(n);
+  }
+
+  let currency = null;
+  if (typeof obj.currency === 'string' && /^[a-z]{3}$/i.test(obj.currency.trim())) {
+    currency = obj.currency.trim().toUpperCase();
+  } else if (typeof obj.currency === 'string') {
+    currency = detectCurrency(obj.currency);
+  }
+
+  let receipt_date = null;
+  if (typeof obj.date === 'string' && obj.date.trim()) {
+    const d = obj.date.trim();
+    // ISO first (the format we asked for); detectDate's dd.mm.yyyy heuristic would
+    // otherwise bite into "2026-06-19" as "26-06-19".
+    const iso = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso && parseInt(iso[2], 10) >= 1 && parseInt(iso[2], 10) <= 12 && parseInt(iso[3], 10) >= 1 && parseInt(iso[3], 10) <= 31) {
+      receipt_date = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    } else {
+      receipt_date = detectDate(d);
+    }
+  }
+
+  const merchant =
+    typeof obj.merchant === 'string' && obj.merchant.trim()
+      ? obj.merchant.trim().replace(/\s{2,}/g, ' ').slice(0, 80)
+      : null;
+
+  const items = Array.isArray(obj.items)
+    ? obj.items
+        .filter((it) => it && typeof it === 'object' && typeof it.name === 'string' && it.name.trim())
+        .map((it) => {
+          const price =
+            typeof it.price === 'number' && Number.isFinite(it.price)
+              ? money.round(it.price)
+              : typeof it.price === 'string' && Number.isFinite(parseAmount(it.price))
+              ? money.round(parseAmount(it.price))
+              : null;
+          return { name: it.name.trim().slice(0, 120), price };
+        })
+    : [];
+
+  return { total_amount: total, currency, receipt_date, merchant, items };
+}
+
+function visionAvailable() {
+  return (
+    typeof provider.isConfigured === 'function' &&
+    typeof provider.supportsVision === 'function' &&
+    typeof provider.vision === 'function' &&
+    provider.isConfigured() &&
+    provider.supportsVision()
+  );
+}
+
+/**
+ * Try the LLM vision path. Returns a full OCR result object on success, or null when
+ * vision is unavailable / unsupported / failed / returned nothing usable (-> tesseract).
+ * Never throws.
+ */
+async function recognizeWithVision(input, options = {}) {
+  if (options.vision === false) return null;
+  let available = false;
+  try {
+    available = visionAvailable();
+  } catch (_) {
+    available = false;
+  }
+  if (!available) return null;
+
+  try {
+    const buffer = decodeImageInput(input);
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) return null;
+    const mimeType = detectMimeType(input, buffer);
+    const result = await provider.vision({
+      imageBase64: buffer.toString('base64'),
+      mimeType,
+      prompt: VISION_PROMPT,
+      maxTokens: 800,
+    });
+    const text = (result && result.text) || '';
+    const parsed = parseVisionJson(text);
+    if (!parsed || (parsed.total_amount == null && !parsed.merchant)) {
+      logger.warn({ provider: result && result.provider }, 'Receipt vision returned nothing usable, falling back to OCR');
+      return null;
+    }
+    const categoryText = [parsed.merchant || '', ...parsed.items.map((i) => i.name)].join('\n');
+    return {
+      ocr_status: 'completed',
+      ocr_engine: 'vision',
+      ocr_provider: (result && result.provider) || null,
+      ocr_raw: text,
+      merchant: parsed.merchant,
+      total_amount: parsed.total_amount,
+      currency: parsed.currency,
+      receipt_date: parsed.receipt_date,
+      category: categorizeReceipt(categoryText),
+      items: parsed.items
+    };
+  } catch (err) {
+    logger.warn({ err: err && err.message }, 'Receipt vision failed, falling back to OCR');
+    return null;
+  }
+}
+
 /**
  * Высокоуровневая обёртка: принимает изображение (Buffer / base64 / data-URL),
  * распознаёт, парсит и возвращает структуру с честным ocr_status.
  * НИКОГДА не бросает: на ошибке возвращает { ocr_status: 'failed', ... }.
  */
 async function processImage(input, options = {}) {
+  // 1) LLM vision first (google / gemini-oauth / openai) when configured; via module.exports
+  //    so tests can observe/replace it. Returns null -> continue with tesseract.
+  const visionResult = await module.exports.recognizeWithVision(input, options);
+  if (visionResult) return visionResult;
+
+  // 2) tesseract fallback (offline, no key).
   let rawText = '';
   try {
     const buffer = decodeImageInput(input);
@@ -323,6 +495,7 @@ async function processImage(input, options = {}) {
       (parsed.total_amount != null || parsed.merchant);
     return {
       ocr_status: meaningful ? 'completed' : 'failed',
+      ocr_engine: 'tesseract',
       ocr_raw: rawText,
       merchant: parsed.merchant,
       total_amount: parsed.total_amount,
@@ -359,5 +532,10 @@ module.exports = {
   detectItems,
   parseReceiptText,
   categorizeReceipt,
+  // vision (PORT_PLAN A14)
+  VISION_PROMPT,
+  detectMimeType,
+  parseVisionJson,
+  recognizeWithVision,
   processImage
 };
