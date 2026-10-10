@@ -1,0 +1,4 @@
+date,transaction,description,amount,balance,currency
+2026-10-01,DEPOSIT,Direct deposit from ACME CORP,2450.00,5120.55,CAD
+2026-10-02,PURCHASE,Farm Boy Ottawa,-42.18,5078.37,CAD
+2026-10-04,TRANSFER,E-transfer to Jane,-200.00,4878.37,CAD

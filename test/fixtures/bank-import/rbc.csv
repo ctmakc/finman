@@ -1,0 +1,6 @@
+"Account Type","Account Number","Transaction Date","Cheque Number","Description 1","Description 2","CAD$","USD$",
+Chequing,01234-5678901,10/01/2026,,"PAYROLL DEPOSIT","ACME CORP",2450.00,,
+Chequing,01234-5678901,10/02/2026,,"LOBLAWS #1234","",-84.17,,
+Chequing,01234-5678901,10/03/2026,,"INTERAC E-TRANSFER SENT","JOHN D",-120.00,,
+Visa,4516********1234,10/04/2026,,"TIM HORTONS #0421","OTTAWA ON",-4.85,,
+Chequing,01234-5678901,10/05/2026,,"MONTHLY FEE","",-16.95,,
