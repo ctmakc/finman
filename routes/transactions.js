@@ -143,8 +143,17 @@ router.post('/', authenticate, async (req, res) => {
     // Получаем владельца счета
     const { get } = require('../db/database');
     const account = await get(`SELECT user_id FROM accounts WHERE id = ?`, [accountId]);
+    if (!account) {
+      return res.status(404).json({
+        error: true,
+        message: 'Счет не найден'
+      });
+    }
 
-    // Создание транзакции (от имени владельца счета)
+    // Семантика расшаренных счетов: транзакция принадлежит ЛЕДЖЕРУ ВЛАДЕЛЬЦА
+    // счёта (user_id = владелец), поэтому баланс и аналитика владельца сходятся,
+    // а контрибьютор видит её через GET /api/accounts/:id/transactions.
+    // Знак суммы нормализует модель (expense < 0, income > 0).
     const newTransaction = await Transaction.create({
       accountId,
       userId: account.user_id,
@@ -239,7 +248,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Обновление транзакции
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, async (req, res, next) => {
   try {
     const { 
       date, 
@@ -268,6 +277,11 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
+    // AppError (400 за попытку сменить тип ноги перевода и т.п.) — через
+    // глобальный errorHandler { success:false, error:{code,message} }.
+    if (error && error.name === 'AppError') {
+      return next(error);
+    }
     console.error('Ошибка при обновлении транзакции:', error);
     res.status(500).json({ 
       error: true, 
