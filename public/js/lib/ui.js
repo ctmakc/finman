@@ -155,10 +155,10 @@
     return out;
   }
 
-  function mixedCurrencyNote(currencies) {
+  function mixedCurrencyNote(currencies, subject) {
     var list = uniqueCurrencies(currencies);
     if (list.length < 2) return '';
-    return '<div class="fm-currency-note" role="note">Счета ведутся в разных валютах (' + esc(list.join(', ')) +
+    return '<div class="fm-currency-note" role="note">' + esc(subject || 'Счета') + ' ведутся в разных валютах (' + esc(list.join(', ')) +
       '): итоговые суммы сложены без конвертации и показаны без знака валюты.</div>';
   }
 

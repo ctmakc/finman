@@ -1,18 +1,199 @@
 // ==================== GOALS ====================
+// Savings goals page. Progress is derived from current_amount / target_amount
+// (API fields `remaining` / `percent` win when present); every amount is shown
+// in the goal's own currency and totals are grouped per currency.
+// Requires: lib/ui.js (window.UI), app.js (fetchWithAuth, showNotification).
+
+// ---- pure helpers (exported for Jest) ----
+function goalProgress(g) {
+  const target = Number(g && g.target_amount) || 0;
+  const current = Number(g && g.current_amount) || 0;
+  const remaining = g && g.remaining != null && isFinite(Number(g.remaining))
+    ? Math.max(0, Number(g.remaining))
+    : Math.max(0, target - current);
+  let percent;
+  if (g && g.percent != null && isFinite(Number(g.percent))) percent = Number(g.percent);
+  else if (g && g.progress != null && isFinite(Number(g.progress))) percent = Number(g.progress);
+  else percent = target > 0 ? (current / target) * 100 : 0;
+  percent = Math.max(0, Math.min(100, percent));
+  const reached = !!(g && g.is_completed) || (target > 0 && remaining <= 0);
+  return { target, current, remaining, percent, pct: Math.round(percent), reached };
+}
+
+// Counts + per-currency saved/target/percent. Never adds CAD to UAH.
+function goalsSummary(goals) {
+  const list = Array.isArray(goals) ? goals : [];
+  const byCurrency = {};
+  let active = 0;
+  let completed = 0;
+  list.forEach((g) => {
+    const p = goalProgress(g);
+    if (p.reached) completed++; else active++;
+    const cur = String(g.currency || (typeof UI !== 'undefined' ? UI.baseCurrency() : 'UAH')).toUpperCase();
+    const row = byCurrency[cur] || (byCurrency[cur] = { saved: 0, target: 0, percent: 0 });
+    row.saved = Math.round((row.saved + p.current) * 100) / 100;
+    row.target = Math.round((row.target + p.target) * 100) / 100;
+  });
+  Object.keys(byCurrency).forEach((cur) => {
+    const row = byCurrency[cur];
+    row.percent = row.target > 0 ? Math.round((row.saved / row.target) * 100) : 0;
+  });
+  return { total: list.length, active, completed, byCurrency };
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { goalProgress, goalsSummary };
+}
+
+// ---- page ----
 async function renderGoalsPage() {
   const mainContent = document.getElementById('main-content');
   mainContent.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const goals = await fetchWithAuth('/api/goals').then(r => r.json());
-    const stats = await fetchWithAuth('/api/goals/stats').then(r => r.json());
-    mainContent.innerHTML = `<div class="goals-page"><div class="page-header"><h1><i class="fas fa-piggy-bank"></i> Цели накопления</h1><button class="btn btn-primary" onclick="showAddGoalModal()"><i class="fas fa-plus"></i> Новая цель</button></div><div class="stats-grid">${renderGoalStats(stats)}</div><div class="card-grid" id="goals-list">${goals.length === 0 ? '<div class="empty-state"><i class="fas fa-piggy-bank"></i><h3>Нет целей</h3></div>' : goals.map(g => renderGoalCard(g)).join('')}</div></div>`;
-  } catch (e) { mainContent.innerHTML = '<div class="alert alert-error">Ошибка загрузки</div>'; }
+    await UI.loadBaseCurrency();
+    const goals = await fetchWithAuth('/api/goals').then((r) => r.json());
+    const list = Array.isArray(goals) ? goals : (goals && goals.data) || [];
+    const summary = goalsSummary(list);
+    mainContent.innerHTML = `
+      <div class="goals-page">
+        <div class="page-header">
+          <h1><i class="fas fa-piggy-bank"></i> Цели накопления</h1>
+          <button type="button" class="btn btn-primary" data-action="goals:add"><i class="fas fa-plus"></i> Новая цель</button>
+        </div>
+        <div class="stats-grid">${renderGoalStats(summary)}</div>
+        <div class="card-grid" id="goals-list">
+          ${list.length === 0
+            ? UI.emptyState({ icon: 'fa-piggy-bank', title: 'Нет целей', text: 'Поставьте первую цель и отмечайте пополнения — прогресс считается автоматически.', action: { label: 'Новая цель', action: 'goals:add', icon: 'fa-plus' } })
+            : list.map((g) => renderGoalCard(g)).join('')}
+        </div>
+      </div>`;
+  } catch (e) {
+    console.error('goals:', e);
+    mainContent.innerHTML = '<div class="alert alert-error">Ошибка загрузки</div>';
+  }
 }
-function renderGoalStats(stats) { return `<div class="stat-card"><div class="stat-icon"><i class="fas fa-bullseye"></i></div><div class="stat-data"><div class="stat-value">${stats.activeGoals}</div><div class="stat-label">Активных</div></div></div><div class="stat-card stat-ok"><div class="stat-icon"><i class="fas fa-coins"></i></div><div class="stat-data"><div class="stat-value">${formatCurrency(stats.totalSaved)}</div><div class="stat-label">Накоплено</div></div></div><div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-pie"></i></div><div class="stat-data"><div class="stat-value">${stats.overallProgress}%</div><div class="stat-label">Прогресс</div></div></div>`; }
-function renderGoalCard(g) { const p = g.progress || 0; const pct = Math.round(p); const reached = !(g.remaining > 0); const meta = g.target_date ? `<div class="goal-meta"><span class="goal-meta-item"><i class="fas fa-calendar"></i> ${g.target_date}</span></div>` : ''; return `<div class="card${reached ? ' goal-reached' : ''}"><div class="card-header"><h3 class="card-title"><i class="fas fa-piggy-bank"></i> ${g.name}</h3><div class="card-actions"><button class="btn btn-sm btn-outline" onclick="showContributeModal(${g.id})" aria-label="Пополнить цель"><i class="fas fa-plus"></i></button><button class="btn btn-sm btn-danger" onclick="deleteGoal(${g.id})" aria-label="Удалить цель"><i class="fas fa-trash"></i></button></div></div><div class="budget-progress"><div class="progress-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Прогресс цели ${pct}%"><div class="progress-fill progress-ok" style="width: ${Math.min(p, 100)}%"></div></div><div class="progress-labels"><span>${formatCurrency(g.current_amount)} / ${formatCurrency(g.target_amount)}</span><span>${pct}%</span></div></div>${meta}${g.remaining > 0 ? `<p>Осталось: ${formatCurrency(g.remaining)}</p>` : '<p class="text-success"><i class="fas fa-check-circle"></i> Достигнута!</p>'}</div>`; }
-async function showAddGoalModal() { const m = document.createElement('div'); m.className = 'modal-backdrop'; m.innerHTML = `<div class="modal"><div class="modal-header"><h2 class="modal-title">Новая цель</h2><button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div><div class="modal-body"><form id="goal-form"><div class="form-group"><label class="form-label">Название</label><input type="text" name="name" class="form-control" required></div><div class="form-row"><div class="form-group"><label class="form-label">Сумма</label><input type="number" name="target_amount" class="form-control" required min="1"></div><div class="form-group"><label class="form-label">Валюта</label><select name="currency" class="form-control"><option value="UAH">UAH</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div></div><div class="form-group"><label class="form-label">Дата</label><input type="date" name="target_date" class="form-control"></div></form></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()">Отмена</button><button class="btn btn-primary" onclick="saveGoal()">Создать</button></div></div>`; document.body.appendChild(m); }
-async function saveGoal() { const f = document.getElementById('goal-form'); const d = Object.fromEntries(new FormData(f)); try { const r = await fetchWithAuth('/api/goals', { method: 'POST', body: JSON.stringify(d) }); if (!r.ok) throw new Error('Ошибка'); document.querySelector('.modal-backdrop').remove(); showNotification('Цель создана', 'success'); renderGoalsPage(); } catch (e) { showNotification(e.message, 'error'); } }
-async function showContributeModal(id) { const m = document.createElement('div'); m.className = 'modal-backdrop'; m.innerHTML = `<div class="modal"><div class="modal-header"><h2>Пополнить</h2><button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div><div class="modal-body"><form id="contribute-form"><input type="hidden" name="goalId" value="${id}"><div class="form-group"><label class="form-label">Сумма</label><input type="number" name="amount" class="form-control" required min="0.01" step="0.01"></div></form></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()">Отмена</button><button class="btn btn-primary" onclick="contributeToGoal()">Пополнить</button></div></div>`; document.body.appendChild(m); }
-async function contributeToGoal() { const f = document.getElementById('contribute-form'); const d = Object.fromEntries(new FormData(f)); try { const r = await fetchWithAuth('/api/goals/' + d.goalId + '/contribute', { method: 'POST', body: JSON.stringify({ amount: parseFloat(d.amount) }) }); if (!r.ok) throw new Error('Ошибка'); document.querySelector('.modal-backdrop').remove(); showNotification('Пополнено', 'success'); renderGoalsPage(); } catch (e) { showNotification(e.message, 'error'); } }
-async function deleteGoal(id) { if (!confirm('Удалить?')) return; try { await fetchWithAuth('/api/goals/' + id, { method: 'DELETE' }); showNotification('Удалено', 'success'); renderGoalsPage(); } catch (e) { showNotification('Ошибка', 'error'); } }
-window.showAddGoalModal = showAddGoalModal; window.showContributeModal = showContributeModal; window.saveGoal = saveGoal; window.contributeToGoal = contributeToGoal; window.deleteGoal = deleteGoal;
+
+function renderGoalStats(summary) {
+  const saved = {};
+  Object.keys(summary.byCurrency).forEach((c) => { saved[c] = summary.byCurrency[c].saved; });
+  const codes = Object.keys(summary.byCurrency);
+  const progress = codes.length === 0
+    ? '0%'
+    : codes.length === 1
+      ? `${summary.byCurrency[codes[0]].percent}%`
+      : codes.map((c) => `<span class="fm-money">${UI.esc(c)} ${summary.byCurrency[c].percent}%</span>`).join('');
+  return `
+    <div class="stat-card"><div class="stat-icon"><i class="fas fa-bullseye"></i></div><div class="stat-data"><div class="stat-value">${summary.active}</div><div class="stat-label">Активных</div></div></div>
+    <div class="stat-card stat-ok"><div class="stat-icon"><i class="fas fa-coins"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(saved)}</div><div class="stat-label">Накоплено</div></div></div>
+    <div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-pie"></i></div><div class="stat-data"><div class="stat-value">${codes.length > 1 ? `<span class="fm-money-list">${progress}</span>` : progress}</div><div class="stat-label">Прогресс</div></div></div>`;
+}
+
+function renderGoalCard(g) {
+  const p = goalProgress(g);
+  const cur = g.currency;
+  const meta = g.target_date ? `<div class="goal-meta"><span class="goal-meta-item"><i class="fas fa-calendar"></i> ${UI.esc(g.target_date)}</span></div>` : '';
+  const status = p.reached
+    ? '<p class="goal-remaining text-success"><i class="fas fa-check-circle"></i> Достигнута!</p>'
+    : `<p class="goal-remaining">Осталось: <strong>${UI.esc(UI.money(p.remaining, cur))}</strong></p>`;
+  return `
+    <div class="card${p.reached ? ' goal-reached' : ''}" data-id="${g.id}">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-piggy-bank"></i> ${UI.esc(g.name)}</h3>
+        <div class="card-actions">
+          <button type="button" class="btn btn-sm btn-outline" data-action="goals:contribute" data-id="${g.id}" aria-label="Пополнить цель" title="Пополнить"><i class="fas fa-plus"></i></button>
+          <button type="button" class="btn btn-sm btn-danger" data-action="goals:delete" data-id="${g.id}" aria-label="Удалить цель" title="Удалить"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>
+      <div class="budget-progress">
+        <div class="progress-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Прогресс цели ${p.pct}%">
+          <div class="progress-fill progress-ok" style="width: ${p.percent}%"></div>
+        </div>
+        <div class="progress-labels">
+          <span>${UI.esc(UI.money(p.current, cur))} / ${UI.esc(UI.money(p.target, cur))}</span>
+          <span>${p.pct}%</span>
+        </div>
+      </div>
+      ${meta}
+      ${status}
+    </div>`;
+}
+
+function showAddGoalModal() {
+  UI.modal({
+    id: 'goal-modal',
+    title: 'Новая цель',
+    body: `
+      <form id="goal-form" data-submit="goals:save">
+        <div class="form-group"><label class="form-label" for="goal-name">Название</label><input type="text" id="goal-name" name="name" class="form-control" required></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="goal-target">Сумма</label><input type="number" id="goal-target" name="target_amount" class="form-control" required min="1" step="0.01"></div>
+          <div class="form-group"><label class="form-label" for="goal-currency">Валюта</label><select id="goal-currency" name="currency" class="form-control">${UI.currencyOptions()}</select></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="goal-date">Дата</label><input type="date" id="goal-date" name="target_date" class="form-control"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" data-action="ui:close">Отмена</button>
+          <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+      </form>`
+  });
+}
+
+async function saveGoal(form) {
+  const d = Object.fromEntries(new FormData(form));
+  if (!d.target_date) delete d.target_date;
+  try {
+    const r = await fetchWithAuth('/api/goals', { method: 'POST', body: JSON.stringify(d) });
+    if (!r.ok) throw new Error('Ошибка');
+    UI.closeModal('goal-modal');
+    showNotification('Цель создана', 'success');
+    renderGoalsPage();
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+function showContributeModal(id) {
+  UI.modal({
+    id: 'contribute-modal',
+    title: 'Пополнить',
+    body: `
+      <form id="contribute-form" data-submit="goals:contribute-save">
+        <input type="hidden" name="goalId" value="${Number(id)}">
+        <div class="form-group"><label class="form-label" for="contribute-amount">Сумма</label><input type="number" id="contribute-amount" name="amount" class="form-control" required min="0.01" step="0.01"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" data-action="ui:close">Отмена</button>
+          <button type="submit" class="btn btn-primary">Пополнить</button>
+        </div>
+      </form>`
+  });
+}
+
+async function contributeToGoal(form) {
+  const d = Object.fromEntries(new FormData(form));
+  try {
+    const r = await fetchWithAuth('/api/goals/' + Number(d.goalId) + '/contribute', { method: 'POST', body: JSON.stringify({ amount: parseFloat(d.amount) }) });
+    if (!r.ok) throw new Error('Ошибка');
+    UI.closeModal('contribute-modal');
+    showNotification('Пополнено', 'success');
+    renderGoalsPage();
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+async function deleteGoal(id) {
+  if (!confirm('Удалить?')) return;
+  try {
+    await fetchWithAuth('/api/goals/' + Number(id), { method: 'DELETE' });
+    showNotification('Удалено', 'success');
+    renderGoalsPage();
+  } catch (e) { showNotification('Ошибка', 'error'); }
+}
+
+if (typeof window !== 'undefined' && window.UI) {
+  UI.actions({
+    'goals:add': () => showAddGoalModal(),
+    'goals:save': (form) => saveGoal(form),
+    'goals:contribute': (el) => showContributeModal(el.dataset.id),
+    'goals:contribute-save': (form) => contributeToGoal(form),
+    'goals:delete': (el) => deleteGoal(el.dataset.id),
+  });
+  window.showAddGoalModal = showAddGoalModal; window.showContributeModal = showContributeModal; window.saveGoal = saveGoal; window.contributeToGoal = contributeToGoal; window.deleteGoal = deleteGoal;
+  window.goalProgress = goalProgress; window.goalsSummary = goalsSummary;
+}
