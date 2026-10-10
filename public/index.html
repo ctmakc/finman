@@ -1,39 +1,42 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#5D5CDE">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="ФинМенеджер">
-  <meta name="description" content="Персональный финансовый менеджер - учёт расходов, бюджеты, инвестиции">
+  <meta name="apple-mobile-web-app-title" content="Finman">
+  <meta name="description" content="Finman is a personal finance manager with an AI CFO: accounts, transactions, budgets, goals, debts, investments and net worth in one place.">
 
-  <title>ФинМенеджер</title>
+  <title>Finman</title>
 
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-  <!-- Design-system typefaces: Space Grotesk (display) + Inter (UI/body) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-
+  <!-- Vendor assets are self-hosted (CSP 'self', works offline). Typography uses the
+       system stack via --fm-font-ui / --fm-font-num until the self-hosted type wave. -->
+  <link rel="preload" href="/vendor/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/vendor/fa.min.css">
   <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
   <div id="app">
     <div class="loading-screen">
       <div class="spinner"></div>
-      <p>Загрузка приложения...</p>
+      <p>Loading Finman…</p>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- i18n должен загрузиться до app.js, чтобы переводы были доступны при инициализации -->
+  <script src="/vendor/chart.min.js"></script>
+  <!-- Locale dictionaries, then the i18n and theme runtimes, must load before app.js -->
+  <script src="/js/locales/en.js"></script>
+  <script src="/js/locales/uk.js"></script>
+  <script src="/js/locales/ru.js"></script>
   <script src="/js/i18n.js"></script>
+  <script src="/js/theme.js"></script>
+  <script src="/js/lib/a11y.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/accounts.js"></script>
@@ -56,10 +59,9 @@
   <script src="/js/dashboard.js"></script>
   <script src="/js/bank-api.js"></script>
   <script src="/js/charts.js"></script>
-  <!-- AI-ассистент (модуль наполняет feature-стрим F4) -->
+  <!-- AI CFO module -->
   <script src="/js/ai.js"></script>
-  <!-- Wave-2 модули -->
-  <script src="/js/theme.js"></script>
+  <!-- Wave-2 modules -->
   <script src="/js/widgets.js"></script>
   <script src="/js/onboarding.js"></script>
   <script src="/js/offline.js"></script>
@@ -67,8 +69,9 @@
   <script src="/js/rules.js"></script>
   <script src="/js/reconcile.js"></script>
   <script src="/js/api-tokens.js"></script>
+  <script src="/js/billing.js"></script>
 
-  <!-- Service Worker Registration -->
+  <!-- Service Worker registration + PWA install prompt -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -78,12 +81,10 @@
       });
     }
 
-    // Install prompt for PWA
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      // Show install button if needed
       const installBtn = document.getElementById('install-btn');
       if (installBtn) installBtn.style.display = 'block';
     });
