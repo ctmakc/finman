@@ -17,6 +17,23 @@ function isValidEmail(email) {
   return emailRegex.test(email);
 }
 
+// CORS: CORS_ORIGIN = список origin через запятую. Мобильные оболочки Capacitor
+// (iOS/Android WebView) шлют Origin capacitor://localhost или http://localhost —
+// они разрешены всегда. В dev без CORS_ORIGIN добавляем http://localhost:3000.
+// Возвращаем массив: пакет cors отражает Origin запроса только при точном совпадении.
+const CAPACITOR_ORIGINS = ['capacitor://localhost', 'http://localhost'];
+function buildCorsOrigins(env = process.env) {
+  const configured = String(env.CORS_ORIGIN || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const origins = new Set([...CAPACITOR_ORIGINS, ...configured]);
+  if (configured.length === 0 && env.NODE_ENV !== 'production') {
+    origins.add('http://localhost:3000');
+  }
+  return [...origins];
+}
+
 // Шифрование токенов банков
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(32).toString('hex') : null);
 const ENCRYPTION_IV_LENGTH = 16;
@@ -79,23 +96,36 @@ module.exports = {
   dbPath: process.env.DATABASE_PATH || './data/finance.db',
   environment: process.env.NODE_ENV || 'development',
 
-  // Rate limiting
+  // Session cookie (express-session). Имя и домен совпадают с продом
+  // (app.finman.money): COOKIE_DOMAIN пустой -> cookie только для хоста.
+  sessionCookieName: 'finman.sid',
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+
+  // Rate limiting. Общий лимит считается на IP за прокси (trust proxy = 1 в server.js);
+  // одна PWA-сессия делает десятки запросов на экран, поэтому 1000/15 мин.
   apiRateLimits: {
     windowMs: 15 * 60 * 1000, // 15 минут
-    max: 100 // макс. запросов за windowMs
+    max: 1000 // макс. запросов за windowMs с одного IP
   },
   authRateLimits: {
     windowMs: 15 * 60 * 1000, // 15 минут
     max: 5 // макс. попыток входа
   },
+  aiRateLimits: {
+    windowMs: 60 * 1000, // 1 минута
+    max: 10 // AI-запросы дорогие (LLM), 10/мин с одного IP
+  },
 
-  // CORS настройки
+  // CORS настройки. CORS_ORIGIN — список через запятую; оболочки Capacitor
+  // (capacitor://localhost, http://localhost) разрешены всегда.
+  corsAllowedOrigins: buildCorsOrigins(process.env),
   corsOptions: {
-    origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : 'http://localhost:3000'),
+    origin: buildCorsOrigins(process.env),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   },
+  buildCorsOrigins,
 
   // Валидация
   isValidEmail,

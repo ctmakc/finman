@@ -65,6 +65,11 @@ const apiV1Routes = require('./routes/apiV1');
 const app = express();
 const PORT = config.port;
 
+// За Caddy/Docker: первый X-Forwarded-For — реальный клиент. Без этого все
+// пользователи делят один rate-limit bucket (IP контейнерной сети) и
+// secure-cookie не выставляется за TLS-терминирующим прокси.
+app.set('trust proxy', 1);
+
 // Request logging (pino-http). В тестах logger в silent-режиме.
 app.use(pinoHttp({ logger }));
 
@@ -73,9 +78,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      // Шрифты self-hosted (public/) или data:-URI — Google Fonts не подключаем.
+      styleSrc: ["'self'", "'unsafe-inline'", "data:", "https://cdnjs.cloudflare.com"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+      // UI wave2 держит ~169 inline-обработчиков (onclick=/onchange=). helmet 8
+      // по умолчанию ставит script-src-attr 'none' и Chrome их молча блокирует —
+      // supertest этого не видит, ломается только браузер.
+      scriptSrcAttr: ["'unsafe-inline'"],
+      fontSrc: ["'self'", "data:", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
@@ -86,6 +96,17 @@ const generalLimiter = rateLimit({
   windowMs: config.apiRateLimits.windowMs,
   max: config.apiRateLimits.max,
   message: { error: true, message: 'Слишком много запросов, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Docker HEALTHCHECK и мониторинг опрашивают /api/health каждые 30с — не считаем.
+  skip: (req) => req.method === 'GET' && (req.originalUrl || req.url || '').split('?')[0] === '/api/health',
+});
+
+// Rate limiting - AI (LLM-вызовы дорогие): 10 запросов в минуту с IP.
+const aiLimiter = rateLimit({
+  windowMs: config.aiRateLimits.windowMs,
+  max: config.aiRateLimits.max,
+  message: { error: true, message: 'Слишком много AI-запросов, подождите минуту' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -106,7 +127,10 @@ app.use('/api/billing/webhook', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+// Сессия нужна только Passport (OAuth-рукопожатие); API ходит по JWT Bearer.
+// Имя/домен/path совпадают с продом, чтобы cookie app.finman.money не потерялась.
 app.use(session({
+  name: config.sessionCookieName,
   secret: config.sessionSecret,
   resave: false,
   saveUninitialized: false,
@@ -114,6 +138,9 @@ app.use(session({
     secure: config.environment === 'production',
     httpOnly: true,
     sameSite: 'strict',
+    path: '/',
+    domain: config.cookieDomain,
+    expires: false,
     maxAge: 24 * 60 * 60 * 1000 // 24 часа
   }
 }));
@@ -122,6 +149,7 @@ app.use(session({
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/ai', aiLimiter);
 
 // Инициализация Passport.js
 app.use(passport.initialize());
