@@ -44,6 +44,14 @@ const ReportsModule = {
     }
   },
 
+  // Report types come from the server with Russian names; prefer the client
+  // dictionary when it has a key for the id, fall back to the server string.
+  typeLabel(rt, field) {
+    const key = 'reports.' + (field === 'description' ? 'typeDesc.' : 'typeName.') + rt.id;
+    const val = t(key);
+    return val !== key ? val : (rt[field] || '');
+  },
+
   renderTypes() {
     const container = document.getElementById('report-types');
     if (!container) return;
@@ -53,7 +61,7 @@ const ReportsModule = {
     container.innerHTML = this.types.map(rt => `
       <div class="report-type-card" data-action="reports:generate-modal" data-type="${UI.esc(rt.id)}" role="button" tabindex="0">
         <span class="report-icon"><i class="fas ${icons[rt.id] || 'fa-file-alt'}"></i></span>
-        <div class="report-type-info"><h3>${UI.esc(rt.name)}</h3><p>${UI.esc(rt.description)}</p></div>
+        <div class="report-type-info"><h3>${UI.esc(this.typeLabel(rt, 'name'))}</h3><p>${UI.esc(this.typeLabel(rt, 'description'))}</p></div>
       </div>
     `).join('');
   },
@@ -77,7 +85,7 @@ const ReportsModule = {
         ${this.reports.map(r => `
           <tr>
             <td>${UI.esc(r.title)}</td>
-            <td>${UI.esc(r.report_type)}</td>
+            <td>${UI.esc(this.typeLabel({ id: r.report_type, name: r.report_type }, 'name'))}</td>
             <td>${UI.esc(r.period_start || '')} - ${UI.esc(r.period_end || '')}</td>
             <td>${new Date(r.created_at).toLocaleDateString(i18n.getLanguage())}</td>
             <td>
@@ -95,7 +103,7 @@ const ReportsModule = {
     document.getElementById('generate-form').reset();
     document.getElementById('report-type').value = type;
     const typeInfo = this.types.find(rt => rt.id === type);
-    document.getElementById('generate-modal-title').textContent = typeInfo ? typeInfo.name : t('reports.generate');
+    document.getElementById('generate-modal-title').textContent = typeInfo ? this.typeLabel(typeInfo, 'name') : t('reports.generate');
 
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
