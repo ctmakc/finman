@@ -6,6 +6,8 @@ const path = require('path');
 const Transaction = require('../models/transaction');
 const Account = require('../models/account');
 const csvImportService = require('../services/csvImportService');
+const currencyService = require('../services/currencyService');
+const dates = require('../lib/dates');
 const { AccountPermission } = require('../models/permission');
 
 const router = express.Router();
@@ -119,6 +121,17 @@ router.post('/', authenticate, async (req, res) => {
         message: 'Account, date and amount are required'
       });
     }
+    // Тип — только доход/расход: 'opening'/'transfer' пишут свои пути, а
+    // произвольный тип двигал баланс и прятал строку из статистики.
+    if (type !== undefined && type !== null && type !== '' && !['income', 'expense'].includes(type)) {
+      return res.status(400).json({ error: true, message: 'Transaction type must be income or expense' });
+    }
+    if (amount === null || amount === '' || !Number.isFinite(Number(amount))) {
+      return res.status(400).json({ error: true, message: 'Amount must be a number' });
+    }
+    if (!dates.isValidYMD(String(date).slice(0, 10))) {
+      return res.status(400).json({ error: true, message: 'Date must be YYYY-MM-DD' });
+    }
 
     // Проверяем права на добавление транзакций
     const permissions = await AccountPermission.getPermissions(
@@ -180,6 +193,7 @@ router.post('/', authenticate, async (req, res) => {
 router.post('/transfer', authenticate, async (req, res, next) => {
   try {
     const { fromAccountId, toAccountId, amount, date, description } = req.body;
+    let { toAmount } = req.body;
 
     // Базовая валидация полей (детальная валидация суммы/одинакового счёта —
     // в модели, она бросает AppError(400)).
@@ -201,11 +215,20 @@ router.post('/transfer', authenticate, async (req, res, next) => {
       });
     }
 
+    // Перевод между валютами: без toAmount зачисление считаем по курсу
+    // (раньше на UAH-счёт приходило 100 вместо ~3000).
+    if ((toAmount === undefined || toAmount === null || toAmount === '') &&
+        fromAccount.currency && toAccount.currency && fromAccount.currency !== toAccount.currency) {
+      const fx = await currencyService.convert(amount, fromAccount.currency, toAccount.currency, date || null);
+      toAmount = fx.result;
+    }
+
     const result = await Transaction.createTransfer({
       userId: req.user.id,
       fromAccountId,
       toAccountId,
       amount,
+      toAmount: toAmount === '' ? undefined : toAmount,
       date,
       description,
     });

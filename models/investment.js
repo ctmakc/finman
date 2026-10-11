@@ -176,6 +176,8 @@ const Investment = {
   async sell(investmentId, quantity, price, fee = 0, date = null) {
     const investment = await this.findInvestmentById(investmentId);
     if (!investment) throw new Error('Asset not found');
+    quantity = Number(quantity);
+    if (!(quantity > 0) || !(Number(price) >= 0)) throw new Error('Quantity must be positive');
     if (investment.quantity < quantity) throw new Error('Not enough holdings to sell');
 
     const sellDate = date || new Date().toISOString().split('T')[0];
@@ -190,8 +192,9 @@ const Investment = {
       date: sellDate
     });
 
-    // Обновляем количество (округляем до 2 знаков, чтобы не копить float-дрейф)
-    const newQuantity = money.round(investment.quantity - quantity);
+    // Количество дробное (0.00512 BTC): money.round до 2 знаков обнулял
+    // позицию. Округляем до 8 знаков — только против float-дрейфа.
+    const newQuantity = Math.round((investment.quantity - quantity) * 1e8) / 1e8;
 
     if (newQuantity === 0) {
       await run('UPDATE investments SET quantity = 0, is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [investmentId]);

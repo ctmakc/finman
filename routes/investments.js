@@ -243,8 +243,11 @@ router.post('/investments/:id/sell', ownInvestment, async (req, res) => {
     const result = await Investment.sell(req.params.id, quantity, price, fee, date);
     res.json(result);
   } catch (error) {
+    if (/^(Not enough holdings to sell|Quantity must be positive)$/.test(error.message)) {
+      return res.status(400).json({ message: error.message });
+    }
     console.error('Error:', error);
-    res.status(500).json({ message: error.message || 'Server error' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

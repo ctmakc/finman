@@ -1,6 +1,6 @@
 // ==================== МОДЕЛЬ ЦЕЛЕЙ НАКОПЛЕНИЯ ====================
 
-const { query, get, run } = require('../db/database');
+const { query, get, run, transaction } = require('../db/database');
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const money = require('../lib/money');
 const dates = require('../lib/dates');
@@ -136,21 +136,26 @@ const SavingsGoal = {
   async addContribution(goalId, amount, note = null, transactionId = null) {
     const goal = await this.findById(goalId);
     if (!goal) throw new Error('Goal not found');
+    // Тело формы/JSON может прислать строку: 50 + "100" = "50100".
+    const value = money.round(Number(amount));
+    if (!(value > 0)) throw new Error('Amount must be positive');
 
-    // Добавляем запись о пополнении
-    await run(
-      `INSERT INTO goal_contributions (goal_id, amount, note, transaction_id) VALUES (?, ?, ?, ?)`,
-      [goalId, amount, note, transactionId]
-    );
-
-    // Обновляем текущую сумму
-    const newAmount = goal.current_amount + amount;
-    const isCompleted = newAmount >= goal.target_amount;
-
-    await run(
-      `UPDATE savings_goals SET current_amount = ?, is_completed = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [newAmount, isCompleted ? 1 : 0, isCompleted ? new Date().toISOString() : null, goalId]
-    );
+    await transaction(async () => {
+      await run(
+        `INSERT INTO goal_contributions (goal_id, amount, note, transaction_id) VALUES (?, ?, ?, ?)`,
+        [goalId, value, note, transactionId]
+      );
+      // Атомарно в SQL: параллельные пополнения не теряют друг друга.
+      await run(
+        `UPDATE savings_goals
+         SET current_amount = ROUND(current_amount + ?, 2),
+             is_completed = CASE WHEN ROUND(current_amount + ?, 2) >= target_amount THEN 1 ELSE 0 END,
+             completed_at = CASE WHEN ROUND(current_amount + ?, 2) >= target_amount THEN COALESCE(completed_at, ?) ELSE NULL END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [value, value, value, new Date().toISOString(), goalId]
+      );
+    });
 
     return this.findById(goalId);
   },
@@ -159,19 +164,26 @@ const SavingsGoal = {
   async withdraw(goalId, amount, note = null) {
     const goal = await this.findById(goalId);
     if (!goal) throw new Error('Goal not found');
-    if (goal.current_amount < amount) throw new Error('Insufficient funds');
+    const value = money.round(Number(amount));
+    if (!(value > 0)) throw new Error('Amount must be positive');
 
-    // Добавляем запись об снятии (отрицательная сумма)
-    await run(
-      `INSERT INTO goal_contributions (goal_id, amount, note) VALUES (?, ?, ?)`,
-      [goalId, -amount, note || 'Withdrawal']
-    );
-
-    // Обновляем текущую сумму
-    await run(
-      `UPDATE savings_goals SET current_amount = current_amount - ?, is_completed = 0, completed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [amount, goalId]
-    );
+    await transaction(async () => {
+      // Проверка остатка внутри транзакции и в самом UPDATE.
+      const res = await run(
+        `UPDATE savings_goals
+         SET current_amount = ROUND(current_amount - ?, 2),
+             is_completed = CASE WHEN ROUND(current_amount - ?, 2) >= target_amount THEN 1 ELSE 0 END,
+             completed_at = CASE WHEN ROUND(current_amount - ?, 2) >= target_amount THEN completed_at ELSE NULL END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND current_amount >= ?`,
+        [value, value, value, goalId, value]
+      );
+      if (res.changes === 0) throw new Error('Insufficient funds');
+      await run(
+        `INSERT INTO goal_contributions (goal_id, amount, note) VALUES (?, ?, ?)`,
+        [goalId, -value, note || 'Withdrawal']
+      );
+    });
 
     return this.findById(goalId);
   },

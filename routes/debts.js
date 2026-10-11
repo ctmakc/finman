@@ -131,6 +131,9 @@ router.put('/:id', async (req, res) => {
     const updated = await Debt.update(req.params.id, normalizeBody(req.body, DEBT_FIELDS));
     res.json(updated);
   } catch (error) {
+    if (error && error.status && error.status < 500) {
+      return res.status(error.status).json({ message: error.message, code: error.code });
+    }
     console.error('Update error:', error);
     res.status(500).json({ message: 'Server error' });
   }
@@ -153,7 +156,13 @@ router.post('/:id/payment', async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Payment error:', error);
-    res.status(500).json({ message: error.message || 'Server error' });
+    if (error && error.status && error.status < 500) {
+      return res.status(error.status).json({ message: error.message, code: error.code });
+    }
+    if (error && /^(Insufficient funds|Amount must be positive)$/.test(error.message)) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

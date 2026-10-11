@@ -1,6 +1,6 @@
 // ==================== МОДЕЛЬ ДОЛГОВ И КРЕДИТОВ ====================
 
-const { query, get, run } = require('../db/database');
+const { query, get, run, transaction } = require('../db/database');
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const money = require('../lib/money');
 const dates = require('../lib/dates');
@@ -155,6 +155,24 @@ const Debt = {
     const fields = [];
     const values = [];
 
+    // Новое тело долга не может быть меньше уже выплаченного (иначе
+    // отрицательный остаток повышает net worth), и is_paid пересчитывается.
+    if (data.amount !== undefined) {
+      const current = await this.findById(id);
+      const amount = money.round(Number(data.amount));
+      if (!(amount > 0)) {
+        throw new AppError(400, 'DEBT_INVALID_AMOUNT', 'Debt amount must be positive');
+      }
+      const paid = money.round((current && current.paid_amount) || 0);
+      if (amount < paid) {
+        throw new AppError(400, 'DEBT_AMOUNT_BELOW_PAID', `Debt amount cannot be less than the amount already paid (${paid})`);
+      }
+      data = { ...data, amount };
+      fields.push('is_paid = ?', 'paid_at = ?');
+      const isPaid = amount <= paid;
+      values.push(isPaid ? 1 : 0, isPaid ? ((current && current.paid_at) || new Date().toISOString()) : null);
+    }
+
     ['name', 'description', 'amount', 'interest_rate', 'counterparty', 'due_date', 'is_active'].forEach(field => {
       if (data[field] !== undefined) {
         fields.push(`${field} = ?`);
@@ -207,20 +225,32 @@ const Debt = {
 
     const payDate = paymentDate || dates.todayISO();
 
-    // Добавляем запись о платеже
-    await run(
-      `INSERT INTO debt_payments (debt_id, amount, payment_type, note, transaction_id, payment_date)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [debtId, payAmount, paymentType, note, transactionId, payDate]
-    );
+    await transaction(async () => {
+      // Повторная проверка внутри транзакции: параллельный платёж мог уже
+      // увеличить paid_amount (read-then-write терял обновления).
+      const fresh = await get('SELECT amount, paid_amount FROM debts WHERE id = ?', [debtId]);
+      const freshPaid = money.round(fresh.paid_amount || 0);
+      const paidAfter = isPrincipal ? money.add(freshPaid, payAmount) : freshPaid;
+      if (paidAfter > money.round(fresh.amount)) {
+        throw new AppError(400, 'DEBT_OVERPAY',
+          `Payment exceeds the remaining debt (remaining: ${money.sub(money.round(fresh.amount), freshPaid)})`);
+      }
+      newPaid = paidAfter;
 
-    // Долг закрыт, когда выплачено тело целиком.
-    const isPaid = newPaid >= principal;
+      await run(
+        `INSERT INTO debt_payments (debt_id, amount, payment_type, note, transaction_id, payment_date)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [debtId, payAmount, paymentType, note, transactionId, payDate]
+      );
 
-    await run(
-      `UPDATE debts SET paid_amount = ?, is_paid = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [newPaid, isPaid ? 1 : 0, isPaid ? new Date().toISOString() : null, debtId]
-    );
+      // Долг закрыт, когда выплачено тело целиком.
+      const isPaid = newPaid >= money.round(fresh.amount);
+
+      await run(
+        `UPDATE debts SET paid_amount = ?, is_paid = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newPaid, isPaid ? 1 : 0, isPaid ? new Date().toISOString() : null, debtId]
+      );
+    });
 
     return this.findById(debtId);
   },

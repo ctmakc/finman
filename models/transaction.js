@@ -94,10 +94,13 @@ class Transaction {
   // Тип 'transfer' автоматически исключён из агрегатов income/expense
   // (они фильтруют type IN ('income','expense')), поэтому переводы не искажают
   // статистику доходов/расходов и не меняют чистый итог по пользователю.
-  static async createTransfer({ userId, fromAccountId, toAccountId, amount, date, description }) {
+  // toAmount — зачисление в валюте счёта-получателя (перевод CAD -> UAH);
+  // по умолчанию равно amount (одна валюта).
+  static async createTransfer({ userId, fromAccountId, toAccountId, amount, toAmount, date, description }) {
     const amt = money.round(amount);
+    const credit = toAmount === undefined || toAmount === null ? amt : money.round(toAmount);
 
-    if (!(amt > 0)) {
+    if (!(amt > 0) || !(credit > 0)) {
       throw new AppError(400, 'INVALID_AMOUNT', 'Transfer amount must be positive');
     }
     if (String(fromAccountId) === String(toAccountId)) {
@@ -123,9 +126,9 @@ class Transaction {
         `INSERT INTO transactions
          (account_id, user_id, date, description, category, amount, type, transfer_id)
          VALUES (?, ?, ?, ?, ?, ?, 'transfer', ?)`,
-        [toAccountId, userId, txDate, desc, 'Transfer', amt, transferId]
+        [toAccountId, userId, txDate, desc, 'Transfer', credit, transferId]
       );
-      await Account.updateBalance(toAccountId, userId, amt);
+      await Account.updateBalance(toAccountId, userId, credit);
 
       return {
         transferId,
@@ -133,7 +136,7 @@ class Transaction {
         date: txDate,
         description: desc,
         from: { id: fromRow.id, accountId: fromAccountId, amount: -amt },
-        to: { id: toRow.id, accountId: toAccountId, amount: amt },
+        to: { id: toRow.id, accountId: toAccountId, amount: credit },
       };
     });
   }
@@ -268,6 +271,18 @@ class Transaction {
       return this.updateTransferLegs(currentTransaction, userId, transactionData);
     }
 
+    // Строка начального баланса: тип и знак не меняются (кредитка −500 после
+    // правки описания становилась +500 типа income).
+    if (currentTransaction.type === 'opening' && transactionData.type && transactionData.type !== 'opening') {
+      throw new AppError(400, 'OPENING_TYPE_LOCKED', 'The type of an opening balance cannot be changed');
+    }
+    if (transactionData.type && !['income', 'expense', 'opening'].includes(transactionData.type)) {
+      throw new AppError(400, 'INVALID_TYPE', 'Transaction type must be income or expense');
+    }
+    if (currentTransaction.type !== 'opening' && transactionData.type === 'opening') {
+      throw new AppError(400, 'INVALID_TYPE', 'Transaction type must be income or expense');
+    }
+
     const newType = transactionData.type || currentTransaction.type;
     const hasAmount = transactionData.amount !== undefined;
     let newAmount = currentTransaction.amount;
@@ -320,9 +335,15 @@ class Transaction {
 
     return transaction(async () => {
       const legs = await query(
-        `SELECT id, account_id, amount FROM transactions WHERE transfer_id = ? AND user_id = ?`,
+        `SELECT t.id, t.account_id, t.amount, a.currency
+         FROM transactions t JOIN accounts a ON a.id = t.account_id
+         WHERE t.transfer_id = ? AND t.user_id = ?`,
         [leg.transfer_id, userId]
       );
+      // Ноги в разных валютах: одна новая сумма для обеих неверна.
+      if (newAbs !== null && new Set(legs.map((l) => l.currency)).size > 1) {
+        throw new AppError(400, 'TRANSFER_FX_AMOUNT_LOCKED', 'The amount of a transfer between currencies cannot be edited; delete the transfer and create it again');
+      }
       let changed = 0;
       for (const row of legs) {
         const updateFields = [];

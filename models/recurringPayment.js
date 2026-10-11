@@ -1,6 +1,11 @@
 const { query, get, run } = require('../db/database');
 const dates = require('../lib/dates');
 
+// Occurrences per month by frequency, for "monthly" totals.
+const MONTHLY_FACTOR_SQL = `(CASE frequency
+  WHEN 'daily' THEN 365.0 / 12 WHEN 'weekly' THEN 52.0 / 12 WHEN 'biweekly' THEN 26.0 / 12
+  WHEN 'quarterly' THEN 1.0 / 3 WHEN 'yearly' THEN 1.0 / 12 ELSE 1 END)`;
+
 class RecurringPayment {
   // Создание регулярного платежа
   static async create(paymentData) {
@@ -43,8 +48,9 @@ class RecurringPayment {
         type || 'expense',
         category || null,
         frequency || 'monthly',
-        dayOfMonth || null,
-        dayOfWeek || null,
+        // ?? not ||: Sunday is day_of_week 0.
+        dayOfMonth ?? null,
+        dayOfWeek ?? null,
         startDate,
         endDate || null,
         nextPaymentDate,
@@ -155,13 +161,13 @@ class RecurringPayment {
     if (fields.length === 0) return true;
 
     // Пересчитать следующую дату платежа если изменилась частота
-    if (updateData.frequency || updateData.dayOfMonth || updateData.dayOfWeek) {
+    if (updateData.frequency || updateData.dayOfMonth !== undefined || updateData.dayOfWeek !== undefined) {
       const currentPayment = await this.findById(id);
       const nextDate = this.calculateNextPaymentDate(
         currentPayment.start_date,
         updateData.frequency || currentPayment.frequency,
-        updateData.dayOfMonth || currentPayment.day_of_month,
-        updateData.dayOfWeek || currentPayment.day_of_week
+        updateData.dayOfMonth ?? currentPayment.day_of_month,
+        updateData.dayOfWeek ?? currentPayment.day_of_week
       );
       fields.push('next_payment_date = ?');
       values.push(nextDate);
@@ -197,8 +203,11 @@ class RecurringPayment {
     if (!payment) return { success: false, message: 'Payment not found' };
 
     const today = dates.todayISO();
+    // The series advances from the due date being paid, not from today:
+    // paying the 11-01 bill on 10-25 must move it to 12-01 (from today it
+    // stayed 11-01 and auto-create charged it a second time).
     const nextDate = this.calculateNextPaymentDate(
-      today,
+      payment.next_payment_date || today,
       payment.frequency,
       payment.day_of_month,
       payment.day_of_week,
@@ -292,9 +301,12 @@ class RecurringPayment {
 
     if (skipCurrent) {
       // Переходим к следующему периоду
+      const weeklyOnDay = frequency === 'weekly' && dayOfWeek !== null && dayOfWeek !== undefined;
       switch (frequency) {
         case 'daily': iso = dates.addDaysISO(iso, 1); break;
-        case 'weekly': iso = dates.addDaysISO(iso, 7); break;
+        // Weekly on a fixed weekday: step one day past the current date and
+        // let the weekday adjustment below find the next occurrence.
+        case 'weekly': iso = dates.addDaysISO(iso, weeklyOnDay ? 1 : 7); break;
         case 'biweekly': iso = dates.addDaysISO(iso, 14); break;
         case 'monthly': iso = dates.addMonthsISO(iso, 1, dayOfMonth || null); break;
         case 'quarterly': iso = dates.addMonthsISO(iso, 3, dayOfMonth || null); break;
@@ -306,12 +318,9 @@ class RecurringPayment {
     // Корректировка для конкретного дня
     if (frequency === 'weekly' && dayOfWeek !== null && dayOfWeek !== undefined) {
       const currentDay = dates.parseISO(iso).getUTCDay();
-      const diff = Number(dayOfWeek) - currentDay;
-      if (diff <= 0 && skipCurrent) {
-        iso = dates.addDaysISO(iso, diff + 7);
-      } else if (diff > 0) {
-        iso = dates.addDaysISO(iso, diff);
-      }
+      // First occurrence of dayOfWeek on or after iso.
+      const diff = ((Number(dayOfWeek) - currentDay) % 7 + 7) % 7;
+      iso = dates.addDaysISO(iso, diff);
     } else if (['monthly', 'quarterly', 'yearly'].includes(frequency) && dayOfMonth) {
       iso = dates.addMonthsISO(iso, 0, Number(dayOfMonth));
     }
@@ -347,8 +356,8 @@ class RecurringPayment {
       `SELECT
          COUNT(*) as total,
          SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-         SUM(CASE WHEN type = 'expense' AND is_active = 1 THEN amount ELSE 0 END) as monthly_expenses,
-         SUM(CASE WHEN type = 'income' AND is_active = 1 THEN amount ELSE 0 END) as monthly_income
+         SUM(CASE WHEN type = 'expense' AND is_active = 1 THEN ABS(amount) * ${MONTHLY_FACTOR_SQL} ELSE 0 END) as monthly_expenses,
+         SUM(CASE WHEN type = 'income' AND is_active = 1 THEN ABS(amount) * ${MONTHLY_FACTOR_SQL} ELSE 0 END) as monthly_income
        FROM recurring_payments
        WHERE user_id = ?`,
       [userId]
@@ -360,8 +369,8 @@ class RecurringPayment {
     return {
       total: stats.total || 0,
       active: stats.active || 0,
-      monthlyExpenses: stats.monthly_expenses || 0,
-      monthlyIncome: stats.monthly_income || 0,
+      monthlyExpenses: Math.round((stats.monthly_expenses || 0) * 100) / 100,
+      monthlyIncome: Math.round((stats.monthly_income || 0) * 100) / 100,
       upcomingCount: upcoming.length,
       overdueCount: overdue.length
     };
