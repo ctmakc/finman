@@ -269,6 +269,15 @@ router.post('/sync-accounts/:connectionId', authenticate, async (req, res) => {
 router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
   try {
     const { startDate, endDate } = req.body || {};
+    // Bad bounds used to reach the bank as ".../NaN/...": reject them here.
+    for (const [value, which] of [[startDate, 'start'], [endDate, 'end']]) {
+      if (value == null || value === '') continue;
+      try {
+        bankApiService.rangeBound(value, which);
+      } catch (e) {
+        return fail(res, 400, e.message);
+      }
+    }
     const account = await Account.findById(req.params.accountId, req.user.id);
     if (!account) return fail(res, 404, 'Account not found');
 

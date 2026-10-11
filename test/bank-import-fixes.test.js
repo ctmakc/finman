@@ -73,3 +73,63 @@ describe('"Re-read with this mapping" keeps the preset roles the wizard does not
     expect(again.rows.find((r) => !r.skipped).currency).toBeNull();
   });
 });
+
+describe('Monobank API: balance, dates, range, currency', () => {
+  let svc;
+  let calls;
+  const ops = [
+    // 00:30 Kyiv on 2026-10-10 (UTC+3) = 2026-10-09T21:30Z
+    { id: 't1', time: Math.floor(Date.parse('2026-10-09T21:30:00Z') / 1000), description: 'Сільпо', mcc: 5411, amount: -12345, balance: 100 }
+  ];
+  beforeAll(() => {
+    calls = [];
+    jest.isolateModules(() => {
+      jest.doMock('axios', () => ({
+        get: async (url) => {
+          calls.push(url);
+          if (url.includes('client-info')) {
+            return {
+              data: {
+                name: 'X',
+                accounts: [
+                  { id: 'acc1', currencyCode: 980, balance: 5100000, creditLimit: 5000000, type: 'black', maskedPan: ['5375****1234'] },
+                  { id: 'acc2', currencyCode: 999, balance: 100, creditLimit: 0, type: 'black' }
+                ]
+              }
+            };
+          }
+          return { data: ops };
+        }
+      }));
+      svc = require(path.join(PROJECT_ROOT, 'services', 'bankApiService.js'));
+    });
+  });
+  afterAll(() => jest.dontMock('axios'));
+
+  test('balance is own money: balance - creditLimit; unknown currency code is skipped, not UAH', async () => {
+    const accounts = await svc.getAccounts('monobank', { access_token: 'tok' });
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0]).toMatchObject({ id: 'acc1', balance: 1000, creditLimit: 50000, currency: 'UAH' });
+    expect(svc.currencyFromNumeric(999)).toBeNull();
+    expect(svc.currencyFromNumeric(933)).toBe('BYN');
+  });
+
+  test('operation dates are Kyiv calendar dates', async () => {
+    const tx = await svc.getTransactions('monobank', { access_token: 'tok' }, 'acc1', { startDate: '2026-10-01', endDate: '2026-10-10' });
+    expect(tx[0].date).toBe('2026-10-10');
+    expect(svc.kyivDate(Date.parse('2026-10-09T20:59:59Z') / 1000)).toBe('2026-10-09');
+  });
+
+  test('the end date includes its own (Kyiv) day; bad dates throw instead of sending NaN', async () => {
+    calls.length = 0;
+    await svc.getTransactions('monobank', { access_token: 'tok' }, 'acc1', { startDate: '2026-10-01', endDate: '2026-10-10' });
+    const [from, to] = calls[0].split('/').slice(-2).map(Number);
+    expect(new Date(from * 1000).toISOString()).toBe('2026-09-30T21:00:00.000Z'); // 00:00 Kyiv, Oct 1
+    expect(new Date(to * 1000).toISOString()).toBe('2026-10-10T20:59:59.000Z'); // 23:59:59 Kyiv, Oct 10
+    expect(calls[0]).not.toMatch(/NaN/);
+    await expect(svc.getTransactions('monobank', { access_token: 'tok' }, 'acc1', { startDate: 'garbage' })).rejects.toThrow(/Invalid start date/);
+    await expect(svc.getTransactions('monobank', { access_token: 'tok' }, 'acc1', { startDate: '2026-02-30' })).rejects.toThrow(/Invalid start date/);
+    // across the DST switch (2026-03-29 03:00 Kyiv)
+    expect(new Date(svc.rangeBound('2026-03-29', 'end') * 1000).toISOString()).toBe('2026-03-29T20:59:59.000Z');
+  });
+});
