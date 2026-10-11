@@ -135,7 +135,7 @@ function validYmd(y, m, d) {
 function parseDate(input, order = 'auto') {
   if (input == null) return null;
   let s = String(input).trim();
-  if (!s) return null;
+  if (!s || s.length > 64) return null; // no date cell is this long
   // Drop a time part: "2026-10-09 14:22:01", "09.10.2026 14:22", "2026-10-09T14:22:01Z"
   s = s.replace(/[T ]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?$/i, '').trim();
 
@@ -270,11 +270,19 @@ function looksLikeDate(s) {
   return parseDate(s) !== null;
 }
 
+// Longest cell that can still be a money amount ("-1 234 567 890,12 USD" is ~25).
+// Anything longer is text; the cap also bounds the regex work on hostile cells.
+const MAX_NUMBER_CELL = 64;
+
+// Digit groups are separated by single whitespace runs only, so the pattern has
+// no overlapping quantifiers (a "1" + 40k spaces + "!" cell used to take ~9 s).
+const NUMBER_CELL = /^[(+-]?\s*(?:[$€£₴A-Z]{1,3}\s*)?[\d.,]+(?:\s+[\d.,]+)*\s*(?:[A-Z]{1,3})?\)?-?$/i;
+
 function looksLikeNumber(s) {
   const t = String(s || '').trim();
-  if (!t) return false;
+  if (!t || t.length > MAX_NUMBER_CELL) return false;
   if (looksLikeDate(t)) return false;
-  return /^[(+-]?\s*[$€£₴A-Z]{0,3}\s*[\d\s.,]+\s*[A-Z]{0,3}\)?-?$/i.test(t) && parseAmount(t) !== null;
+  return NUMBER_CELL.test(t) && parseAmount(t) !== null;
 }
 
 // Some exports open with a free-text preamble ("Following data is valid as of
