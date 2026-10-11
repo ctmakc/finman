@@ -555,6 +555,15 @@ async function fetchTransactions(filters = {}) {
     });
   }
   
+  // Currency of a transaction row: the API row carries none, so take it from
+  // the account (appState.accounts) and fall back to the base currency.
+  function transactionCurrency(transaction) {
+    if (transaction && transaction.currency) return transaction.currency;
+    const accounts = (typeof appState !== 'undefined' && Array.isArray(appState.accounts)) ? appState.accounts : [];
+    const acc = accounts.find(a => String(a.id) === String(transaction && transaction.account_id));
+    return acc && acc.currency ? acc.currency : undefined;
+  }
+
   // Рендеринг списка транзакций
   function renderTransactionsList(transactions) {
     // После рендера вставляем кнопку «Перевод» в тулбар транзакций (см.
@@ -591,7 +600,7 @@ async function fetchTransactions(filters = {}) {
         </td>
         <td data-label="${t('transactions.field.account')}" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
         <td data-label="${t('common.amount')}" class="text-right tx-cell tx-cell-amount transaction-amount ${amountClass}">
-          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount))}
+          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount), transactionCurrency(transaction))}
         </td>
         <td data-label="${t('common.actions')}" class="tx-cell tx-cell-actions">
           <div class="table-actions">

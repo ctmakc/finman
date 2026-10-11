@@ -20,6 +20,22 @@ function orderedCurrencies(list) {
   return arr.sort((a, b) => rank(a) - rank(b) || String(a.code).localeCompare(String(b.code)));
 }
 
+// Currency name in the UI language (Intl.DisplayNames); the server list
+// carries a fixed-language name, which is only the fallback.
+function currencyDisplayName(code, fallback) {
+  try {
+    const locale = (typeof numberLocale === 'function') ? numberLocale() : 'en';
+    const dn = new Intl.DisplayNames([locale], { type: 'currency' });
+    const name = dn.of(String(code).toUpperCase());
+    if (name && name !== String(code).toUpperCase()) return name;
+  } catch (e) { /* older browsers: fall back to the server name */ }
+  return fallback || code;
+}
+
+function currencyOptionLabel(c) {
+  return `${c.symbol} ${c.code} - ${escapeHtml(currencyDisplayName(c.code, c.name))}`;
+}
+
 // The user's base currency: saved settings first, then app state, then CAD.
 function userBaseCurrency() {
   const fromSettings = currencyState.settings && (currencyState.settings.base_currency || currencyState.settings.baseCurrency);
@@ -230,7 +246,7 @@ async function renderConverterTab() {
               <select id="convert-from" class="form-control">
                 ${currencies.map(c => `
                   <option value="${c.code}" ${String(c.code).toUpperCase() === defaultFrom ? 'selected' : ''}>
-                    ${c.symbol} ${c.code} - ${c.name}
+                    ${currencyOptionLabel(c)}
                   </option>
                 `).join('')}
               </select>
@@ -245,7 +261,7 @@ async function renderConverterTab() {
               <select id="convert-to" class="form-control">
                 ${currencies.map(c => `
                   <option value="${c.code}" ${String(c.code).toUpperCase() === defaultTo ? 'selected' : ''}>
-                    ${c.symbol} ${c.code} - ${c.name}
+                    ${currencyOptionLabel(c)}
                   </option>
                 `).join('')}
               </select>
@@ -396,7 +412,7 @@ async function loadRates() {
               <div class="rate-value">
                 ${rate ? Number(rate).toFixed(4) : t('common.empty')}
               </div>
-              <div class="rate-name">${c.name}</div>
+              <div class="rate-name">${escapeHtml(currencyDisplayName(c.code, c.name))}</div>
             </div>
           `;
         }).join('')}
@@ -445,7 +461,7 @@ async function renderCurrencySettingsTab() {
             <select id="base-currency" class="form-control">
               ${orderedCurrencies(currencyState.supportedCurrencies).map(c => `
                 <option value="${c.code}" ${c.code === settings.base_currency ? 'selected' : ''}>
-                  ${c.symbol} ${c.code} - ${c.name}
+                  ${currencyOptionLabel(c)}
                 </option>
               `).join('')}
             </select>
