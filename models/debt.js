@@ -118,11 +118,13 @@ const Debt = {
   // Создание долга
   async create(data) {
     const result = await run(
-      `INSERT INTO debts (user_id, name, description, type, amount, interest_rate, currency, counterparty, start_date, due_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [data.user_id, data.name, data.description, data.type, data.amount,
+      `INSERT INTO debts (user_id, name, description, type, amount, paid_amount, interest_rate, currency, counterparty, start_date, due_date, is_paid)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.user_id, data.name, data.description, data.type, money.round(data.amount),
+       money.round(data.paid_amount || 0),
        data.interest_rate || 0, data.currency || DEFAULT_CURRENCY, data.counterparty,
-       data.start_date, data.due_date]
+       data.start_date, data.due_date,
+       money.round(data.paid_amount || 0) >= money.round(data.amount) ? 1 : 0]
     );
     return this.findById(result.id);
   },

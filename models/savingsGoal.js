@@ -88,9 +88,10 @@ const SavingsGoal = {
   // Создание цели
   async create(data) {
     const result = await run(
-      `INSERT INTO savings_goals (user_id, name, description, target_amount, currency, target_date, category, icon, color)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO savings_goals (user_id, name, description, target_amount, current_amount, currency, target_date, category, icon, color)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.user_id, data.name, data.description, data.target_amount,
+       money.round(data.current_amount || 0),
        data.currency || DEFAULT_CURRENCY, data.target_date, data.category,
        data.icon || 'piggy-bank', data.color || '#5D5CDE']
     );

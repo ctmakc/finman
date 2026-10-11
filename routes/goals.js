@@ -5,6 +5,28 @@ const router = express.Router();
 const passport = require('passport');
 const SavingsGoal = require('../models/savingsGoal');
 const { todayISO, userTz } = require('../lib/dates');
+const { normalizeBody, missingFields, missingFieldsMessage } = require('../lib/bodyFields');
+
+// Body fields accepted in snake_case or camelCase (public API docs vs PWA).
+const GOAL_FIELDS = {
+  name: [],
+  description: [],
+  target_amount: ['targetAmount', 'target', 'goalAmount'],
+  current_amount: ['currentAmount', 'saved'],
+  currency: [],
+  target_date: ['targetDate', 'deadline'],
+  category: [],
+  icon: [],
+  color: [],
+  is_active: ['isActive'],
+};
+const GOAL_REQUIRED = ['name', 'target_amount'];
+
+function parseAmount(v) {
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
 
 // Все маршруты требуют аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -48,24 +70,40 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Создать цель
+// Create a goal. Accepts snake_case and camelCase bodies.
 router.post('/', async (req, res) => {
   try {
-    const { name, description, target_amount, currency, target_date, category, icon, color } = req.body;
-    
-    if (!name || !target_amount) {
-      return res.status(400).json({ message: 'Название и целевая сумма обязательны' });
+    const data = normalizeBody(req.body, GOAL_FIELDS);
+    const missing = missingFields(data, GOAL_REQUIRED);
+    if (missing.length) {
+      return res.status(400).json({ message: missingFieldsMessage(missing), missing });
+    }
+    const target = parseAmount(data.target_amount);
+    if (!(target > 0)) {
+      return res.status(400).json({ message: 'target_amount must be a positive number' });
+    }
+    const current = data.current_amount === undefined ? undefined : parseAmount(data.current_amount);
+    if (current !== undefined && !(current >= 0)) {
+      return res.status(400).json({ message: 'current_amount must be a non-negative number' });
     }
 
     const goal = await SavingsGoal.create({
       user_id: req.user.id,
-      name, description, target_amount, currency, target_date, category, icon, color
+      name: data.name,
+      description: data.description,
+      target_amount: target,
+      current_amount: current,
+      currency: data.currency,
+      target_date: data.target_date,
+      category: data.category,
+      icon: data.icon,
+      color: data.color
     });
 
     res.status(201).json(goal);
   } catch (error) {
-    console.error('Ошибка создания цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error creating goal:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -77,7 +115,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Цель не найдена' });
     }
 
-    const updated = await SavingsGoal.update(req.params.id, req.body);
+    const updated = await SavingsGoal.update(req.params.id, normalizeBody(req.body, GOAL_FIELDS));
     res.json(updated);
   } catch (error) {
     console.error('Ошибка обновления цели:', error);
