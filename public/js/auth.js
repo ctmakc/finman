@@ -15,7 +15,7 @@ async function handleProfileUpdate(e) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления профиля', 'error');
+        showNotification(data.message || t('auth.profile.updateError'), 'error');
         return;
       }
       
@@ -28,10 +28,10 @@ async function handleProfileUpdate(e) {
         fullName: userData.fullName
       };
       
-      showNotification('Профиль успешно обновлен', 'success');
+      showNotification(t('auth.profile.updated'), 'success');
     } catch (error) {
       console.error('Ошибка обновления профиля:', error);
-      showNotification('Произошла ошибка при обновлении профиля', 'error');
+      showNotification(t('auth.profile.updateFailed'), 'error');
     }
   }
   
@@ -44,7 +44,7 @@ async function handleProfileUpdate(e) {
     const confirmPassword = document.getElementById('settings-confirm-password').value;
     
     if (newPassword !== confirmPassword) {
-      showNotification('Пароли не совпадают', 'error');
+      showNotification(t('auth.password.mismatch'), 'error');
       return;
     }
     
@@ -59,7 +59,7 @@ async function handleProfileUpdate(e) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления пароля', 'error');
+        showNotification(data.message || t('auth.password.updateError'), 'error');
         return;
       }
       
@@ -68,10 +68,10 @@ async function handleProfileUpdate(e) {
       document.getElementById('settings-new-password').value = '';
       document.getElementById('settings-confirm-password').value = '';
       
-      showNotification('Пароль успешно обновлен', 'success');
+      showNotification(t('auth.password.updated'), 'success');
     } catch (error) {
       console.error('Ошибка обновления пароля:', error);
-      showNotification('Произошла ошибка при обновлении пароля', 'error');
+      showNotification(t('auth.password.updateFailed'), 'error');
     }
   }
   
