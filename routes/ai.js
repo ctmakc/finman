@@ -16,6 +16,13 @@
 //   GET  /api/ai/insights/monthly ?month=YYYY-MM&refresh=1 -> { insight, cached, aiUsed }  (cached in ai_insights)
 //   GET  /api/ai/insights/weekly            -> { brief, totalSpent, totalEarned, transactionCount, aiUsed }
 //   GET  /api/ai/conversations/:id          -> разговор с сообщениями
+//   GET  /api/ai/opt-in                     -> { optIn, aiConfigured }
+//   POST /api/ai/opt-in  body { enabled }   -> { optIn }
+//
+// AI opt-in (users.ai_opt_in, migration 017e): the dashboard loads /insights/monthly and
+// /insights/weekly on its own, so those two send nothing to the AI provider until the user
+// has opted in (opening the AI page, sending a chat message, any explicit AI action on the
+// AI page, or POST /opt-in). Without opt-in they answer with deterministic numbers.
 //
 // Если AI-провайдер не настроен — корректный 503 AI_NOT_CONFIGURED (через AppError).
 // Ошибки бросаются как AppError и форматируются центральным errorHandler.
@@ -28,12 +35,46 @@ const { AppError } = require('../middleware/error');
 const aiService = require('../services/aiService');
 const provider = require('../lib/ai/provider');
 const AiConversation = require('../models/aiConversation');
+const User = require('../models/user');
 const insights = require('../services/financialInsights');
 
 // Обёртка для async-хендлеров: пробрасывает ошибки в errorHandler.
 function wrap(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
+
+// Explicit AI actions by the user count as opting in (they send data to the provider
+// by the user's own request). Never fails the request.
+async function markOptIn(req) {
+  try {
+    await User.setAiOptIn(req.user.id, true);
+  } catch (_) {
+    /* pre-017e DB: column missing — nothing to record */
+  }
+}
+
+// GET /api/ai/opt-in — whether the user's data may be sent to the AI provider.
+router.get(
+  '/opt-in',
+  wrap(async (req, res) => {
+    const optIn = await User.getAiOptIn(req.user.id);
+    return ok(res, { optIn, aiConfigured: provider.isConfigured() });
+  })
+);
+
+// POST /api/ai/opt-in — body { enabled: boolean } (default true).
+router.post(
+  '/opt-in',
+  wrap(async (req, res) => {
+    const body = req.body || {};
+    if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+      throw new AppError(400, 'INVALID_BODY', 'Field "enabled" must be a boolean');
+    }
+    const enabled = body.enabled !== false;
+    await User.setAiOptIn(req.user.id, enabled);
+    return ok(res, { optIn: enabled });
+  })
+);
 
 // POST /api/ai/chat — диалог с CFO.
 router.post(
@@ -49,6 +90,7 @@ router.post(
     if (!provider.isConfigured()) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI provider not configured');
     }
+    await markOptIn(req);
     const result = await aiService.chat(req.user.id, conversationId, message);
     return ok(res, result);
   })
@@ -76,6 +118,15 @@ router.post(
     if (!provider.isConfigured()) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI provider not configured');
     }
+    await markOptIn(req);
+
+    // Client disconnect -> abort the upstream generation (no tokens burnt for nobody,
+    // nothing half-written saved). res 'close' before the response finished = client gone
+    // (req 'close' fires once the body is consumed on modern Node, so it is not usable).
+    const ac = new AbortController();
+    res.on('close', () => {
+      if (!res.writableFinished) ac.abort();
+    });
 
     // Открываем SSE-поток.
     res.writeHead(200, {
@@ -87,12 +138,14 @@ router.post(
     if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
     const send = (event, data) => {
+      if (ac.signal.aborted || res.writableEnded) return;
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
     try {
       await aiService.chatStream(req.user.id, conversationId, message, {
+        signal: ac.signal,
         onStart: ({ conversationId: cid }) => send('start', { conversationId: cid }),
         onChunk: (text) => send('chunk', { text }),
         onDone: ({ conversationId: cid, reply }) =>
@@ -105,7 +158,7 @@ router.post(
         message: err.message || 'Streaming failed',
       });
     } finally {
-      res.end();
+      if (!res.writableEnded) res.end();
     }
   })
 );
@@ -114,6 +167,7 @@ router.post(
 router.get(
   '/categorize',
   wrap(async (req, res) => {
+    await markOptIn(req);
     const result = await aiService.autoCategorize(req.user.id);
     return ok(res, result);
   })
@@ -139,6 +193,7 @@ router.get(
   '/summary',
   wrap(async (req, res) => {
     const month = (req.query && req.query.month) || undefined;
+    await markOptIn(req);
     const result = await aiService.monthlyNarrative(req.user.id, month);
     return ok(res, result);
   })
@@ -175,11 +230,13 @@ router.get(
     if (q.month !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(q.month))) {
       throw new AppError(400, 'INVALID_MONTH', 'Query "month" must be YYYY-MM (month 01-12)');
     }
+    const aiOptIn = await User.getAiOptIn(req.user.id);
     const result = await insights.monthlyInsight(req.user.id, {
       month: q.month,
       refresh: q.refresh === '1' || q.refresh === 'true',
+      allowAi: aiOptIn,
     });
-    return ok(res, { ...result, aiConfigured: provider.isConfigured() });
+    return ok(res, { ...result, aiConfigured: provider.isConfigured(), aiOptIn });
   })
 );
 
@@ -187,8 +244,9 @@ router.get(
 router.get(
   '/insights/weekly',
   wrap(async (req, res) => {
-    const result = await insights.weeklyBrief(req.user.id);
-    return ok(res, { ...result, aiConfigured: provider.isConfigured() });
+    const aiOptIn = await User.getAiOptIn(req.user.id);
+    const result = await insights.weeklyBrief(req.user.id, { allowAi: aiOptIn });
+    return ok(res, { ...result, aiConfigured: provider.isConfigured(), aiOptIn });
   })
 );
 
@@ -196,6 +254,7 @@ router.get(
 router.get(
   '/insights',
   wrap(async (req, res) => {
+    await markOptIn(req);
     const result = await aiService.analyzeSpending(req.user.id);
     return ok(res, {
       analysis: result.analysis,
@@ -210,6 +269,7 @@ router.get(
 router.get(
   '/plan',
   wrap(async (req, res) => {
+    await markOptIn(req);
     const result = await aiService.buildFinancialPlan(req.user.id);
     return ok(res, {
       plan: result.plan,
@@ -228,6 +288,7 @@ router.post(
       cuts: Array.isArray(body.cuts) ? body.cuts : [],
       extraMonthlySaving: body.extraMonthlySaving,
     };
+    await markOptIn(req);
     const out = await aiService.simulateScenario(req.user.id, scenario);
     return ok(res, {
       result: out.result,

@@ -12,8 +12,14 @@
 //   deriveAlerts(digest)                    -> ranked actionable alerts (pure)
 //   digestToPrompt(digest)                  -> FINANCIAL DIGEST text block for the system prompt (pure)
 //   GROUNDING_SYSTEM                        -> guardrail instruction for the LLM
-//   monthlyInsight(userId, { month, now, refresh }) -> { insight, cached, aiUsed, provider, model }
-//   weeklyBrief(userId, { now })            -> { brief, totalSpent, totalEarned, transactionCount, aiUsed }
+//   monthlyInsight(userId, { month, now, refresh, allowAi }) -> { insight, cached, aiUsed, provider, model }
+//   weeklyBrief(userId, { now, allowAi })   -> { brief, totalSpent, totalEarned, transactionCount, aiUsed, cached }
+//
+// allowAi (default true) = the user opted in to AI (users.ai_opt_in). With allowAi:false
+// nothing is sent to the provider and both stories are deterministic.
+// Cache (ai_insights, UNIQUE(org_id, user_id, period, type), per-user rows have org_id 0):
+//   monthly — per month; the CURRENT month's entry expires after 24h (its numbers move);
+//   weekly  — per end date, 6h.
 
 const { query, get, run } = require('../db/database');
 const provider = require('../lib/ai/provider');
@@ -367,24 +373,77 @@ function anchorForMonth(month, now) {
   return new Date(y, m, 0); // day 0 of next month = last day of `month`
 }
 
+const MONTHLY_CURRENT_TTL_MS = 24 * 3600 * 1000;
+const WEEKLY_TTL_MS = 6 * 3600 * 1000;
+
+// generated_at is SQLite CURRENT_TIMESTAMP ('YYYY-MM-DD HH:MM:SS', UTC).
+function cacheAgeMs(generatedAt) {
+  if (!generatedAt) return Infinity;
+  const t = Date.parse(`${String(generatedAt).replace(' ', 'T')}${/Z|[+-]\d\d:?\d\d$/.test(generatedAt) ? '' : 'Z'}`);
+  return Number.isFinite(t) ? Date.now() - t : Infinity;
+}
+
+// Newest cache row for (user, period, type); our per-user rows (org_id 0) win over
+// rows a production org wrote for the same user.
+async function readCache(userId, period, type) {
+  const row = await get(
+    `SELECT content, model, generated_at FROM ai_insights
+      WHERE user_id = ? AND period = ? AND type = ?
+      ORDER BY (org_id = 0) DESC, generated_at DESC, id DESC LIMIT 1`,
+    [userId, period, type]
+  );
+  if (!row) return null;
+  let content = null;
+  try {
+    content = JSON.parse(row.content);
+  } catch (_) {
+    content = null;
+  }
+  if (!content || typeof content !== 'object') return null;
+  return { content, model: row.model || null, ageMs: cacheAgeMs(row.generated_at) };
+}
+
+// Atomic upsert (no DELETE+INSERT window for two concurrent requests).
+async function writeCache(userId, period, type, content, model) {
+  await run(
+    `INSERT INTO ai_insights (org_id, user_id, period, type, content, model, generated_at)
+     VALUES (0, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(org_id, user_id, period, type)
+     DO UPDATE SET content = excluded.content, model = excluded.model, generated_at = CURRENT_TIMESTAMP`,
+    [userId, period, type, JSON.stringify(content), model || null]
+  );
+}
+
 async function monthlyInsight(userOrId, opts = {}) {
   const userId = toUserId(userOrId);
   const now = opts.now || new Date();
   const month = normalizeMonth(opts.month, now);
+  const allowAi = opts.allowAi !== false;
+  const isCurrent = month === monthKey(now);
 
-  if (!opts.refresh) {
-    const cached = await get(
-      `SELECT content, model FROM ai_insights WHERE user_id = ? AND period = ? AND type = 'monthly'`,
-      [userId, month]
-    );
-    if (cached) {
-      let insight = null;
-      try {
-        insight = JSON.parse(cached.content);
-      } catch (_) {
-        insight = null;
+  if (allowAi && !opts.refresh) {
+    const cached = await readCache(userId, month, 'monthly');
+    const usable =
+      cached &&
+      typeof cached.content.text === 'string' &&
+      cached.content.text.trim() &&
+      !(isCurrent && cached.ageMs > MONTHLY_CURRENT_TTL_MS);
+    if (usable) {
+      const insight = { ...cached.content };
+      // Rows written by other lineages (production) may lack the figures: fill them in.
+      const missing = ['totalIncome', 'totalSpent', 'savingsRate'].some((k) => typeof insight[k] !== 'number');
+      if (missing || !Array.isArray(insight.topMovers)) {
+        const d = await buildDigest(userId, { now: anchorForMonth(month, now) });
+        if (missing) {
+          insight.totalIncome = d.income.thisMonth;
+          insight.totalSpent = d.spend.thisMonth;
+          insight.savingsRate = d.savingsRate;
+        }
+        if (!Array.isArray(insight.topMovers)) insight.topMovers = d.topMovers;
       }
-      if (insight) return { insight, cached: true, aiUsed: Boolean(insight.aiUsed), model: cached.model || null };
+      insight.month = month;
+      insight.aiUsed = insight.aiUsed !== false;
+      return { insight, cached: true, aiUsed: insight.aiUsed, model: cached.model };
     }
   }
 
@@ -401,7 +460,7 @@ async function monthlyInsight(userOrId, opts = {}) {
   let model = null;
   let aiError = null;
 
-  if (provider.isConfigured()) {
+  if (allowAi && provider.isConfigured()) {
     try {
       const result = await provider.chat({
         system: `${GROUNDING_SYSTEM}\n\n${digestToPrompt(digest)}`,
@@ -427,30 +486,28 @@ async function monthlyInsight(userOrId, opts = {}) {
     }
   }
   if (!insight.text) {
-    insight.text = fallbackMonthlyStory(digest, { complete: month !== monthKey(now) });
+    insight.text = fallbackMonthlyStory(digest, { complete: !isCurrent });
     insight.aiUsed = false;
   }
 
   // Cache only AI-generated stories; deterministic text is cheap to recompute and
   // should pick up a provider the moment one is configured.
   if (insight.aiUsed) {
-    await run(`DELETE FROM ai_insights WHERE user_id = ? AND period = ? AND type = 'monthly'`, [userId, month]);
-    await run(
-      `INSERT INTO ai_insights (user_id, period, type, content, model) VALUES (?, ?, 'monthly', ?, ?)`,
-      [userId, month, JSON.stringify(insight), model]
-    );
+    await writeCache(userId, month, 'monthly', insight, model);
   }
 
   return { insight, cached: false, aiUsed: insight.aiUsed, model, aiError };
 }
 
 // ---------------------------------------------------------------------------
-// weeklyBrief — last 7 days, grounded on the digest. Not cached (recency matters).
+// weeklyBrief — last 7 days, grounded on the digest. The AI text is cached for 6h per
+// user + end date (the figures are always recomputed: they are plain SQL).
 // ---------------------------------------------------------------------------
 
 async function weeklyBrief(userOrId, opts = {}) {
   const userId = toUserId(userOrId);
   const now = opts.now || new Date();
+  const allowAi = opts.allowAi !== false;
   // Seven calendar days inclusive: today plus the six days before it.
   const since = isoDate(new Date(now.getTime() - 6 * 864e5));
   const until = isoDate(now);
@@ -507,7 +564,16 @@ async function weeklyBrief(userOrId, opts = {}) {
   let brief = '';
   let aiUsed = false;
   let aiError = null;
-  if (provider.isConfigured() && transactions.length) {
+  let cached = false;
+  if (allowAi && provider.isConfigured() && transactions.length && !opts.refresh) {
+    const hit = await readCache(userId, until, 'weekly');
+    if (hit && typeof hit.content.brief === 'string' && hit.content.brief.trim() && hit.ageMs <= WEEKLY_TTL_MS) {
+      brief = hit.content.brief;
+      aiUsed = true;
+      cached = true;
+    }
+  }
+  if (!brief && allowAi && provider.isConfigured() && transactions.length) {
     try {
       const digest = await buildDigest(userId, { now });
       const weekData = {
@@ -538,6 +604,7 @@ async function weeklyBrief(userOrId, opts = {}) {
       });
       brief = (result && result.text) || '';
       aiUsed = Boolean(brief);
+      if (aiUsed) await writeCache(userId, until, 'weekly', { brief, since, until }, (result && result.model) || null);
     } catch (err) {
       aiError = (err && err.code) || 'AI_REQUEST_FAILED';
       logger.warn({ err: err && err.message, userId }, 'weeklyBrief: provider failed, deterministic fallback');
@@ -555,6 +622,7 @@ async function weeklyBrief(userOrId, opts = {}) {
     dailyTotals: week.dailyTotals,
     aiUsed,
     aiError,
+    cached,
   };
 }
 
@@ -566,5 +634,5 @@ module.exports = {
   monthlyInsight,
   weeklyBrief,
   // test hooks
-  _internal: { fallbackMonthlyStory, fallbackWeeklyBrief, anchorForMonth, normalizeMonth, periodLabel },
+  _internal: { fallbackMonthlyStory, fallbackWeeklyBrief, anchorForMonth, normalizeMonth, periodLabel, cacheAgeMs },
 };
