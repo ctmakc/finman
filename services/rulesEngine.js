@@ -17,7 +17,7 @@ const CategoryRule = require('../models/categoryRule');
 
 // Плейсхолдеры «без категории», которые проставляет дефолт Transaction.create
 // и репорт-слой. Считаем такие транзакции некатегоризированными.
-const PLACEHOLDER_CATEGORIES = ['прочее', 'без категории', 'uncategorized'];
+const PLACEHOLDER_CATEGORIES = ['other', 'uncategorized', 'прочее', 'без категории'];
 
 function isUncategorized(category) {
   if (category == null) return true;
@@ -97,7 +97,7 @@ function firstMatch(rules, tx) {
 
 // Получить некатегоризированные расходные транзакции пользователя.
 async function getUncategorizedExpenses(userId, limit) {
-  // ВАЖНО: SQLite LOWER() не понижает кириллицу ('Прочее' != 'прочее'), поэтому
+  // ВАЖНО: SQLite LOWER() не понижает кириллицу ('Other' != 'прочее'), поэтому
   // плейсхолдер-фильтр делаем в JS через isUncategorized() (JS toLowerCase знает кириллицу).
   const rows = await query(
     `SELECT id, date, description, category, amount, type

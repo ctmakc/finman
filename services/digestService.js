@@ -66,7 +66,7 @@ async function buildDigest(userId, { now } = {}) {
       income = money.add(income, amt);
     } else {
       expense = money.add(expense, amt);
-      const cat = row.category || 'Без категории';
+      const cat = row.category || 'Uncategorized';
       categoryTotals[cat] = money.add(categoryTotals[cat] || 0, amt);
     }
   }
@@ -147,23 +147,23 @@ async function buildDigest(userId, { now } = {}) {
 
 function renderText(d) {
   const lines = [];
-  lines.push(`Еженедельная сводка FinMan`);
-  lines.push(`Период: ${d.period.start} — ${d.period.end}`);
+  lines.push(`FinMan weekly summary`);
+  lines.push(`Period: ${d.period.start} — ${d.period.end}`);
   lines.push('');
-  lines.push(`Доходы:  ${d.income}`);
-  lines.push(`Расходы: ${d.expense}`);
-  lines.push(`Итог:    ${d.net}`);
-  lines.push(`Транзакций: ${d.transactionCount}`);
+  lines.push(`Income:   ${d.income}`);
+  lines.push(`Expenses: ${d.expense}`);
+  lines.push(`Net:      ${d.net}`);
+  lines.push(`Transactions: ${d.transactionCount}`);
 
   if (d.topCategories.length) {
     lines.push('');
-    lines.push('Топ категорий расходов:');
+    lines.push('Top expense categories:');
     d.topCategories.forEach((c) => lines.push(`  - ${c.category}: ${c.amount}`));
   }
 
   if (d.budgets.length) {
     lines.push('');
-    lines.push('Бюджеты:');
+    lines.push('Budgets:');
     d.budgets.forEach((b) =>
       lines.push(`  - ${b.name}: ${b.spent}/${b.amount} (${b.percent}%, ${b.status})`)
     );
@@ -171,9 +171,9 @@ function renderText(d) {
 
   if (d.upcomingBills.length) {
     lines.push('');
-    lines.push('Предстоящие платежи (7 дней):');
+    lines.push('Upcoming payments (7 days):');
     d.upcomingBills.forEach((b) => lines.push(`  - ${b.date} ${b.name}: ${b.amount}`));
-    lines.push(`  Итого предстоит: ${d.upcomingTotal}`);
+    lines.push(`  Total upcoming: ${d.upcomingTotal}`);
   }
 
   return lines.join('\n');
@@ -188,17 +188,17 @@ function escapeHtml(s) {
 
 function renderHtml(d) {
   const parts = [];
-  parts.push('<h2>Еженедельная сводка FinMan</h2>');
-  parts.push(`<p>Период: ${escapeHtml(d.period.start)} — ${escapeHtml(d.period.end)}</p>`);
+  parts.push('<h2>FinMan weekly summary</h2>');
+  parts.push(`<p>Period: ${escapeHtml(d.period.start)} — ${escapeHtml(d.period.end)}</p>`);
   parts.push('<ul>');
-  parts.push(`<li>Доходы: <b>${d.income}</b></li>`);
-  parts.push(`<li>Расходы: <b>${d.expense}</b></li>`);
-  parts.push(`<li>Итог: <b>${d.net}</b></li>`);
-  parts.push(`<li>Транзакций: ${d.transactionCount}</li>`);
+  parts.push(`<li>Income: <b>${d.income}</b></li>`);
+  parts.push(`<li>Expenses: <b>${d.expense}</b></li>`);
+  parts.push(`<li>Net: <b>${d.net}</b></li>`);
+  parts.push(`<li>Transactions: ${d.transactionCount}</li>`);
   parts.push('</ul>');
 
   if (d.topCategories.length) {
-    parts.push('<h3>Топ категорий расходов</h3><ul>');
+    parts.push('<h3>Top expense categories</h3><ul>');
     d.topCategories.forEach((c) =>
       parts.push(`<li>${escapeHtml(c.category)}: ${c.amount}</li>`)
     );
@@ -206,7 +206,7 @@ function renderHtml(d) {
   }
 
   if (d.budgets.length) {
-    parts.push('<h3>Бюджеты</h3><ul>');
+    parts.push('<h3>Budgets</h3><ul>');
     d.budgets.forEach((b) =>
       parts.push(
         `<li>${escapeHtml(b.name)}: ${b.spent}/${b.amount} (${b.percent}%, ${escapeHtml(b.status)})</li>`
@@ -216,19 +216,19 @@ function renderHtml(d) {
   }
 
   if (d.upcomingBills.length) {
-    parts.push('<h3>Предстоящие платежи (7 дней)</h3><ul>');
+    parts.push('<h3>Upcoming payments (7 days)</h3><ul>');
     d.upcomingBills.forEach((b) =>
       parts.push(`<li>${escapeHtml(b.date)} ${escapeHtml(b.name)}: ${b.amount}</li>`)
     );
     parts.push('</ul>');
-    parts.push(`<p>Итого предстоит: <b>${d.upcomingTotal}</b></p>`);
+    parts.push(`<p>Total upcoming: <b>${d.upcomingTotal}</b></p>`);
   }
 
   return parts.join('\n');
 }
 
 function digestSubject(d) {
-  return `FinMan: сводка за неделю (${d.period.start} — ${d.period.end})`;
+  return `FinMan: your weekly summary (${d.period.start} — ${d.period.end})`;
 }
 
 // --- диспетчеризация --------------------------------------------------------
@@ -240,7 +240,7 @@ async function sendDigest(userId, { now, force = false } = {}) {
 
   // weekly_summary выключен -> ничего не делаем (если не force).
   if (!force && !settings.weekly_summary) {
-    logger.info({ userId }, 'digestService.sendDigest: weekly_summary выключен — пропуск');
+    logger.info({ userId }, 'digestService.sendDigest: weekly_summary disabled, skipping');
     return { skipped: true, reason: 'WEEKLY_SUMMARY_DISABLED', notified: false, emailed: false };
   }
 
@@ -255,8 +255,8 @@ async function sendDigest(userId, { now, force = false } = {}) {
     notification = await Notification.create({
       user_id: userId,
       type: Notification.TYPES.WEEKLY_SUMMARY,
-      title: 'Еженедельная сводка',
-      message: `Доходы ${digest.income}, расходы ${digest.expense}, итог ${digest.net}`,
+      title: 'Weekly summary',
+      message: `Income ${digest.income}, expenses ${digest.expense}, net ${digest.net}`,
       data: {
         period: digest.period,
         income: digest.income,
@@ -267,7 +267,7 @@ async function sendDigest(userId, { now, force = false } = {}) {
       },
     });
   } catch (err) {
-    logger.error({ userId, msg: err.message }, 'digestService.sendDigest: ошибка создания in-app уведомления');
+    logger.error({ userId, msg: err.message }, 'digestService.sendDigest: failed to create in-app notification');
   }
 
   // 2) Email — только если email_enabled включён. emailService сам no-op-ит,
@@ -308,7 +308,7 @@ async function sendDigestToAll({ now } = {}) {
       const r = await sendDigest(u.id, { now });
       results.push({ userId: u.id, skipped: r.skipped, emailed: r.emailed, notified: r.notified });
     } catch (err) {
-      logger.error({ userId: u.id, msg: err.message }, 'digestService.sendDigestToAll: ошибка для пользователя');
+      logger.error({ userId: u.id, msg: err.message }, 'digestService.sendDigestToAll: error for user');
       results.push({ userId: u.id, error: true });
     }
   }

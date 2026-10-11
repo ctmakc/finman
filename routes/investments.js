@@ -16,13 +16,13 @@ async function ownPortfolio(req, res, next) {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || Number(portfolio.user_id) !== Number(req.user.id)) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
     req.portfolio = portfolio;
     next();
   } catch (error) {
-    console.error('Ошибка ownPortfolio:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('ownPortfolio error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -30,15 +30,15 @@ async function ownPortfolio(req, res, next) {
 async function ownInvestment(req, res, next) {
   try {
     const inv = await get('SELECT portfolio_id FROM investments WHERE id = ?', [req.params.id]);
-    if (!inv) return res.status(404).json({ message: 'Актив не найден' });
+    if (!inv) return res.status(404).json({ message: 'Asset not found' });
     const portfolio = await Investment.findPortfolioById(inv.portfolio_id);
     if (!portfolio || Number(portfolio.user_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Нет доступа' });
+      return res.status(403).json({ message: 'Access denied' });
     }
     next();
   } catch (error) {
-    console.error('Ошибка ownInvestment:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('ownInvestment error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -53,8 +53,8 @@ router.post('/refresh-prices', async (req, res) => {
     const stats = await Investment.getUserStats(req.user.id);
     res.json({ ...summary, stats });
   } catch (error) {
-    console.error('Ошибка обновления цен:', error);
-    res.status(error.status || 500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Price update error:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -63,15 +63,15 @@ router.post('/portfolios/:id/refresh-prices', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     const summary = await priceService.refreshPortfolioPrices(req.params.id);
     const stats = await Investment.calculatePortfolioValue(req.params.id);
     res.json({ ...summary, stats });
   } catch (error) {
-    console.error('Ошибка обновления цен:', error);
-    res.status(error.status || 500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Price update error:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -83,8 +83,8 @@ router.get('/portfolios', async (req, res) => {
     const portfolios = await Investment.findPortfoliosByUser(req.user.id);
     res.json(portfolios);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -94,8 +94,8 @@ router.get('/stats', async (req, res) => {
     const stats = await Investment.getUserStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -104,14 +104,14 @@ router.get('/portfolios/:id', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     const stats = await Investment.calculatePortfolioValue(req.params.id);
     res.json({ ...portfolio, ...stats });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -120,7 +120,7 @@ router.post('/portfolios', async (req, res) => {
   try {
     const { name, description, currency } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Название обязательно' });
+      return res.status(400).json({ message: 'Name is required' });
     }
 
     const portfolio = await Investment.createPortfolio({
@@ -130,8 +130,8 @@ router.post('/portfolios', async (req, res) => {
 
     res.status(201).json(portfolio);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -140,14 +140,14 @@ router.put('/portfolios/:id', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     const updated = await Investment.updatePortfolio(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -156,14 +156,14 @@ router.delete('/portfolios/:id', async (req, res) => {
   try {
     const portfolio = await Investment.findPortfolioById(req.params.id);
     if (!portfolio || portfolio.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Портфель не найден' });
+      return res.status(404).json({ message: 'Portfolio not found' });
     }
 
     await Investment.deletePortfolio(req.params.id);
-    res.json({ message: 'Портфель удалён' });
+    res.json({ message: 'Portfolio deleted' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -178,8 +178,8 @@ router.get('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
     );
     res.json(withValues.filter(v => v));
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -189,7 +189,7 @@ router.post('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
     const { symbol, name, type, quantity, buy_price, current_price, currency, buy_date, notes, fee } = req.body;
 
     if (!symbol || !name || !type || !quantity || !buy_price || !buy_date) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Please fill in the required fields' });
     }
 
     const investment = await Investment.addInvestment({
@@ -199,8 +199,8 @@ router.post('/portfolios/:id/investments', ownPortfolio, async (req, res) => {
 
     res.status(201).json(investment);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -210,8 +210,8 @@ router.put('/investments/:id', ownInvestment, async (req, res) => {
     const updated = await Investment.updateInvestment(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -220,14 +220,14 @@ router.put('/investments/:id/price', ownInvestment, async (req, res) => {
   try {
     const { price } = req.body;
     if (!price) {
-      return res.status(400).json({ message: 'Цена обязательна' });
+      return res.status(400).json({ message: 'Price is required' });
     }
 
     const updated = await Investment.updatePrice(req.params.id, price);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -237,14 +237,14 @@ router.post('/investments/:id/sell', ownInvestment, async (req, res) => {
     const { quantity, price, fee, date } = req.body;
     
     if (!quantity || !price) {
-      return res.status(400).json({ message: 'Количество и цена обязательны' });
+      return res.status(400).json({ message: 'Quantity and price are required' });
     }
 
     const result = await Investment.sell(req.params.id, quantity, price, fee, date);
     res.json(result);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -254,8 +254,8 @@ router.get('/investments/:id/transactions', ownInvestment, async (req, res) => {
     const transactions = await Investment.getTransactions(req.params.id);
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -265,8 +265,8 @@ router.get('/portfolios/:id/transactions', ownPortfolio, async (req, res) => {
     const transactions = await Investment.getPortfolioTransactions(req.params.id);
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -278,13 +278,13 @@ router.post('/investments/:id/events', ownInvestment, async (req, res) => {
   try {
     const { type, amount, date, note } = req.body;
     if (!type || !Object.values(Investment.EVENT_TYPES).includes(type)) {
-      return res.status(400).json({ message: 'Некорректный тип события' });
+      return res.status(400).json({ message: 'Invalid event type' });
     }
     // split — информационное событие, сумма не обязательна; для денежных требуем amount.
     if (type !== Investment.EVENT_TYPES.SPLIT) {
       const n = Number(amount);
       if (!Number.isFinite(n) || n <= 0) {
-        return res.status(400).json({ message: 'Сумма обязательна и должна быть > 0' });
+        return res.status(400).json({ message: 'Amount is required and must be > 0' });
       }
     }
 
@@ -297,8 +297,8 @@ router.post('/investments/:id/events', ownInvestment, async (req, res) => {
     });
     res.status(201).json(event);
   } catch (error) {
-    console.error('Ошибка добавления события:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Error adding event:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -308,8 +308,8 @@ router.get('/investments/:id/events', ownInvestment, async (req, res) => {
     const events = await Investment.getEvents(Number(req.params.id));
     res.json(events);
   } catch (error) {
-    console.error('Ошибка получения событий:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error fetching events:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -319,8 +319,8 @@ router.get('/portfolios/:id/allocation', ownPortfolio, async (req, res) => {
     const allocation = await Investment.getAllocation(Number(req.params.id));
     res.json(allocation);
   } catch (error) {
-    console.error('Ошибка аллокации:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Allocation error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -342,8 +342,8 @@ router.get('/portfolios/:id/fire', ownPortfolio, async (req, res) => {
     });
     res.json(projection);
   } catch (error) {
-    console.error('Ошибка FIRE-проекции:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('FIRE projection error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

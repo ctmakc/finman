@@ -22,10 +22,10 @@ router.get('/', authenticate, async (req, res) => {
       res.json({ own: accounts, shared: [], all: accounts });
     }
   } catch (error) {
-    console.error('Ошибка при получении счетов:', error);
+    console.error('Error fetching accounts:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении счетов'
+      message: 'Failed to fetch accounts'
     });
   }
 });
@@ -46,7 +46,7 @@ router.post('/', authenticate, async (req, res) => {
     if (!name) {
       return res.status(400).json({ 
         error: true, 
-        message: 'Необходимо указать название счета' 
+        message: 'Account name is required' 
       });
     }
     
@@ -64,10 +64,10 @@ router.post('/', authenticate, async (req, res) => {
     
     res.status(201).json(newAccount);
   } catch (error) {
-    console.error('Ошибка при создании счета:', error);
+    console.error('Error creating account:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при создании счета' 
+      message: 'Failed to create account' 
     });
   }
 });
@@ -84,7 +84,7 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!permissions || !permissions.canView) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
@@ -98,16 +98,16 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!account) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
     res.json({ ...account, permissions });
   } catch (error) {
-    console.error('Ошибка при получении счета:', error);
+    console.error('Error fetching account:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении счета'
+      message: 'Failed to fetch account'
     });
   }
 });
@@ -124,7 +124,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!permissions || !permissions.canEdit) {
       return res.status(403).json({
         error: true,
-        message: 'Недостаточно прав для редактирования счета'
+        message: 'Insufficient permissions to edit this account'
       });
     }
 
@@ -143,7 +143,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!account) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
@@ -162,14 +162,14 @@ router.put('/:id', authenticate, async (req, res) => {
     } else {
       res.status(404).json({
         error: true,
-        message: 'Счет не найден или не обновлен'
+        message: 'Account not found or not updated'
       });
     }
   } catch (error) {
-    console.error('Ошибка при обновлении счета:', error);
+    console.error('Error updating account:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при обновлении счета'
+      message: 'Failed to update account'
     });
   }
 });
@@ -186,7 +186,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (!permissions || !permissions.canDelete) {
       return res.status(403).json({
         error: true,
-        message: 'Недостаточно прав для удаления счета'
+        message: 'Insufficient permissions to delete this account'
       });
     }
 
@@ -197,7 +197,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (!account) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
@@ -206,19 +206,19 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (success) {
       res.json({
         success: true,
-        message: 'Счет успешно удален'
+        message: 'Account deleted'
       });
     } else {
       res.status(404).json({
         error: true,
-        message: 'Счет не найден или не удален'
+        message: 'Account not found or not deleted'
       });
     }
   } catch (error) {
-    console.error('Ошибка при удалении счета:', error);
+    console.error('Error deleting account:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при удалении счета'
+      message: 'Failed to delete account'
     });
   }
 });
@@ -235,7 +235,7 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
     if (!permissions || !permissions.canView) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
@@ -260,7 +260,7 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
     if (!account) {
       return res.status(404).json({
         error: true,
-        message: 'Счет не найден'
+        message: 'Account not found'
       });
     }
 
@@ -283,10 +283,10 @@ router.get('/:id/transactions', authenticate, async (req, res) => {
 
     res.json(transactions);
   } catch (error) {
-    console.error('Ошибка при получении транзакций по счету:', error);
+    console.error('Error fetching account transactions:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении транзакций по счету'
+      message: 'Failed to fetch account transactions'
     });
   }
 });

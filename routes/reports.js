@@ -27,13 +27,13 @@ router.get('/', async (req, res) => {
 // Типы отчётов
 router.get('/types', (req, res) => {
   res.json([
-    { id: 'monthly', name: 'Месячный отчёт', description: 'Доходы и расходы за месяц' },
-    { id: 'yearly', name: 'Годовой отчёт', description: 'Сводка за год' },
-    { id: 'category', name: 'По категориям', description: 'Расходы по категориям' },
-    { id: 'networth', name: 'Net Worth', description: 'Динамика чистой стоимости' },
-    { id: 'budget', name: 'Бюджеты', description: 'Выполнение бюджетов' },
-    { id: 'investments', name: 'Инвестиции', description: 'Портфель и доходность' },
-    { id: 'tax', name: 'Налоговый', description: 'Данные для налоговой отчётности' }
+    { id: 'monthly', name: 'Monthly report', description: 'Income and expenses for the month' },
+    { id: 'yearly', name: 'Yearly report', description: 'Year in review' },
+    { id: 'category', name: 'By category', description: 'Expenses by category' },
+    { id: 'networth', name: 'Net Worth', description: 'Net worth over time' },
+    { id: 'budget', name: 'Budgets', description: 'Budget performance' },
+    { id: 'investments', name: 'Investments', description: 'Portfolio and returns' },
+    { id: 'tax', name: 'Tax', description: 'Data for tax filing' }
   ]);
 });
 
@@ -79,34 +79,34 @@ router.post('/generate', async (req, res, next) => {
     switch (report_type) {
       case 'monthly':
         reportData = await generateMonthlyReport(req.user.id, period_start, period_end);
-        title = `Месячный отчёт ${period_start} - ${period_end}`;
+        title = `Monthly report ${period_start} - ${period_end}`;
         break;
       case 'yearly':
         reportData = await generateYearlyReport(req.user.id, period_start);
-        title = `Годовой отчёт ${period_start}`;
+        title = `Yearly report ${period_start}`;
         break;
       case 'category':
         reportData = await generateCategoryReport(req.user.id, period_start, period_end);
-        title = `Отчёт по категориям ${period_start} - ${period_end}`;
+        title = `Category report ${period_start} - ${period_end}`;
         break;
       case 'networth':
         reportData = await generateNetWorthReport(req.user.id);
-        title = 'Отчёт Net Worth';
+        title = 'Net worth report';
         break;
       case 'budget':
         reportData = await generateBudgetReport(req.user.id, period_start, period_end);
-        title = `Отчёт по бюджетам ${period_start} - ${period_end}`;
+        title = `Budget report ${period_start} - ${period_end}`;
         break;
       case 'investments':
         reportData = await generateInvestmentReport(req.user.id);
-        title = 'Отчёт по инвестициям';
+        title = 'Investment report';
         break;
       case 'tax':
         reportData = await generateTaxReport(req.user.id, period_start, period_end);
-        title = `Налоговый отчёт ${period_start} - ${period_end}`;
+        title = `Tax report ${period_start} - ${period_end}`;
         break;
       default:
-        return res.status(400).json({ message: 'Неизвестный тип отчёта' });
+        return res.status(400).json({ message: 'Unknown report type' });
     }
 
     // Сохраняем отчёт
@@ -152,7 +152,7 @@ router.get('/:id/download', async (req, res, next) => {
 router.get('/:id', async (req, res) => {
   try {
     const report = await get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!report) return res.status(404).json({ message: 'Отчёт не найден' });
+    if (!report) return res.status(404).json({ message: 'Report not found' });
 
     res.json({
       ...report,
@@ -168,7 +168,7 @@ router.get('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM reports WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Отчёт удалён' });
+    res.json({ message: 'Report deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -41,7 +41,7 @@ class Transaction {
           transactionData.userId,
           transactionData.date,
           transactionData.description || '',
-          transactionData.category || 'Прочее',
+          transactionData.category || 'Other',
           amount,
           type
         ]
@@ -71,7 +71,7 @@ class Transaction {
             tx.userId,
             tx.date,
             tx.description || '',
-            tx.category || 'Прочее',
+            tx.category || 'Other',
             amount,
             type
           ]
@@ -97,14 +97,14 @@ class Transaction {
     const amt = money.round(amount);
 
     if (!(amt > 0)) {
-      throw new AppError(400, 'INVALID_AMOUNT', 'Сумма перевода должна быть положительной');
+      throw new AppError(400, 'INVALID_AMOUNT', 'Transfer amount must be positive');
     }
     if (String(fromAccountId) === String(toAccountId)) {
-      throw new AppError(400, 'SAME_ACCOUNT', 'Нельзя переводить на тот же счёт');
+      throw new AppError(400, 'SAME_ACCOUNT', 'Cannot transfer to the same account');
     }
 
     const transferId = crypto.randomUUID();
-    const desc = description || 'Перевод';
+    const desc = description || 'Transfer';
     const txDate = date || new Date().toISOString().split('T')[0];
 
     return transaction(async () => {
@@ -113,7 +113,7 @@ class Transaction {
         `INSERT INTO transactions
          (account_id, user_id, date, description, category, amount, type, transfer_id)
          VALUES (?, ?, ?, ?, ?, ?, 'transfer', ?)`,
-        [fromAccountId, userId, txDate, desc, 'Перевод', -amt, transferId]
+        [fromAccountId, userId, txDate, desc, 'Transfer', -amt, transferId]
       );
       await Account.updateBalance(fromAccountId, userId, -amt);
 
@@ -122,7 +122,7 @@ class Transaction {
         `INSERT INTO transactions
          (account_id, user_id, date, description, category, amount, type, transfer_id)
          VALUES (?, ?, ?, ?, ?, ?, 'transfer', ?)`,
-        [toAccountId, userId, txDate, desc, 'Перевод', amt, transferId]
+        [toAccountId, userId, txDate, desc, 'Transfer', amt, transferId]
       );
       await Account.updateBalance(toAccountId, userId, amt);
 
@@ -260,7 +260,7 @@ class Transaction {
     const currentTransaction = await this.findById(id, userId);
 
     if (!currentTransaction) {
-      throw new Error('Транзакция не найдена');
+      throw new Error('Transaction not found');
     }
 
     if (currentTransaction.transfer_id) {
@@ -307,13 +307,13 @@ class Transaction {
   // дельты. Тип ноги перевода менять нельзя (AppError 400).
   static async updateTransferLegs(leg, userId, transactionData) {
     if (transactionData.type && transactionData.type !== 'transfer') {
-      throw new AppError(400, 'TRANSFER_TYPE_LOCKED', 'Тип ноги перевода изменить нельзя — удалите перевод и создайте транзакцию');
+      throw new AppError(400, 'TRANSFER_TYPE_LOCKED', 'The type of a transfer leg cannot be changed; delete the transfer and create a transaction');
     }
     let newAbs = null;
     if (transactionData.amount !== undefined) {
       newAbs = Math.abs(money.round(transactionData.amount));
       if (!(newAbs > 0)) {
-        throw new AppError(400, 'INVALID_AMOUNT', 'Сумма перевода должна быть положительной');
+        throw new AppError(400, 'INVALID_AMOUNT', 'Transfer amount must be positive');
       }
     }
 
@@ -355,7 +355,7 @@ class Transaction {
   static async delete(id, userId) {
     const row = await this.findById(id, userId);
     if (!row) {
-      throw new Error('Транзакция не найдена');
+      throw new Error('Transaction not found');
     }
     return transaction(async () => {
       const legs = row.transfer_id

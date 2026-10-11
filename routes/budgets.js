@@ -26,10 +26,10 @@ router.get('/', authenticate, async (req, res) => {
     });
     res.json(enriched);
   } catch (error) {
-    console.error('Ошибка при получении бюджетов:', error);
+    console.error('Error fetching budgets:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении бюджетов'
+      message: 'Failed to fetch budgets'
     });
   }
 });
@@ -43,10 +43,10 @@ router.get('/stats', authenticate, async (req, res) => {
     const stats = await Budget.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка при получении статистики бюджетов:', error);
+    console.error('Error fetching budget stats:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении статистики'
+      message: 'Failed to fetch statistics'
     });
   }
 });
@@ -60,10 +60,10 @@ router.get('/active', authenticate, async (req, res) => {
     const budgets = await Budget.getActiveBudgets(req.user.id);
     res.json(budgets);
   } catch (error) {
-    console.error('Ошибка при получении активных бюджетов:', error);
+    console.error('Error fetching active budgets:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении активных бюджетов'
+      message: 'Failed to fetch active budgets'
     });
   }
 });
@@ -76,16 +76,16 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!budget) {
       return res.status(404).json({
         error: true,
-        message: 'Бюджет не найден'
+        message: 'Budget not found'
       });
     }
 
     res.json(budget);
   } catch (error) {
-    console.error('Ошибка при получении бюджета:', error);
+    console.error('Error fetching budget:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при получении бюджета'
+      message: 'Failed to fetch budget'
     });
   }
 });
@@ -97,15 +97,15 @@ router.post('/', authenticate, async (req, res) => {
 
     // Валидация
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: true, message: 'Название бюджета обязательно' });
+      return res.status(400).json({ error: true, message: 'Budget name is required' });
     }
     if (!amount || amount <= 0) {
-      return res.status(400).json({ error: true, message: 'Сумма бюджета должна быть положительной' });
+      return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
     }
 
     const validPeriods = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
     if (period && !validPeriods.includes(period)) {
-      return res.status(400).json({ error: true, message: 'Некорректный период' });
+      return res.status(400).json({ error: true, message: 'Invalid period' });
     }
 
     // Устанавливаем дату начала если не указана
@@ -136,10 +136,10 @@ router.post('/', authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Ошибка при создании бюджета:', error);
+    console.error('Error creating budget:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при создании бюджета'
+      message: 'Failed to create budget'
     });
   }
 });
@@ -153,12 +153,12 @@ router.put('/:id', authenticate, async (req, res) => {
     // Проверка существования
     const existingBudget = await Budget.findById(id, req.user.id);
     if (!existingBudget) {
-      return res.status(404).json({ error: true, message: 'Бюджет не найден' });
+      return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
     // Валидация суммы
     if (amount !== undefined && amount <= 0) {
-      return res.status(400).json({ error: true, message: 'Сумма бюджета должна быть положительной' });
+      return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
     }
 
     const updated = await Budget.update(id, req.user.id, {
@@ -179,13 +179,13 @@ router.put('/:id', authenticate, async (req, res) => {
       const budget = await Budget.findById(id, req.user.id);
       res.json({ success: true, budget });
     } else {
-      res.status(400).json({ error: true, message: 'Не удалось обновить бюджет' });
+      res.status(400).json({ error: true, message: 'Failed to update budget' });
     }
   } catch (error) {
-    console.error('Ошибка при обновлении бюджета:', error);
+    console.error('Error updating budget:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при обновлении бюджета'
+      message: 'Failed to update budget'
     });
   }
 });
@@ -197,7 +197,7 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
 
     const budget = await Budget.findById(id, req.user.id);
     if (!budget) {
-      return res.status(404).json({ error: true, message: 'Бюджет не найден' });
+      return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
     await Budget.recalculateSpent(req.user.id, budget.category);
@@ -209,10 +209,10 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
       budget: updatedBudget
     });
   } catch (error) {
-    console.error('Ошибка при пересчете бюджета:', error);
+    console.error('Error recalculating budget:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при пересчете бюджета'
+      message: 'Failed to recalculate budget'
     });
   }
 });
@@ -229,10 +229,10 @@ router.post('/recalculate-all', authenticate, async (req, res) => {
       budgets
     });
   } catch (error) {
-    console.error('Ошибка при пересчете бюджетов:', error);
+    console.error('Error recalculating budgets:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при пересчете бюджетов'
+      message: 'Failed to recalculate budgets'
     });
   }
 });
@@ -245,7 +245,7 @@ router.post('/roll-forward', authenticate, async (req, res) => {
 
     const validPeriods = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
     if (!validPeriods.includes(fromPeriod)) {
-      return res.status(400).json({ error: true, message: 'Некорректный период' });
+      return res.status(400).json({ error: true, message: 'Invalid period' });
     }
 
     // Сначала актуализируем потраченное, чтобы перенести верный остаток.
@@ -260,10 +260,10 @@ router.post('/roll-forward', authenticate, async (req, res) => {
       budgets
     });
   } catch (error) {
-    console.error('Ошибка при переносе остатка бюджетов:', error);
+    console.error('Error rolling over budgets:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при переносе остатка'
+      message: 'Failed to roll over budgets'
     });
   }
 });
@@ -276,7 +276,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     const existingBudget = await Budget.findById(id, req.user.id);
     if (!existingBudget) {
-      return res.status(404).json({ error: true, message: 'Бюджет не найден' });
+      return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
     const deleted = hardDelete
@@ -284,15 +284,15 @@ router.delete('/:id', authenticate, async (req, res) => {
       : await Budget.delete(id, req.user.id);
 
     if (deleted) {
-      res.json({ success: true, message: 'Бюджет удален' });
+      res.json({ success: true, message: 'Budget deleted' });
     } else {
-      res.status(400).json({ error: true, message: 'Не удалось удалить бюджет' });
+      res.status(400).json({ error: true, message: 'Failed to delete budget' });
     }
   } catch (error) {
-    console.error('Ошибка при удалении бюджета:', error);
+    console.error('Error deleting budget:', error);
     res.status(500).json({
       error: true,
-      message: 'Произошла ошибка при удалении бюджета'
+      message: 'Failed to delete budget'
     });
   }
 });

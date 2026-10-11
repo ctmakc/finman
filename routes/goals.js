@@ -40,8 +40,8 @@ router.get('/', async (req, res) => {
     const today = todayISO(userTz(req.user));
     res.json(goals.map(g => SavingsGoal.calculateProgress(g, today)));
   } catch (error) {
-    console.error('Ошибка получения целей:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error fetching goals:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -51,8 +51,8 @@ router.get('/stats', async (req, res) => {
     const stats = await SavingsGoal.getUserStats(req.user.id, todayISO(userTz(req.user)));
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка получения статистики:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -61,12 +61,12 @@ router.get('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
     res.json(SavingsGoal.calculateProgress(goal, todayISO(userTz(req.user))));
   } catch (error) {
-    console.error('Ошибка получения цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error fetching goal:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -112,14 +112,14 @@ router.put('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const updated = await SavingsGoal.update(req.params.id, normalizeBody(req.body, GOAL_FIELDS));
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка обновления цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error updating goal:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -128,19 +128,19 @@ router.post('/:id/contribute', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const { amount, note } = req.body;
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Сумма должна быть положительной' });
+      return res.status(400).json({ message: 'Amount must be positive' });
     }
 
     const updated = await SavingsGoal.addContribution(req.params.id, amount, note);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка пополнения:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Contribution error:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -149,19 +149,19 @@ router.post('/:id/withdraw', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const { amount, note } = req.body;
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Сумма должна быть положительной' });
+      return res.status(400).json({ message: 'Amount must be positive' });
     }
 
     const updated = await SavingsGoal.withdraw(req.params.id, amount, note);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка снятия:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Withdrawal error:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -170,14 +170,14 @@ router.get('/:id/contributions', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     const contributions = await SavingsGoal.getContributions(req.params.id);
     res.json(contributions);
   } catch (error) {
-    console.error('Ошибка получения истории:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error fetching history:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -186,14 +186,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const goal = await SavingsGoal.findById(req.params.id);
     if (!goal || goal.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
 
     await SavingsGoal.delete(req.params.id);
-    res.json({ message: 'Цель удалена' });
+    res.json({ message: 'Goal deleted' });
   } catch (error) {
-    console.error('Ошибка удаления цели:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error deleting goal:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

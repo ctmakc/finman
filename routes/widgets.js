@@ -28,31 +28,31 @@ const VALID_SIZES = ['small', 'medium', 'large'];
 // Дефолтный набор виджетов, который сеется при первом заходе пользователя.
 const DEFAULT_WIDGETS = [
   { type: 'networth', title: 'Net Worth', position: 0, size: 'medium' },
-  { type: 'cashflow', title: 'Денежный поток', position: 1, size: 'medium' },
-  { type: 'budget', title: 'Бюджеты', position: 2, size: 'medium' },
-  { type: 'goals', title: 'Цели', position: 3, size: 'medium' },
-  { type: 'upcoming', title: 'Предстоящие платежи', position: 4, size: 'medium' },
-  { type: 'top_categories', title: 'Топ категорий', position: 5, size: 'medium' }
+  { type: 'cashflow', title: 'Cash flow', position: 1, size: 'medium' },
+  { type: 'budget', title: 'Budgets', position: 2, size: 'medium' },
+  { type: 'goals', title: 'Goals', position: 3, size: 'medium' },
+  { type: 'upcoming', title: 'Upcoming payments', position: 4, size: 'medium' },
+  { type: 'top_categories', title: 'Top categories', position: 5, size: 'medium' }
 ];
 
 // Каталог доступных виджетов (тип -> метаданные).
 const AVAILABLE_WIDGETS = [
-  { type: 'balance', name: 'Общий баланс', description: 'Сумма всех счетов', sizes: ['small', 'medium'] },
-  { type: 'networth', name: 'Net Worth', description: 'Чистая стоимость', sizes: ['small', 'medium'] },
-  { type: 'cashflow', name: 'Денежный поток', description: 'Доходы минус расходы за период', sizes: ['small', 'medium', 'large'] },
-  { type: 'budget', name: 'Бюджеты', description: 'Статус бюджетов', sizes: ['medium', 'large'] },
-  { type: 'expenses', name: 'Расходы', description: 'Расходы за период', sizes: ['small', 'medium', 'large'] },
-  { type: 'income', name: 'Доходы', description: 'Доходы за период', sizes: ['small', 'medium'] },
-  { type: 'goals', name: 'Цели', description: 'Прогресс целей', sizes: ['medium', 'large'] },
-  { type: 'upcoming', name: 'Предстоящие платежи', description: 'Ближайшие платежи', sizes: ['medium', 'large'] },
-  { type: 'top_categories', name: 'Топ категорий', description: 'Крупнейшие категории расходов', sizes: ['medium', 'large'] },
-  { type: 'subscriptions', name: 'Подписки', description: 'Активные подписки', sizes: ['small', 'medium'] },
-  { type: 'investments', name: 'Инвестиции', description: 'Портфель', sizes: ['medium', 'large'] },
-  { type: 'debts', name: 'Долги', description: 'Текущие долги', sizes: ['small', 'medium'] },
-  { type: 'chart_expenses', name: 'График расходов', description: 'Динамика расходов', sizes: ['large'] },
-  { type: 'chart_balance', name: 'График баланса', description: 'Динамика баланса', sizes: ['large'] },
-  { type: 'recent', name: 'Последние операции', description: 'Недавние транзакции', sizes: ['medium', 'large'] },
-  { type: 'quick_add', name: 'Быстрый ввод', description: 'Добавить транзакцию', sizes: ['small'] }
+  { type: 'balance', name: 'Total balance', description: 'Sum of all accounts', sizes: ['small', 'medium'] },
+  { type: 'networth', name: 'Net Worth', description: 'Net worth', sizes: ['small', 'medium'] },
+  { type: 'cashflow', name: 'Cash flow', description: 'Income minus expenses for the period', sizes: ['small', 'medium', 'large'] },
+  { type: 'budget', name: 'Budgets', description: 'Budget status', sizes: ['medium', 'large'] },
+  { type: 'expenses', name: 'Expenses', description: 'Expenses for the period', sizes: ['small', 'medium', 'large'] },
+  { type: 'income', name: 'Income', description: 'Income for the period', sizes: ['small', 'medium'] },
+  { type: 'goals', name: 'Goals', description: 'Goal progress', sizes: ['medium', 'large'] },
+  { type: 'upcoming', name: 'Upcoming payments', description: 'Next payments', sizes: ['medium', 'large'] },
+  { type: 'top_categories', name: 'Top categories', description: 'Largest expense categories', sizes: ['medium', 'large'] },
+  { type: 'subscriptions', name: 'Subscriptions', description: 'Active subscriptions', sizes: ['small', 'medium'] },
+  { type: 'investments', name: 'Investments', description: 'Portfolio', sizes: ['medium', 'large'] },
+  { type: 'debts', name: 'Debts', description: 'Current debts', sizes: ['small', 'medium'] },
+  { type: 'chart_expenses', name: 'Expense chart', description: 'Expenses over time', sizes: ['large'] },
+  { type: 'chart_balance', name: 'Balance chart', description: 'Balance over time', sizes: ['large'] },
+  { type: 'recent', name: 'Recent activity', description: 'Recent transactions', sizes: ['medium', 'large'] },
+  { type: 'quick_add', name: 'Quick add', description: 'Add a transaction', sizes: ['small'] }
 ];
 
 const KNOWN_TYPES = new Set(AVAILABLE_WIDGETS.map((w) => w.type));
@@ -167,7 +167,7 @@ router.get('/:type/data', async (req, res, next) => {
         data = await getChartBalanceData(req.user.id);
         break;
       default:
-        throw new AppError(400, 'UNKNOWN_WIDGET_TYPE', 'Неизвестный тип виджета');
+        throw new AppError(400, 'UNKNOWN_WIDGET_TYPE', 'Unknown widget type');
     }
 
     res.json(data);
@@ -184,14 +184,14 @@ router.post('/', async (req, res, next) => {
     const { widget_type, title, size, settings } = req.body || {};
 
     if (!widget_type || typeof widget_type !== 'string') {
-      throw new AppError(400, 'VALIDATION', 'widget_type обязателен');
+      throw new AppError(400, 'VALIDATION', 'widget_type is required');
     }
     if (!KNOWN_TYPES.has(widget_type)) {
-      throw new AppError(400, 'UNKNOWN_WIDGET_TYPE', 'Неизвестный тип виджета');
+      throw new AppError(400, 'UNKNOWN_WIDGET_TYPE', 'Unknown widget type');
     }
     const finalSize = size || 'medium';
     if (!VALID_SIZES.includes(finalSize)) {
-      throw new AppError(400, 'VALIDATION', 'Недопустимый размер виджета');
+      throw new AppError(400, 'VALIDATION', 'Invalid widget size');
     }
 
     const maxPos = await get(
@@ -224,7 +224,7 @@ router.put('/:id', async (req, res, next) => {
   try {
     const widget = await loadOwnedWidget(req.params.id, req.user.id);
     if (!widget) {
-      throw new AppError(404, 'NOT_FOUND', 'Виджет не найден');
+      throw new AppError(404, 'NOT_FOUND', 'Widget not found');
     }
 
     const { title, size, settings, is_visible } = req.body || {};
@@ -232,7 +232,7 @@ router.put('/:id', async (req, res, next) => {
     let finalSize = widget.size;
     if (size !== undefined) {
       if (!VALID_SIZES.includes(size)) {
-        throw new AppError(400, 'VALIDATION', 'Недопустимый размер виджета');
+        throw new AppError(400, 'VALIDATION', 'Invalid widget size');
       }
       finalSize = size;
     }
@@ -262,7 +262,7 @@ router.patch('/:id/visibility', async (req, res, next) => {
   try {
     const widget = await loadOwnedWidget(req.params.id, req.user.id);
     if (!widget) {
-      throw new AppError(404, 'NOT_FOUND', 'Виджет не найден');
+      throw new AppError(404, 'NOT_FOUND', 'Widget not found');
     }
     const { is_visible } = req.body || {};
     const visible = is_visible ? 1 : 0;
@@ -285,7 +285,7 @@ router.post('/reorder', async (req, res, next) => {
   try {
     const { order } = req.body || {};
     if (!Array.isArray(order)) {
-      throw new AppError(400, 'VALIDATION', 'order должен быть массивом');
+      throw new AppError(400, 'VALIDATION', 'order must be an array');
     }
 
     // Нормализуем оба формата к [{ id, position }].
@@ -305,7 +305,7 @@ router.post('/reorder', async (req, res, next) => {
     const ownedIds = new Set(owned.map((r) => Number(r.id)));
     for (const p of pairs) {
       if (p.id == null || !ownedIds.has(Number(p.id))) {
-        throw new AppError(404, 'NOT_FOUND', `Виджет ${p.id} не найден`);
+        throw new AppError(404, 'NOT_FOUND', `Widget ${p.id} not found`);
       }
     }
 
@@ -331,7 +331,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const widget = await loadOwnedWidget(req.params.id, req.user.id);
     if (!widget) {
-      throw new AppError(404, 'NOT_FOUND', 'Виджет не найден');
+      throw new AppError(404, 'NOT_FOUND', 'Widget not found');
     }
     await run('DELETE FROM dashboard_widgets WHERE id = ? AND user_id = ?', [
       req.params.id,
@@ -474,7 +474,7 @@ async function getUpcomingData(userId, tz) {
 async function getTopCategoriesData(userId, period, tz) {
   const start = periodStart(period, tz);
   const rows = await query(
-    `SELECT COALESCE(category, 'Без категории') as category, SUM(amount) as total, COUNT(*) as count
+    `SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as total, COUNT(*) as count
      FROM transactions
      WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
      GROUP BY category

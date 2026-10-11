@@ -26,7 +26,7 @@ const { AppError } = require('../middleware/error');
 // passport-jwt. Если req.user отсутствует — отдаём 401.
 router.use((req, res, next) => {
   if (!req.user || !req.user.id) {
-    return next(new AppError(401, 'UNAUTHORIZED', 'Требуется аутентификация'));
+    return next(new AppError(401, 'UNAUTHORIZED', 'Authentication required'));
   }
   next();
 });
@@ -36,11 +36,11 @@ const STEPS = ['account', 'transaction', 'budget', 'goal'];
 
 // Дефолтные категории для стартового сидера (тип + цвет в стиле приложения).
 const DEFAULT_CATEGORIES = [
-  { name: 'Продукты', type: 'expense', color: '#5D5CDE' },
-  { name: 'Транспорт', type: 'expense', color: '#22C55E' },
-  { name: 'Жильё', type: 'expense', color: '#F59E0B' },
-  { name: 'Развлечения', type: 'expense', color: '#EC4899' },
-  { name: 'Зарплата', type: 'income', color: '#10B981' },
+  { name: 'Groceries', type: 'expense', color: '#5D5CDE' },
+  { name: 'Vehicles', type: 'expense', color: '#22C55E' },
+  { name: 'Housing', type: 'expense', color: '#F59E0B' },
+  { name: 'Entertainment', type: 'expense', color: '#EC4899' },
+  { name: 'Salary', type: 'income', color: '#10B981' },
 ];
 
 // Идемпотентно гарантируем существование таблицы прогресса (CREATE IF NOT EXISTS —
@@ -146,7 +146,7 @@ router.post('/complete-step', async (req, res, next) => {
       throw new AppError(
         400,
         'VALIDATION_ERROR',
-        `step обязателен и должен быть одним из: ${STEPS.join(', ')}`
+        `step is required and must be one of: ${STEPS.join(', ')}`
       );
     }
 
@@ -176,7 +176,7 @@ router.post('/quickstart', async (req, res, next) => {
       : DEFAULT_CURRENCY;
     const accName = typeof accountName === 'string' && accountName.trim()
       ? accountName.trim()
-      : 'Основной счёт';
+      : 'Main account';
 
     // Счёт создаём только если у пользователя ещё нет активных счетов.
     const existingAccount = await get(

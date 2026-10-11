@@ -36,8 +36,8 @@ router.get('/', async (req, res) => {
     const today = todayISO(userTz(req.user));
     res.json(debts.map(d => Debt.calculateDebtInfo(d, today)));
   } catch (error) {
-    console.error('Ошибка получения долгов:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error fetching debts:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -47,8 +47,8 @@ router.get('/stats', async (req, res) => {
     const stats = await Debt.getUserStats(req.user.id, todayISO(userTz(req.user)));
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка статистики:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Stats error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -59,8 +59,8 @@ router.get('/upcoming', async (req, res) => {
     const debts = await Debt.getUpcomingPayments(req.user.id, days);
     res.json(debts);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -69,12 +69,12 @@ router.get('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
     res.json(Debt.calculateDebtInfo(debt, todayISO(userTz(req.user))));
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -125,14 +125,14 @@ router.put('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const updated = await Debt.update(req.params.id, normalizeBody(req.body, DEBT_FIELDS));
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка обновления:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Update error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -141,19 +141,19 @@ router.post('/:id/payment', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const { amount, payment_type, note, payment_date } = req.body;
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Сумма должна быть положительной' });
+      return res.status(400).json({ message: 'Amount must be positive' });
     }
 
     const updated = await Debt.addPayment(req.params.id, amount, payment_type, note, null, payment_date);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка платежа:', error);
-    res.status(500).json({ message: error.message || 'Ошибка сервера' });
+    console.error('Payment error:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 });
 
@@ -162,14 +162,14 @@ router.get('/:id/payments', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     const payments = await Debt.getPayments(req.params.id);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -178,14 +178,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const debt = await Debt.findById(req.params.id);
     if (!debt || debt.user_id !== req.user.id) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
 
     await Debt.delete(req.params.id);
-    res.json({ message: 'Долг удалён' });
+    res.json({ message: 'Debt deleted' });
   } catch (error) {
-    console.error('Ошибка удаления:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Delete error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

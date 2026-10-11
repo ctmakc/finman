@@ -269,7 +269,7 @@ describe('digestService.buildDigest', () => {
     const d = await digestService.buildDigest(ctx.userId, { now: NOW });
 
     const text = digestService.renderText(d);
-    expect(text).toContain('Еженедельная сводка');
+    expect(text).toContain('FinMan weekly summary');
     expect(text).toContain('40000');
     expect(text).toContain('Groceries');
 
@@ -332,7 +332,7 @@ describe('digestService.sendDigest — настройки уведомлений
       [ctx.userId, 'weekly_summary']
     );
     expect(notes).toHaveLength(1);
-    expect(notes[0].title).toBe('Еженедельная сводка');
+    expect(notes[0].title).toBe('Weekly summary');
   });
 
   test('email_enabled выключен -> уведомление есть, письмо не шлётся', async () => {
@@ -366,7 +366,7 @@ describe('digestService.sendDigest — настройки уведомлений
     expect(axiosLive.post).toHaveBeenCalledTimes(1);
     const [, payload] = axiosLive.post.mock.calls[0];
     expect(payload.to).toEqual(['test@example.com']);
-    expect(payload.subject).toContain('сводка за неделю');
+    expect(payload.subject).toContain('weekly summary');
   });
 });
 

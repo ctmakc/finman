@@ -281,7 +281,7 @@ router.get('/goal/:id', async (req, res) => {
     );
 
     if (!goal) {
-      return res.status(404).json({ message: 'Цель не найдена' });
+      return res.status(404).json({ message: 'Goal not found' });
     }
     const todayStr = dates.todayISO(dates.userTz(req.user));
 
@@ -308,7 +308,7 @@ router.get('/goal/:id', async (req, res) => {
         daysToTarget,
         requiredDaily: daysToTarget ? remaining / daysToTarget : null,
         onTrack: null,
-        message: 'Недостаточно данных для прогноза'
+        message: 'Not enough data for a projection'
       });
     }
 
@@ -356,7 +356,7 @@ router.get('/debt/:id', async (req, res) => {
     );
 
     if (!debt) {
-      return res.status(404).json({ message: 'Долг не найден' });
+      return res.status(404).json({ message: 'Debt not found' });
     }
     const todayStr = dates.todayISO(dates.userTz(req.user));
 
@@ -375,7 +375,7 @@ router.get('/debt/:id', async (req, res) => {
         remaining,
         avgPayment: 0,
         projectedDate: null,
-        message: 'Недостаточно данных для прогноза'
+        message: 'Not enough data for a projection'
       });
     }
 

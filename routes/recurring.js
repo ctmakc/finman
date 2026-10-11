@@ -15,8 +15,8 @@ router.get('/', authenticate, async (req, res) => {
     const payments = await RecurringPayment.findByUserId(req.user.id, includeInactive);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка при получении платежей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежей' });
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch payments' });
   }
 });
 
@@ -26,8 +26,8 @@ router.get('/stats', authenticate, async (req, res) => {
     const stats = await RecurringPayment.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка при получении статистики:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении статистики' });
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch statistics' });
   }
 });
 
@@ -38,8 +38,8 @@ router.get('/upcoming', authenticate, async (req, res) => {
     const payments = await RecurringPayment.getUpcoming(req.user.id, days);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка при получении ближайших платежей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежей' });
+    console.error('Error fetching upcoming payments:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch payments' });
   }
 });
 
@@ -49,8 +49,8 @@ router.get('/overdue', authenticate, async (req, res) => {
     const payments = await RecurringPayment.getOverdue(req.user.id);
     res.json(payments);
   } catch (error) {
-    console.error('Ошибка при получении просроченных платежей:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежей' });
+    console.error('Error fetching overdue payments:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch payments' });
   }
 });
 
@@ -82,14 +82,14 @@ router.post('/', authenticate, async (req, res) => {
     if (!accountId || !name || !amount || !startDate) {
       return res.status(400).json({
         error: true,
-        message: 'Необходимо указать счет, название, сумму и дату начала'
+        message: 'Account, name, amount and start date are required'
       });
     }
 
     // Проверка счета
     const account = await Account.findById(accountId, req.user.id);
     if (!account) {
-      return res.status(404).json({ error: true, message: 'Счет не найден' });
+      return res.status(404).json({ error: true, message: 'Account not found' });
     }
 
     const payment = await RecurringPayment.create({
@@ -111,8 +111,8 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json({ success: true, payment });
   } catch (error) {
-    console.error('Ошибка при создании платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при создании платежа' });
+    console.error('Error creating payment:', error);
+    res.status(500).json({ error: true, message: 'Failed to create payment' });
   }
 });
 
@@ -122,13 +122,13 @@ router.get('/:id', authenticate, async (req, res) => {
     const payment = await RecurringPayment.findById(req.params.id);
 
     if (!payment || payment.user_id !== req.user.id) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
     res.json(payment);
   } catch (error) {
-    console.error('Ошибка при получении платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при получении платежа' });
+    console.error('Error fetching payment:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch payment' });
   }
 });
 
@@ -142,14 +142,14 @@ router.put('/:id', authenticate, async (req, res) => {
     );
 
     if (!success) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
     const payment = await RecurringPayment.findById(req.params.id);
     res.json({ success: true, payment });
   } catch (error) {
-    console.error('Ошибка при обновлении платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при обновлении платежа' });
+    console.error('Error updating payment:', error);
+    res.status(500).json({ error: true, message: 'Failed to update payment' });
   }
 });
 
@@ -159,13 +159,13 @@ router.delete('/:id', authenticate, async (req, res) => {
     const success = await RecurringPayment.delete(req.params.id, req.user.id);
 
     if (!success) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
-    res.json({ success: true, message: 'Платеж удален' });
+    res.json({ success: true, message: 'Payment deleted' });
   } catch (error) {
-    console.error('Ошибка при удалении платежа:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при удалении платежа' });
+    console.error('Error deleting payment:', error);
+    res.status(500).json({ error: true, message: 'Failed to delete payment' });
   }
 });
 
@@ -185,8 +185,8 @@ router.post('/:id/pay', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при оплате:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при оплате' });
+    console.error('Error marking as paid:', error);
+    res.status(500).json({ error: true, message: 'Failed to mark as paid' });
   }
 });
 
@@ -201,8 +201,8 @@ router.post('/:id/skip', authenticate, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при пропуске:', error);
-    res.status(500).json({ error: true, message: 'Ошибка при пропуске платежа' });
+    console.error('Error skipping payment:', error);
+    res.status(500).json({ error: true, message: 'Failed to skip payment' });
   }
 });
 
@@ -212,7 +212,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     const payment = await RecurringPayment.findById(req.params.id);
 
     if (!payment || payment.user_id !== req.user.id) {
-      return res.status(404).json({ error: true, message: 'Платеж не найден' });
+      return res.status(404).json({ error: true, message: 'Payment not found' });
     }
 
     await RecurringPayment.update(req.params.id, req.user.id, {
@@ -222,8 +222,8 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     const updated = await RecurringPayment.findById(req.params.id);
     res.json({ success: true, payment: updated });
   } catch (error) {
-    console.error('Ошибка при переключении:', error);
-    res.status(500).json({ error: true, message: 'Ошибка' });
+    console.error('Error toggling payment:', error);
+    res.status(500).json({ error: true, message: 'Error' });
   }
 });
 

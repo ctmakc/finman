@@ -17,7 +17,7 @@ const Account = require('../models/account');
 const Transaction = require('../models/transaction');
 
 // Категория/описание для авто-корректировки сверки.
-const ADJUST_CATEGORY = 'Корректировка сверки';
+const ADJUST_CATEGORY = 'Reconciliation adjustment';
 
 // Внутренний помощник: загрузить счёт пользователя или бросить понятную ошибку.
 async function loadOwnedAccount(accountId, userId) {
@@ -177,7 +177,7 @@ async function postAdjustment(accountId, userId, delta) {
         accountId,
         userId,
         new Date().toISOString().split('T')[0],
-        'Корректировка по результатам сверки',
+        'Adjustment from reconciliation',
         ADJUST_CATEGORY,
         amount,
         amount >= 0 ? 'income' : 'expense',

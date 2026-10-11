@@ -49,7 +49,7 @@ router.post('/restore', express.json({ limit: '25mb' }), async (req, res, next) 
     const result = await backupService.importAll(req.user.id, payload);
     res.json({
       success: true,
-      message: 'Восстановление завершено',
+      message: 'Restore completed',
       data: result,
     });
   } catch (error) {
@@ -84,28 +84,28 @@ router.get('/transactions/csv', async (req, res) => {
     if (accountId) { sql += ' AND t.account_id = ?'; params.push(accountId); }
     sql += ' ORDER BY t.date DESC';
     const transactions = await query(sql, params);
-    const headers = ['Дата', 'Описание', 'Категория', 'Сумма', 'Тип', 'Счёт', 'Валюта'];
+    const headers = ['Date', 'Description', 'Category', 'Amount', 'Type', 'Account', 'Currency'];
     const rows = transactions.map(t => [
       t.date, '"' + (t.description || '').replace(/"/g, '""') + '"', t.category || '',
-      t.amount, t.type === 'income' ? 'Доход' : 'Расход', t.account_name || '', t.currency || DEFAULT_CURRENCY
+      t.amount, t.type === 'income' ? 'Income' : 'Expense', t.account_name || '', t.currency || DEFAULT_CURRENCY
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=transactions_' + new Date().toISOString().split('T')[0] + '.csv');
     res.send('\ufeff' + csv);
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.get('/accounts/csv', async (req, res) => {
   try {
     const accounts = await query('SELECT name, account_number, bank_name, balance, currency, account_type, created_at FROM accounts WHERE user_id = ? AND is_active = 1', [req.user.id]);
-    const headers = ['Название', 'Номер', 'Банк', 'Баланс', 'Валюта', 'Тип', 'Создан'];
+    const headers = ['Name', 'Number', 'Bank', 'Balance', 'Currency', 'Type', 'Created'];
     const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || DEFAULT_CURRENCY, a.account_type || '', a.created_at]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=accounts_' + new Date().toISOString().split('T')[0] + '.csv');
     res.send('\ufeff' + csv);
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.get('/full/json', async (req, res) => {
@@ -121,7 +121,7 @@ router.get('/full/json', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename=finman_backup_' + new Date().toISOString().split('T')[0] + '.json');
     res.json({ exportDate: new Date().toISOString(), accounts, transactions, budgets, savingsGoals: goals, debts });
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 // Импорт CSV (формат нашего же экспорта /transactions/csv). Счёт должен
@@ -131,9 +131,9 @@ router.get('/full/json', async (req, res) => {
 router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' }), async (req, res) => {
   try {
     const { accountId } = req.query;
-    if (!accountId) return res.status(400).json({ message: 'Укажите счёт' });
+    if (!accountId) return res.status(400).json({ message: 'Account is required' });
     const account = await Account.findById(accountId, req.user.id);
-    if (!account) return res.status(404).json({ message: 'Счёт не найден' });
+    if (!account) return res.status(404).json({ message: 'Account not found' });
 
     const lines = String(req.body || '').replace(/^\ufeff/, '').split('\n').filter(l => l.trim()).slice(1);
     const rows = [];
@@ -148,14 +148,15 @@ router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' 
         userId: req.user.id,
         date: date.trim(),
         description: (description || '').replace(/"/g, ''),
-        category: (category || '').trim() || 'Прочее',
+        category: (category || '').trim() || 'Other',
         amount: num,
-        type: type && type.includes('Доход') ? 'income' : 'expense'
+        // Type column: English, Russian or Ukrainian label (legacy exports).
+        type: type && /income|доход|дохід/i.test(type) ? 'income' : 'expense'
       });
     }
     const saved = rows.length ? await Transaction.bulkCreate(rows) : [];
     res.json({ imported: saved.length });
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 router.post('/full/json', express.json({ limit: '10mb' }), async (req, res) => {
@@ -169,8 +170,8 @@ router.post('/full/json', express.json({ limit: '10mb' }), async (req, res) => {
       if (Array.isArray(data.savingsGoals)) for (const g of data.savingsGoals) { try { await run('INSERT INTO savings_goals (user_id, name, target_amount, current_amount, currency, target_date) VALUES (?, ?, ?, ?, ?, ?)', [userId, g.name, g.target_amount, g.current_amount || 0, g.currency, g.target_date]); results.goals++; } catch(e){} }
       if (Array.isArray(data.debts)) for (const d of data.debts) { try { await run('INSERT INTO debts (user_id, name, type, amount, paid_amount, currency, start_date, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, d.name, d.type, d.amount, d.paid_amount || 0, d.currency, d.start_date, d.due_date]); results.debts++; } catch(e){} }
     });
-    res.json({ message: 'Импорт завершён', results });
-  } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
+    res.json({ message: 'Import completed', results });
+  } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
 });
 
 // Beancount (plain-text double-entry) export — anti-lock-in / Fava-friendly.
@@ -187,7 +188,7 @@ router.get('/beancount', async (req, res) => {
     res.send(text);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

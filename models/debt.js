@@ -176,12 +176,12 @@ const Debt = {
   // сегодняшняя дата.
   async addPayment(debtId, amount, paymentType = 'principal', note = null, transactionId = null, paymentDate = null) {
     const debt = await this.findById(debtId);
-    if (!debt) throw new AppError(404, 'DEBT_NOT_FOUND', 'Долг не найден');
+    if (!debt) throw new AppError(404, 'DEBT_NOT_FOUND', 'Debt not found');
 
     // Сумма платежа должна быть положительной.
     const payAmount = money.round(amount);
     if (!(payAmount > 0)) {
-      throw new AppError(400, 'DEBT_INVALID_PAYMENT', 'Сумма платежа должна быть положительной');
+      throw new AppError(400, 'DEBT_INVALID_PAYMENT', 'Payment amount must be positive');
     }
 
     // Только платежи по телу долга (principal) уменьшают paid_amount и могут
@@ -200,7 +200,7 @@ const Debt = {
         throw new AppError(
           400,
           'DEBT_OVERPAY',
-          `Платёж превышает остаток долга (остаток: ${money.sub(principal, currentPaid)})`
+          `Payment exceeds the remaining debt (remaining: ${money.sub(principal, currentPaid)})`
         );
       }
     }

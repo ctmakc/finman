@@ -192,8 +192,8 @@ const Notification = {
           notifications.push({
             user_id: userId,
             type: this.TYPES.BUDGET_EXCEEDED,
-            title: `Бюджет "${budget.name}" превышен!`,
-            message: `Потрачено ${budget.spent} из ${budget.amount} (${Math.round(percent)}%)`,
+            title: `Budget "${budget.name}" exceeded`,
+            message: `Spent ${budget.spent} of ${budget.amount} (${Math.round(percent)}%)`,
             data: { budget_id: budget.id, percent }
           });
         }
@@ -209,8 +209,8 @@ const Notification = {
           notifications.push({
             user_id: userId,
             type: this.TYPES.BUDGET_WARNING,
-            title: `Бюджет "${budget.name}" почти исчерпан`,
-            message: `Использовано ${Math.round(percent)}% бюджета`,
+            title: `Budget "${budget.name}" almost used up`,
+            message: `${Math.round(percent)}% of the budget used`,
             data: { budget_id: budget.id, percent }
           });
         }
@@ -256,7 +256,7 @@ const Notification = {
         notifications.push({
           user_id: userId,
           type,
-          title: isToday ? `Платёж "${payment.name}" сегодня` : `Скоро платёж "${payment.name}"`,
+          title: isToday ? `Payment "${payment.name}" is due today` : `Upcoming payment "${payment.name}"`,
           message: `${payment.amount} ${payment.account_name} - ${payment.next_payment_date}`,
           data: { payment_id: payment.id, date: payment.next_payment_date }
         });
@@ -300,8 +300,8 @@ const Notification = {
         notifications.push({
           user_id: userId,
           type,
-          title: isOverdue ? `Долг "${debt.name}" просрочен!` : `Долг "${debt.name}" скоро истекает`,
-          message: `Осталось выплатить: ${remaining}. Срок: ${debt.due_date}`,
+          title: isOverdue ? `Debt "${debt.name}" is overdue` : `Debt "${debt.name}" is due soon`,
+          message: `Remaining: ${remaining}. Due: ${debt.due_date}`,
           data: { debt_id: debt.id, due_date: debt.due_date, remaining }
         });
       }

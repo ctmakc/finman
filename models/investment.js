@@ -175,8 +175,8 @@ const Investment = {
   // Продать актив
   async sell(investmentId, quantity, price, fee = 0, date = null) {
     const investment = await this.findInvestmentById(investmentId);
-    if (!investment) throw new Error('Актив не найден');
-    if (investment.quantity < quantity) throw new Error('Недостаточно активов для продажи');
+    if (!investment) throw new Error('Asset not found');
+    if (investment.quantity < quantity) throw new Error('Not enough holdings to sell');
 
     const sellDate = date || new Date().toISOString().split('T')[0];
 
@@ -241,7 +241,7 @@ const Investment = {
   async addEvent(data) {
     const type = data.type;
     if (!Object.values(this.EVENT_TYPES).includes(type)) {
-      throw new Error('Неизвестный тип события');
+      throw new Error('Unknown event type');
     }
     const date = data.date || new Date().toISOString().split('T')[0];
     // Нормализуем сумму до 2 знаков и берём модуль (направление — от типа).

@@ -74,7 +74,7 @@ router.post('/snapshot', async (req, res, next) => {
   try {
     const { notes } = req.body || {};
     const data = await networthService.takeSnapshot(req.user.id, { notes });
-    res.status(201).json({ id: data.id, message: 'Snapshot создан', data });
+    res.status(201).json({ id: data.id, message: 'Snapshot created', data });
   } catch (error) {
     next(error);
   }
@@ -100,7 +100,7 @@ router.post('/assets', async (req, res, next) => {
       req.body;
 
     if (!name || value === undefined || value === null) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'name и value обязательны');
+      throw new AppError(400, 'VALIDATION_ERROR', 'name and value are required');
     }
 
     const result = await run(
@@ -118,7 +118,7 @@ router.post('/assets', async (req, res, next) => {
       ]
     );
 
-    res.status(201).json({ id: result.id, message: 'Актив добавлен' });
+    res.status(201).json({ id: result.id, message: 'Asset added' });
   } catch (error) {
     next(error);
   }
@@ -131,7 +131,7 @@ router.put('/assets/:id', async (req, res, next) => {
       req.params.id,
       req.user.id,
     ]);
-    if (!asset) throw new AppError(404, 'NOT_FOUND', 'Актив не найден');
+    if (!asset) throw new AppError(404, 'NOT_FOUND', 'Asset not found');
 
     const { name, type, value, currency, purchase_date, purchase_price, description, is_active } =
       req.body;
@@ -151,7 +151,7 @@ router.put('/assets/:id', async (req, res, next) => {
       ]
     );
 
-    res.json({ message: 'Актив обновлён' });
+    res.json({ message: 'Asset updated' });
   } catch (error) {
     next(error);
   }
@@ -164,7 +164,7 @@ router.delete('/assets/:id', async (req, res, next) => {
       req.params.id,
       req.user.id,
     ]);
-    res.json({ message: 'Актив удалён' });
+    res.json({ message: 'Asset deleted' });
   } catch (error) {
     next(error);
   }
@@ -173,12 +173,12 @@ router.delete('/assets/:id', async (req, res, next) => {
 // Типы активов
 router.get('/asset-types', (req, res) => {
   res.json({
-    real_estate: 'Недвижимость',
-    vehicle: 'Транспорт',
-    jewelry: 'Драгоценности',
-    collectibles: 'Коллекции',
-    equipment: 'Оборудование',
-    other: 'Другое',
+    real_estate: 'Real estate',
+    vehicle: 'Vehicles',
+    jewelry: 'Jewelry',
+    collectibles: 'Collectibles',
+    equipment: 'Equipment',
+    other: 'Other',
   });
 });
 

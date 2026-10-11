@@ -117,8 +117,8 @@ function detectAmountOutliers(transactions, cfg) {
           transactionId: t.id,
           type: 'amount_outlier',
           reason:
-            `Необычно крупная транзакция в категории "${category === '__uncategorized__' ? 'без категории' : category}": ` +
-            `${money.round(amt)} при среднем ${money.round(m)}`,
+            `Unusually large transaction in category "${category === '__uncategorized__' ? 'uncategorized' : category}": ` +
+            `${money.round(amt)} vs. an average of ${money.round(m)}`,
           severity,
           category: category === '__uncategorized__' ? null : category,
           amount: money.round(Number(t.amount) || 0),
@@ -172,9 +172,9 @@ function detectDuplicates(transactions, cfg) {
           transactionId: cur.id,
           type: 'duplicate_charge',
           reason:
-            `Возможное повторное списание у "${cur.description}" на сумму ` +
-            `${money.round(Number(cur.amount) || 0)} в пределах ${Math.round(diff)} дн. ` +
-            `(дубликат транзакции #${prev.id})`,
+            `Possible duplicate charge from "${cur.description}" for ` +
+            `${money.round(Number(cur.amount) || 0)} within ${Math.round(diff)} day(s) ` +
+            `(duplicate of transaction #${prev.id})`,
           severity: diff <= 1 ? 'high' : 'medium',
           duplicateOf: prev.id,
           amount: money.round(Number(cur.amount) || 0),
@@ -234,7 +234,7 @@ async function detectSubscriptionHikes(userId, cfg) {
         subscriptionId: sub.id,
         type: 'subscription_hike',
         reason:
-          `Цена подписки "${sub.name}" выросла на ${money.round(hikePct)}% ` +
+          `Subscription "${sub.name}" price rose by ${money.round(hikePct)}% ` +
           `(${money.round(base)} -> ${money.round(current)})`,
         severity: hikePct >= 50 ? 'high' : hikePct >= 25 ? 'medium' : 'low',
         amount: money.round(current),
@@ -307,7 +307,7 @@ async function detectForUser(userId, opts = {}) {
         await Notification.create({
           user_id: userId,
           type: Notification.TYPES.SYSTEM,
-          title: 'Обнаружена аномалия в транзакциях',
+          title: 'Transaction anomaly detected',
           message: a.reason,
           data: {
             anomaly_ref:

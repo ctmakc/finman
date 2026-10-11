@@ -17,8 +17,8 @@ router.get('/', async (req, res) => {
     const rules = await CategoryRule.findByUserId(req.user.id);
     res.json(rules);
   } catch (error) {
-    console.error('Ошибка при получении правил:', error);
-    res.status(500).json({ error: true, message: 'Не удалось получить правила' });
+    console.error('Error fetching rules:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch rules' });
   }
 });
 
@@ -39,8 +39,8 @@ router.post('/', async (req, res) => {
     }
     res.status(201).json(result);
   } catch (error) {
-    console.error('Ошибка при создании правила:', error);
-    res.status(500).json({ error: true, message: 'Не удалось создать правило' });
+    console.error('Error creating rule:', error);
+    res.status(500).json({ error: true, message: 'Failed to create rule' });
   }
 });
 
@@ -52,8 +52,8 @@ router.post('/apply', async (req, res) => {
     const result = await rulesEngine.applyToUncategorized(req.user.id, { dryRun });
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при применении правил:', error);
-    res.status(500).json({ error: true, message: 'Не удалось применить правила' });
+    console.error('Error applying rules:', error);
+    res.status(500).json({ error: true, message: 'Failed to apply rules' });
   }
 });
 
@@ -61,11 +61,11 @@ router.post('/apply', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const rule = await CategoryRule.findById(req.params.id, req.user.id);
-    if (!rule) return res.status(404).json({ error: true, message: 'Правило не найдено' });
+    if (!rule) return res.status(404).json({ error: true, message: 'Rule not found' });
     res.json(rule);
   } catch (error) {
-    console.error('Ошибка при получении правила:', error);
-    res.status(500).json({ error: true, message: 'Не удалось получить правило' });
+    console.error('Error fetching rule:', error);
+    res.status(500).json({ error: true, message: 'Failed to fetch rule' });
   }
 });
 
@@ -82,15 +82,15 @@ router.put('/:id', async (req, res) => {
       is_active,
     });
     if (result === null) {
-      return res.status(404).json({ error: true, message: 'Правило не найдено' });
+      return res.status(404).json({ error: true, message: 'Rule not found' });
     }
     if (result && result.error) {
       return res.status(400).json({ error: true, message: result.message });
     }
     res.json(result);
   } catch (error) {
-    console.error('Ошибка при обновлении правила:', error);
-    res.status(500).json({ error: true, message: 'Не удалось обновить правило' });
+    console.error('Error updating rule:', error);
+    res.status(500).json({ error: true, message: 'Failed to update rule' });
   }
 });
 
@@ -98,11 +98,11 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const ok = await CategoryRule.delete(req.params.id, req.user.id);
-    if (!ok) return res.status(404).json({ error: true, message: 'Правило не найдено' });
-    res.json({ success: true, message: 'Правило удалено' });
+    if (!ok) return res.status(404).json({ error: true, message: 'Rule not found' });
+    res.json({ success: true, message: 'Rule deleted' });
   } catch (error) {
-    console.error('Ошибка при удалении правила:', error);
-    res.status(500).json({ error: true, message: 'Не удалось удалить правило' });
+    console.error('Error deleting rule:', error);
+    res.status(500).json({ error: true, message: 'Failed to delete rule' });
   }
 });
 

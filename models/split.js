@@ -18,7 +18,7 @@ const Split = {
     // Добавляем создателя как участника
     await this.addMember(result.id, {
       user_id: data.user_id,
-      name: data.creator_name || 'Я',
+      name: data.creator_name || 'Me',
       is_registered: true
     });
 
@@ -401,7 +401,7 @@ const Split = {
     };
 
     expenses.forEach(e => {
-      const cat = e.category || 'Другое';
+      const cat = e.category || 'Other';
       stats.byCategory[cat] = money.add(stats.byCategory[cat] || 0, e.amount);
     });
 

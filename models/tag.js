@@ -11,7 +11,7 @@ class Tag {
       return this.findById(result.id);
     } catch (error) {
       if (error.message.includes('UNIQUE')) {
-        return { error: true, message: 'Тег с таким именем уже существует' };
+        return { error: true, message: 'A tag with this name already exists' };
       }
       throw error;
     }
@@ -62,7 +62,7 @@ class Tag {
       return true;
     } catch (error) {
       if (error.message.includes('UNIQUE')) {
-        return { error: true, message: 'Тег с таким именем уже существует' };
+        return { error: true, message: 'A tag with this name already exists' };
       }
       throw error;
     }
@@ -86,7 +86,7 @@ class Tag {
       );
       return true;
     } catch (error) {
-      console.error('Ошибка добавления тега:', error);
+      console.error('Error adding tag:', error);
       return false;
     }
   }

@@ -35,10 +35,10 @@ class CategoryRule {
     const is_active = data.is_active === undefined ? 1 : (data.is_active ? 1 : 0);
 
     if (!set_category) {
-      return { error: true, message: 'Не указана категория (set_category)' };
+      return { error: true, message: 'Category is required (set_category)' };
     }
     if (!match_value) {
-      return { error: true, message: 'Не указано значение условия (match_value)' };
+      return { error: true, message: 'Condition value is required (match_value)' };
     }
 
     const result = await run(
@@ -93,7 +93,7 @@ class CategoryRule {
     }
     if (data.set_category !== undefined) {
       const cat = String(data.set_category).trim();
-      if (!cat) return { error: true, message: 'Категория не может быть пустой' };
+      if (!cat) return { error: true, message: 'Category cannot be empty' };
       fields.push('set_category = ?');
       values.push(cat);
     }

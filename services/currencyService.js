@@ -165,16 +165,16 @@ const currencyService = {
   async convert(amount, from, to, date = null) {
     const value = Number(amount);
     if (!Number.isFinite(value)) {
-      throw new AppError(400, 'INVALID_AMOUNT', 'Сумма должна быть числом');
+      throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be a number');
     }
     const f = norm(from);
     const t = norm(to);
     if (!/^[A-Z]{3,5}$/.test(f) || !/^[A-Z]{3,5}$/.test(t)) {
-      throw new AppError(400, 'INVALID_CURRENCY', 'Код валюты: 3 латинские буквы, например CAD');
+      throw new AppError(400, 'INVALID_CURRENCY', 'Currency code must be 3 letters, e.g. CAD');
     }
     const found = await this.rateOrFallback(f, t, date);
     if (!found) {
-      throw new AppError(422, 'RATE_NOT_FOUND', `Нет курса ${f} → ${t}. Добавьте курс вручную (POST /api/currency/rate) или обновите курсы.`);
+      throw new AppError(422, 'RATE_NOT_FOUND', `No exchange rate ${f} → ${t}. Add one manually (POST /api/currency/rate) or refresh the rates.`);
     }
     const result = money.round(value * found.rate);
     return {

@@ -44,7 +44,7 @@ router.post(
       throw new AppError(400, 'EMPTY_MESSAGE', 'Field "message" is required');
     }
     if (String(message).length > 8000) {
-      throw new AppError(400, 'MESSAGE_TOO_LONG', 'Сообщение слишком длинное (макс 8000 символов)');
+      throw new AppError(400, 'MESSAGE_TOO_LONG', 'Message is too long (max 8000 characters)');
     }
     if (!provider.isConfigured()) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI provider not configured');
@@ -71,7 +71,7 @@ router.post(
       throw new AppError(400, 'EMPTY_MESSAGE', 'Field "message" is required');
     }
     if (String(message).length > 8000) {
-      throw new AppError(400, 'MESSAGE_TOO_LONG', 'Сообщение слишком длинное (макс 8000 символов)');
+      throw new AppError(400, 'MESSAGE_TOO_LONG', 'Message is too long (max 8000 characters)');
     }
     if (!provider.isConfigured()) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI provider not configured');

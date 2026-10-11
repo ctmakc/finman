@@ -20,14 +20,14 @@ router.get('/google/status', (req, res) => res.json({ enabled: googleEnabled() }
 
 router.get('/google', (req, res, next) => {
   if (!googleEnabled()) {
-    return res.status(503).json({ error: true, message: 'Вход через Google не настроен' });
+    return res.status(503).json({ error: true, message: 'Google sign-in is not configured' });
   }
   passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
 });
 
 router.get('/google/callback', (req, res, next) => {
   if (!googleEnabled()) {
-    return res.status(503).json({ error: true, message: 'Вход через Google не настроен' });
+    return res.status(503).json({ error: true, message: 'Google sign-in is not configured' });
   }
   passport.authenticate('google', { session: false }, (err, user) => {
     const fail = (reason) =>
@@ -57,7 +57,7 @@ router.post('/register', async (req, res) => {
     if (!username || !email || !password) {
       return res.status(400).json({
         error: true,
-        message: 'Необходимо указать имя пользователя, email и пароль'
+        message: 'Username, email and password are required'
       });
     }
 
@@ -65,7 +65,7 @@ router.post('/register', async (req, res) => {
     if (!config.isValidEmail(email)) {
       return res.status(400).json({
         error: true,
-        message: 'Некорректный формат email'
+        message: 'Invalid email format'
       });
     }
 
@@ -73,7 +73,7 @@ router.post('/register', async (req, res) => {
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
       return res.status(400).json({
         error: true,
-        message: 'Имя пользователя должно содержать 3-30 символов (буквы, цифры, подчёркивания)'
+        message: 'Username must be 3-30 characters (letters, digits, underscores)'
       });
     }
 
@@ -81,7 +81,7 @@ router.post('/register', async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({
         error: true,
-        message: 'Пароль должен содержать минимум 6 символов'
+        message: 'Password must be at least 6 characters'
       });
     }
     
@@ -90,7 +90,7 @@ router.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ 
         error: true, 
-        message: 'Пользователь с таким именем уже существует' 
+        message: 'A user with this username already exists' 
       });
     }
     
@@ -99,7 +99,7 @@ router.post('/register', async (req, res) => {
     if (existingEmail) {
       return res.status(400).json({ 
         error: true, 
-        message: 'Пользователь с таким email уже существует' 
+        message: 'A user with this email already exists' 
       });
     }
     
@@ -133,10 +133,10 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Ошибка при регистрации:', error);
+    console.error('Registration error:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при регистрации' 
+      message: 'Registration failed' 
     });
   }
 });
@@ -151,7 +151,7 @@ router.post('/login', (req, res, next) => {
     if (!user) {
       return res.status(401).json({ 
         error: true, 
-        message: info.message || 'Неверное имя пользователя или пароль' 
+        message: info.message || 'Invalid username or password' 
       });
     }
     
@@ -181,7 +181,7 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
     if (!user) {
       return res.status(404).json({ 
         error: true, 
-        message: 'Пользователь не найден' 
+        message: 'User not found' 
       });
     }
     
@@ -193,10 +193,10 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
       createdAt: user.created_at
     });
   } catch (error) {
-    console.error('Ошибка при получении данных пользователя:', error);
+    console.error('Error fetching user:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при получении данных пользователя' 
+      message: 'Failed to fetch user data' 
     });
   }
 });
@@ -211,7 +211,7 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
       if (!currentPassword) {
         return res.status(400).json({ 
           error: true, 
-          message: 'Необходимо указать текущий пароль' 
+          message: 'Current password is required' 
         });
       }
       
@@ -221,7 +221,7 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
       if (!isPasswordValid) {
         return res.status(401).json({ 
           error: true, 
-          message: 'Неверный текущий пароль' 
+          message: 'Current password is incorrect' 
         });
       }
     }
@@ -232,7 +232,7 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
       if (taken && taken.id !== req.user.id) {
         return res.status(409).json({
           error: true,
-          message: 'Этот email уже используется другим аккаунтом'
+          message: 'This email is already used by another account'
         });
       }
     }
@@ -257,7 +257,7 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
     } else {
       res.status(400).json({ 
         error: true, 
-        message: 'Не удалось обновить данные пользователя' 
+        message: 'Failed to update user data' 
       });
     }
   } catch (error) {
@@ -265,13 +265,13 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
     if (error && /UNIQUE constraint failed: users\.email/.test(error.message || '')) {
       return res.status(409).json({
         error: true,
-        message: 'Этот email уже используется другим аккаунтом'
+        message: 'This email is already used by another account'
       });
     }
-    console.error('Ошибка при обновлении данных пользователя:', error);
+    console.error('Error updating user:', error);
     res.status(500).json({ 
       error: true, 
-      message: 'Произошла ошибка при обновлении данных пользователя' 
+      message: 'Failed to update user data' 
     });
   }
 });

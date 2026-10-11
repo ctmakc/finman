@@ -161,7 +161,7 @@ describe('Google sign-in: enabled with credentials', () => {
     await signupNotify.flush();
     expect(sendSpy).toHaveBeenCalledTimes(1);
     const mail = sendSpy.mock.calls[0][0];
-    expect(mail.subject).toBe('Регистрация · finman.money · google.person@example.com');
+    expect(mail.subject).toBe('Signup · finman.money · google.person@example.com');
     expect(mail.from).toMatch(/^INNOVA Leads </);
     expect(mail.to).toEqual(['ctmakc@gmail.com']);
     expect(mail.replyTo).toBe('google.person@example.com');

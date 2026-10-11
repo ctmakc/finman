@@ -19,14 +19,14 @@ passport.use(new LocalStrategy(
       const user = await User.findByUsername(username);
 
       if (!user) {
-        return done(null, false, { message: 'Неверное имя пользователя или пароль' });
+        return done(null, false, { message: 'Invalid username or password' });
       }
 
       // Проверка пароля
       const isPasswordValid = await User.verifyPassword(user, password);
 
       if (!isPasswordValid) {
-        return done(null, false, { message: 'Неверное имя пользователя или пароль' });
+        return done(null, false, { message: 'Invalid username or password' });
       }
 
       // Пользователь успешно аутентифицирован

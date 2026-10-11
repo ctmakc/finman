@@ -79,7 +79,7 @@ describe('signupNotify via /api/auth/register and /login', () => {
     await signupNotify.flush();
 
     const mail = sendSpy.mock.calls[0][0];
-    expect(mail.subject).toBe(`Регистрация · finman.money · ${body.email}`);
+    expect(mail.subject).toBe(`Signup · finman.money · ${body.email}`);
     expect(mail.from).toBe('INNOVA Leads <leads@remolda.com>');
     expect(mail.to).toEqual(['ctmakc@gmail.com']);
     expect(mail.replyTo).toBe(body.email);
@@ -224,7 +224,7 @@ describe('signupNotify unit: skip, retry, GA4', () => {
   });
 
   test('buildSubject uses the email and the finman.money site tag', () => {
-    expect(signupNotify.buildSubject({ email: 'x@y.z' })).toBe('Регистрация · finman.money · x@y.z');
-    expect(signupNotify.buildSubject({ username: 'nomail' })).toBe('Регистрация · finman.money · nomail');
+    expect(signupNotify.buildSubject({ email: 'x@y.z' })).toBe('Signup · finman.money · x@y.z');
+    expect(signupNotify.buildSubject({ username: 'nomail' })).toBe('Signup · finman.money · nomail');
   });
 });

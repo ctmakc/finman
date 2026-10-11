@@ -34,9 +34,9 @@ const PLANS = [
     currency: 'usd',
     interval: 'month',
     features: [
-      'Учёт счетов и транзакций',
-      'Бюджеты и цели',
-      'Импорт CSV',
+      'Accounts and transactions',
+      'Budgets and goals',
+      'CSV import',
     ],
   },
   {
@@ -47,10 +47,10 @@ const PLANS = [
     currency: 'usd',
     interval: 'month',
     features: [
-      'Всё из Free',
-      'AI-ассистент по финансам',
-      'Синхронизация с банками',
-      'Детектор аномалий',
+      'Everything in Free',
+      'AI finance assistant',
+      'Bank sync',
+      'Anomaly detection',
     ],
   },
   {
@@ -61,10 +61,10 @@ const PLANS = [
     currency: 'usd',
     interval: 'month',
     features: [
-      'Всё из Pro',
-      'Семейный доступ и общий бюджет',
-      'До 5 участников',
-      'Приоритетная поддержка',
+      'Everything in Pro',
+      'Family sharing and shared budget',
+      'Up to 5 members',
+      'Priority support',
     ],
   },
 ];
@@ -97,7 +97,7 @@ function getStripe() {
     return _stripe;
   } catch (err) {
     _stripeLoadError = err;
-    logger.error({ err: err.message }, 'Stripe SDK недоступен, биллинг в disabled-режиме');
+    logger.error({ err: err.message }, 'Stripe SDK unavailable, billing runs in disabled mode');
     return null;
   }
 }
@@ -152,7 +152,7 @@ async function createCheckoutSession(userId, plan) {
     }
   } catch (err) {
     if (err instanceof AppError) throw err;
-    logger.error({ err: err.message, userId }, 'Не удалось подготовить Stripe customer');
+    logger.error({ err: err.message, userId }, 'Failed to prepare the Stripe customer');
     throw new AppError(502, 'BILLING_PROVIDER_ERROR', 'Failed to prepare billing customer');
   }
 

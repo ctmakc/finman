@@ -46,7 +46,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!receipt) return res.status(404).json({ message: 'Чек не найден' });
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
     res.json({
       ...receipt,
@@ -63,7 +63,7 @@ router.post('/upload', async (req, res) => {
     const { image_data, notes } = req.body;
 
     if (!image_data) {
-      return res.status(400).json({ message: 'Изображение обязательно' });
+      return res.status(400).json({ message: 'Image is required' });
     }
 
     // 1) Сразу сохраняем чек в статусе 'pending' — пользователь видит запись,
@@ -82,7 +82,7 @@ router.post('/upload', async (req, res) => {
 
     if (wantAsync) {
       // Неблокирующий режим: отвечаем сразу, OCR в фоне (async-safe).
-      res.status(201).json({ id: receiptId, ocr_status: 'pending', message: 'Чек загружен, идёт распознавание...' });
+      res.status(201).json({ id: receiptId, ocr_status: 'pending', message: 'Receipt uploaded, recognition in progress...' });
       // Не ждём промис — но ошибки гасим, чтобы не уронить процесс.
       processAndStore(receiptId, image_data).catch((e) => {
         logger.error({ err: e && e.message, receiptId }, 'Async OCR failed');
@@ -101,7 +101,7 @@ router.post('/upload', async (req, res) => {
       receipt_date: ocr.receipt_date,
       category: ocr.category,
       items: ocr.items,
-      message: ocr.ocr_status === 'completed' ? 'Чек распознан' : 'Не удалось распознать чек, заполните вручную'
+      message: ocr.ocr_status === 'completed' ? 'Receipt recognised' : 'Could not recognise the receipt, please fill it in manually'
     });
   } catch (error) {
     logger.error({ err: error && error.message }, 'Receipt upload failed');
@@ -151,7 +151,7 @@ router.post('/manual', async (req, res) => {
       [req.user.id, merchant, total_amount, currency || DEFAULT_CURRENCY, receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
     );
 
-    res.status(201).json({ id: result.id, message: 'Чек добавлен' });
+    res.status(201).json({ id: result.id, message: 'Receipt added' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -161,7 +161,7 @@ router.post('/manual', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!receipt) return res.status(404).json({ message: 'Чек не найден' });
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
     const { merchant, total_amount, currency, receipt_date, category, items, notes, is_processed } = req.body;
 
@@ -170,7 +170,7 @@ router.put('/:id', async (req, res) => {
       [merchant || receipt.merchant, total_amount || receipt.total_amount, currency || receipt.currency, receipt_date || receipt.receipt_date, category || receipt.category, JSON.stringify(items || JSON.parse(receipt.items || '[]')), notes, is_processed !== undefined ? (is_processed ? 1 : 0) : receipt.is_processed, req.params.id]
     );
 
-    res.json({ message: 'Чек обновлён' });
+    res.json({ message: 'Receipt updated' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -180,19 +180,19 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/create-transaction', async (req, res) => {
   try {
     const receipt = await get('SELECT * FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (!receipt) return res.status(404).json({ message: 'Чек не найден' });
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
     const { account_id, category } = req.body;
 
     if (!account_id) {
-      return res.status(400).json({ message: 'Укажите счёт' });
+      return res.status(400).json({ message: 'Account is required' });
     }
 
     // Счёт должен принадлежать текущему пользователю (иначе чек B списывал
     // деньги со счёта A). 404 — счёта нет, 403 — чужой.
     const account = await get('SELECT id, user_id FROM accounts WHERE id = ?', [account_id]);
-    if (!account) return res.status(404).json({ message: 'Счёт не найден' });
-    if (account.user_id !== req.user.id) return res.status(403).json({ message: 'Нет доступа к этому счёту' });
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    if (account.user_id !== req.user.id) return res.status(403).json({ message: 'No access to this account' });
 
     // Три записи — одной транзакцией БД. Расход хранится со знаком минус
     // (единое правило: дельта баланса = хранимая сумма).
@@ -203,7 +203,7 @@ router.post('/:id/create-transaction', async (req, res) => {
       const txResult = await run(
         `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
          VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
-        [req.user.id, account_id, amount, receipt.merchant || 'Чек', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
+        [req.user.id, account_id, amount, receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
       );
       await run(
         'UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
@@ -216,7 +216,7 @@ router.post('/:id/create-transaction', async (req, res) => {
       return txResult.id;
     });
 
-    res.json({ transaction_id: txId, message: 'Транзакция создана' });
+    res.json({ transaction_id: txId, message: 'Transaction created' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -226,7 +226,7 @@ router.post('/:id/create-transaction', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM receipts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Чек удалён' });
+    res.json({ message: 'Receipt deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

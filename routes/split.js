@@ -14,15 +14,15 @@ router.use(authenticate);
 async function ownGroup(req, res, next) {
   try {
     const group = await Split.findGroupById(req.params.id);
-    if (!group) return res.status(404).json({ message: 'Группа не найдена' });
+    if (!group) return res.status(404).json({ message: 'Group not found' });
     if (Number(group.user_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Нет доступа к этой группе' });
+      return res.status(403).json({ message: 'No access to this group' });
     }
     req.group = group;
     next();
   } catch (error) {
-    console.error('Ошибка ownGroup:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('ownGroup error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -30,15 +30,15 @@ async function ownGroup(req, res, next) {
 async function ownMember(req, res, next) {
   try {
     const member = await get('SELECT group_id FROM split_members WHERE id = ?', [req.params.id]);
-    if (!member) return res.status(404).json({ message: 'Участник не найден' });
+    if (!member) return res.status(404).json({ message: 'Member not found' });
     const group = await Split.findGroupById(member.group_id);
     if (!group || Number(group.user_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Нет доступа' });
+      return res.status(403).json({ message: 'Access denied' });
     }
     next();
   } catch (error) {
-    console.error('Ошибка ownMember:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('ownMember error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -46,15 +46,15 @@ async function ownMember(req, res, next) {
 async function ownExpense(req, res, next) {
   try {
     const expense = await get('SELECT group_id FROM split_expenses WHERE id = ?', [req.params.id]);
-    if (!expense) return res.status(404).json({ message: 'Расход не найден' });
+    if (!expense) return res.status(404).json({ message: 'Expense not found' });
     const group = await Split.findGroupById(expense.group_id);
     if (!group || Number(group.user_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Нет доступа' });
+      return res.status(403).json({ message: 'Access denied' });
     }
     next();
   } catch (error) {
-    console.error('Ошибка ownExpense:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('ownExpense error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -66,8 +66,8 @@ router.get('/groups', async (req, res) => {
     const groups = await Split.findGroupsByUser(req.user.id);
     res.json(groups);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -77,8 +77,8 @@ router.get('/stats', async (req, res) => {
     const stats = await Split.getUserStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -87,8 +87,8 @@ router.get('/groups/:id', ownGroup, async (req, res) => {
   try {
     res.json(req.group);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -98,8 +98,8 @@ router.get('/groups/:id/stats', ownGroup, async (req, res) => {
     const stats = await Split.getGroupStats(req.params.id);
     res.json(stats);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -108,7 +108,7 @@ router.post('/groups', async (req, res) => {
   try {
     const { name, description, currency, creator_name } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Название обязательно' });
+      return res.status(400).json({ message: 'Name is required' });
     }
 
     const group = await Split.createGroup({
@@ -118,8 +118,8 @@ router.post('/groups', async (req, res) => {
 
     res.status(201).json(group);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -129,8 +129,8 @@ router.put('/groups/:id', ownGroup, async (req, res) => {
     const updated = await Split.updateGroup(req.params.id, req.body);
     res.json(updated);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -142,8 +142,8 @@ router.get('/groups/:id/members', ownGroup, async (req, res) => {
     const members = await Split.getMembers(req.params.id);
     res.json(members);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -152,14 +152,14 @@ router.post('/groups/:id/members', ownGroup, async (req, res) => {
   try {
     const { name, email } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Имя обязательно' });
+      return res.status(400).json({ message: 'Name is required' });
     }
 
     const member = await Split.addMember(req.params.id, { name, email, is_registered: false });
     res.status(201).json(member);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -167,10 +167,10 @@ router.post('/groups/:id/members', ownGroup, async (req, res) => {
 router.delete('/members/:id', ownMember, async (req, res) => {
   try {
     await Split.removeMember(req.params.id);
-    res.json({ message: 'Участник удалён' });
+    res.json({ message: 'Member removed' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -182,8 +182,8 @@ router.get('/groups/:id/expenses', ownGroup, async (req, res) => {
     const expenses = await Split.getExpenses(req.params.id);
     res.json(expenses);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -193,7 +193,7 @@ router.post('/groups/:id/expenses', ownGroup, async (req, res) => {
     const { paid_by, description, amount, split_type, date, category, shares } = req.body;
 
     if (!paid_by || !description || !amount) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Please fill in the required fields' });
     }
 
     const expense = await Split.addExpense({
@@ -203,8 +203,8 @@ router.post('/groups/:id/expenses', ownGroup, async (req, res) => {
 
     res.status(201).json(expense);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -212,10 +212,10 @@ router.post('/groups/:id/expenses', ownGroup, async (req, res) => {
 router.delete('/expenses/:id', ownExpense, async (req, res) => {
   try {
     await Split.deleteExpense(req.params.id);
-    res.json({ message: 'Расход удалён' });
+    res.json({ message: 'Expense deleted' });
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -227,8 +227,8 @@ router.get('/groups/:id/balances', ownGroup, async (req, res) => {
     const balances = await Split.calculateBalances(req.params.id);
     res.json(balances);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -238,8 +238,8 @@ router.get('/groups/:id/settlements/suggested', ownGroup, async (req, res) => {
     const settlements = await Split.calculateSettlements(req.params.id);
     res.json(settlements);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -249,7 +249,7 @@ router.post('/groups/:id/settlements', ownGroup, async (req, res) => {
     const { from_member, to_member, amount, date, note } = req.body;
 
     if (!from_member || !to_member || !amount) {
-      return res.status(400).json({ message: 'Заполните обязательные поля' });
+      return res.status(400).json({ message: 'Please fill in the required fields' });
     }
 
     const settlement = await Split.addSettlement({
@@ -259,8 +259,8 @@ router.post('/groups/:id/settlements', ownGroup, async (req, res) => {
 
     res.status(201).json(settlement);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -270,8 +270,8 @@ router.get('/groups/:id/settlements', ownGroup, async (req, res) => {
     const settlements = await Split.getSettlements(req.params.id);
     res.json(settlements);
   } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

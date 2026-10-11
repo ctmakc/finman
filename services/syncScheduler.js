@@ -87,7 +87,7 @@ async function insertTransaction(t) {
       t.userId,
       t.date,
       t.description || '',
-      t.category || 'Прочее',
+      t.category || 'Other',
       round(Number(t.amount) || 0),
       t.type || ((Number(t.amount) || 0) >= 0 ? 'income' : 'expense'),
     ]

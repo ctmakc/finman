@@ -42,7 +42,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы users:', err);
+          console.error('Error creating table users:', err);
           reject(err);
         }
       });
@@ -65,7 +65,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы accounts:', err);
+          console.error('Error creating table accounts:', err);
           reject(err);
         }
       });
@@ -88,7 +88,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы transactions:', err);
+          console.error('Error creating table transactions:', err);
           reject(err);
         }
       });
@@ -107,7 +107,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы categories:', err);
+          console.error('Error creating table categories:', err);
           reject(err);
         }
       });
@@ -129,7 +129,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы bank_connections:', err);
+          console.error('Error creating table bank_connections:', err);
           reject(err);
         }
       });
@@ -155,7 +155,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы custom_banks:', err);
+          console.error('Error creating table custom_banks:', err);
           reject(err);
         }
       });
@@ -181,7 +181,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы budgets:', err);
+          console.error('Error creating table budgets:', err);
           reject(err);
         }
       });
@@ -201,7 +201,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы families:', err);
+          console.error('Error creating table families:', err);
           reject(err);
         }
       });
@@ -221,7 +221,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы family_members:', err);
+          console.error('Error creating table family_members:', err);
           reject(err);
         }
       });
@@ -246,7 +246,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы account_permissions:', err);
+          console.error('Error creating table account_permissions:', err);
           reject(err);
         }
       });
@@ -268,7 +268,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы budget_permissions:', err);
+          console.error('Error creating table budget_permissions:', err);
           reject(err);
         }
       });
@@ -290,7 +290,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы family_invites:', err);
+          console.error('Error creating table family_invites:', err);
           reject(err);
         }
       });
@@ -323,7 +323,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы recurring_payments:', err);
+          console.error('Error creating table recurring_payments:', err);
           reject(err);
         }
       });
@@ -342,7 +342,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы currency_rates:', err);
+          console.error('Error creating table currency_rates:', err);
           reject(err);
         }
       });
@@ -361,7 +361,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы user_currency_settings:', err);
+          console.error('Error creating table user_currency_settings:', err);
           reject(err);
         }
       });
@@ -379,7 +379,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы tags:', err);
+          console.error('Error creating table tags:', err);
           reject(err);
         }
       });
@@ -395,7 +395,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы transaction_tags:', err);
+          console.error('Error creating table transaction_tags:', err);
           reject(err);
         }
       });
@@ -423,7 +423,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы savings_goals:', err);
+          console.error('Error creating table savings_goals:', err);
           reject(err);
         }
       });
@@ -442,7 +442,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы goal_contributions:', err);
+          console.error('Error creating table goal_contributions:', err);
           reject(err);
         }
       });
@@ -471,7 +471,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы debts:', err);
+          console.error('Error creating table debts:', err);
           reject(err);
         }
       });
@@ -492,7 +492,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы debt_payments:', err);
+          console.error('Error creating table debt_payments:', err);
           reject(err);
         }
       });
@@ -512,7 +512,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы split_groups:', err);
+          console.error('Error creating table split_groups:', err);
           reject(err);
         }
       });
@@ -532,7 +532,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы split_members:', err);
+          console.error('Error creating table split_members:', err);
           reject(err);
         }
       });
@@ -555,7 +555,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы split_expenses:', err);
+          console.error('Error creating table split_expenses:', err);
           reject(err);
         }
       });
@@ -574,7 +574,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы split_shares:', err);
+          console.error('Error creating table split_shares:', err);
           reject(err);
         }
       });
@@ -596,7 +596,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы split_settlements:', err);
+          console.error('Error creating table split_settlements:', err);
           reject(err);
         }
       });
@@ -617,7 +617,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы notifications:', err);
+          console.error('Error creating table notifications:', err);
           reject(err);
         }
       });
@@ -640,7 +640,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы notification_settings:', err);
+          console.error('Error creating table notification_settings:', err);
           reject(err);
         }
       });
@@ -660,7 +660,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы investment_portfolios:', err);
+          console.error('Error creating table investment_portfolios:', err);
           reject(err);
         }
       });
@@ -686,7 +686,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы investments:', err);
+          console.error('Error creating table investments:', err);
           reject(err);
         }
       });
@@ -705,7 +705,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы investment_prices:', err);
+          console.error('Error creating table investment_prices:', err);
           reject(err);
         }
       });
@@ -726,7 +726,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы investment_transactions:', err);
+          console.error('Error creating table investment_transactions:', err);
           reject(err);
         }
       });
@@ -759,7 +759,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы subscriptions:', err);
+          console.error('Error creating table subscriptions:', err);
           reject(err);
         }
       });
@@ -779,7 +779,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы subscription_payments:', err);
+          console.error('Error creating table subscription_payments:', err);
           reject(err);
         }
       });
@@ -809,7 +809,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы receipts:', err);
+          console.error('Error creating table receipts:', err);
           reject(err);
         }
       });
@@ -831,7 +831,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы networth_snapshots:', err);
+          console.error('Error creating table networth_snapshots:', err);
           reject(err);
         }
       });
@@ -855,7 +855,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы manual_assets:', err);
+          console.error('Error creating table manual_assets:', err);
           reject(err);
         }
       });
@@ -877,7 +877,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы dashboard_widgets:', err);
+          console.error('Error creating table dashboard_widgets:', err);
           reject(err);
         }
       });
@@ -909,7 +909,7 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы calendar_events:', err);
+          console.error('Error creating table calendar_events:', err);
           reject(err);
         }
       });
@@ -932,10 +932,10 @@ function initDatabase() {
         )
       `, (err) => {
         if (err) {
-          console.error('Ошибка при создании таблицы reports:', err);
+          console.error('Error creating table reports:', err);
           reject(err);
         } else {
-          console.log('База данных инициализирована успешно');
+          console.log('Database initialised');
           // Применяем миграции (ADDITIVE: subscription_tier, stripe ids,
           // ai_conversations, ai_messages и т.д.). require внутри, чтобы
           // избежать циклической зависимости на этапе загрузки модуля.
@@ -943,12 +943,12 @@ function initDatabase() {
           runMigrations({ query, get, run })
             .then((applied) => {
               if (applied && applied.length) {
-                console.log('Применены миграции:', applied.join(', '));
+                console.log('Migrations applied:', applied.join(', '));
               }
               resolve();
             })
             .catch((mErr) => {
-              console.error('Ошибка применения миграций:', mErr);
+              console.error('Migration error:', mErr);
               reject(mErr);
             });
         }
@@ -962,7 +962,7 @@ function query(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
       if (err) {
-        console.error('Ошибка SQL:', err);
+        console.error('SQL error:', err);
         reject(err);
       } else {
         resolve(rows);
@@ -976,7 +976,7 @@ function get(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
       if (err) {
-        console.error('Ошибка SQL:', err);
+        console.error('SQL error:', err);
         reject(err);
       } else {
         resolve(row);
@@ -990,7 +990,7 @@ function run(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.run(sql, params, function(err) {
       if (err) {
-        console.error('Ошибка SQL:', err);
+        console.error('SQL error:', err);
         reject(err);
       } else {
         resolve({ id: this.lastID, changes: this.changes });
@@ -1004,10 +1004,10 @@ function closeDatabase() {
   return new Promise((resolve, reject) => {
     db.close((err) => {
       if (err) {
-        console.error('Ошибка при закрытии базы данных:', err);
+        console.error('Error closing database:', err);
         reject(err);
       } else {
-        console.log('База данных закрыта');
+        console.log('Database closed');
         resolve();
       }
     });

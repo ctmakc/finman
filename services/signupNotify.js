@@ -42,7 +42,7 @@ function sender() {
 
 function buildSubject(user) {
   const u = user || {};
-  return `Регистрация · ${SITE} · ${u.email || u.username || 'unknown'}`;
+  return `Signup · ${SITE} · ${u.email || u.username || 'unknown'}`;
 }
 
 function buildMessage(user, method) {
@@ -59,8 +59,8 @@ function buildMessage(user, method) {
   ];
   const dash = (v) => (v == null || v === '' ? '-' : v);
   const text = rows.map(([k, v]) => `${k}: ${dash(v)}`).join('\n')
-    + `\n\nНовая регистрация в приложении Finman (app.${SITE}).`;
-  const html = `<p style="font-family:sans-serif">Новая регистрация в приложении Finman (app.${SITE}).</p>`
+    + `\n\nNew signup in the Finman app (app.${SITE}).`;
+  const html = `<p style="font-family:sans-serif">New signup in the Finman app (app.${SITE}).</p>`
     + '<table style="font-family:sans-serif;border-collapse:collapse">'
     + rows.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${esc(k)}</td><td style="padding:4px 0"><b>${esc(dash(v))}</b></td></tr>`).join('')
     + '</table>';

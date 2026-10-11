@@ -50,7 +50,7 @@ async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
   const recipients = normalizeRecipients(to);
 
   if (recipients.length === 0) {
-    logger.warn('emailService.sendEmail: получатель не указан, пропускаем');
+    logger.warn('emailService.sendEmail: no recipient, skipping');
     return { sent: false, skipped: true, reason: 'NO_RECIPIENT' };
   }
 
@@ -58,7 +58,7 @@ async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
     // Чёткий disabled-режим: ничего не падает, просто no-op.
     logger.info(
       { to: recipients, subject },
-      'emailService.sendEmail: RESEND_API_KEY не задан — письмо не отправлено (no-op)'
+      'emailService.sendEmail: RESEND_API_KEY not set, email not sent (no-op)'
     );
     return { sent: false, skipped: true, reason: 'EMAIL_NOT_CONFIGURED' };
   }
@@ -67,7 +67,7 @@ async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
     // Явный from (например, LEAD_NOTIFY_FROM у signupNotify) важнее MAIL_FROM.
     from: from || getFrom(),
     to: recipients,
-    subject: subject || '(без темы)',
+    subject: subject || '(no subject)',
   };
   if (replyTo) payload.reply_to = replyTo;
   if (html) payload.html = html;
@@ -83,14 +83,14 @@ async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
       timeout: 15000,
     });
     const id = (resp.data && resp.data.id) || null;
-    logger.info({ to: recipients, id }, 'emailService.sendEmail: письмо отправлено');
+    logger.info({ to: recipients, id }, 'emailService.sendEmail: email sent');
     return { sent: true, id };
   } catch (err) {
     // Сетевые/HTTP-ошибки НЕ роняют дайджест — логируем и возвращаем флаг.
     const status = err.response && err.response.status;
     logger.error(
       { to: recipients, status, msg: err.message },
-      'emailService.sendEmail: ошибка отправки через Resend'
+      'emailService.sendEmail: Resend send error'
     );
     return { sent: false, error: true, reason: 'SEND_FAILED', status: status || null };
   }
