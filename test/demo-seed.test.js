@@ -104,7 +104,7 @@ describe('DEMO_SEED_ON_EMPTY — in-process seed', () => {
     expect(again.n).toBe(2);
     const txCount = await database.get('SELECT COUNT(*) AS n FROM transactions');
     expect(txCount.n).toBe(first.counts.transactions + 2 * first.counts.transfers + 3 /* openings */ + 6 /* partner */ + 1 /* partner opening */);
-  });
+  }, 180000); // seeds the household: slow on a loaded shared machine
 
   test('demo password works through the model layer', async () => {
     const User = require(path.join(ROOT, 'models', 'user.js'));
@@ -268,7 +268,7 @@ describe('DEMO_SEED_ON_EMPTY unset — nothing is seeded', () => {
       await database.closeDatabase();
       rm(dbFile);
     }
-  }, 90000); // a full seed takes ~25s on a loaded shared machine
+  }, 180000); // a full seed (force) takes 25-100s on a loaded shared machine
 });
 
 describe('demo seed safety: atomic cleanup + production guard', () => {
@@ -315,7 +315,7 @@ describe('demo seed safety: atomic cleanup + production guard', () => {
       await database.closeDatabase();
       rm(dbFile);
     }
-  }, 60000);
+  }, 180000);
 
   test('NODE_ENV=production refuses DEMO_SEED_ON_EMPTY unless DEMO_SEED_ALLOW_PRODUCTION=1', async () => {
     const dbFile = tmpDbPath();
@@ -341,7 +341,7 @@ describe('demo seed safety: atomic cleanup + production guard', () => {
       await database.closeDatabase();
       rm(dbFile);
     }
-  }, 60000);
+  }, 180000);
 });
 
 describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
@@ -381,7 +381,7 @@ describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
     });
     const base = `http://127.0.0.1:${port}`;
     let health = null;
-    for (let i = 0; i < 240; i += 1) {
+    for (let i = 0; i < 600; i += 1) { // up to 150s: the seed is slow on a loaded machine
       try {
         const r = await fetch(`${base}/api/health`);
         if (r.ok) {
@@ -452,5 +452,5 @@ describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
       });
     });
     expect(n).toBe(2);
-  }, 60000);
+  }, 180000);
 });
