@@ -69,7 +69,7 @@ const SubscriptionsModule = {
     }
 
     container.innerHTML = toolbar + this.subscriptions.map(sub => `
-      <div class="card subscription-card" data-id="${sub.id}" style="border-left: 4px solid ${this.safeColor(sub.color)}">
+      <div class="card subscription-card${this.isActive(sub) ? '' : ' inactive'}" data-id="${Number(sub.id)}" style="border-left: 4px solid ${this.safeColor(sub.color)}">
         <div class="subscription-header">
           <div class="subscription-info">
             <span class="subscription-icon">${sub.icon ? UI.esc(sub.icon) : '<i class="fas fa-box"></i>'}</span>
@@ -88,9 +88,11 @@ const SubscriptionsModule = {
           <span>${this.dueLabel(sub.daysUntilBilling)}</span>
         </div>
         <div class="subscription-actions">
-          <button type="button" class="btn btn-sm" data-action="subs:pay" data-id="${sub.id}"><i class="fas fa-check"></i> ${t('subs.markPaid')}</button>
-          <button type="button" class="btn btn-sm btn-secondary" data-action="subs:edit" data-id="${sub.id}" aria-label="${t('btn.edit')}" title="${t('btn.edit')}"><i class="fas fa-pen"></i></button>
-          <button type="button" class="btn btn-sm btn-danger" data-action="subs:cancel" data-id="${sub.id}" aria-label="${t('subs.cancelSub')}" title="${t('subs.cancelSub')}"><i class="fas fa-times"></i></button>
+          <button type="button" class="btn btn-sm" data-action="subs:pay" data-id="${Number(sub.id)}"><i class="fas fa-check"></i> ${t('subs.markPaid')}</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-action="subs:edit" data-id="${Number(sub.id)}" aria-label="${t('btn.edit')}" title="${t('btn.edit')}"><i class="fas fa-pen"></i></button>
+          ${this.isActive(sub)
+            ? `<button type="button" class="btn btn-sm btn-danger" data-action="subs:cancel" data-id="${Number(sub.id)}" aria-label="${t('subs.cancelSub')}" title="${t('subs.cancelSub')}"><i class="fas fa-times"></i></button>`
+            : `<button type="button" class="btn btn-sm btn-outline" data-action="subs:cancel" data-id="${Number(sub.id)}" aria-label="${t('subs.resume')}" title="${t('subs.resume')}"><i class="fas fa-redo"></i></button>`}
         </div>
       </div>
     `).join('');
@@ -231,11 +233,12 @@ const SubscriptionsModule = {
     try {
       const url = id ? `/api/subscriptions/${id}` : '/api/subscriptions';
       const method = id ? 'PUT' : 'POST';
-      await fetch(url, {
+      const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', ...this.headers() },
         body: JSON.stringify(data)
       });
+      if (!response.ok) throw new Error(await this.errorMessage(response, t('subs.saveError')));
       UI.closeModal('subscription-modal');
       await this.loadSubscriptions();
       await this.loadStats();
@@ -244,28 +247,51 @@ const SubscriptionsModule = {
     }
   },
 
+  isActive(sub) {
+    return !!sub && sub.is_active !== 0 && sub.is_active !== false && sub.is_active !== '0';
+  },
+
+  async errorMessage(response, fallback) {
+    try {
+      const body = await response.json();
+      const msg = body && (body.message || (body.error && body.error.message));
+      if (typeof msg === 'string' && msg) return msg;
+    } catch (e) { /* not JSON */ }
+    return fallback;
+  },
+
+  // POST /api/subscriptions/:id/payment records today's payment and moves
+  // next_billing_date forward.
   async markPaid(id) {
     if (!confirm(t('subs.confirmPaid'))) return;
     try {
-      await fetch(`/api/subscriptions/${Number(id)}/pay`, {
+      const response = await fetch(`/api/subscriptions/${Number(id)}/payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.headers() },
-        body: JSON.stringify({ create_transaction: true })
+        body: JSON.stringify({ payment_date: UI.todayYMD() })
       });
-      await this.loadSubscriptions();
-    } catch (error) {
-      alert(t('msg.error'));
-    }
-  },
-
-  async cancel(id) {
-    if (!confirm(t('subs.confirmCancel'))) return;
-    try {
-      await fetch(`/api/subscriptions/${Number(id)}/cancel`, { method: 'POST', headers: this.headers() });
+      if (!response.ok) throw new Error(await this.errorMessage(response, t('msg.error')));
+      showNotification(t('msg.saved'), 'success');
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert(t('msg.error'));
+      showNotification(error.message || t('msg.error'), 'error');
+    }
+  },
+
+  // POST /api/subscriptions/:id/toggle flips is_active: cancel an active
+  // subscription, resume a cancelled one.
+  async cancel(id) {
+    const sub = (this.subscriptions || []).find(s => Number(s.id) === Number(id));
+    const active = sub ? this.isActive(sub) : true;
+    if (!confirm(active ? t('subs.confirmCancel') : t('subs.confirmResume'))) return;
+    try {
+      const response = await fetch(`/api/subscriptions/${Number(id)}/toggle`, { method: 'POST', headers: this.headers() });
+      if (!response.ok) throw new Error(await this.errorMessage(response, t('msg.error')));
+      await this.loadSubscriptions();
+      await this.loadStats();
+    } catch (error) {
+      showNotification(error.message || t('msg.error'), 'error');
     }
   },
 

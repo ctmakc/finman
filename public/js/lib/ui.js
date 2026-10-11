@@ -5,7 +5,11 @@
 //
 // Public API (window.UI):
 //   esc(text)                              HTML-escape for innerHTML templates
-//   money(amount, currency)                format with the entity's own currency
+//   money(amount, currency)                format with the entity's own currency (HTML-safe)
+//   todayYMD() / ymd(date) / parseYMD(s)   LOCAL calendar dates (never toISOString)
+//   monthRange(date)                       { start, end } YYYY-MM-DD of the local month
+//   safeColor(c, fallback)                 #hex colour or the fallback (style attributes)
+//   busy(form, fn)                         disable submit buttons while fn() runs
 //   fmtNumber(n, digits)                   plain localized number (no currency)
 //   baseCurrency() / loadBaseCurrency()    user's base currency (/api/currency/settings)
 //   sumByCurrency(items, amountOf, currencyOf) -> { CUR: total }
@@ -27,7 +31,7 @@
   'use strict';
 
   var doc = root.document;
-  var DEFAULT_BASE = 'UAH'; // server default (services/networthService DEFAULT_BASE)
+  var DEFAULT_BASE = 'CAD'; // last resort; appState.baseCurrency wins (see baseCurrency())
   var COMMON_CURRENCIES = ['USD', 'EUR', 'CAD', 'UAH', 'GBP', 'PLN'];
 
   // ---------- text / numbers ----------
@@ -58,15 +62,81 @@
     }
   }
 
+  // ---------- currency codes ----------
+  // Only a well-formed ISO 4217 code goes to Intl; anything else is shown as
+  // "number + code" with the code HTML-escaped, so money() is always safe to
+  // interpolate into innerHTML.
+  function isCurrencyCode(code) {
+    return typeof code === 'string' && /^[A-Z]{3}$/.test(code);
+  }
+
+  // ---------- local calendar dates ----------
+  // toISOString() is UTC: west of Greenwich in the evening it is already
+  // "tomorrow". These helpers always use the local calendar.
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  // Date from any realm (iframes, tests) without instanceof.
+  function isDate(d) {
+    return Object.prototype.toString.call(d) === '[object Date]';
+  }
+
+  function ymd(date) {
+    var d = isDate(date) ? date : new Date(date);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function todayYMD() {
+    return ymd(new Date());
+  }
+
+  // 'YYYY-MM-DD' (optionally followed by a time) -> local Date at midnight.
+  // Other strings go through Date(); invalid input -> null.
+  function parseYMD(s) {
+    if (isDate(s)) return isNaN(s.getTime()) ? null : s;
+    var str = String(s == null ? '' : s);
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(str);
+    if (m && !/[T ]\d{2}:\d{2}/.test(str.slice(10))) {
+      var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return d.getMonth() === Number(m[2]) - 1 ? d : null;
+    }
+    if (!str) return null;
+    var other = new Date(str);
+    return isNaN(other.getTime()) ? null : other;
+  }
+
+  function monthRange(date) {
+    var d = isDate(date) && !isNaN(date.getTime()) ? date : new Date();
+    return {
+      start: ymd(new Date(d.getFullYear(), d.getMonth(), 1)),
+      end: ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+    };
+  }
+
+  function safeColor(c, fallback) {
+    return /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? String(c) : (fallback || '#6c757d');
+  }
+
   var baseCur = null;
   var basePromise = null;
 
+  // Explicitly loaded value -> the app shell's appState.baseCurrency -> CAD.
   function baseCurrency() {
-    return baseCur || DEFAULT_BASE;
+    if (baseCur) return baseCur;
+    var st = root.appState && root.appState.baseCurrency;
+    if (st && isCurrencyCode(String(st).toUpperCase())) return String(st).toUpperCase();
+    return DEFAULT_BASE;
   }
 
   function setBaseCurrency(code) {
     if (code) baseCur = String(code).toUpperCase();
+  }
+
+  // Forget the cached value (logout / user switch).
+  function resetBaseCurrency() {
+    baseCur = null;
+    basePromise = null;
+    accountsPromise = null;
   }
 
   function authFetch(url, options) {
@@ -94,12 +164,16 @@
     return basePromise;
   }
 
+  // Safe in innerHTML: Intl output for ISO codes, escaped text otherwise.
   function money(amount, currency) {
     var cur = String(currency || baseCurrency()).toUpperCase();
     var num = Number(amount);
     if (!isFinite(num)) num = 0;
+    if (!isCurrencyCode(cur)) {
+      return fmtNumber(num) + ' ' + esc(cur.slice(0, 10));
+    }
     if (typeof root.formatCurrency === 'function') {
-      try { return root.formatCurrency(num, cur); } catch (e) { /* invalid code -> fallback */ }
+      try { return esc(root.formatCurrency(num, cur)); } catch (e) { /* fallback below */ }
     }
     try {
       return new Intl.NumberFormat(locale(), { style: 'currency', currency: cur, minimumFractionDigits: 2 }).format(num);
@@ -187,7 +261,7 @@
     var sel = String(selected || baseCurrency()).toUpperCase();
     var codes = uniqueCurrencies([sel].concat(accountCurrencies(), COMMON_CURRENCIES));
     return codes.map(function (c) {
-      return '<option value="' + c + '"' + (c === sel ? ' selected' : '') + '>' + c + '</option>';
+      return '<option value="' + esc(c) + '"' + (c === sel ? ' selected' : '') + '>' + esc(c) + '</option>';
     }).join('');
   }
 
@@ -264,11 +338,35 @@
     run(el.dataset.action, el, e);
   }
 
+  // Runs fn() with the form's submit buttons disabled; a second submit while
+  // the first is in flight is ignored (no double POST on a double click).
+  function busy(form, fn) {
+    if (!form || !form.querySelectorAll) return Promise.resolve().then(fn);
+    if (form.dataset && form.dataset.busy === '1') return Promise.resolve(undefined);
+    var buttons = Array.prototype.slice.call(
+      form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])'));
+    var prev = buttons.map(function (b) { return b.disabled; });
+    form.dataset.busy = '1';
+    buttons.forEach(function (b) { b.disabled = true; b.setAttribute('aria-busy', 'true'); });
+    function done() {
+      delete form.dataset.busy;
+      buttons.forEach(function (b, i) { b.disabled = prev[i]; b.removeAttribute('aria-busy'); });
+    }
+    var out;
+    try { out = fn(); } catch (err) { done(); return Promise.reject(err); }
+    return Promise.resolve(out).then(
+      function (v) { done(); return v; },
+      function (err) { done(); throw err; });
+  }
+
   function onSubmit(e) {
     var form = e.target;
     if (!form || !form.matches || !form.matches('form[data-submit]')) return;
     e.preventDefault();
-    run(form.dataset.submit, form, e);
+    var name = form.dataset.submit;
+    if (typeof registry[name] !== 'function') return;
+    busy(form, function () { return registry[name](form, e); })
+      .catch(function (err) { console.error('[UI action ' + name + ']', err); });
   }
 
   function onChange(e) {
@@ -438,6 +536,14 @@
   var api = {
     esc: esc,
     money: money,
+    isCurrencyCode: isCurrencyCode,
+    ymd: ymd,
+    todayYMD: todayYMD,
+    parseYMD: parseYMD,
+    monthRange: monthRange,
+    safeColor: safeColor,
+    busy: busy,
+    resetBaseCurrency: resetBaseCurrency,
     fmtNumber: fmtNumber,
     baseCurrency: baseCurrency,
     setBaseCurrency: setBaseCurrency,

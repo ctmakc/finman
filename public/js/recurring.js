@@ -258,7 +258,7 @@ async function loadRecurringPayments() {
   const upcoming = await fetchUpcomingPayments(7);
 
   // Просроченные
-  const today = new Date().toISOString().split('T')[0];
+  const today = UI.todayYMD();
   const overdue = payments.filter(p => p.is_active && p.next_payment_date < today);
 
   const overdueSection = document.getElementById('overdue-section');
@@ -291,13 +291,18 @@ async function loadRecurringPayments() {
 }
 
 function renderPaymentCard(payment, isOverdue = false) {
-  const daysUntil = Math.ceil((new Date(payment.next_payment_date) - new Date()) / (1000 * 60 * 60 * 24));
+  // Whole local days between today and the next payment date.
+  const next = UI.parseYMD(payment.next_payment_date);
+  const todayDate = UI.parseYMD(UI.todayYMD());
+  const daysUntil = next ? Math.round((next - todayDate) / (1000 * 60 * 60 * 24)) : NaN;
+  // Whitelisted: it lands in a class attribute.
+  const typeClass = payment.type === 'income' ? 'income' : 'expense';
   const statusClass = isOverdue ? 'overdue' : (daysUntil <= 3 ? 'soon' : '');
 
   return `
-    <div class="payment-card ${statusClass} ${!payment.is_active ? 'inactive' : ''}" data-id="${payment.id}">
+    <div class="payment-card ${statusClass} ${!payment.is_active ? 'inactive' : ''}" data-id="${UI.esc(payment.id)}">
       <div class="payment-main">
-        <div class="payment-icon ${payment.type}">
+        <div class="payment-icon ${typeClass}">
           <i class="fas fa-${payment.type === 'income' ? 'arrow-down' : 'arrow-up'}"></i>
         </div>
         <div class="payment-info">
@@ -305,7 +310,7 @@ function renderPaymentCard(payment, isOverdue = false) {
           <span class="payment-account">${escapeHtmlRecurring(payment.account_name)}</span>
           ${payment.category ? `<span class="payment-category">${escapeHtmlRecurring(payment.category)}</span>` : ''}
         </div>
-        <div class="payment-amount ${payment.type}">
+        <div class="payment-amount ${typeClass}">
           ${payment.type === 'expense' ? '-' : '+'}${UI.esc(UI.money(Math.abs(payment.amount), payment.account_currency))}
         </div>
       </div>
@@ -321,21 +326,21 @@ function renderPaymentCard(payment, isOverdue = false) {
 
       <div class="payment-actions">
         ${payment.is_active ? `
-          <button type="button" class="btn btn-sm btn-success" data-action="recurring:pay" data-id="${payment.id}" title="${t('recurring.action.pay')}" aria-label="${t('recurring.action.pay')}">
+          <button type="button" class="btn btn-sm btn-success" data-action="recurring:pay" data-id="${UI.esc(payment.id)}" title="${t('recurring.action.pay')}" aria-label="${t('recurring.action.pay')}">
             <i class="fas fa-check"></i>
           </button>
-          <button type="button" class="btn btn-sm btn-warning" data-action="recurring:skip" data-id="${payment.id}" title="${t('recurring.action.skip')}" aria-label="${t('recurring.action.skip')}">
+          <button type="button" class="btn btn-sm btn-warning" data-action="recurring:skip" data-id="${UI.esc(payment.id)}" title="${t('recurring.action.skip')}" aria-label="${t('recurring.action.skip')}">
             <i class="fas fa-forward"></i>
           </button>
         ` : ''}
-        <button type="button" class="btn btn-sm btn-outline" data-action="recurring:edit" data-id="${payment.id}" title="${t('btn.edit')}" aria-label="${t('btn.edit')}">
+        <button type="button" class="btn btn-sm btn-outline" data-action="recurring:edit" data-id="${UI.esc(payment.id)}" title="${t('btn.edit')}" aria-label="${t('btn.edit')}">
           <i class="fas fa-edit"></i>
         </button>
         <button type="button" class="btn btn-sm ${payment.is_active ? 'btn-secondary' : 'btn-primary'}"
-                data-action="recurring:toggle" data-id="${payment.id}" title="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}" aria-label="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}">
+                data-action="recurring:toggle" data-id="${UI.esc(payment.id)}" title="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}" aria-label="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}">
           <i class="fas fa-${payment.is_active ? 'pause' : 'play'}"></i>
         </button>
-        <button type="button" class="btn btn-sm btn-danger" data-action="recurring:delete" data-id="${payment.id}" title="${t('btn.delete')}" aria-label="${t('btn.delete')}">
+        <button type="button" class="btn btn-sm btn-danger" data-action="recurring:delete" data-id="${UI.esc(payment.id)}" title="${t('btn.delete')}" aria-label="${t('btn.delete')}">
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -346,9 +351,12 @@ function renderPaymentCard(payment, isOverdue = false) {
 function showAddRecurringModal(payment = null) {
   const isEdit = !!payment;
   const accounts = UI.accountsArray();
+  // Pre-select the saved weekday (0 = Sunday is a real value); Monday for new ones.
+  const savedDow = payment ? parseIntOrNull(payment.day_of_week) : null;
+  const dayOfWeekSelected = savedDow != null && savedDow >= 0 && savedDow <= 6 ? savedDow : 1;
 
   const body = `
-        <form id="recurring-form" data-submit="recurring:save" data-id="${payment?.id || ''}">
+        <form id="recurring-form" data-submit="recurring:save" data-id="${UI.esc(payment?.id || '')}">
           <div class="form-row">
             <div class="form-group">
               <label>${t('common.name')} *</label>
@@ -358,7 +366,7 @@ function showAddRecurringModal(payment = null) {
               <label>${t('recurring.field.account')} *</label>
               <select id="rp-account" required>
                 ${accounts.map(a => `
-                  <option value="${a.id}" ${payment?.account_id === a.id ? 'selected' : ''}>
+                  <option value="${UI.esc(a.id)}" ${payment?.account_id === a.id ? 'selected' : ''}>
                     ${escapeHtmlRecurring(a.name)}
                   </option>
                 `).join('')}
@@ -369,7 +377,7 @@ function showAddRecurringModal(payment = null) {
           <div class="form-row">
             <div class="form-group">
               <label>${t('common.amount')} *</label>
-              <input type="number" id="rp-amount" step="0.01" min="0" value="${payment?.amount || ''}" required>
+              <input type="number" id="rp-amount" step="0.01" min="0" value="${UI.esc(payment?.amount || '')}" required>
             </div>
             <div class="form-group">
               <label>${t('common.type')}</label>
@@ -399,29 +407,23 @@ function showAddRecurringModal(payment = null) {
             <div class="form-group" id="day-of-week-group" style="display:none;">
               <label>${t('recurring.field.dayOfWeek')}</label>
               <select id="rp-day-of-week">
-                <option value="0">${t('recurring.day.0')}</option>
-                <option value="1" ${payment?.day_of_week === 1 ? 'selected' : ''}>${t('recurring.day.1')}</option>
-                <option value="2">${t('recurring.day.2')}</option>
-                <option value="3">${t('recurring.day.3')}</option>
-                <option value="4">${t('recurring.day.4')}</option>
-                <option value="5">${t('recurring.day.5')}</option>
-                <option value="6">${t('recurring.day.6')}</option>
+                ${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${dayOfWeekSelected === d ? 'selected' : ''}>${t('recurring.day.' + d)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group" id="day-of-month-group">
               <label>${t('recurring.field.dayOfMonth')}</label>
-              <input type="number" id="rp-day-of-month" min="1" max="31" value="${payment?.day_of_month || ''}">
+              <input type="number" id="rp-day-of-month" min="1" max="31" value="${UI.esc(payment?.day_of_month || '')}">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>${t('recurring.field.startDate')} *</label>
-              <input type="date" id="rp-start-date" value="${payment?.start_date || new Date().toISOString().split('T')[0]}" required>
+              <input type="date" id="rp-start-date" value="${UI.esc(payment?.start_date || UI.todayYMD())}" required>
             </div>
             <div class="form-group">
               <label>${t('recurring.field.endDate')}</label>
-              <input type="date" id="rp-end-date" value="${payment?.end_date || ''}">
+              <input type="date" id="rp-end-date" value="${UI.esc(payment?.end_date || '')}">
             </div>
           </div>
 
@@ -434,7 +436,7 @@ function showAddRecurringModal(payment = null) {
             </div>
             <div class="form-group">
               <label>${t('recurring.field.notifyBefore')}</label>
-              <input type="number" id="rp-notify-before" min="0" max="30" value="${payment?.notify_before || 3}">
+              <input type="number" id="rp-notify-before" min="0" max="30" value="${UI.esc(payment?.notify_before ?? 3)}">
             </div>
           </div>
 
@@ -477,13 +479,17 @@ async function saveRecurring(id) {
     type: document.getElementById('rp-type').value,
     category: document.getElementById('rp-category').value.trim(),
     frequency: document.getElementById('rp-frequency').value,
-    dayOfMonth: parseInt(document.getElementById('rp-day-of-month').value) || null,
-    dayOfWeek: parseInt(document.getElementById('rp-day-of-week').value) || null,
+    dayOfMonth: parseIntOrNull(document.getElementById('rp-day-of-month').value),
+    // Sunday is 0: `parseInt(...) || null` used to turn it into null.
+    dayOfWeek: parseIntOrNull(document.getElementById('rp-day-of-week').value),
     startDate: document.getElementById('rp-start-date').value,
     endDate: document.getElementById('rp-end-date').value || null,
     autoCreate: document.getElementById('rp-auto-create').checked,
-    notifyBefore: parseInt(document.getElementById('rp-notify-before').value) || 3
+    notifyBefore: parseIntOrNull(document.getElementById('rp-notify-before').value) ?? 3
   };
+  // Only the field that matches the frequency is meaningful.
+  if (!['weekly', 'biweekly'].includes(data.frequency)) data.dayOfWeek = null;
+  if (!['monthly', 'quarterly', 'yearly'].includes(data.frequency)) data.dayOfMonth = null;
 
   if (!data.name || !data.amount || !data.startDate) {
     showNotification(t('recurring.fillRequired'), 'error');
@@ -565,8 +571,9 @@ function recurringDateLocale() {
 // «1 дек.» для текущего года, «1 дек. 2025» — для любого другого: иначе
 // просроченный с прошлого года платёж выглядит как будущий.
 function formatDateShort(dateStr) {
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return UI.esc(dateStr || '');
+  // 'YYYY-MM-DD' is a local calendar date (new Date() would read it as UTC).
+  const date = UI.parseYMD(dateStr);
+  if (!date) return '';
   const opts = { day: 'numeric', month: 'short' };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
   return date.toLocaleDateString(recurringDateLocale(), opts);
@@ -575,6 +582,12 @@ function formatDateShort(dateStr) {
 // HTML-экранирование и форматирование денег — общие (lib/ui.js). Раньше здесь
 // жили глобальные formatCurrency('UAH')/escapeHtml/closeModal, которые
 // перекрывали одноимённые функции app.js для всех модулей.
+// '' -> null, '0' -> 0 (Sunday), '15' -> 15.
+function parseIntOrNull(value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 function escapeHtmlRecurring(text) {
   return UI.esc(text);
 }

@@ -18,7 +18,9 @@ function debtProgress(d, today) {
   else percent = amount > 0 ? (paid / amount) * 100 : 0;
   percent = Math.max(0, Math.min(100, percent));
   const isPaid = !!(d && d.is_paid) || (amount > 0 && remaining <= 0);
-  const todayStr = today || new Date().toISOString().split('T')[0];
+  // Local calendar date (UI.todayYMD; inline when lib/ui.js is absent, e.g. Jest).
+  const todayStr = today || (typeof UI !== 'undefined' && UI.todayYMD ? UI.todayYMD()
+    : (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })());
   const isOverdue = d && d.isOverdue != null
     ? !!d.isOverdue
     : !!(d && d.due_date && !isPaid && String(d.due_date).slice(0, 10) < todayStr);
@@ -130,7 +132,7 @@ function renderDebtCard(d) {
 }
 
 function showAddDebtModal() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = UI.todayYMD();
   UI.modal({
     id: 'debt-modal',
     title: t('debts.modal.new'),

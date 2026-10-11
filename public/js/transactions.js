@@ -68,7 +68,8 @@ async function fetchTransactions(filters = {}) {
   async function fetchCategories() {
     try {
       // Простая реализация - извлечение категорий из существующих транзакций
-      const transactions = await fetchTransactions({ limit: 1000 });
+      // The API clamps limit to 500.
+      const transactions = await fetchTransactions({ limit: TX_PAGE_LIMIT });
       
       // Извлечение уникальных категорий
       const categories = [...new Set(transactions.map(t => t.category))].filter(Boolean);
@@ -80,105 +81,179 @@ async function fetchTransactions(filters = {}) {
     }
   }
   
-  // Получение статистики транзакций
-  async function fetchTransactionStats() {
+  // Server-side page size cap for GET /api/transactions (routes/transactions.js).
+  const TX_PAGE_LIMIT = 500;
+
+  // Every page of a filtered query (the API returns at most 500 rows per page).
+  async function fetchAllTransactions(filters = {}, maxPages = 40) {
+    let all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const batch = await fetchTransactions({ ...filters, page, limit: TX_PAGE_LIMIT });
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      all = all.concat(batch);
+      if (batch.length < TX_PAGE_LIMIT) break;
+    }
+    return all;
+  }
+
+  // Total balance converted into the base currency by the server
+  // (GET /api/analytics/overview -> totalBalance + baseCurrency); null if unavailable.
+  async function fetchConvertedBalance() {
     try {
-      // Получение текущей даты
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
-      // Получение транзакций за текущий месяц
-      const monthlyTransactions = await fetchTransactions({
-        startDate: firstDayOfMonth.toISOString().split('T')[0],
-        limit: 1000
-      });
-      
-      // Получение всех счетов для расчета общего баланса
-      const accounts = await fetchAccounts();
-      
-      // Расчет статистики
-      const stats = {
-        monthlyIncome: 0,
-        monthlyExpense: 0,
-        totalBalance: accounts.reduce((sum, acc) => sum + acc.balance, 0),
-        transactionsByCategory: {},
-        transactionsByMonth: {}
-      };
-      
-      // Расчет доходов и расходов за месяц
-      monthlyTransactions.forEach(transaction => {
-        if (transaction.type === 'income') {
-          stats.monthlyIncome += transaction.amount;
-        } else if (transaction.type === 'expense') {
-          stats.monthlyExpense += Math.abs(transaction.amount);
-        }
-        
-        // Группировка по категориям
-        const category = transaction.category || t('transactions.uncategorized');
-        if (!stats.transactionsByCategory[category]) {
-          stats.transactionsByCategory[category] = {
-            income: 0,
-            expense: 0
-          };
-        }
-        
-        if (transaction.type === 'income') {
-          stats.transactionsByCategory[category].income += transaction.amount;
-        } else {
-          stats.transactionsByCategory[category].expense += Math.abs(transaction.amount);
-        }
-        
-        // Группировка по месяцам
-        const date = new Date(transaction.date);
-        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        
-        if (!stats.transactionsByMonth[monthKey]) {
-          stats.transactionsByMonth[monthKey] = {
-            income: 0,
-            expense: 0
-          };
-        }
-        
-        if (transaction.type === 'income') {
-          stats.transactionsByMonth[monthKey].income += transaction.amount;
-        } else {
-          stats.transactionsByMonth[monthKey].expense += Math.abs(transaction.amount);
-        }
-      });
-      
-      return stats;
-    } catch (error) {
-      console.error('Ошибка получения статистики:', error);
+      const response = await fetchWithAuth('/api/analytics/overview');
+      if (!response.ok) return null;
+      const data = await response.json();
+      const total = Number(data && data.totalBalance);
+      if (!Number.isFinite(total)) return null;
       return {
-        monthlyIncome: 0,
-        monthlyExpense: 0,
-        totalBalance: 0,
-        transactionsByCategory: {},
-        transactionsByMonth: {}
+        total,
+        currency: data.baseCurrency ? String(data.baseCurrency).toUpperCase() : null,
+        missingRates: Array.isArray(data.missingRates) ? data.missingRates : []
       };
+    } catch (error) {
+      return null;
     }
   }
-  
-  // Создание новой транзакции
-  async function createTransaction(transactionData) {
+
+  // Pure aggregation (unit-tested): only real cash flow (income/expense) counts
+  // — opening balances and transfers are not income or spending — and amounts
+  // are grouped per currency, never added across currencies.
+  function computeTransactionStats(transactions, accounts, baseCurrency) {
+    const base = String(baseCurrency || 'CAD').toUpperCase();
+    const curOf = (tx) => String(transactionCurrency(tx, accounts) || base).toUpperCase();
+    const add = (map, key, v) => { map[key] = Math.round(((map[key] || 0) + v) * 100) / 100; };
+
+    const incomeByCurrency = {};
+    const expenseByCurrency = {};
+    const flow = (transactions || []).filter(tx => tx && (tx.type === 'income' || tx.type === 'expense'));
+    flow.forEach(tx => {
+      const amount = Math.abs(Number(tx.amount) || 0);
+      add(tx.type === 'income' ? incomeByCurrency : expenseByCurrency, curOf(tx), amount);
+    });
+
+    const balanceByCurrency = {};
+    (accounts || []).forEach(acc => {
+      add(balanceByCurrency, String(acc.currency || base).toUpperCase(), Number(acc.balance) || 0);
+    });
+
+    const flowCurrencies = [...new Set([...Object.keys(incomeByCurrency), ...Object.keys(expenseByCurrency)])];
+    // Charts show one currency: the base one when present, else the first seen.
+    const currency = flowCurrencies.length === 0 || flowCurrencies.includes(base) ? base : flowCurrencies[0];
+
+    const transactionsByCategory = {};
+    const transactionsByMonth = {};
+    flow.filter(tx => curOf(tx) === currency).forEach(tx => {
+      const amount = Math.abs(Number(tx.amount) || 0);
+      const key = tx.type === 'income' ? 'income' : 'expense';
+      const category = tx.category || t('transactions.uncategorized');
+      if (!transactionsByCategory[category]) transactionsByCategory[category] = { income: 0, expense: 0 };
+      transactionsByCategory[category][key] += amount;
+      const monthKey = String(tx.date || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(monthKey)) {
+        if (!transactionsByMonth[monthKey]) transactionsByMonth[monthKey] = { income: 0, expense: 0 };
+        transactionsByMonth[monthKey][key] += amount;
+      }
+    });
+
+    return {
+      currency,
+      mixedCurrencies: flowCurrencies.length > 1,
+      incomeByCurrency,
+      expenseByCurrency,
+      monthlyIncome: incomeByCurrency[currency] || 0,
+      monthlyExpense: expenseByCurrency[currency] || 0,
+      balanceByCurrency,
+      totalBalance: null,
+      balanceCurrency: null,
+      transactionsByCategory,
+      transactionsByMonth
+    };
+  }
+
+  // Dashboard statistics for the current (local) month.
+  async function fetchTransactionStats() {
+    const base = (typeof appState !== 'undefined' && appState.baseCurrency) || 'CAD';
     try {
-      const response = await fetchWithAuth('/api/transactions', {
+      const { start } = UI.monthRange(new Date());
+      const [monthlyTransactions, accounts, converted] = await Promise.all([
+        fetchAllTransactions({ startDate: start }),
+        fetchAccounts(),
+        fetchConvertedBalance()
+      ]);
+      const stats = computeTransactionStats(monthlyTransactions, accounts, base);
+      if (converted) {
+        stats.totalBalance = converted.total;
+        stats.balanceCurrency = converted.currency || base;
+        stats.missingRates = converted.missingRates;
+      } else {
+        const codes = Object.keys(stats.balanceByCurrency);
+        if (codes.length <= 1) {
+          stats.totalBalance = codes.length ? stats.balanceByCurrency[codes[0]] : 0;
+          stats.balanceCurrency = codes[0] || base;
+        }
+      }
+      return stats;
+    } catch (error) {
+      console.error('Could not load statistics:', error);
+      return computeTransactionStats([], [], base);
+    }
+  }
+
+  // Создание новой транзакции
+  // Offline: put the transaction into the IndexedDB queue (offline.js). Returns
+  // a placeholder row on success, null when there is no queue to put it in.
+  async function queueTransactionOffline(transactionData) {
+    if (typeof window === 'undefined' || typeof window.queueOfflineTransaction !== 'function') {
+      showNotification(t('transactions.offlineNotSaved'), 'error');
+      return null;
+    }
+    try {
+      const item = await window.queueOfflineTransaction(transactionData);
+      showNotification(t('transactions.offlineQueued'), 'warning');
+      return { queued: true, clientTxId: item && item.clientId };
+    } catch (error) {
+      console.error('Could not queue the transaction offline:', error);
+      showNotification(t('transactions.offlineNotSaved'), 'error');
+      return null;
+    }
+  }
+
+  async function createTransaction(transactionData) {
+    let response;
+    try {
+      response = await fetchWithAuth('/api/transactions', {
         method: 'POST',
         body: JSON.stringify(transactionData)
       });
-      
+    } catch (error) {
+      if (error && error.status === 401) return null;
+      // No service worker and no network: fetch itself rejects.
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (offline || error instanceof TypeError) return queueTransactionOffline(transactionData);
+      console.error('Could not create the transaction:', error);
+      showNotification(t('transactions.createFailed'), 'error');
+      return null;
+    }
+
+    try {
+      let data = null;
+      try { data = await response.json(); } catch (_) { data = null; }
+
+      // The service worker answers 503 { offline: true } when the network is gone.
+      if (response.status === 503 && data && data.offline) {
+        return queueTransactionOffline(transactionData);
+      }
+
       if (!response.ok) {
-        const data = await response.json();
-        showNotification(data.message || t('transactions.createError'), 'error');
+        const message = (data && (data.message || (data.error && data.error.message))) || t('transactions.createError');
+        showNotification(message, 'error');
         return null;
       }
-      
-      const newTransaction = await response.json();
+
       showNotification(t('transactions.created'), 'success');
-      
-      return newTransaction;
+      return data || {};
     } catch (error) {
-      console.error('Ошибка создания транзакции:', error);
+      console.error('Could not create the transaction:', error);
       showNotification(t('transactions.createFailed'), 'error');
       return null;
     }
@@ -269,11 +344,21 @@ async function fetchTransactions(filters = {}) {
   }
   
   // Модальное окно создания/редактирования транзакции
+  // showAddTransactionModal()           -> new transaction
+  // showAddTransactionModal('expense')  -> new transaction with the type preset (widgets)
+  // showAddTransactionModal(row)        -> edit an existing income/expense row
   function showAddTransactionModal(transactionData = null) {
-    // Создание модального окна
     const modalId = 'transaction-modal';
+    const presetType = typeof transactionData === 'string' ? transactionData : null;
+    if (typeof transactionData !== 'object') transactionData = null;
     const isEditing = !!transactionData;
-    
+    // Opening balances and transfers have their own sign rules: this form only
+    // knows income/expense, so it would flip -500 into +500. Keep their type
+    // and sign untouched (the Edit button is hidden for them anyway).
+    const lockedType = isEditing && !['income', 'expense'].includes(transactionData.type)
+      ? String(transactionData.type || '') : null;
+    const selectedType = isEditing ? transactionData.type : (presetType === 'income' ? 'income' : 'expense');
+
     const modalHtml = `
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
@@ -288,8 +373,8 @@ async function fetchTransactions(filters = {}) {
               <select id="${modalId}-account" class="form-control" required>
                 <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
-                  <option value="${account.id}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
-                    ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+                  <option value="${escapeHtml(account.id)}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
+                    ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
                   </option>
                 `).join('')}
               </select>
@@ -297,20 +382,21 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-type" class="form-label">${t('transactions.field.type')}</label>
-              <select id="${modalId}-type" class="form-control" required>
-                <option value="income" ${isEditing && transactionData.type === 'income' ? 'selected' : ''}>${t('common.income')}</option>
-                <option value="expense" ${isEditing && transactionData.type === 'expense' ? 'selected' : ''}>${t('common.expense')}</option>
+              <select id="${modalId}-type" class="form-control" required ${lockedType ? 'disabled' : ''}>
+                ${lockedType ? `<option value="${escapeHtml(lockedType)}" selected>${escapeHtml(lockedType)}</option>` : `
+                <option value="income" ${selectedType === 'income' ? 'selected' : ''}>${t('common.income')}</option>
+                <option value="expense" ${selectedType === 'expense' ? 'selected' : ''}>${t('common.expense')}</option>`}
               </select>
             </div>
             
             <div class="form-group">
               <label for="${modalId}-amount" class="form-label">${t('common.amount')}</label>
-              <input type="number" id="${modalId}-amount" class="form-control" step="0.01" value="${isEditing ? Math.abs(transactionData.amount) : ''}" required>
+              <input type="number" id="${modalId}-amount" class="form-control" step="0.01" value="${isEditing ? escapeHtml(Math.abs(Number(transactionData.amount) || 0)) : ''}" required>
             </div>
             
             <div class="form-group">
               <label for="${modalId}-date" class="form-label">${t('common.date')}</label>
-              <input type="date" id="${modalId}-date" class="form-control" value="${isEditing ? transactionData.date : new Date().toISOString().split('T')[0]}" required>
+              <input type="date" id="${modalId}-date" class="form-control" value="${escapeHtml(isEditing ? String(transactionData.date || '').slice(0, 10) : UI.todayYMD())}" required>
             </div>
             
             <div class="form-group">
@@ -372,16 +458,21 @@ async function fetchTransactions(filters = {}) {
       }
     });
     
-    // Обработчик отправки формы
-    modalForm.addEventListener('submit', async (e) => {
+    // Обработчик отправки формы (кнопка заблокирована, пока запрос в пути)
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+      UI.busy(modalForm, () => submitTransactionForm()).catch((err) => console.error(err));
+    });
+
+    async function submitTransactionForm() {
       const accountId = document.getElementById(`${modalId}-account`).value;
-      const type = document.getElementById(`${modalId}-type`).value;
+      const type = lockedType || document.getElementById(`${modalId}-type`).value;
       let amount = parseFloat(document.getElementById(`${modalId}-amount`).value);
       
-      // Если это расход, делаем сумму отрицательной
-      if (type === 'expense') {
+      if (lockedType) {
+        // Keep the original sign of opening/transfer rows.
+        amount = (Number(transactionData.amount) < 0 ? -1 : 1) * Math.abs(amount);
+      } else if (type === 'expense') {
         amount = -Math.abs(amount);
       } else {
         amount = Math.abs(amount);
@@ -420,7 +511,7 @@ async function fetchTransactions(filters = {}) {
           });
         }
       }
-    });
+    }
   }
   
   // Модальное окно импорта транзакций
@@ -442,8 +533,8 @@ async function fetchTransactions(filters = {}) {
               <select id="${modalId}-account" class="form-control" required>
                 <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
-                  <option value="${account.id}">
-                    ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+                  <option value="${escapeHtml(account.id)}">
+                    ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
                   </option>
                 `).join('')}
               </select>
@@ -531,10 +622,13 @@ async function fetchTransactions(filters = {}) {
       }
     });
     
-    // Обработчик отправки формы
-    modalForm.addEventListener('submit', async (e) => {
+    // Обработчик отправки формы (кнопка заблокирована, пока запрос в пути)
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+      UI.busy(modalForm, () => submitImportForm()).catch((err) => console.error(err));
+    });
+
+    async function submitImportForm() {
       const accountId = document.getElementById(`${modalId}-account`).value;
       const bankType = document.getElementById(`${modalId}-bank-type`).value;
       const file = fileInput.files[0];
@@ -563,14 +657,15 @@ async function fetchTransactions(filters = {}) {
           renderDashboard();
         }
       }
-    });
+    }
   }
   
   // Currency of a transaction row: the API row carries none, so take it from
   // the account (appState.accounts) and fall back to the base currency.
-  function transactionCurrency(transaction) {
+  function transactionCurrency(transaction, accountList) {
     if (transaction && transaction.currency) return transaction.currency;
-    const accounts = (typeof appState !== 'undefined' && Array.isArray(appState.accounts)) ? appState.accounts : [];
+    const accounts = Array.isArray(accountList) ? accountList
+      : ((typeof appState !== 'undefined' && Array.isArray(appState.accounts)) ? appState.accounts : []);
     const acc = accounts.find(a => String(a.id) === String(transaction && transaction.account_id));
     return acc && acc.currency ? acc.currency : undefined;
   }
@@ -599,8 +694,8 @@ async function fetchTransactions(filters = {}) {
         : (isIncome ? 'income text-success' : 'expense text-error');
       const sign = isInflow ? '+' : '−';
       return `
-      <tr data-transaction-id="${transaction.id}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
-        <td data-label="${t('common.date')}" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
+      <tr data-transaction-id="${escapeHtml(transaction.id)}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
+        <td data-label="${t('common.date')}" class="tx-cell tx-cell-date">${escapeHtml(formatDate(transaction.date))}</td>
         <td data-label="${t('common.description')}" class="tx-cell tx-cell-desc">
           <span class="tx-direction" aria-hidden="true"><i class="fas fa-${isTransfer ? 'exchange-alt' : 'arrow-' + arrow}"></i></span>
           <span class="tx-desc-text">${escapeHtml(description)}</span>
@@ -611,14 +706,14 @@ async function fetchTransactions(filters = {}) {
         </td>
         <td data-label="${t('transactions.field.account')}" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
         <td data-label="${t('common.amount')}" class="text-right tx-cell tx-cell-amount transaction-amount ${amountClass}">
-          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount), transactionCurrency(transaction))}
+          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${escapeHtml(formatCurrency(Math.abs(transaction.amount), transactionCurrency(transaction)))}
         </td>
         <td data-label="${t('common.actions')}" class="tx-cell tx-cell-actions">
           <div class="table-actions">
-            ${isTransfer ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="${t('transactions.editAria')}" title="${t('btn.edit')}">
+            ${(isTransfer || transaction.type === 'opening') ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${escapeHtml(transaction.id)}" aria-label="${t('transactions.editAria')}" title="${t('btn.edit')}">
               <i class="fas fa-edit"></i>
             </button>`}
-            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}" aria-label="${t('transactions.deleteAria')}" title="${t('btn.delete')}">
+            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${escapeHtml(transaction.id)}" aria-label="${t('transactions.deleteAria')}" title="${t('btn.delete')}">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -682,8 +777,8 @@ async function fetchTransactions(filters = {}) {
     const accounts = (typeof appState !== 'undefined' && appState.accounts) ? appState.accounts : [];
 
     const accountOptions = accounts.map(account => `
-      <option value="${account.id}">
-        ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+      <option value="${escapeHtml(account.id)}">
+        ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
       </option>
     `).join('');
 
@@ -719,7 +814,7 @@ async function fetchTransactions(filters = {}) {
 
             <div class="form-group">
               <label for="${modalId}-date" class="form-label">${t('common.date')}</label>
-              <input type="date" id="${modalId}-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+              <input type="date" id="${modalId}-date" class="form-control" value="${UI.todayYMD()}" required>
             </div>
 
             <div class="form-group">
@@ -758,9 +853,12 @@ async function fetchTransactions(filters = {}) {
       if (e.target === modalBackdrop) closeModal();
     });
 
-    modalForm.addEventListener('submit', async (e) => {
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      UI.busy(modalForm, () => submitTransferForm()).catch((err) => console.error(err));
+    });
 
+    async function submitTransferForm() {
       const fromAccountId = document.getElementById(`${modalId}-from`).value;
       const toAccountId = document.getElementById(`${modalId}-to`).value;
       const amount = parseFloat(document.getElementById(`${modalId}-amount`).value);
@@ -795,7 +893,7 @@ async function fetchTransactions(filters = {}) {
           }
         }
       }
-    });
+    }
   }
   
   // Рендеринг пагинации
@@ -852,15 +950,23 @@ async function fetchTransactions(filters = {}) {
     if (!action || !transactionId) return;
     
     switch (action) {
-      case 'edit':
-        // Получение данных транзакции
-        const transactions = await fetchTransactions();
-        const transaction = transactions.find(t => t.id == transactionId);
-        
-        if (transaction) {
+      case 'edit': {
+        // The row may be beyond the first page: load it by id.
+        let transaction = null;
+        try {
+          const response = await fetchWithAuth(`/api/transactions/${encodeURIComponent(transactionId)}`);
+          if (response.ok) transaction = await response.json();
+        } catch (error) {
+          if (!(error && error.status === 401)) console.error('Could not load the transaction:', error);
+        }
+        if (transaction && transaction.data && !transaction.id) transaction = transaction.data;
+        if (transaction && transaction.type !== 'opening' && transaction.type !== 'transfer') {
           showAddTransactionModal(transaction);
+        } else if (!transaction) {
+          showNotification(t('transactions.fetchError'), 'error');
         }
         break;
+      }
         
       case 'delete':
         if (confirm(t('transactions.confirmDelete'))) {
@@ -933,6 +1039,14 @@ async function fetchTransactions(filters = {}) {
     renderTransactionsPage();
   }
   
+  // One quoted CSV cell. Text starting with = + - @ TAB or CR is prefixed with
+  // ' so spreadsheet apps do not evaluate it as a formula (CSV injection).
+  function csvCell(value) {
+    let text = String(value == null ? '' : value);
+    if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
   // Экспорт данных
   async function handleDataExport() {
     const period = document.getElementById('export-period').value;
@@ -949,21 +1063,15 @@ async function fetchTransactions(filters = {}) {
         return;
       }
     } else if (period === 'month') {
-      const now = new Date();
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      ({ start: startDate, end: endDate } = UI.monthRange(new Date()));
     } else if (period === 'year') {
-      const now = new Date();
-      startDate = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-      endDate = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
+      const year = new Date().getFullYear();
+      startDate = `${year}-01-01`;
+      endDate = `${year}-12-31`;
     }
     
-    // Получение транзакций за указанный период
-    const transactions = await fetchTransactions({
-      startDate,
-      endDate,
-      limit: 10000 // Большое значение для получения всех транзакций
-    });
+    // Every page (the API caps a page at 500 rows).
+    const transactions = await fetchAllTransactions({ startDate, endDate });
     
     if (!transactions.length) {
       showNotification(t('export.empty'), 'warning');
@@ -976,12 +1084,12 @@ async function fetchTransactions(filters = {}) {
     
     transactions.forEach(transaction => {
       const rowData = [
-        transaction.date,
-        `"${(transaction.description || '').replace(/"/g, '""')}"`,
-        `"${(transaction.category || '').replace(/"/g, '""')}"`,
-        `"${(transaction.account_name || '').replace(/"/g, '""')}"`,
-        transaction.amount,
-        transaction.type
+        csvCell(transaction.date),
+        csvCell(transaction.description),
+        csvCell(transaction.category),
+        csvCell(transaction.account_name),
+        Number(transaction.amount) || 0,
+        csvCell(transaction.type)
       ];
       
       csvRows.push(rowData.join(','));
@@ -1001,4 +1109,8 @@ async function fetchTransactions(filters = {}) {
     document.body.removeChild(link);
     
     showNotification(t('transactions.export.done'), 'success');
+  }
+  // Pure helpers for node/jsdom unit tests.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { computeTransactionStats, csvCell, transactionCurrency, renderTransactionsList };
   }

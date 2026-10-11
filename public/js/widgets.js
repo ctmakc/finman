@@ -152,10 +152,15 @@
           return '<p class="text-secondary">' + tr('widgets.noTransactions') + '</p>';
         }
         return '<div class="mini-list">' + data.transactions.slice(0, 5).map(function (t) {
-          var sign = t.type === 'income' ? '+' : '-';
-          var cls = t.type === 'income' ? 'positive' : 'negative';
+          // Expense rows are stored negative: sign from the type (or from the
+          // amount for transfers/opening balances), magnitude via Math.abs —
+          // otherwise an expense reads "--$50.00".
+          var amount = Number(t.amount) || 0;
+          var inflow = t.type === 'income' || (t.type !== 'expense' && amount >= 0);
+          var sign = inflow ? '+' : '\u2212';
+          var cls = inflow ? 'positive' : 'negative';
           return '<div class="mini-item"><span>' + esc(t.description || t.category) + '</span>' +
-            '<span class="' + cls + '">' + sign + money(t.amount) + '</span></div>';
+            '<span class="' + cls + '">' + sign + esc(money(Math.abs(amount))) + '</span></div>';
         }).join('') + '</div>';
       }
 

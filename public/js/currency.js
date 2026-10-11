@@ -37,7 +37,7 @@ function currencyDisplayName(code, fallback) {
 }
 
 function currencyOptionLabel(c) {
-  return `${c.symbol} ${c.code} - ${escapeHtml(currencyDisplayName(c.code, c.name))}`;
+  return `${escapeHtml(c.symbol)} ${escapeHtml(c.code)} - ${escapeHtml(currencyDisplayName(c.code, c.name))}`;
 }
 
 // The user's base currency: saved settings first, then app state, then CAD.
@@ -249,7 +249,7 @@ async function renderConverterTab() {
               <label class="form-label">${t('common.from')}</label>
               <select id="convert-from" class="form-control">
                 ${currencies.map(c => `
-                  <option value="${c.code}" ${String(c.code).toUpperCase() === defaultFrom ? 'selected' : ''}>
+                  <option value="${escapeHtml(c.code)}" ${String(c.code).toUpperCase() === defaultFrom ? 'selected' : ''}>
                     ${currencyOptionLabel(c)}
                   </option>
                 `).join('')}
@@ -264,7 +264,7 @@ async function renderConverterTab() {
               <label class="form-label">${t('common.to')}</label>
               <select id="convert-to" class="form-control">
                 ${currencies.map(c => `
-                  <option value="${c.code}" ${String(c.code).toUpperCase() === defaultTo ? 'selected' : ''}>
+                  <option value="${escapeHtml(c.code)}" ${String(c.code).toUpperCase() === defaultTo ? 'selected' : ''}>
                     ${currencyOptionLabel(c)}
                   </option>
                 `).join('')}
@@ -359,8 +359,8 @@ async function renderRatesTab() {
           <div class="rates-actions">
             <select id="rates-base" class="form-control">
               ${orderedCurrencies(currencyState.supportedCurrencies).map(c => `
-                <option value="${c.code}" ${c.code === settings.base_currency ? 'selected' : ''}>
-                  ${c.code}
+                <option value="${escapeHtml(c.code)}" ${c.code === settings.base_currency ? 'selected' : ''}>
+                  ${escapeHtml(c.code)}
                 </option>
               `).join('')}
             </select>
@@ -410,8 +410,8 @@ async function loadRates() {
           return `
             <div class="rate-card">
               <div class="rate-currency">
-                <span class="rate-symbol">${c.symbol}</span>
-                <span class="rate-code">${c.code}</span>
+                <span class="rate-symbol">${escapeHtml(c.symbol)}</span>
+                <span class="rate-code">${escapeHtml(c.code)}</span>
               </div>
               <div class="rate-value">
                 ${rate ? Number(rate).toFixed(4) : t('common.empty')}
@@ -464,7 +464,7 @@ async function renderCurrencySettingsTab() {
             <label class="form-label">${t('currency.settings.base')}</label>
             <select id="base-currency" class="form-control">
               ${orderedCurrencies(currencyState.supportedCurrencies).map(c => `
-                <option value="${c.code}" ${c.code === settings.base_currency ? 'selected' : ''}>
+                <option value="${escapeHtml(c.code)}" ${c.code === settings.base_currency ? 'selected' : ''}>
                   ${currencyOptionLabel(c)}
                 </option>
               `).join('')}
@@ -477,9 +477,9 @@ async function renderCurrencySettingsTab() {
             <div class="currency-checkboxes">
               ${orderedCurrencies(currencyState.supportedCurrencies).map(c => `
                 <label class="checkbox-label">
-                  <input type="checkbox" name="display_currencies" value="${c.code}"
+                  <input type="checkbox" name="display_currencies" value="${escapeHtml(c.code)}"
                     ${displayCurrencies.includes(c.code) ? 'checked' : ''}>
-                  <span>${c.symbol} ${c.code}</span>
+                  <span>${escapeHtml(c.symbol)} ${escapeHtml(c.code)}</span>
                 </label>
               `).join('')}
             </div>
@@ -509,16 +509,18 @@ async function renderCurrencySettingsTab() {
     const displayCurrencies = Array.from(displayCheckboxes).map(cb => cb.value);
 
     try {
+      // models/currency.js updateUserSettings reads camelCase keys.
       const result = await updateCurrencySettings({
-        base_currency: baseCurrency,
-        display_currencies: displayCurrencies,
-        auto_convert: autoConvert
+        baseCurrency,
+        displayCurrencies,
+        autoConvert
       });
 
       currencyState.settings = result.settings;
       showNotification(t('currency.settings.saved'), 'success');
       if (typeof appState !== 'undefined' && result && result.settings && result.settings.base_currency) {
         appState.baseCurrency = String(result.settings.base_currency).toUpperCase();
+        if (typeof UI !== 'undefined' && UI.setBaseCurrency) UI.setBaseCurrency(appState.baseCurrency);
       }
     } catch (error) {
       showNotification(t('currency.settings.saveError'), 'error');
@@ -575,20 +577,20 @@ async function loadTags() {
     container.innerHTML = `
       <div class="tags-grid">
         ${tags.map(tag => `
-          <div class="tag-card" data-tag-id="${tag.id}">
-            <div class="tag-color" style="background-color: ${tag.color}"></div>
+          <div class="tag-card" data-tag-id="${Number(tag.id)}">
+            <div class="tag-color" style="background-color: ${UI.safeColor(tag.color)}"></div>
             <div class="tag-info">
               <h4>${escapeHtml(tag.name)}</h4>
               <span class="tag-usage">${t('currency.tags.usage', { n: tag.usage_count || 0 })}</span>
             </div>
             <div class="tag-actions">
-              <button class="btn btn-sm btn-outline" onclick="showEditTagModal(${tag.id})" aria-label="${t('currency.tags.edit')}" title="${t('currency.tags.edit')}">
+              <button class="btn btn-sm btn-outline" onclick="showEditTagModal(${Number(tag.id)})" aria-label="${t('currency.tags.edit')}" title="${t('currency.tags.edit')}">
                 <i class="fas fa-edit"></i>
               </button>
-              <button class="btn btn-sm btn-outline" onclick="showTagStats(${tag.id})" aria-label="${t('currency.tags.stats')}" title="${t('currency.tags.stats')}">
+              <button class="btn btn-sm btn-outline" onclick="showTagStats(${Number(tag.id)})" aria-label="${t('currency.tags.stats')}" title="${t('currency.tags.stats')}">
                 <i class="fas fa-chart-bar"></i>
               </button>
-              <button class="btn btn-sm btn-danger" onclick="confirmDeleteTag(${tag.id})" aria-label="${t('btn.delete')}" title="${t('btn.delete')}">
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteTag(${Number(tag.id)})" aria-label="${t('btn.delete')}" title="${t('btn.delete')}">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -748,7 +750,7 @@ async function showTagStats(tagId) {
       <div class="modal">
         <div class="modal-header">
           <h2 class="modal-title">
-            <span class="tag-badge" style="background-color: ${tag.color}">${escapeHtml(tag.name)}</span>
+            <span class="tag-badge" style="background-color: ${UI.safeColor(tag.color)}">${escapeHtml(tag.name)}</span>
             ${t('currency.tags.stats')}
           </h2>
           <button class="modal-close">&times;</button>
@@ -758,7 +760,7 @@ async function showTagStats(tagId) {
             <div class="stat-card">
               <div class="stat-icon"><i class="fas fa-list"></i></div>
               <div class="stat-data">
-                <div class="stat-value">${stats.transactionCount}</div>
+                <div class="stat-value">${Number(stats.transactionCount) || 0}</div>
                 <div class="stat-label">${t('currency.tags.stats.transactions')}</div>
               </div>
             </div>
@@ -830,9 +832,9 @@ async function renderTagSelector(transactionId, containerId) {
       <label class="form-label">${t('currency.tags.selector')}</label>
       <div class="selected-tags" id="selected-tags-${containerId}">
         ${selectedTags.map(t => `
-          <span class="tag-badge" style="background-color: ${t.color}" data-tag-id="${t.id}">
+          <span class="tag-badge" style="background-color: ${UI.safeColor(t.color)}" data-tag-id="${Number(t.id)}">
             ${escapeHtml(t.name)}
-            <button type="button" class="tag-remove" onclick="removeTagFromSelector(${t.id}, '${containerId}')">&times;</button>
+            <button type="button" class="tag-remove" onclick="removeTagFromSelector(${Number(t.id)}, '${escapeHtml(containerId)}')">&times;</button>
           </span>
         `).join('')}
       </div>
@@ -841,8 +843,8 @@ async function renderTagSelector(transactionId, containerId) {
                id="tag-search-${containerId}">
         <div class="tag-options hidden" id="tag-options-${containerId}">
           ${tags.filter(t => !selectedIds.includes(t.id)).map(t => `
-            <div class="tag-option" data-tag-id="${t.id}" onclick="addTagToSelector(${t.id}, '${containerId}')">
-              <span class="tag-color-dot" style="background-color: ${t.color}"></span>
+            <div class="tag-option" data-tag-id="${Number(t.id)}" onclick="addTagToSelector(${Number(t.id)}, '${escapeHtml(containerId)}')">
+              <span class="tag-color-dot" style="background-color: ${UI.safeColor(t.color)}"></span>
               ${escapeHtml(t.name)}
             </div>
           `).join('')}

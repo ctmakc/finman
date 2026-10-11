@@ -128,7 +128,8 @@ const ForecastModule = {
     const canvas = document.getElementById('forecast-chart');
     if (!canvas || !this.forecast || typeof Chart === 'undefined') return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return; // no 2D context: keep the summary, skip the chart
     const data = this.forecast.forecast;
 
     if (window.forecastChartInstance) {
@@ -263,7 +264,8 @@ const ForecastModule = {
     const canvas = document.getElementById('trends-chart');
     if (!canvas || !this.trends || typeof Chart === 'undefined') return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return; // no 2D context: keep the summary, skip the chart
     const months = this.trends.months;
 
     if (window.trendsChartInstance) {

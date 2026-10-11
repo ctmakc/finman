@@ -5,20 +5,21 @@
 //   - НАВИГАЦИЯ: network-first -> при офлайне отдаём кэш index.html (app shell).
 //   - СТАТИКА (GET, тот же origin): stale-while-revalidate — мгновенно из кэша,
 //     обновление в фоне.
-//   - /api/* : NETWORK-FIRST. GET-ответы кэшируем как "последнее известное"
-//     значение и отдаём из кэша при офлайне; не-GET (POST/PUT/DELETE) при
-//     офлайне возвращают понятный JSON-флаг offline:true, чтобы клиент положил
-//     запись в IndexedDB-очередь (см. public/js/offline.js).
+//   - /api/* : NETWORK-ONLY. Ответы API персональные (Bearer-токен), а Cache
+//     API ключует только по URL: кэш отдавал бы данные прошлого пользователя
+//     следующему на том же устройстве. Поэтому /api НЕ кэшируется; при офлайне
+//     любой запрос получает 503 JSON { offline:true } — POST /api/transactions
+//     страница сама кладёт в IndexedDB-очередь (transactions.js → offline.js).
 //   - BACKGROUND SYNC: тег 'sync-transactions' будит клиентов сообщением
 //     { type:'replay-queue' } — реальная отправка очереди живёт в странице
 //     (там есть localStorage-токен и доступ к IndexedDB-очереди).
 //
-// Версия кэша поднята до v3 (fe-shell: self-hosted vendor + locales); activate чистит все НЕ-текущие кэши (старый
-// finman-v1 будет удалён автоматически — существующее поведение не ломается).
+// Версия кэша v4 (review/fix-fe: /api больше не кэшируется, + lib/ui.js в
+// precache); activate удаляет все НЕ-текущие кэши, включая старый finman-v3-api
+// с ответами API.
 
-const CACHE_VERSION = 'finman-v3';
+const CACHE_VERSION = 'finman-v4';
 const STATIC_CACHE = CACHE_VERSION + '-static';
-const API_CACHE = CACHE_VERSION + '-api';
 
 const STATIC_ASSETS = [
   '/',
@@ -42,6 +43,7 @@ const STATIC_ASSETS = [
   '/js/theme.js',
   '/js/lib/a11y.js',
   '/js/app.js',
+  '/js/lib/ui.js',
   '/js/auth.js',
   '/js/accounts.js',
   '/js/transactions.js',
@@ -99,7 +101,7 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(key => key !== STATIC_CACHE && key !== API_CACHE)
+          .filter(key => key !== STATIC_CACHE)
           .map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
@@ -114,33 +116,24 @@ function isApiRequest(url) {
   return url.pathname.startsWith('/api/');
 }
 
-// NETWORK-FIRST для /api: свежие данные, кэш как фолбэк (для GET).
-async function apiNetworkFirst(request) {
+// NETWORK-ONLY для /api (персональные данные не кэшируем). Офлайн -> 503
+// { offline:true }. queueable подсказывает странице, что этот запрос она
+// может положить в офлайн-очередь; сам SW ничего не сохраняет, поэтому и не
+// обещает пользователю, что изменение сохранено.
+async function apiNetworkOnly(request) {
   const url = new URL(request.url);
   try {
-    const response = await fetch(request);
-    // Кэшируем только успешные GET — это "последнее известное" состояние.
-    if (request.method === 'GET' && response && response.ok) {
-      const clone = response.clone();
-      caches.open(API_CACHE).then(cache => cache.put(request, clone)).catch(() => {});
-    }
-    return response;
+    return await fetch(request);
   } catch (err) {
-    // Офлайн. Для GET пробуем кэш.
-    if (request.method === 'GET') {
-      const cached = await caches.match(request);
-      if (cached) return cached;
-    }
-    // Для мутаций — сигналим клиенту, что мы офлайн и запись надо поставить
-    // в очередь. Создание транзакций перехватывает offline.js на странице.
-    const isTxCreate =
+    const queueable =
       request.method === 'POST' && url.pathname.replace(/\/+$/, '') === '/api/transactions';
     return new Response(
       JSON.stringify({
         error: true,
         offline: true,
-        queued: isTxCreate,
-        message: 'You are offline. The change was saved on this device and will sync when you reconnect.'
+        queued: false,
+        queueable,
+        message: 'You are offline. This change was not sent; please try again when you reconnect.'
       }),
       {
         status: 503,
@@ -200,7 +193,7 @@ self.addEventListener('fetch', event => {
   }
 
   if (isApiRequest(url)) {
-    event.respondWith(apiNetworkFirst(request));
+    event.respondWith(apiNetworkOnly(request));
     return;
   }
 
@@ -246,6 +239,13 @@ self.addEventListener('message', event => {
   const data = event.data || {};
   if (data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  } else if (data.type === 'clear-api-cache') {
+    // Logout: drop any API responses an older SW version may have cached.
+    event.waitUntil(
+      caches.keys()
+        .then(keys => Promise.all(keys.filter(k => /-api$/.test(k)).map(k => caches.delete(k))))
+        .catch(() => {})
+    );
   } else if (data.type === 'trigger-sync') {
     // Зарегистрировать background sync по запросу страницы.
     if (self.registration && self.registration.sync) {

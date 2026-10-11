@@ -255,7 +255,7 @@ function renderBudgetCards(budgets) {
   return budgets.map(budget => {
     const statusClass = budget.isOverBudget ? 'over' :
                         budget.shouldNotify ? 'warning' : 'ok';
-    const progressWidth = Math.min(budget.percentUsed, 100);
+    const progressWidth = Math.max(0, Math.min(Number(budget.percentUsed) || 0, 100));
 
     const pctLabel = Math.round(budget.percentUsed);
 
@@ -267,10 +267,10 @@ function renderBudgetCards(budgets) {
             ${budget.category ? `<span class="budget-category">${budgetEscapeHtml(budget.category)}</span>` : ''}
           </div>
           <div class="budget-actions">
-            <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budget.id}" aria-label="${t('budgets.editAria')}">
+            <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budgetEscapeHtml(budget.id)}" aria-label="${t('budgets.editAria')}">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="btn btn-sm btn-danger budget-delete-btn" data-id="${budget.id}" aria-label="${t('budgets.deleteAria')}">
+            <button class="btn btn-sm btn-danger budget-delete-btn" data-id="${budgetEscapeHtml(budget.id)}" aria-label="${t('budgets.deleteAria')}">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -419,9 +419,12 @@ function showCreateBudgetModal() {
     if (e.target === modalBackdrop) closeModal();
   });
 
-  modalForm.addEventListener('submit', async (e) => {
+  modalForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    UI.busy(modalForm, () => submitBudgetForm()).catch((err) => console.error(err));
+  });
 
+  async function submitBudgetForm() {
     const budgetData = {
       name: document.getElementById(`${modalId}-name`).value.trim(),
       category: document.getElementById(`${modalId}-category`).value.trim() || null,
@@ -438,7 +441,7 @@ function showCreateBudgetModal() {
       closeModal();
       renderBudgetsPage();
     }
-  });
+  }
 }
 
 // Модальное окно редактирования бюджета
@@ -473,7 +476,7 @@ async function showEditBudgetModal(id) {
           <div class="form-row">
             <div class="form-group">
               <label for="${modalId}-amount" class="form-label">${t('common.amount')} *</label>
-              <input type="number" id="${modalId}-amount" class="form-control" min="1" step="0.01" value="${budget.amount}" required>
+              <input type="number" id="${modalId}-amount" class="form-control" min="1" step="0.01" value="${budgetEscapeHtml(budget.amount)}" required>
             </div>
 
             <div class="form-group">
@@ -496,7 +499,7 @@ async function showEditBudgetModal(id) {
 
           <div class="form-group">
             <label for="${modalId}-notify" class="form-label">${t('budgets.field.notifyAt')}</label>
-            <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="${budget.notifyAtPercent}">
+            <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="${budgetEscapeHtml(budget.notifyAtPercent)}">
           </div>
 
           <div class="form-group form-group-checkbox">
@@ -536,9 +539,12 @@ async function showEditBudgetModal(id) {
     if (e.target === modalBackdrop) closeModal();
   });
 
-  modalForm.addEventListener('submit', async (e) => {
+  modalForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    UI.busy(modalForm, () => submitBudgetForm()).catch((err) => console.error(err));
+  });
 
+  async function submitBudgetForm() {
     const budgetData = {
       name: document.getElementById(`${modalId}-name`).value.trim(),
       category: document.getElementById(`${modalId}-category`).value.trim() || null,
@@ -555,7 +561,7 @@ async function showEditBudgetModal(id) {
       closeModal();
       renderBudgetsPage();
     }
-  });
+  }
 }
 
 // Подтверждение удаления бюджета
@@ -585,13 +591,13 @@ async function renderBudgetWidget() {
   }
 
   const budgetsHtml = stats.budgets.slice(0, 3).map(budget => `
-    <div class="budget-mini budget-${budget.status}">
+    <div class="budget-mini budget-${budgetEscapeHtml(budget.status)}">
       <div class="budget-mini-info">
         <span class="budget-mini-name">${budgetEscapeHtml(budget.name)}</span>
-        <span class="budget-mini-progress">${budget.percentUsed}%</span>
+        <span class="budget-mini-progress">${Math.round(Number(budget.percentUsed) || 0)}%</span>
       </div>
       <div class="progress-bar-mini">
-        <div class="progress-fill-mini progress-${budget.status}" style="width: ${Math.min(budget.percentUsed, 100)}%"></div>
+        <div class="progress-fill-mini progress-${budgetEscapeHtml(budget.status)}" style="width: ${Math.min(Number(budget.percentUsed) || 0, 100)}%"></div>
       </div>
     </div>
   `).join('');

@@ -42,6 +42,9 @@ const appState = {
     page: 1
   }
 };
+// A top-level const is not a window property: expose it for lib/ui.js
+// (UI.baseCurrency / UI.accountsArray read root.appState).
+if (typeof window !== 'undefined') window.appState = appState;
 
 // ---------------------------------------------------------------------------
 // Navigation information architecture
@@ -211,6 +214,7 @@ async function initApp() {
   }
 
   renderAuthenticatedUI();
+  replayOfflineQueue();
 
   await Promise.all([
     fetchAccounts(),
@@ -350,18 +354,25 @@ function renderAuthenticatedUI() {
     e.stopPropagation();
     setMoreMenu(!more.classList.contains('open'));
   });
-  document.addEventListener('click', (e) => {
-    if (more.classList.contains('open') && !more.contains(e.target)) setMoreMenu(false);
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (more.classList.contains('open')) {
+  // Document-level listeners survive re-renders of the shell (every login
+  // rebuilds it), so they are added once and look the elements up each time.
+  if (!appState._shellDocListeners) {
+    appState._shellDocListeners = true;
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('nav-more');
+      if (menu && menu.classList.contains('open') && !menu.contains(e.target)) setMoreMenu(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const menu = document.getElementById('nav-more');
+      if (menu && menu.classList.contains('open')) {
         setMoreMenu(false);
-        moreBtn.focus();
+        const btn = document.getElementById('nav-more-btn');
+        if (btn) btn.focus();
       }
       if (isDrawerOpen()) closeDrawer();
-    }
-  });
+    });
+  }
 
   // Drawer (mobile / tablet)
   document.getElementById('mobile-menu-toggle').addEventListener('click', () => {
@@ -568,26 +579,29 @@ async function fetchWithAuth(url, options = {}) {
     throw err;
   }
 
-  const defaultOptions = {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  };
+  // A FormData body needs the browser's multipart boundary: never force JSON on it.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const defaultHeaders = { 'Authorization': `Bearer ${token}` };
+  if (!isFormData) defaultHeaders['Content-Type'] = 'application/json';
+  const defaultOptions = { headers: defaultHeaders };
 
   const mergedOptions = { ...defaultOptions, ...options };
 
   if (options.headers) {
     mergedOptions.headers = { ...defaultOptions.headers, ...options.headers };
+    if (isFormData) {
+      Object.keys(mergedOptions.headers).forEach((k) => {
+        if (k.toLowerCase() === 'content-type') delete mergedOptions.headers[k];
+      });
+    }
   }
 
   const response = await fetch(url, mergedOptions);
 
   if (response.status === 401) {
-    // Token rejected: back to the login page.
-    localStorage.removeItem('token');
-    appState.isAuthenticated = false;
-    renderLoginPage();
+    // Token rejected: drop the session state (cached base currency, filters…)
+    // and go back to the login page.
+    logout();
     const err = new Error('Your session has expired. Please sign in again.');
     err.status = 401;
     throw err;
@@ -682,6 +696,9 @@ async function loadBaseCurrencySettings() {
     const settings = data && data.settings ? data.settings : data;
     if (settings && typeof settings.base_currency === 'string' && settings.base_currency) {
       appState.baseCurrency = settings.base_currency.toUpperCase();
+      if (typeof UI !== 'undefined' && UI && typeof UI.setBaseCurrency === 'function') {
+        UI.setBaseCurrency(appState.baseCurrency);
+      }
     }
     appState.currencySettings = settings || null;
     return settings;
@@ -844,8 +861,8 @@ function renderLoginPage() {
     });
   });
 
-  loginForm.addEventListener('submit', handleLogin);
-  registerForm.addEventListener('submit', handleRegister);
+  loginForm.addEventListener('submit', withBusyForm(handleLogin));
+  registerForm.addEventListener('submit', withBusyForm(handleRegister));
 
   revealGoogleSignIn();
 }
@@ -871,6 +888,19 @@ function renderConnectionError(message) {
   `;
   document.getElementById('retry-btn').addEventListener('click', () => initApp());
   document.getElementById('error-logout-btn').addEventListener('click', logout);
+}
+
+// Submit handler wrapper: the form's submit button stays disabled while the
+// request is in flight, so a double click cannot send it twice.
+function withBusyForm(handler) {
+  return (e) => {
+    e.preventDefault();
+    const form = e.currentTarget || e.target;
+    if (typeof UI !== 'undefined' && UI && typeof UI.busy === 'function') {
+      return UI.busy(form, () => handler(e)).catch((err) => console.error(err));
+    }
+    return handler(e);
+  };
 }
 
 async function handleLogin(e) {
@@ -979,11 +1009,11 @@ async function renderDashboard() {
           <i class="fas ${getAccountIcon(account.account_type)}"></i>
         </div>
         <div class="account-details">
-          <h3 class="account-name">${account.name}</h3>
-          <p class="account-number">${account.account_number || ''}</p>
+          <h3 class="account-name">${escapeHtmlShell(account.name)}</h3>
+          <p class="account-number">${escapeHtmlShell(account.account_number || '')}</p>
         </div>
       </div>
-      <div class="account-balance">${fmFormatCurrency(account.balance, account.currency)}</div>
+      <div class="account-balance">${escapeHtmlShell(fmFormatCurrency(account.balance, account.currency))}</div>
     </div>
   `).join('') || '<p>You have no accounts yet. <a href="#" class="add-account-link">Add an account</a></p>';
 
@@ -991,29 +1021,45 @@ async function renderDashboard() {
     ? recentTransactions.map((transaction) => `
       <div class="transaction-item">
         <div class="transaction-info">
-          <div class="transaction-date">${formatDate(transaction.date)}</div>
-          <div class="transaction-description">${transaction.description}</div>
-          <div class="transaction-category">${transaction.category}</div>
+          <div class="transaction-date">${escapeHtmlShell(formatDate(transaction.date))}</div>
+          <div class="transaction-description">${escapeHtmlShell(transaction.description || '')}</div>
+          <div class="transaction-category">${escapeHtmlShell(transaction.category || '')}</div>
         </div>
         <div class="transaction-amount ${transaction.type === 'income' ? 'income' : 'expense'}">
-          ${fmFormatCurrency(transaction.amount, transaction.currency)}
+          ${escapeHtmlShell(fmFormatCurrency(transaction.amount, typeof transactionCurrency === 'function' ? transactionCurrency(transaction) : transaction.currency))}
         </div>
       </div>
     `).join('')
     : '<p>You have no transactions yet. <a href="#" class="add-transaction-link">Add a transaction</a></p>';
 
   // ---- Signature hero ----
-  const totalBalance = statsData.totalBalance || 0;
-  const monthIn = statsData.monthlyIncome || 0;
-  const monthOut = statsData.monthlyExpense || 0;
+  // Balance: the server's figure converted into the base currency; without it,
+  // one line per account currency (never a cross-currency sum).
+  const hasTotal = statsData.totalBalance != null && Number.isFinite(Number(statsData.totalBalance));
+  const balanceCurrency = statsData.balanceCurrency || appState.baseCurrency;
+  const totalBalance = hasTotal ? Number(statsData.totalBalance) : 0;
+  const balanceText = hasTotal
+    ? fmFormatCurrency(totalBalance, balanceCurrency)
+    : formatTotals(statsData.balanceByCurrency, balanceCurrency);
+  // Cash flow per currency (opening balances and transfers excluded).
+  const flowCurrency = statsData.currency || appState.baseCurrency;
+  const monthIn = Number(statsData.monthlyIncome) || 0;
+  const monthOut = Number(statsData.monthlyExpense) || 0;
   const netFlow = monthIn - monthOut;
   const flowUp = netFlow >= 0;
+  const incomeText = statsData.incomeByCurrency
+    ? formatTotals(statsData.incomeByCurrency, flowCurrency) : fmFormatCurrency(monthIn, flowCurrency);
+  const expenseText = statsData.expenseByCurrency
+    ? formatTotals(statsData.expenseByCurrency, flowCurrency) : fmFormatCurrency(monthOut, flowCurrency);
+  const netText = statsData.mixedCurrencies
+    ? formatTotals(netByCurrency(statsData.incomeByCurrency, statsData.expenseByCurrency), flowCurrency)
+    : fmFormatCurrency(Math.abs(netFlow), flowCurrency);
   const aiInsight = (typeof getDashboardInsight === 'function')
     ? getDashboardInsight(statsData)
     : (flowUp
         ? 'You are spending less than you earn this month, so your balance is growing.'
         : 'Spending exceeded income this month. Check the categories to get back on track.');
-  const symbol = currencySymbol(appState.baseCurrency);
+  const symbol = currencySymbol(balanceCurrency);
 
   const heroHtml = `
     <section class="fm-hero" aria-label="Your finances">
@@ -1021,22 +1067,22 @@ async function renderDashboard() {
         <div class="fm-hero-main">
           <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
           <h1 class="fm-hero-title">Total balance</h1>
-          <div class="fm-hero-figure" id="hero-networth"
+          ${hasTotal ? `<div class="fm-hero-figure" id="hero-networth"
                data-countup="${totalBalance}" data-currency="${escapeHtmlShell(symbol)}">
             <span class="fm-hero-currency">${escapeHtmlShell(symbol)}</span><span class="fm-hero-amount">${formatPlainNumber(totalBalance)}</span>
-          </div>
+          </div>` : `<div class="fm-hero-figure"><span class="fm-hero-amount">${escapeHtmlShell(balanceText)}</span></div>`}
           <span class="fm-hero-delta ${flowUp ? 'up' : 'down'}">
             <i class="fas fa-arrow-${flowUp ? 'up' : 'down'}"></i>
-            ${fmFormatCurrency(Math.abs(netFlow))} this month
+            ${escapeHtmlShell(netText)} this month
           </span>
           <div class="fm-hero-cashflow">
             <div class="fm-cashflow-item">
               <span class="fm-cashflow-label">Income</span>
-              <span class="fm-cashflow-value in">${fmFormatCurrency(monthIn)}</span>
+              <span class="fm-cashflow-value in">${escapeHtmlShell(incomeText)}</span>
             </div>
             <div class="fm-cashflow-item">
               <span class="fm-cashflow-label">Expenses</span>
-              <span class="fm-cashflow-value out">${fmFormatCurrency(monthOut)}</span>
+              <span class="fm-cashflow-value out">${escapeHtmlShell(expenseText)}</span>
             </div>
           </div>
         </div>
@@ -1061,7 +1107,7 @@ async function renderDashboard() {
         </div>
         <div class="summary-data">
           <h3>Income this month</h3>
-          <div class="summary-amount">${fmFormatCurrency(monthIn)}</div>
+          <div class="summary-amount">${escapeHtmlShell(incomeText)}</div>
         </div>
       </div>
 
@@ -1071,7 +1117,7 @@ async function renderDashboard() {
         </div>
         <div class="summary-data">
           <h3>Expenses this month</h3>
-          <div class="summary-amount">${fmFormatCurrency(monthOut)}</div>
+          <div class="summary-amount">${escapeHtmlShell(expenseText)}</div>
         </div>
       </div>
 
@@ -1081,7 +1127,7 @@ async function renderDashboard() {
         </div>
         <div class="summary-data">
           <h3>Total balance</h3>
-          <div class="summary-amount">${fmFormatCurrency(totalBalance)}</div>
+          <div class="summary-amount">${escapeHtmlShell(balanceText)}</div>
         </div>
       </div>
     </div>
@@ -1230,34 +1276,34 @@ async function renderAccountsPage() {
 
 function renderAccountsList(accounts) {
   return accounts.map((account) => `
-    <div class="account-card card" data-account-id="${account.id}">
+    <div class="account-card card" data-account-id="${escapeHtmlShell(account.id)}">
       <div class="account-header">
         <div class="account-icon">
           <i class="fas ${getAccountIcon(account.account_type)}"></i>
         </div>
         <div class="account-details">
-          <h3 class="account-name">${account.name}</h3>
-          <p class="account-number">${account.account_number || 'No account number'}</p>
+          <h3 class="account-name">${escapeHtmlShell(account.name)}</h3>
+          <p class="account-number">${escapeHtmlShell(account.account_number || 'No account number')}</p>
         </div>
       </div>
 
       <div class="account-balance">
-        ${fmFormatCurrency(account.balance, account.currency)}
+        ${escapeHtmlShell(fmFormatCurrency(account.balance, account.currency))}
       </div>
 
       <div class="account-info">
-        <p class="account-bank">${account.bank_name || 'Personal account'}</p>
+        <p class="account-bank">${escapeHtmlShell(account.bank_name || 'Personal account')}</p>
         <p class="account-type">${getAccountTypeName(account.account_type)}</p>
       </div>
 
       <div class="account-actions">
-        <button class="btn btn-sm btn-outline" data-account-action="view" data-account-id="${account.id}">
+        <button class="btn btn-sm btn-outline" data-account-action="view" data-account-id="${escapeHtmlShell(account.id)}">
           <i class="fas fa-eye"></i> Details
         </button>
-        <button class="btn btn-sm btn-outline" data-account-action="edit" data-account-id="${account.id}">
+        <button class="btn btn-sm btn-outline" data-account-action="edit" data-account-id="${escapeHtmlShell(account.id)}">
           <i class="fas fa-edit"></i> Edit
         </button>
-        <button class="btn btn-sm btn-danger" data-account-action="delete" data-account-id="${account.id}">
+        <button class="btn btn-sm btn-danger" data-account-action="delete" data-account-id="${escapeHtmlShell(account.id)}">
           <i class="fas fa-trash"></i> Delete
         </button>
       </div>
@@ -1294,12 +1340,12 @@ async function renderTransactionsPage() {
         <div class="filters-row">
           <div class="form-group">
             <label for="filter-date-start" class="form-label">From</label>
-            <input type="date" id="filter-date-start" class="form-control" value="${appState.filters.startDate || ''}">
+            <input type="date" id="filter-date-start" class="form-control" value="${escapeHtmlShell(appState.filters.startDate || '')}">
           </div>
 
           <div class="form-group">
             <label for="filter-date-end" class="form-label">To</label>
-            <input type="date" id="filter-date-end" class="form-control" value="${appState.filters.endDate || ''}">
+            <input type="date" id="filter-date-end" class="form-control" value="${escapeHtmlShell(appState.filters.endDate || '')}">
           </div>
 
           <div class="form-group">
@@ -1307,8 +1353,8 @@ async function renderTransactionsPage() {
             <select id="filter-account" class="form-control">
               <option value="">All accounts</option>
               ${appState.accounts.map((account) => `
-                <option value="${account.id}" ${appState.filters.accountId == account.id ? 'selected' : ''}>
-                  ${account.name}
+                <option value="${escapeHtmlShell(account.id)}" ${appState.filters.accountId == account.id ? 'selected' : ''}>
+                  ${escapeHtmlShell(account.name)}
                 </option>
               `).join('')}
             </select>
@@ -1321,8 +1367,8 @@ async function renderTransactionsPage() {
             <select id="filter-category" class="form-control">
               <option value="">All categories</option>
               ${categories.map((category) => `
-                <option value="${category}" ${appState.filters.category === category ? 'selected' : ''}>
-                  ${category}
+                <option value="${escapeHtmlShell(category)}" ${appState.filters.category === category ? 'selected' : ''}>
+                  ${escapeHtmlShell(category)}
                 </option>
               `).join('')}
             </select>
@@ -1339,7 +1385,7 @@ async function renderTransactionsPage() {
 
           <div class="form-group">
             <label for="filter-search" class="form-label">Search</label>
-            <input type="text" id="filter-search" class="form-control" placeholder="Search by description" value="${appState.filters.search || ''}">
+            <input type="text" id="filter-search" class="form-control" placeholder="Search by description" value="${escapeHtmlShell(appState.filters.search || '')}">
           </div>
         </div>
 
@@ -1523,8 +1569,8 @@ function renderSettingsPage() {
     </div>
   `;
 
-  document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
-  document.getElementById('password-form').addEventListener('submit', handlePasswordUpdate);
+  document.getElementById('profile-form').addEventListener('submit', withBusyForm(handleProfileUpdate));
+  document.getElementById('password-form').addEventListener('submit', withBusyForm(handlePasswordUpdate));
   document.getElementById('export-btn').addEventListener('click', handleDataExport);
 
   const exportPeriod = document.getElementById('export-period');
@@ -1609,11 +1655,37 @@ function openOnboardingWizard() {
 // ---------------------------------------------------------------------------
 // Session
 // ---------------------------------------------------------------------------
+// Offline queue (offline.js): items queued before a sign-in (or that hit a
+// 401 during replay) are sent as soon as there is a valid session again.
+function replayOfflineQueue() {
+  try {
+    const ctl = typeof window !== 'undefined' && window.offlineSync && window.offlineSync.controller;
+    if (ctl && typeof ctl.sync === 'function') {
+      Promise.resolve(ctl.sync()).catch(() => {});
+    }
+  } catch (e) { /* offline support is optional */ }
+}
+
+// Drops any per-user API responses an older service worker cached.
+function clearApiCaches() {
+  try {
+    if (typeof caches !== 'undefined' && caches && typeof caches.keys === 'function') {
+      caches.keys()
+        .then((keys) => Promise.all(keys.filter((k) => /-api$/.test(k)).map((k) => caches.delete(k))))
+        .catch(() => {});
+    }
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'clear-api-cache' });
+    }
+  } catch (e) { /* ignore */ }
+}
+
 function logout() {
   localStorage.removeItem('token');
 
   appState.isAuthenticated = false;
   appState.user = null;
+  appState.token = null;
   appState.accounts = [];
   appState.accountsByScope = { own: [], shared: [], all: [] };
   appState.transactions = [];
@@ -1621,6 +1693,12 @@ function logout() {
   appState.bankConnections = [];
   appState.supportedBanks = [];
   appState.currencySettings = null;
+  appState.baseCurrency = 'CAD';
+  appState.filters = {
+    startDate: null, endDate: null, accountId: null, category: null, type: null, search: '', page: 1
+  };
+  if (typeof UI !== 'undefined' && UI && typeof UI.resetBaseCurrency === 'function') UI.resetBaseCurrency();
+  clearApiCaches();
 
   closeDrawer();
   document.title = 'Finman';
@@ -1649,22 +1727,36 @@ function numberLocale() {
   return 'en-CA';
 }
 
+// ISO 4217 shape check: only these codes are handed to Intl.
+function isCurrencyCode(code) {
+  return typeof code === 'string' && /^[A-Z]{3}$/.test(code);
+}
+
+// A non-ISO code is still shown (e.g. "US$"), but HTML-escaped and short:
+// it comes from the server and ends up in innerHTML.
+function fallbackCurrencyLabel(code) {
+  return escapeHtmlShell(String(code == null ? '' : code).toUpperCase().slice(0, 10));
+}
+
 // Canonical currency formatter. Default currency = the user's base currency
-// (from /api/currency/settings), falling back to CAD. Never throws.
+// (from /api/currency/settings), falling back to CAD. Never throws, and the
+// result is safe to interpolate into innerHTML (Intl text or escaped fallback).
 function fmFormatCurrency(amount, currency) {
   const code = String(currency || appState.baseCurrency || 'CAD').toUpperCase();
   const value = Number(amount);
   const safe = Number.isFinite(value) ? value : 0;
-  try {
-    return new Intl.NumberFormat(numberLocale(), {
-      style: 'currency',
-      currency: code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(safe);
-  } catch (e) {
-    return `${safe.toFixed(2)} ${code}`;
+  if (isCurrencyCode(code)) {
+    try {
+      return new Intl.NumberFormat(numberLocale(), {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(safe);
+    } catch (e) { /* fall through */ }
   }
+  const label = fallbackCurrencyLabel(code);
+  return `${formatPlainNumber(safe)}${label ? ' ' + label : ''}`;
 }
 
 // Global alias used by the feature modules.
@@ -1672,8 +1764,24 @@ function formatCurrency(amount, currency) {
   return fmFormatCurrency(amount, currency);
 }
 
+// { CAD: 10, EUR: 5 } -> "$10.00 · €5.00" (zero lines dropped; one line minimum).
+function formatTotals(totals, fallbackCurrency) {
+  const map = totals || {};
+  const codes = Object.keys(map).filter((c) => Number(map[c]) !== 0);
+  if (!codes.length) return fmFormatCurrency(0, fallbackCurrency);
+  return codes.map((c) => fmFormatCurrency(map[c], c)).join(' · ');
+}
+
+function netByCurrency(income, expense) {
+  const out = {};
+  Object.keys(income || {}).forEach((c) => { out[c] = (out[c] || 0) + Number(income[c] || 0); });
+  Object.keys(expense || {}).forEach((c) => { out[c] = (out[c] || 0) - Number(expense[c] || 0); });
+  return out;
+}
+
 function currencySymbol(code) {
   const c = String(code || appState.baseCurrency || 'CAD').toUpperCase();
+  if (!isCurrencyCode(c)) return fallbackCurrencyLabel(c);
   try {
     const parts = new Intl.NumberFormat(numberLocale(), { style: 'currency', currency: c }).formatToParts(0);
     const part = parts.find((p) => p.type === 'currency');
@@ -1722,9 +1830,21 @@ function animateHeroNetWorth() {
   requestAnimationFrame(step);
 }
 
+// 'YYYY-MM-DD' (optionally with a time) -> local Date; null when invalid.
+// Same rules as UI.parseYMD (lib/ui.js), which app.js cannot require.
+function parseLocalDate(value) {
+  if (typeof UI !== 'undefined' && UI && typeof UI.parseYMD === 'function') return UI.parseYMD(value);
+  const str = String(value == null ? '' : value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(str);
+  return str && !Number.isNaN(d.getTime()) ? d : null;
+}
+
+// Localized date; '' for anything that is not a date (never echoes raw input).
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return String(dateString || '');
+  const date = parseLocalDate(dateString);
+  if (!date || Number.isNaN(date.getTime())) return '';
   try {
     return date.toLocaleDateString(numberLocale());
   } catch (e) {
@@ -1895,6 +2015,10 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     appState,
     formatCurrency: fmFormatCurrency,
+    formatDate,
+    formatTotals,
+    netByCurrency,
+    isCurrencyCode,
     currencySymbol,
     numberLocale,
     formatPlainNumber,

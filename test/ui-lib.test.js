@@ -155,9 +155,9 @@ describe('UI money helpers', () => {
       { amount: 10, currency: 'CAD' },
       { amount: 5.5, currency: 'CAD' },
       { amount: 100, currency: 'UAH' },
-      { amount: 1 }, // no currency -> base currency
+      { amount: 1 }, // no currency -> base currency (CAD without appState)
     ]);
-    expect(totals).toEqual({ CAD: 15.5, UAH: 101 });
+    expect(totals).toEqual({ CAD: 16.5, UAH: 100 });
   });
 
   test('moneyList renders one entry per currency', () => {

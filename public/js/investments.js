@@ -71,7 +71,7 @@ async function openPortfolio(id) {
           <h1>${esc(portfolio.name)} <small class="text-secondary">${esc(cur)}</small></h1>
           <div class="page-actions">
             <button type="button" class="btn btn-outline" data-action="inv:refresh-portfolio" data-id="${Number(id)}"><i class="fas fa-sync-alt"></i> ${t('inv.refreshPrices')}</button>
-            <button type="button" class="btn btn-primary" data-action="inv:add-investment" data-id="${Number(id)}"><i class="fas fa-plus"></i> ${t('inv.addAsset')}</button>
+            <button type="button" class="btn btn-primary" data-action="inv:add-investment" data-id="${Number(id)}" data-currency="${esc(cur)}"><i class="fas fa-plus"></i> ${t('inv.addAsset')}</button>
           </div>
         </div>
         <div class="stats-grid">
@@ -139,7 +139,8 @@ async function savePortfolio(form) {
   } catch (e) { showNotification(e.message, 'error'); }
 }
 
-async function showAddInvestmentModal(portfolioId) {
+// currency defaults to the portfolio's, then the user's base currency.
+async function showAddInvestmentModal(portfolioId, currency) {
   const types = await fetchWithAuth('/api/investments/types').then(r => r.json());
   UI.modal({
     id: 'investment-modal',
@@ -156,7 +157,8 @@ async function showAddInvestmentModal(portfolioId) {
           <div class="form-group"><label class="form-label" for="inv-qty">${t('inv.form.quantity')}</label><input type="number" id="inv-qty" name="quantity" class="form-control" required min="0.0001" step="0.0001"></div>
           <div class="form-group"><label class="form-label" for="inv-price">${t('inv.col.buyPrice')}</label><input type="number" id="inv-price" name="buy_price" class="form-control" required min="0.01" step="0.01"></div>
         </div>
-        <div class="form-group"><label class="form-label" for="inv-date">${t('inv.form.buyDate')}</label><input type="date" id="inv-date" name="buy_date" class="form-control" required value="${new Date().toISOString().split('T')[0]}"></div>
+        <div class="form-group"><label class="form-label" for="inv-currency">${t('common.currency')}</label><select id="inv-currency" name="currency" class="form-control">${UI.currencyOptions(currency || UI.baseCurrency())}</select></div>
+        <div class="form-group"><label class="form-label" for="inv-date">${t('inv.form.buyDate')}</label><input type="date" id="inv-date" name="buy_date" class="form-control" required value="${UI.todayYMD()}"></div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" data-action="ui:close">${t('btn.cancel')}</button>
           <button type="submit" class="btn btn-primary">${t('btn.add')}</button>
@@ -258,7 +260,7 @@ function showAddEventModal(investmentId, symbol) {
         <input type="hidden" name="investment_id" value="${Number(investmentId)}">
         <div class="form-group"><label class="form-label" for="ev-type">${t('common.type')}</label><select id="ev-type" name="type" class="form-control"><option value="dividend">${t('inv.event.dividend')}</option><option value="fee">${t('inv.event.fee')}</option><option value="split">${t('inv.event.split')}</option></select></div>
         <div class="form-group"><label class="form-label" for="ev-amount">${t('common.amount')}</label><input type="number" id="ev-amount" name="amount" class="form-control" min="0" step="0.01" placeholder="0.00"></div>
-        <div class="form-group"><label class="form-label" for="ev-date">${t('common.date')}</label><input type="date" id="ev-date" name="date" class="form-control" value="${new Date().toISOString().split('T')[0]}"></div>
+        <div class="form-group"><label class="form-label" for="ev-date">${t('common.date')}</label><input type="date" id="ev-date" name="date" class="form-control" value="${UI.todayYMD()}"></div>
         <div class="form-group"><label class="form-label" for="ev-note">${t('inv.form.note')}</label><input type="text" id="ev-note" name="note" class="form-control" aria-describedby="ev-sym"><small id="ev-sym" class="text-secondary">${sym}</small></div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" data-action="ui:close">${t('btn.cancel')}</button>
@@ -349,7 +351,7 @@ async function calcFire(portfolioId, currency) {
     'inv:back': () => renderInvestmentsPage(),
     'inv:refresh-all': (el) => refreshAllPrices(el),
     'inv:refresh-portfolio': (el) => refreshPortfolioPrices(Number(el.dataset.id), el),
-    'inv:add-investment': (el) => showAddInvestmentModal(Number(el.dataset.id)),
+    'inv:add-investment': (el) => showAddInvestmentModal(Number(el.dataset.id), el.dataset.currency),
     'inv:save-investment': (form) => saveInvestment(form),
     'inv:sell': (el) => sellInvestment(Number(el.dataset.id)),
     'inv:add-event': (el) => showAddEventModal(Number(el.dataset.id), el.dataset.symbol),
