@@ -22,7 +22,7 @@ class Account {
         ]
       );
       
-      return { id: result.id, ...accountData };
+      return { id: result.id, ...accountData, currency: accountData.currency || DEFAULT_CURRENCY };
     } catch (error) {
       throw error;
     }
@@ -67,7 +67,13 @@ class Account {
           ]
         );
       }
-      return { id: result.id, ...accountData, balance };
+      return {
+        id: result.id,
+        ...accountData,
+        currency: accountData.currency || DEFAULT_CURRENCY,
+        accountType: accountData.accountType || 'checking',
+        balance
+      };
     });
   }
   
