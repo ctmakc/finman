@@ -17,18 +17,18 @@ passport.use(new LocalStrategy(
     try {
       // Поиск пользователя по имени
       const user = await User.findByUsername(username);
-      
+
       if (!user) {
         return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
-      
+
       // Проверка пароля
       const isPasswordValid = await User.verifyPassword(user, password);
-      
+
       if (!isPasswordValid) {
         return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
-      
+
       // Пользователь успешно аутентифицирован
       return done(null, user);
     } catch (error) {
@@ -37,16 +37,83 @@ passport.use(new LocalStrategy(
   }
 ));
 
+// --- Google OAuth 2.0 (портировано из прод-линейки app.finman.money) ---------
+
+// Включён ли вход через Google: нужны оба значения из config.google.
+function googleEnabled() {
+  return !!(config.google && config.google.clientId && config.google.clientSecret);
+}
+
+// Verify-колбэк стратегии. Вынесен отдельно, чтобы тестировать без сети:
+//   1) известный google_id -> тот же пользователь;
+//   2) совпал email зарегистрированного по паролю -> привязываем Google к нему
+//      (без дубликата аккаунта);
+//   3) иначе создаём нового пользователя и один раз уведомляем оператора.
+async function googleVerify(accessToken, refreshToken, profile, done) {
+  try {
+    const googleId = profile && profile.id;
+    if (!googleId) return done(null, false, { message: 'Google profile has no id' });
+    const email = ((profile.emails && profile.emails[0] && profile.emails[0].value) || '').toLowerCase();
+    const avatarUrl = profile.photos && profile.photos[0] && profile.photos[0].value;
+    const fullName = profile.displayName || '';
+
+    let user = await User.findByGoogleId(googleId);
+    if (user) return done(null, user);
+
+    if (email) {
+      const existing = await User.findByEmail(email);
+      if (existing) {
+        await User.linkGoogle(existing.id, googleId, avatarUrl);
+        // Отдаём свежую строку (с google_id/avatar_url), а не снимок до привязки.
+        return done(null, (await User.findById(existing.id)) || existing);
+      }
+    }
+
+    if (!email) return done(null, false, { message: 'Google account has no usable email' });
+
+    const created = await User.createFromGoogle({ googleId, email, fullName, avatarUrl });
+    const fresh = await User.findById(created.id);
+    // Уведомление оператора о новом аккаунте — никогда не блокирует вход.
+    require('./signupNotify').notifySignup(
+      { id: created.id, username: created.username, email, fullName },
+      'google'
+    );
+    return done(null, fresh || created);
+  } catch (error) {
+    return done(error);
+  }
+}
+
+// Регистрирует стратегию только при заданных GOOGLE_CLIENT_ID/SECRET, чтобы
+// приложение без Google стартовало как раньше. Возвращает true, если включили.
+function registerGoogleStrategy() {
+  if (!googleEnabled()) {
+    console.log('Passport: Google OAuth disabled (GOOGLE_CLIENT_ID/SECRET not set)');
+    return false;
+  }
+  const GoogleStrategy = require('passport-google-oauth20').Strategy;
+  passport.use(new GoogleStrategy({
+    clientID: config.google.clientId,
+    clientSecret: config.google.clientSecret,
+    callbackURL: config.google.callbackUrl,
+    scope: ['profile', 'email'],
+  }, googleVerify));
+  console.log('Passport: Google OAuth strategy enabled');
+  return true;
+}
+
+registerGoogleStrategy();
+
 // JWT-стратегия (для защищенных API-маршрутов)
 passport.use(new JwtStrategy(jwtOptions, async function(jwtPayload, done) {
   try {
     // Поиск пользователя по ID из токена
     const user = await User.findById(jwtPayload.id);
-    
+
     if (!user) {
       return done(null, false);
     }
-    
+
     // Пользователь найден
     return done(null, user);
   } catch (error) {
@@ -67,3 +134,5 @@ passport.deserializeUser(async function(id, done) {
     done(error);
   }
 });
+
+module.exports = { googleEnabled, googleVerify, registerGoogleStrategy };

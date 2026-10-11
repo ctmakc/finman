@@ -1,12 +1,19 @@
 const { query, get, run } = require('../db/database');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const config = require('../config/config');
+
+// Стоимость bcrypt берём из config (BCRYPT_ROUNDS, по умолчанию 12).
+function bcryptRounds() {
+  return config.bcryptRounds || 12;
+}
 
 class User {
   // Создание пользователя
   static async create(userData) {
     try {
       // Хеширование пароля
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      const hashedPassword = await bcrypt.hash(userData.password, bcryptRounds());
       
       const result = await run(
         `INSERT INTO users (username, email, password, full_name) 
@@ -25,7 +32,8 @@ class User {
     try {
       const user = await get(
         `SELECT id, username, email, full_name, created_at, updated_at,
-                subscription_tier, stripe_customer_id, stripe_subscription_id, timezone
+                subscription_tier, stripe_customer_id, stripe_subscription_id, timezone,
+                google_id, avatar_url
          FROM users WHERE id = ?`,
         [id]
       );
@@ -50,11 +58,50 @@ class User {
     }
   }
   
-  // Поиск пользователя по email
+  // Поиск по Google-идентификатору
+  static async findByGoogleId(googleId) {
+    try {
+      return await get('SELECT * FROM users WHERE google_id = ?', [googleId]);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Создание пользователя из Google-профиля.
+  // Пароль заполняется недостижимым случайным хешем: колонка NOT NULL,
+  // но войти по паролю в такой аккаунт нельзя — сравнение никогда не совпадёт.
+  static async createFromGoogle({ googleId, email, fullName, avatarUrl }) {
+    const unusable = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), bcryptRounds());
+
+    const base = (email || '').split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '') || 'user';
+    let username = base;
+    for (let i = 0; i < 50; i++) {
+      const clash = await get('SELECT id FROM users WHERE username = ?', [username]);
+      if (!clash) break;
+      username = base + '-' + crypto.randomBytes(2).toString('hex');
+    }
+
+    const result = await run(
+      `INSERT INTO users (username, email, password, full_name, google_id, avatar_url)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [username, email, unusable, fullName || '', googleId, avatarUrl || null]
+    );
+    return { id: result.id, username, email, fullName, googleId };
+  }
+
+  // Привязка Google-аккаунта к существующему пользователю с тем же email
+  static async linkGoogle(userId, googleId, avatarUrl) {
+    await run('UPDATE users SET google_id = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?',
+      [googleId, avatarUrl || null, userId]);
+  }
+
+  // Поиск пользователя по email. Регистр не учитываем: /register хранит email
+  // как ввели, а Google отдаёт его в нижнем регистре — иначе вход через Google
+  // создавал бы второй аккаунт на тот же адрес вместо привязки.
   static async findByEmail(email) {
     try {
       const user = await get(
-        `SELECT * FROM users WHERE email = ?`,
+        `SELECT * FROM users WHERE email = ? COLLATE NOCASE`,
         [email]
       );
       
@@ -81,7 +128,7 @@ class User {
       }
       
       if (userData.password) {
-        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        const hashedPassword = await bcrypt.hash(userData.password, bcryptRounds());
         updateFields.push('password = ?');
         params.push(hashedPassword);
       }

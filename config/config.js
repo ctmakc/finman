@@ -127,6 +127,24 @@ module.exports = {
   },
   buildCorsOrigins,
 
+  // Стоимость bcrypt при хешировании НОВЫХ паролей. Прод-линейка (app.finman.money)
+  // хешировала с 12, wave2 — с 10; bcrypt.compare принимает любую стоимость,
+  // так что старые хеши продолжают проверяться при любом значении здесь.
+  bcryptRounds: (() => {
+    const n = parseInt(process.env.BCRYPT_ROUNDS, 10);
+    return Number.isFinite(n) && n >= 4 && n <= 31 ? n : 12;
+  })(),
+
+  // Google OAuth 2.0 (вход через Google). Стратегия регистрируется только
+  // когда заданы clientId и clientSecret — без них приложение стартует как обычно.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'https://app.finman.money/api/auth/google/callback',
+    // Куда отправить браузер после успешного входа; токен уедет во фрагменте (#token=).
+    successRedirect: process.env.GOOGLE_SUCCESS_REDIRECT || 'https://app.finman.money/'
+  },
+
   // Валидация
   isValidEmail,
 
