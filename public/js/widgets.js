@@ -39,6 +39,18 @@
     }
   }
 
+  // Base-currency money: app.js canonical formatter when present, plain number otherwise.
+  function money(n) {
+    if (typeof global.fmFormatCurrency === 'function') return global.fmFormatCurrency(n);
+    if (typeof global.formatCurrency === 'function') return global.formatCurrency(n);
+    return fmt(n);
+  }
+
+  function tr(key, vars) {
+    if (global.i18n && typeof global.i18n.t === 'function') return global.i18n.t(key, vars);
+    return key;
+  }
+
   function sizeClass(size) {
     if (size === 'small') return 'widget-sm';
     if (size === 'large') return 'widget-lg';
@@ -50,41 +62,39 @@
     data = data || {};
     switch (type) {
       case 'balance':
-        return '<div class="widget-value">' + fmt(data.total) + ' ₴</div>';
+        return '<div class="widget-value">' + money(data.total) + '</div>';
 
       case 'networth': {
         var nw = Number(data.netWorth || 0);
         return '<div class="widget-value ' + (nw >= 0 ? 'positive' : 'negative') + '">' +
-          fmt(nw) + ' ₴</div>' +
-          '<div class="widget-subtitle">Активы: ' + fmt(data.assets) +
-          ' ₴ | Долги: ' + fmt(data.liabilities) + ' ₴</div>';
+          money(nw) + '</div>' +
+          '<div class="widget-subtitle">' + tr('widgets.assetsLiabilities', { assets: money(data.assets), liabilities: money(data.liabilities) }) + '</div>';
       }
 
       case 'cashflow': {
         var net = Number(data.net || 0);
         return '<div class="widget-value ' + (net >= 0 ? 'positive' : 'negative') + '">' +
-          (net >= 0 ? '+' : '') + fmt(net) + ' ₴</div>' +
-          '<div class="widget-subtitle">Доход ' + fmt(data.income) +
-          ' ₴ / Расход ' + fmt(data.expense) + ' ₴</div>';
+          (net >= 0 ? '+' : '') + money(net) + '</div>' +
+          '<div class="widget-subtitle">' + tr('widgets.incomeExpense', { income: money(data.income), expense: money(data.expense) }) + '</div>';
       }
 
       case 'expenses':
-        return '<div class="widget-value negative">' + fmt(data.total) + ' ₴</div>' +
-          '<div class="widget-subtitle">за ' + (data.period === 'year' ? 'год' : 'месяц') + '</div>';
+        return '<div class="widget-value negative">' + money(data.total) + '</div>' +
+          '<div class="widget-subtitle">' + tr(data.period === 'year' ? 'widgets.period.year' : 'widgets.period.month') + '</div>';
 
       case 'income':
-        return '<div class="widget-value positive">' + fmt(data.total) + ' ₴</div>' +
-          '<div class="widget-subtitle">за ' + (data.period === 'year' ? 'год' : 'месяц') + '</div>';
+        return '<div class="widget-value positive">' + money(data.total) + '</div>' +
+          '<div class="widget-subtitle">' + tr(data.period === 'year' ? 'widgets.period.year' : 'widgets.period.month') + '</div>';
 
       case 'budget': {
         if (!data.budgets || data.budgets.length === 0) {
-          return '<p class="text-secondary">Нет бюджетов</p>';
+          return '<p class="text-secondary">' + tr('widgets.noBudgets') + '</p>';
         }
         return data.budgets.slice(0, 3).map(function (b) {
           var pct = b.amount > 0 ? Math.min(100, ((b.spent || 0) / b.amount) * 100) : 0;
           return '<div class="mini-budget">' +
             '<div class="mini-budget-header"><span>' + esc(b.category || b.name) + '</span>' +
-            '<span>' + fmt(b.spent || 0) + '/' + fmt(b.amount) + '</span></div>' +
+            '<span>' + money(b.spent || 0) + ' / ' + money(b.amount) + '</span></div>' +
             '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
             '</div>';
         }).join('');
@@ -92,7 +102,7 @@
 
       case 'goals': {
         if (!data.goals || data.goals.length === 0) {
-          return '<p class="text-secondary">Нет целей</p>';
+          return '<p class="text-secondary">' + tr('widgets.noGoals') + '</p>';
         }
         return data.goals.slice(0, 3).map(function (g) {
           var p = Math.round(g.progress || 0);
@@ -104,57 +114,57 @@
 
       case 'upcoming': {
         if (!data.items || data.items.length === 0) {
-          return '<p class="text-secondary">Нет предстоящих платежей</p>';
+          return '<p class="text-secondary">' + tr('widgets.noUpcoming') + '</p>';
         }
         return '<div class="mini-list">' + data.items.slice(0, 5).map(function (i) {
           return '<div class="mini-item"><span>' + esc(i.title) + '</span>' +
-            '<span>' + fmt(i.amount) + ' ₴</span><small>' + esc(i.date) + '</small></div>';
+            '<span>' + money(i.amount) + '</span><small>' + esc(i.date) + '</small></div>';
         }).join('') + '</div>';
       }
 
       case 'top_categories': {
         if (!data.categories || data.categories.length === 0) {
-          return '<p class="text-secondary">Нет расходов</p>';
+          return '<p class="text-secondary">' + tr('widgets.noExpenses') + '</p>';
         }
         return data.categories.slice(0, 5).map(function (c) {
           return '<div class="mini-budget">' +
             '<div class="mini-budget-header"><span>' + esc(c.category) + '</span>' +
-            '<span>' + fmt(c.total) + ' ₴ (' + (c.percent || 0) + '%)</span></div>' +
+            '<span>' + money(c.total) + ' (' + (Number(c.percent) || 0) + '%)</span></div>' +
             '<div class="progress-bar"><div class="progress-fill" style="width:' + (c.percent || 0) + '%"></div></div>' +
             '</div>';
         }).join('');
       }
 
       case 'subscriptions':
-        return '<div class="widget-value">' + fmt(data.monthlyTotal) + ' ₴/мес</div>' +
-          '<div class="widget-subtitle">' + ((data.subscriptions && data.subscriptions.length) || 0) + ' подписок</div>';
+        return '<div class="widget-value">' + tr('widgets.perMonth', { amount: money(data.monthlyTotal) }) + '</div>' +
+          '<div class="widget-subtitle">' + tr('widgets.subscriptionsCount', { n: (data.subscriptions && data.subscriptions.length) || 0 }) + '</div>';
 
       case 'investments':
-        return '<div class="widget-value">' + fmt(data.totalValue) + ' ₴</div>' +
-          '<div class="widget-subtitle">' + (data.portfolioCount || 0) + ' портфелей</div>';
+        return '<div class="widget-value">' + money(data.totalValue) + '</div>' +
+          '<div class="widget-subtitle">' + tr('widgets.portfoliosCount', { n: data.portfolioCount || 0 }) + '</div>';
 
       case 'debts':
-        return '<div class="widget-value negative">' + fmt(data.totalOwed) + ' ₴</div>' +
-          '<div class="widget-subtitle">' + ((data.debts && data.debts.length) || 0) + ' долгов</div>';
+        return '<div class="widget-value negative">' + money(data.totalOwed) + '</div>' +
+          '<div class="widget-subtitle">' + tr('widgets.debtsCount', { n: (data.debts && data.debts.length) || 0 }) + '</div>';
 
       case 'recent': {
         if (!data.transactions || data.transactions.length === 0) {
-          return '<p class="text-secondary">Нет транзакций</p>';
+          return '<p class="text-secondary">' + tr('widgets.noTransactions') + '</p>';
         }
         return '<div class="mini-list">' + data.transactions.slice(0, 5).map(function (t) {
           var sign = t.type === 'income' ? '+' : '-';
           var cls = t.type === 'income' ? 'positive' : 'negative';
           return '<div class="mini-item"><span>' + esc(t.description || t.category) + '</span>' +
-            '<span class="' + cls + '">' + sign + fmt(t.amount) + '</span></div>';
+            '<span class="' + cls + '">' + sign + money(t.amount) + '</span></div>';
         }).join('') + '</div>';
       }
 
       case 'quick_add':
-        return '<button class="btn btn-success btn-block" onclick="showAddTransactionModal(\'income\')">+ Доход</button>' +
-          '<button class="btn btn-danger btn-block" onclick="showAddTransactionModal(\'expense\')">- Расход</button>';
+        return '<button class="btn btn-success btn-block" onclick="showAddTransactionModal(\'income\')">' + tr('widgets.quickIncome') + '</button>' +
+          '<button class="btn btn-danger btn-block" onclick="showAddTransactionModal(\'expense\')">' + tr('widgets.quickExpense') + '</button>';
 
       default:
-        return '<p class="text-secondary">Виджет недоступен</p>';
+        return '<p class="text-secondary">' + tr('widgets.unavailable') + '</p>';
     }
   }
 
@@ -166,11 +176,11 @@
     var actions = '';
     if (editMode) {
       actions = '<div class="widget-actions">' +
-        '<button class="btn btn-sm btn-icon" data-action="up" onclick="SmartDashboard.moveWidget(' + widget.id + ', -1)">↑</button>' +
-        '<button class="btn btn-sm btn-icon" data-action="down" onclick="SmartDashboard.moveWidget(' + widget.id + ', 1)">↓</button>' +
-        '<button class="btn btn-sm btn-icon" data-action="hide" onclick="SmartDashboard.toggleVisibility(' + widget.id + ')" title="Скрыть">\u{1F441}</button>' +
-        '<button class="btn btn-sm btn-icon" data-action="resize" onclick="SmartDashboard.cycleSize(' + widget.id + ')" title="Размер">⇲</button>' +
-        '<button class="btn btn-sm btn-icon btn-danger" data-action="remove" onclick="SmartDashboard.removeWidget(' + widget.id + ')">✕</button>' +
+        '<button class="btn btn-sm btn-icon" data-action="up" aria-label="' + esc(tr('widgets.moveUp')) + '" title="' + esc(tr('widgets.moveUp')) + '" onclick="SmartDashboard.moveWidget(' + widget.id + ', -1)"><i class="fas fa-arrow-up"></i></button>' +
+        '<button class="btn btn-sm btn-icon" data-action="down" aria-label="' + esc(tr('widgets.moveDown')) + '" title="' + esc(tr('widgets.moveDown')) + '" onclick="SmartDashboard.moveWidget(' + widget.id + ', 1)"><i class="fas fa-arrow-down"></i></button>' +
+        '<button class="btn btn-sm btn-icon" data-action="hide" aria-label="' + esc(tr('widgets.hide')) + '" title="' + esc(tr('widgets.hide')) + '" onclick="SmartDashboard.toggleVisibility(' + widget.id + ')"><i class="fas fa-eye-slash"></i></button>' +
+        '<button class="btn btn-sm btn-icon" data-action="resize" aria-label="' + esc(tr('widgets.resize')) + '" title="' + esc(tr('widgets.resize')) + '" onclick="SmartDashboard.cycleSize(' + widget.id + ')"><i class="fas fa-expand"></i></button>' +
+        '<button class="btn btn-sm btn-icon btn-danger" data-action="remove" aria-label="' + esc(tr('widgets.remove')) + '" title="' + esc(tr('widgets.remove')) + '" onclick="SmartDashboard.removeWidget(' + widget.id + ')"><i class="fas fa-times"></i></button>' +
         '</div>';
     }
     return '<div class="dashboard-widget ' + sizeClass(widget.size) + '"' + draggable +
@@ -270,6 +280,7 @@
     authHeaders: authHeaders,
     esc: esc,
     fmt: fmt,
+    money: money,
     sizeClass: sizeClass,
     renderContent: renderContent,
     renderWidget: renderWidget,

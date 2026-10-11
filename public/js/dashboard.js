@@ -34,14 +34,30 @@ const SmartDashboard = {
     }
   },
 
-  // Форматирование суммы в гривне с табличными цифрами.
+  // Whole-number amount in the user's number locale (app.js helper when present).
   fmtMoney(value) {
-    const n = Number(value) || 0;
+    const n = Math.round(Number(value) || 0);
+    if (typeof formatPlainNumber === 'function') return formatPlainNumber(n, 0);
     try {
-      return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(Math.round(n));
+      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
     } catch (e) {
-      return String(Math.round(n));
+      return String(n);
     }
+  },
+
+  // Base-currency amount with symbol (app.js canonical formatter when present).
+  fmtCurrency(value) {
+    if (typeof fmFormatCurrency === 'function') return fmFormatCurrency(value);
+    return this.fmtMoney(value);
+  },
+
+  baseCurrency() {
+    return (typeof appState !== 'undefined' && appState && appState.baseCurrency) || 'CAD';
+  },
+
+  baseSymbol() {
+    if (typeof currencySymbol === 'function') return currencySymbol(this.baseCurrency());
+    return this.baseCurrency();
   },
 
   // Плавный count-up чистого капитала (restrained; уважает reduced-motion).
@@ -108,17 +124,17 @@ const SmartDashboard = {
         const inEl = document.getElementById('hero-cashflow-in');
         const outEl = document.getElementById('hero-cashflow-out');
         if (inEl && typeof cashflow.income !== 'undefined') {
-          inEl.textContent = '₴' + this.fmtMoney(cashflow.income);
+          inEl.textContent = this.fmtCurrency(cashflow.income);
         }
         if (outEl && typeof cashflow.expense !== 'undefined') {
-          outEl.textContent = '₴' + this.fmtMoney(cashflow.expense);
+          outEl.textContent = this.fmtCurrency(cashflow.expense);
         }
         const insightEl = document.getElementById('hero-insight-text');
         if (insightEl) {
           const net = (Number(cashflow.income) || 0) - (Number(cashflow.expense) || 0);
           insightEl.textContent = net >= 0
-            ? 'Цього місяця ви витрачаєте менше, ніж заробляєте — капітал зростає. Так тримати.'
-            : 'Витрати цього місяця перевищили доходи. Загляньте в категорії, щоб повернути баланс.';
+            ? t('dashboard.insightPositive')
+            : t('dashboard.insightNegative');
         }
       }
     } catch (error) {
@@ -162,7 +178,7 @@ const SmartDashboard = {
 
     if (visibleWidgets.length === 0) {
       container.innerHTML =
-        '<div class="empty-state"><p>Нет виджетов. Нажмите "Настроить" чтобы добавить.</p></div>';
+        `<div class="empty-state"><p>${t('dashboard.noWidgets')}</p></div>`;
       return;
     }
 
@@ -187,14 +203,14 @@ const SmartDashboard = {
       widget.size === 'small' ? 'widget-sm' : widget.size === 'large' ? 'widget-lg' : 'widget-md';
     const actions = this.editMode
       ? `<div class="widget-actions">
-          <button class="btn btn-sm btn-icon" onclick="SmartDashboard.moveWidget(${widget.id}, -1)">↑</button>
-          <button class="btn btn-sm btn-icon" onclick="SmartDashboard.moveWidget(${widget.id}, 1)">↓</button>
-          <button class="btn btn-sm btn-icon btn-danger" onclick="SmartDashboard.removeWidget(${widget.id})">✕</button>
+          <button class="btn btn-sm btn-icon" aria-label="${t('widgets.moveUp')}" title="${t('widgets.moveUp')}" onclick="SmartDashboard.moveWidget(${widget.id}, -1)"><i class="fas fa-arrow-up"></i></button>
+          <button class="btn btn-sm btn-icon" aria-label="${t('widgets.moveDown')}" title="${t('widgets.moveDown')}" onclick="SmartDashboard.moveWidget(${widget.id}, 1)"><i class="fas fa-arrow-down"></i></button>
+          <button class="btn btn-sm btn-icon btn-danger" aria-label="${t('widgets.remove')}" title="${t('widgets.remove')}" onclick="SmartDashboard.removeWidget(${widget.id})"><i class="fas fa-times"></i></button>
         </div>`
       : '';
     return `
       <div class="dashboard-widget ${sizeClass}" data-id="${widget.id}" data-type="${widget.widget_type}">
-        <div class="widget-header"><h3>${widget.title || widget.widget_type}</h3>${actions}</div>
+        <div class="widget-header"><h3>${(this.W ? this.W.esc : String)(widget.title || widget.widget_type)}</h3>${actions}</div>
         <div class="widget-content" id="widget-content-${widget.id}">
           <div class="widget-loading"><div class="spinner"></div></div>
         </div>
@@ -218,22 +234,22 @@ const SmartDashboard = {
         container.innerHTML = this.renderWidgetContentFallback(widget.widget_type, data);
       }
     } catch (error) {
-      container.innerHTML = '<p class="text-secondary">Ошибка загрузки</p>';
+      container.innerHTML = `<p class="text-secondary">${t('msg.loadError')}</p>`;
     }
   },
 
   // Минимальный фолбэк-рендер контента (когда widgets.js недоступен).
   renderWidgetContentFallback(type, data) {
     data = data || {};
-    if (type === 'balance') return `<div class="widget-value">${(data.total || 0).toLocaleString()} ₴</div>`;
-    if (type === 'cashflow') return `<div class="widget-value">${(data.net || 0).toLocaleString()} ₴</div>`;
+    if (type === 'balance') return `<div class="widget-value">${this.fmtCurrency(data.total || 0)}</div>`;
+    if (type === 'cashflow') return `<div class="widget-value">${this.fmtCurrency(data.net || 0)}</div>`;
     return '<p class="text-secondary">—</p>';
   },
 
   toggleEditMode() {
     this.editMode = !this.editMode;
     const btn = document.getElementById('edit-mode-btn');
-    if (btn) btn.textContent = this.editMode ? '✓ Готово' : '⚙️ Настроить';
+    if (btn) btn.innerHTML = this.editMode ? `<i class="fas fa-check"></i> ${t('dashboard.done')}` : `<i class="fas fa-cog"></i> ${t('dashboard.customize')}`;
     this.render();
   },
 
@@ -275,11 +291,11 @@ const SmartDashboard = {
     modal.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <h2>Добавить виджет</h2>
-          <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button>
+          <h2>${t('widgets.add')}</h2>
+          <button class="modal-close" aria-label="${t('btn.close')}" onclick="this.closest('.modal-backdrop').remove()">&times;</button>
         </div>
         <div class="modal-body">
-          ${available.length === 0 ? '<p>Все виджеты уже добавлены</p>' : `
+          ${available.length === 0 ? `<p>${t('dashboard.allAdded')}</p>` : `
             <div class="widget-picker">
               ${available.map((w) => `
                 <div class="widget-option" onclick="SmartDashboard.addWidget('${w.type}', '${w.name}')">
@@ -307,12 +323,12 @@ const SmartDashboard = {
       document.querySelector('.modal-backdrop')?.remove();
       await this.loadWidgets();
     } catch (error) {
-      alert('Ошибка добавления');
+      alert(t('dashboard.addError'));
     }
   },
 
   async removeWidget(id) {
-    if (!confirm('Удалить виджет?')) return;
+    if (!confirm(t('dashboard.confirmRemoveWidget'))) return;
     try {
       await fetch(`/api/widgets/${id}`, {
         method: 'DELETE',
@@ -320,7 +336,7 @@ const SmartDashboard = {
       });
       await this.loadWidgets();
     } catch (error) {
-      alert('Ошибка');
+      alert(t('msg.error'));
     }
   },
 
@@ -403,30 +419,30 @@ const SmartDashboard = {
   // existing widget API calls stay the single source of truth.
   renderHero() {
     return `
-      <section class="fm-hero" aria-label="Ваши финансы">
+      <section class="fm-hero" aria-label="${t('dashboard.heroAria')}">
         <div class="fm-hero-grid">
           <div class="fm-hero-main">
             <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
-            <h1 class="fm-hero-title">Чистый капитал</h1>
-            <div class="fm-hero-figure" id="hero-networth" data-countup="0" data-currency="₴">
-              <span class="fm-hero-currency">₴</span><span class="fm-hero-amount">—</span>
+            <h1 class="fm-hero-title">${t('dashboard.heroTitle')}</h1>
+            <div class="fm-hero-figure" id="hero-networth" data-countup="0" data-currency="${this.baseCurrency()}">
+              <span class="fm-hero-currency">${this.baseSymbol()}</span><span class="fm-hero-amount">—</span>
             </div>
             <div class="fm-hero-cashflow">
               <div class="fm-cashflow-item">
-                <span class="fm-cashflow-label">Доходы</span>
+                <span class="fm-cashflow-label">${t('common.income')}</span>
                 <span class="fm-cashflow-value in" id="hero-cashflow-in">—</span>
               </div>
               <div class="fm-cashflow-item">
-                <span class="fm-cashflow-label">Расходы</span>
+                <span class="fm-cashflow-label">${t('common.expense')}</span>
                 <span class="fm-cashflow-value out" id="hero-cashflow-out">—</span>
               </div>
             </div>
           </div>
-          <aside class="fm-insight-card" aria-label="AI-инсайт">
-            <span class="fm-insight-label"><span class="fm-insight-dot"></span> AI-финдиректор</span>
-            <p class="fm-insight-text" id="hero-insight-text">Анализирую ваши финансы…</p>
+          <aside class="fm-insight-card" aria-label="${t('dashboard.insightAria')}">
+            <span class="fm-insight-label"><span class="fm-insight-dot"></span> ${t('dashboard.aiCfo')}</span>
+            <p class="fm-insight-text" id="hero-insight-text">${t('dashboard.analyzing')}</p>
             <div class="fm-insight-foot">
-              <button class="btn btn-sm" id="hero-ai-more" type="button">Спросить AI</button>
+              <button class="btn btn-sm" id="hero-ai-more" type="button">${t('dashboard.askAi')}</button>
             </div>
           </aside>
         </div>
@@ -439,10 +455,10 @@ const SmartDashboard = {
         ${this.renderHero()}
         <section id="dashboard-insights" class="ai-dash" aria-label="Insights"></section>
         <div class="page-header">
-          <h1>📊 Дашборд</h1>
+          <h1>${t('dashboard.title')}</h1>
           <div class="btn-group">
-            <button class="btn" id="edit-mode-btn" onclick="SmartDashboard.toggleEditMode()">⚙️ Настроить</button>
-            <button class="btn btn-primary" onclick="SmartDashboard.showAddWidgetModal()">+ Виджет</button>
+            <button class="btn" id="edit-mode-btn" onclick="SmartDashboard.toggleEditMode()"><i class="fas fa-cog"></i> ${t('dashboard.customize')}</button>
+            <button class="btn btn-primary" onclick="SmartDashboard.showAddWidgetModal()"><i class="fas fa-plus"></i> ${t('widgets.add')}</button>
           </div>
         </div>
         <div class="dashboard-grid" id="dashboard-widgets"></div>
