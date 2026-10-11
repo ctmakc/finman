@@ -5,8 +5,13 @@
 //   - decodeImageInput(input) -> Buffer|input               // base64 / data-URL -> Buffer
 //   - parseReceiptText(rawText) -> { merchant, total_amount, currency, receipt_date, items }
 //   - categorizeReceipt(text) -> string                      // эвристика категории
-//   - processImage(input, { lang, vision }) -> Promise<{ ocr_status, ocr_engine, ocr_raw, merchant, total_amount, currency, receipt_date, category, items }>
-//     (LLM vision first when a configured provider supports it, tesseract fallback; vision:false forces tesseract)
+//   - processImage(input, { lang, vision, now }) -> Promise<{ ocr_status, ocr_engine, ocr_raw, merchant, total_amount, currency, receipt_date, category, items }>
+//     LLM vision ONLY with vision:true (the caller checked the user's AI opt-in + tier: the image
+//     leaves the server); otherwise local tesseract. Vision failures fall back to tesseract.
+//
+// Receipt dates (both engines) must be real calendar dates within [today − 2 years, today + 1 day],
+// otherwise null (the transaction then uses today). A bare "$" means the deployment's dollar
+// (config.defaultCurrency when it is a dollar currency, else USD) — "CA$"/"US$" stay explicit.
 //
 // Дизайн: парсер (parseReceiptText) — чистая функция без сети/wasm, что делает его
 // полностью тестируемым. recognizeBuffer тонко оборачивает tesseract; в тестах его
@@ -38,15 +43,31 @@ const TOTAL_KEYWORDS = [
 // Слова, которые НЕ должны попадать в итог (промежуточные/служебные строки).
 const TOTAL_NEGATIVE = ['без пдв', 'без ндс', 'пдв', 'ндс', 'vat', 'tax', 'subtotal', 'сдача', 'решта', 'готівка', 'наличн', 'карт'];
 
-// Символы валют -> ISO код.
+// Символы валют -> ISO код. code: null = bare "$", resolved by dollarCurrency().
 const CURRENCY_SYMBOLS = [
   { re: /грн|₴|uah/i, code: 'UAH' },
   { re: /руб|₽|rub/i, code: 'RUB' },
-  { re: /\$|usd|долл/i, code: 'USD' },
+  { re: /\bcad\b|c\$|ca\$/i, code: 'CAD' },
+  { re: /\busd\b|us\$|долл/i, code: 'USD' },
   { re: /€|eur|евро|євро/i, code: 'EUR' },
   { re: /£|gbp/i, code: 'GBP' },
-  { re: /zł|pln/i, code: 'PLN' }
+  { re: /zł|pln/i, code: 'PLN' },
+  { re: /\$/, code: null }
 ];
+
+const DOLLAR_CURRENCIES = new Set(['USD', 'CAD', 'AUD', 'NZD', 'SGD', 'HKD', 'MXN', 'TWD']);
+
+// "$" on a receipt is the local dollar: the deployment default when that is a dollar
+// currency (CAD for app.finman.money), USD otherwise.
+function dollarCurrency() {
+  let def = '';
+  try {
+    def = String(require('../config/config').defaultCurrency || '').toUpperCase();
+  } catch (_) {
+    def = String(process.env.DEFAULT_CURRENCY || '').toUpperCase();
+  }
+  return DOLLAR_CURRENCIES.has(def) ? def : 'USD';
+}
 
 /**
  * Привести произвольный вход (Buffer / base64-строка / data-URL) к Buffer.
@@ -133,34 +154,47 @@ function extractNumbers(line) {
 // Определить валюту по всему тексту.
 function detectCurrency(text) {
   for (const { re, code } of CURRENCY_SYMBOLS) {
-    if (re.test(text)) return code;
+    if (re.test(text)) return code || dollarCurrency();
   }
   return null;
 }
 
-// Найти дату в тексте (несколько распространённых форматов) -> YYYY-MM-DD | null
-function detectDate(text) {
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+// y/m/d -> 'YYYY-MM-DD' when it is a real calendar date (no 31.02) inside
+// [now − 2 years, now + 1 day]; null otherwise. A receipt cannot be from the future,
+// and a misread year (2062, 1926) must not silently date a transaction.
+function validReceiptDate(y, m, d, now = new Date()) {
+  const yy = Number(y);
+  const mm = Number(m);
+  const dd = Number(d);
+  if (!Number.isInteger(yy) || !Number.isInteger(mm) || !Number.isInteger(dd)) return null;
+  const dt = new Date(Date.UTC(yy, mm - 1, dd));
+  if (dt.getUTCFullYear() !== yy || dt.getUTCMonth() !== mm - 1 || dt.getUTCDate() !== dd) return null;
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const min = Date.UTC(now.getFullYear() - 2, now.getMonth(), now.getDate());
+  if (dt.getTime() < min || dt.getTime() > today + 864e5) return null;
+  return `${yy}-${pad2(mm)}-${pad2(dd)}`;
+}
+
+// Найти дату в тексте (несколько распространённых форматов) -> YYYY-MM-DD | null.
+// Перебираем все кандидаты и берём первую ВАЛИДНУЮ дату (см. validReceiptDate).
+function detectDate(text, now = new Date()) {
   if (!text) return null;
-  // dd.mm.yyyy | dd/mm/yyyy | dd-mm-yyyy  (год 2 или 4 цифры)
-  let m = text.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
-  if (m) {
-    let [, d, mo, y] = m;
-    if (y.length === 2) y = '20' + y;
-    d = d.padStart(2, '0');
-    mo = mo.padStart(2, '0');
-    const day = parseInt(d, 10);
-    const mon = parseInt(mo, 10);
-    if (mon >= 1 && mon <= 12 && day >= 1 && day <= 31) {
-      return `${y}-${mo}-${d}`;
-    }
+  const str = String(text);
+  // yyyy-mm-dd / yyyy.mm.dd / yyyy/mm/dd first: the dd.mm.yy pattern would bite into
+  // "2026-06-19" as "26-06-19".
+  for (const m of str.matchAll(/(?<!\d)(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)/g)) {
+    const v = validReceiptDate(m[1], m[2], m[3], now);
+    if (v) return v;
   }
-  // yyyy-mm-dd
-  m = text.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (m) {
-    const [, y, mo, d] = m;
-    if (parseInt(mo, 10) <= 12 && parseInt(d, 10) <= 31) {
-      return `${y}-${mo}-${d}`;
-    }
+  // dd.mm.yyyy | dd/mm/yyyy | dd-mm-yyyy  (год 2 или 4 цифры)
+  for (const m of str.matchAll(/(?<!\d)(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4}|\d{2})(?!\d)/g)) {
+    const y = m[3].length === 2 ? `20${m[3]}` : m[3];
+    const v = validReceiptDate(y, m[2], m[1], now);
+    if (v) return v;
   }
   return null;
 }
@@ -243,14 +277,14 @@ function detectItems(lines) {
  * Главный парсер: из сырого OCR-текста извлекает структуру чека.
  * Чистая функция — без сети, полностью тестируема.
  */
-function parseReceiptText(rawText) {
+function parseReceiptText(rawText, now = new Date()) {
   const text = String(rawText || '');
   const lines = text.split(/\r?\n/).map((l) => l.replace(/ /g, ' '));
 
   const merchant = detectMerchant(lines);
   const total = detectTotal(lines);
   const currency = detectCurrency(text);
-  const receipt_date = detectDate(text);
+  const receipt_date = detectDate(text, now);
   const items = detectItems(lines);
 
   return {
@@ -327,7 +361,7 @@ function detectMimeType(input, buffer) {
  * Tolerates ```json fences and prose around the object. Returns null when no JSON object
  * can be read — the caller then falls back to tesseract.
  */
-function parseVisionJson(text) {
+function parseVisionJson(text, now = new Date()) {
   if (!text) return null;
   let raw = String(text).trim();
   raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
@@ -362,11 +396,7 @@ function parseVisionJson(text) {
     // ISO first (the format we asked for); detectDate's dd.mm.yyyy heuristic would
     // otherwise bite into "2026-06-19" as "26-06-19".
     const iso = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (iso && parseInt(iso[2], 10) >= 1 && parseInt(iso[2], 10) <= 12 && parseInt(iso[3], 10) >= 1 && parseInt(iso[3], 10) <= 31) {
-      receipt_date = `${iso[1]}-${iso[2]}-${iso[3]}`;
-    } else {
-      receipt_date = detectDate(d);
-    }
+    receipt_date = iso ? validReceiptDate(iso[1], iso[2], iso[3], now) : detectDate(d, now);
   }
 
   const merchant =
@@ -407,7 +437,8 @@ function visionAvailable() {
  * Never throws.
  */
 async function recognizeWithVision(input, options = {}) {
-  if (options.vision === false) return null;
+  // Opt-in only: the image leaves the server. The caller decides (AI opt-in + tier).
+  if (options.vision !== true) return null;
   let available = false;
   try {
     available = visionAvailable();
@@ -427,7 +458,7 @@ async function recognizeWithVision(input, options = {}) {
       maxTokens: 800,
     });
     const text = (result && result.text) || '';
-    const parsed = parseVisionJson(text);
+    const parsed = parseVisionJson(text, options.now);
     if (!parsed || (parsed.total_amount == null && !parsed.merchant)) {
       logger.warn({ provider: result && result.provider }, 'Receipt vision returned nothing usable, falling back to OCR');
       return null;
@@ -488,7 +519,7 @@ async function processImage(input, options = {}) {
   }
 
   try {
-    const parsed = parseReceiptText(rawText);
+    const parsed = parseReceiptText(rawText, options.now);
     const category = categorizeReceipt(rawText);
     // "completed" только если реально что-то распознали и вытащили хоть сумму/магазин.
     const meaningful =
@@ -529,6 +560,8 @@ module.exports = {
   extractNumbers,
   detectCurrency,
   detectDate,
+  validReceiptDate,
+  dollarCurrency,
   detectMerchant,
   detectTotal,
   detectItems,

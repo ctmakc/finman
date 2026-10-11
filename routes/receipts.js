@@ -4,6 +4,10 @@ const passport = require('passport');
 const { query, get, run } = require('../db/database');
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const ocrService = require('../services/ocrService');
+const User = require('../models/user');
+const { requireTier } = require('../middleware/requireTier');
+
+const requireProForAi = requireTier('pro');
 
 // Foundation-инфраструктура (feature-detect: если чего-то нет — деградируем мягко).
 let logger;
@@ -15,6 +19,23 @@ try {
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
+
+// Receipt images go to the LLM vision provider only for users who opted in to AI
+// (users.ai_opt_in) and pass the same tier gate as /api/ai (server.js aiTierGate:
+// Pro is required while billing is configured). Everyone else gets local tesseract.
+async function visionAllowed(req) {
+  if (!(await User.getAiOptIn(req.user.id))) return false;
+  let billingOn = false;
+  try {
+    billingOn = require('../services/billingService').isConfigured();
+  } catch (_) {
+    billingOn = false;
+  }
+  if (!billingOn) return true;
+  return new Promise((resolve) => {
+    requireProForAi(req, null, (err) => resolve(!err));
+  });
+}
 
 // Получить все чеки
 router.get('/', async (req, res) => {
@@ -79,19 +100,20 @@ router.post('/upload', async (req, res) => {
     //    содержал актуальный статус (нет «вечного pending» как в фейке).
     //    Если хочется неблокирующе — см. ниже опцию async=1.
     const wantAsync = req.query.async === '1' || req.body.async === true;
+    const vision = await visionAllowed(req);
 
     if (wantAsync) {
       // Неблокирующий режим: отвечаем сразу, OCR в фоне (async-safe).
       res.status(201).json({ id: receiptId, ocr_status: 'pending', message: 'Receipt uploaded, recognition in progress...' });
       // Не ждём промис — но ошибки гасим, чтобы не уронить процесс.
-      processAndStore(receiptId, image_data).catch((e) => {
+      processAndStore(receiptId, image_data, { vision }).catch((e) => {
         logger.error({ err: e && e.message, receiptId }, 'Async OCR failed');
       });
       return;
     }
 
     // Синхронный режим (по умолчанию): дожидаемся OCR и возвращаем результат.
-    const ocr = await processAndStore(receiptId, image_data);
+    const ocr = await processAndStore(receiptId, image_data, { vision });
     return res.status(201).json({
       id: receiptId,
       ocr_status: ocr.ocr_status,
@@ -115,8 +137,8 @@ router.post('/upload', async (req, res) => {
  * processImage сам ловит ошибки и ставит ocr_status:'failed'. Падение может
  * прийти только от БД (его обрабатывает вызывающий код / .catch фонового режима).
  */
-async function processAndStore(receiptId, imageData) {
-  const ocr = await ocrService.processImage(imageData);
+async function processAndStore(receiptId, imageData, { vision = false } = {}) {
+  const ocr = await ocrService.processImage(imageData, { vision: vision === true });
 
   await run(
     `UPDATE receipts
@@ -127,7 +149,9 @@ async function processAndStore(receiptId, imageData) {
     [
       ocr.merchant,
       ocr.total_amount,
-      ocr.currency || DEFAULT_CURRENCY,
+      // Unknown stays NULL (= "the account's currency" at create-transaction); a
+      // guessed default would trip the currency check on every non-default account.
+      ocr.currency || null,
       ocr.receipt_date,
       ocr.category,
       JSON.stringify(ocr.items || []),
@@ -148,7 +172,7 @@ router.post('/manual', async (req, res) => {
     const result = await run(
       `INSERT INTO receipts (user_id, merchant, total_amount, currency, receipt_date, category, items, ocr_status, is_processed, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', 1, ?)`,
-      [req.user.id, merchant, total_amount, currency || DEFAULT_CURRENCY, receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
+      [req.user.id, merchant, total_amount, currency ? String(currency).trim().toUpperCase() : null, receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
     );
 
     res.status(201).json({ id: result.id, message: 'Receipt added' });
@@ -184,37 +208,81 @@ router.post('/:id/create-transaction', async (req, res) => {
 
     const { account_id, category } = req.body;
 
+    // Idempotent: one receipt -> at most one transaction (double click, retry, two tabs).
+    if (receipt.transaction_id) {
+      return res.status(409).json({
+        message: 'A transaction was already created from this receipt',
+        transaction_id: receipt.transaction_id,
+      });
+    }
+
     if (!account_id) {
       return res.status(400).json({ message: 'Account is required' });
     }
 
+    const total = Number(receipt.total_amount);
+    if (!Number.isFinite(total) || total <= 0) {
+      return res.status(400).json({ message: 'Receipt total must be greater than 0 — correct the receipt first' });
+    }
+
     // Счёт должен принадлежать текущему пользователю (иначе чек B списывал
     // деньги со счёта A). 404 — счёта нет, 403 — чужой.
-    const account = await get('SELECT id, user_id FROM accounts WHERE id = ?', [account_id]);
+    const account = await get('SELECT id, user_id, currency FROM accounts WHERE id = ?', [account_id]);
     if (!account) return res.status(404).json({ message: 'Account not found' });
     if (account.user_id !== req.user.id) return res.status(403).json({ message: 'No access to this account' });
+
+    // No silent conversion: a USD receipt must not land as CAD on a CAD account.
+    const receiptCur = String(receipt.currency || '').trim().toUpperCase();
+    const accountCur = String(account.currency || DEFAULT_CURRENCY).trim().toUpperCase();
+    if (receiptCur && receiptCur !== accountCur) {
+      return res.status(400).json({
+        code: 'CURRENCY_MISMATCH',
+        message: `Receipt currency (${receiptCur}) differs from the account currency (${accountCur}). Choose an account in ${receiptCur} or correct the receipt currency.`,
+      });
+    }
 
     // Три записи — одной транзакцией БД. Расход хранится со знаком минус
     // (единое правило: дельта баланса = хранимая сумма).
     const { transaction } = require('../db/database');
     const money = require('../lib/money');
-    const amount = -Math.abs(money.round(receipt.total_amount));
-    const txId = await transaction(async () => {
-      const txResult = await run(
-        `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
-         VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
-        [req.user.id, account_id, amount, receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
-      );
-      await run(
-        'UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
-        [amount, account_id, req.user.id]
-      );
-      await run(
-        'UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
-        [txResult.id, req.params.id, req.user.id]
-      );
-      return txResult.id;
-    });
+    const amount = -Math.abs(money.round(total));
+    const CONFLICT = 'RECEIPT_ALREADY_LINKED';
+    let txId;
+    try {
+      txId = await transaction(async () => {
+        const txResult = await run(
+          `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
+           VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
+          [req.user.id, account_id, amount, receipt.merchant || 'Receipt', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
+        );
+        // Claim the receipt atomically: a concurrent request that got here first wins,
+        // this one rolls back its transaction row (no double charge).
+        const claim = await run(
+          `UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND transaction_id IS NULL`,
+          [txResult.id, req.params.id, req.user.id]
+        );
+        if (!claim.changes) {
+          const e = new Error('Receipt already linked to a transaction');
+          e.code = CONFLICT;
+          throw e;
+        }
+        await run(
+          'UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+          [amount, account_id, req.user.id]
+        );
+        return txResult.id;
+      });
+    } catch (err) {
+      if (err && err.code === CONFLICT) {
+        const now = await get('SELECT transaction_id FROM receipts WHERE id = ?', [req.params.id]);
+        return res.status(409).json({
+          message: 'A transaction was already created from this receipt',
+          transaction_id: now ? now.transaction_id : null,
+        });
+      }
+      throw err;
+    }
 
     res.json({ transaction_id: txId, message: 'Transaction created' });
   } catch (error) {
