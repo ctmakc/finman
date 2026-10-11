@@ -232,14 +232,25 @@ async function fetchTransactions(filters = {}) {
   // Импорт транзакций из CSV
   async function importTransactionsFromCSV(formData) {
     try {
-      const response = await fetchWithAuth('/api/transactions/import', {
+      // Multipart upload: the browser must set Content-Type itself (with the
+      // boundary). fetchWithAuth forces application/json, which made multer
+      // see no file and every import fail, so this calls fetch directly.
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showNotification(t('transactions.importFailed'), 'error');
+        return null;
+      }
+      const response = await fetch('/api/transactions/import', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        if (typeof renderLoginPage === 'function') renderLoginPage();
+        return null;
+      }
+
       if (!response.ok) {
         const data = await response.json();
         showNotification(data.message || t('transactions.importError'), 'error');
