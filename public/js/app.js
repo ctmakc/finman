@@ -977,11 +977,11 @@ async function renderDashboard() {
           <i class="fas ${getAccountIcon(account.account_type)}"></i>
         </div>
         <div class="account-details">
-          <h3 class="account-name">${account.name}</h3>
-          <p class="account-number">${account.account_number || ''}</p>
+          <h3 class="account-name">${escapeHtmlShell(account.name)}</h3>
+          <p class="account-number">${escapeHtmlShell(account.account_number || '')}</p>
         </div>
       </div>
-      <div class="account-balance">${fmFormatCurrency(account.balance, account.currency)}</div>
+      <div class="account-balance">${escapeHtmlShell(fmFormatCurrency(account.balance, account.currency))}</div>
     </div>
   `).join('') || '<p>You have no accounts yet. <a href="#" class="add-account-link">Add an account</a></p>';
 
@@ -989,12 +989,12 @@ async function renderDashboard() {
     ? recentTransactions.map((transaction) => `
       <div class="transaction-item">
         <div class="transaction-info">
-          <div class="transaction-date">${formatDate(transaction.date)}</div>
-          <div class="transaction-description">${transaction.description}</div>
-          <div class="transaction-category">${transaction.category}</div>
+          <div class="transaction-date">${escapeHtmlShell(formatDate(transaction.date))}</div>
+          <div class="transaction-description">${escapeHtmlShell(transaction.description || '')}</div>
+          <div class="transaction-category">${escapeHtmlShell(transaction.category || '')}</div>
         </div>
         <div class="transaction-amount ${transaction.type === 'income' ? 'income' : 'expense'}">
-          ${fmFormatCurrency(transaction.amount, transaction.currency)}
+          ${escapeHtmlShell(fmFormatCurrency(transaction.amount, typeof transactionCurrency === 'function' ? transactionCurrency(transaction) : transaction.currency))}
         </div>
       </div>
     `).join('')
@@ -1228,34 +1228,34 @@ async function renderAccountsPage() {
 
 function renderAccountsList(accounts) {
   return accounts.map((account) => `
-    <div class="account-card card" data-account-id="${account.id}">
+    <div class="account-card card" data-account-id="${escapeHtmlShell(account.id)}">
       <div class="account-header">
         <div class="account-icon">
           <i class="fas ${getAccountIcon(account.account_type)}"></i>
         </div>
         <div class="account-details">
-          <h3 class="account-name">${account.name}</h3>
-          <p class="account-number">${account.account_number || 'No account number'}</p>
+          <h3 class="account-name">${escapeHtmlShell(account.name)}</h3>
+          <p class="account-number">${escapeHtmlShell(account.account_number || 'No account number')}</p>
         </div>
       </div>
 
       <div class="account-balance">
-        ${fmFormatCurrency(account.balance, account.currency)}
+        ${escapeHtmlShell(fmFormatCurrency(account.balance, account.currency))}
       </div>
 
       <div class="account-info">
-        <p class="account-bank">${account.bank_name || 'Personal account'}</p>
+        <p class="account-bank">${escapeHtmlShell(account.bank_name || 'Personal account')}</p>
         <p class="account-type">${getAccountTypeName(account.account_type)}</p>
       </div>
 
       <div class="account-actions">
-        <button class="btn btn-sm btn-outline" data-account-action="view" data-account-id="${account.id}">
+        <button class="btn btn-sm btn-outline" data-account-action="view" data-account-id="${escapeHtmlShell(account.id)}">
           <i class="fas fa-eye"></i> Details
         </button>
-        <button class="btn btn-sm btn-outline" data-account-action="edit" data-account-id="${account.id}">
+        <button class="btn btn-sm btn-outline" data-account-action="edit" data-account-id="${escapeHtmlShell(account.id)}">
           <i class="fas fa-edit"></i> Edit
         </button>
-        <button class="btn btn-sm btn-danger" data-account-action="delete" data-account-id="${account.id}">
+        <button class="btn btn-sm btn-danger" data-account-action="delete" data-account-id="${escapeHtmlShell(account.id)}">
           <i class="fas fa-trash"></i> Delete
         </button>
       </div>
@@ -1292,12 +1292,12 @@ async function renderTransactionsPage() {
         <div class="filters-row">
           <div class="form-group">
             <label for="filter-date-start" class="form-label">From</label>
-            <input type="date" id="filter-date-start" class="form-control" value="${appState.filters.startDate || ''}">
+            <input type="date" id="filter-date-start" class="form-control" value="${escapeHtmlShell(appState.filters.startDate || '')}">
           </div>
 
           <div class="form-group">
             <label for="filter-date-end" class="form-label">To</label>
-            <input type="date" id="filter-date-end" class="form-control" value="${appState.filters.endDate || ''}">
+            <input type="date" id="filter-date-end" class="form-control" value="${escapeHtmlShell(appState.filters.endDate || '')}">
           </div>
 
           <div class="form-group">
@@ -1305,8 +1305,8 @@ async function renderTransactionsPage() {
             <select id="filter-account" class="form-control">
               <option value="">All accounts</option>
               ${appState.accounts.map((account) => `
-                <option value="${account.id}" ${appState.filters.accountId == account.id ? 'selected' : ''}>
-                  ${account.name}
+                <option value="${escapeHtmlShell(account.id)}" ${appState.filters.accountId == account.id ? 'selected' : ''}>
+                  ${escapeHtmlShell(account.name)}
                 </option>
               `).join('')}
             </select>
@@ -1319,8 +1319,8 @@ async function renderTransactionsPage() {
             <select id="filter-category" class="form-control">
               <option value="">All categories</option>
               ${categories.map((category) => `
-                <option value="${category}" ${appState.filters.category === category ? 'selected' : ''}>
-                  ${category}
+                <option value="${escapeHtmlShell(category)}" ${appState.filters.category === category ? 'selected' : ''}>
+                  ${escapeHtmlShell(category)}
                 </option>
               `).join('')}
             </select>
@@ -1337,7 +1337,7 @@ async function renderTransactionsPage() {
 
           <div class="form-group">
             <label for="filter-search" class="form-label">Search</label>
-            <input type="text" id="filter-search" class="form-control" placeholder="Search by description" value="${appState.filters.search || ''}">
+            <input type="text" id="filter-search" class="form-control" placeholder="Search by description" value="${escapeHtmlShell(appState.filters.search || '')}">
           </div>
         </div>
 
@@ -1647,22 +1647,36 @@ function numberLocale() {
   return 'en-CA';
 }
 
+// ISO 4217 shape check: only these codes are handed to Intl.
+function isCurrencyCode(code) {
+  return typeof code === 'string' && /^[A-Z]{3}$/.test(code);
+}
+
+// A non-ISO code is still shown (e.g. "US$"), but HTML-escaped and short:
+// it comes from the server and ends up in innerHTML.
+function fallbackCurrencyLabel(code) {
+  return escapeHtmlShell(String(code == null ? '' : code).toUpperCase().slice(0, 10));
+}
+
 // Canonical currency formatter. Default currency = the user's base currency
-// (from /api/currency/settings), falling back to CAD. Never throws.
+// (from /api/currency/settings), falling back to CAD. Never throws, and the
+// result is safe to interpolate into innerHTML (Intl text or escaped fallback).
 function fmFormatCurrency(amount, currency) {
   const code = String(currency || appState.baseCurrency || 'CAD').toUpperCase();
   const value = Number(amount);
   const safe = Number.isFinite(value) ? value : 0;
-  try {
-    return new Intl.NumberFormat(numberLocale(), {
-      style: 'currency',
-      currency: code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(safe);
-  } catch (e) {
-    return `${safe.toFixed(2)} ${code}`;
+  if (isCurrencyCode(code)) {
+    try {
+      return new Intl.NumberFormat(numberLocale(), {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(safe);
+    } catch (e) { /* fall through */ }
   }
+  const label = fallbackCurrencyLabel(code);
+  return `${formatPlainNumber(safe)}${label ? ' ' + label : ''}`;
 }
 
 // Global alias used by the feature modules.
@@ -1720,9 +1734,21 @@ function animateHeroNetWorth() {
   requestAnimationFrame(step);
 }
 
+// 'YYYY-MM-DD' (optionally with a time) -> local Date; null when invalid.
+// Same rules as UI.parseYMD (lib/ui.js), which app.js cannot require.
+function parseLocalDate(value) {
+  if (typeof UI !== 'undefined' && UI && typeof UI.parseYMD === 'function') return UI.parseYMD(value);
+  const str = String(value == null ? '' : value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(str);
+  return str && !Number.isNaN(d.getTime()) ? d : null;
+}
+
+// Localized date; '' for anything that is not a date (never echoes raw input).
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return String(dateString || '');
+  const date = parseLocalDate(dateString);
+  if (!date || Number.isNaN(date.getTime())) return '';
   try {
     return date.toLocaleDateString(numberLocale());
   } catch (e) {

@@ -160,7 +160,7 @@ const CalendarModule = {
         <div class="day-event-item">
           <span>${this.icon(e.event_type)}</span>
           <div><strong>${UI.esc(e.title)}</strong>${e.amount ? ` - ${this.amount(e)}` : ''}<br><small>${UI.esc(e.description || e.event_type)}</small></div>
-          ${e.source ? '' : `<button type="button" class="btn btn-sm btn-icon" data-action="cal:complete" data-id="${e.id}" aria-label="${t('calendar.markDone')}" title="${t('calendar.done')}"><i class="fas fa-check"></i></button>`}
+          ${e.source ? '' : `<button type="button" class="btn btn-sm btn-icon" data-action="cal:complete" data-id="${UI.esc(e.id)}" aria-label="${t('calendar.markDone')}" title="${t('calendar.done')}"><i class="fas fa-check"></i></button>`}
         </div>
       `).join('');
 

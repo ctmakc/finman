@@ -277,8 +277,8 @@ async function fetchTransactions(filters = {}) {
               <select id="${modalId}-account" class="form-control" required>
                 <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
-                  <option value="${account.id}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
-                    ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+                  <option value="${escapeHtml(account.id)}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
+                    ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
                   </option>
                 `).join('')}
               </select>
@@ -294,7 +294,7 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-amount" class="form-label">${t('common.amount')}</label>
-              <input type="number" id="${modalId}-amount" class="form-control" step="0.01" value="${isEditing ? Math.abs(transactionData.amount) : ''}" required>
+              <input type="number" id="${modalId}-amount" class="form-control" step="0.01" value="${isEditing ? escapeHtml(Math.abs(Number(transactionData.amount) || 0)) : ''}" required>
             </div>
             
             <div class="form-group">
@@ -431,8 +431,8 @@ async function fetchTransactions(filters = {}) {
               <select id="${modalId}-account" class="form-control" required>
                 <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
-                  <option value="${account.id}">
-                    ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+                  <option value="${escapeHtml(account.id)}">
+                    ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
                   </option>
                 `).join('')}
               </select>
@@ -588,8 +588,8 @@ async function fetchTransactions(filters = {}) {
         : (isIncome ? 'income text-success' : 'expense text-error');
       const sign = isInflow ? '+' : '−';
       return `
-      <tr data-transaction-id="${transaction.id}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
-        <td data-label="${t('common.date')}" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
+      <tr data-transaction-id="${escapeHtml(transaction.id)}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
+        <td data-label="${t('common.date')}" class="tx-cell tx-cell-date">${escapeHtml(formatDate(transaction.date))}</td>
         <td data-label="${t('common.description')}" class="tx-cell tx-cell-desc">
           <span class="tx-direction" aria-hidden="true"><i class="fas fa-${isTransfer ? 'exchange-alt' : 'arrow-' + arrow}"></i></span>
           <span class="tx-desc-text">${escapeHtml(description)}</span>
@@ -600,7 +600,7 @@ async function fetchTransactions(filters = {}) {
         </td>
         <td data-label="${t('transactions.field.account')}" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
         <td data-label="${t('common.amount')}" class="text-right tx-cell tx-cell-amount transaction-amount ${amountClass}">
-          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount), transactionCurrency(transaction))}
+          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${escapeHtml(formatCurrency(Math.abs(transaction.amount), transactionCurrency(transaction)))}
         </td>
         <td data-label="${t('common.actions')}" class="tx-cell tx-cell-actions">
           <div class="table-actions">
@@ -671,8 +671,8 @@ async function fetchTransactions(filters = {}) {
     const accounts = (typeof appState !== 'undefined' && appState.accounts) ? appState.accounts : [];
 
     const accountOptions = accounts.map(account => `
-      <option value="${account.id}">
-        ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
+      <option value="${escapeHtml(account.id)}">
+        ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
       </option>
     `).join('');
 

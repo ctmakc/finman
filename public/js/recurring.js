@@ -291,13 +291,18 @@ async function loadRecurringPayments() {
 }
 
 function renderPaymentCard(payment, isOverdue = false) {
-  const daysUntil = Math.ceil((new Date(payment.next_payment_date) - new Date()) / (1000 * 60 * 60 * 24));
+  // Whole local days between today and the next payment date.
+  const next = UI.parseYMD(payment.next_payment_date);
+  const todayDate = UI.parseYMD(UI.todayYMD());
+  const daysUntil = next ? Math.round((next - todayDate) / (1000 * 60 * 60 * 24)) : NaN;
+  // Whitelisted: it lands in a class attribute.
+  const typeClass = payment.type === 'income' ? 'income' : 'expense';
   const statusClass = isOverdue ? 'overdue' : (daysUntil <= 3 ? 'soon' : '');
 
   return `
-    <div class="payment-card ${statusClass} ${!payment.is_active ? 'inactive' : ''}" data-id="${payment.id}">
+    <div class="payment-card ${statusClass} ${!payment.is_active ? 'inactive' : ''}" data-id="${UI.esc(payment.id)}">
       <div class="payment-main">
-        <div class="payment-icon ${payment.type}">
+        <div class="payment-icon ${typeClass}">
           <i class="fas fa-${payment.type === 'income' ? 'arrow-down' : 'arrow-up'}"></i>
         </div>
         <div class="payment-info">
@@ -305,7 +310,7 @@ function renderPaymentCard(payment, isOverdue = false) {
           <span class="payment-account">${escapeHtmlRecurring(payment.account_name)}</span>
           ${payment.category ? `<span class="payment-category">${escapeHtmlRecurring(payment.category)}</span>` : ''}
         </div>
-        <div class="payment-amount ${payment.type}">
+        <div class="payment-amount ${typeClass}">
           ${payment.type === 'expense' ? '-' : '+'}${UI.esc(UI.money(Math.abs(payment.amount), payment.account_currency))}
         </div>
       </div>
@@ -321,21 +326,21 @@ function renderPaymentCard(payment, isOverdue = false) {
 
       <div class="payment-actions">
         ${payment.is_active ? `
-          <button type="button" class="btn btn-sm btn-success" data-action="recurring:pay" data-id="${payment.id}" title="${t('recurring.action.pay')}" aria-label="${t('recurring.action.pay')}">
+          <button type="button" class="btn btn-sm btn-success" data-action="recurring:pay" data-id="${UI.esc(payment.id)}" title="${t('recurring.action.pay')}" aria-label="${t('recurring.action.pay')}">
             <i class="fas fa-check"></i>
           </button>
-          <button type="button" class="btn btn-sm btn-warning" data-action="recurring:skip" data-id="${payment.id}" title="${t('recurring.action.skip')}" aria-label="${t('recurring.action.skip')}">
+          <button type="button" class="btn btn-sm btn-warning" data-action="recurring:skip" data-id="${UI.esc(payment.id)}" title="${t('recurring.action.skip')}" aria-label="${t('recurring.action.skip')}">
             <i class="fas fa-forward"></i>
           </button>
         ` : ''}
-        <button type="button" class="btn btn-sm btn-outline" data-action="recurring:edit" data-id="${payment.id}" title="${t('btn.edit')}" aria-label="${t('btn.edit')}">
+        <button type="button" class="btn btn-sm btn-outline" data-action="recurring:edit" data-id="${UI.esc(payment.id)}" title="${t('btn.edit')}" aria-label="${t('btn.edit')}">
           <i class="fas fa-edit"></i>
         </button>
         <button type="button" class="btn btn-sm ${payment.is_active ? 'btn-secondary' : 'btn-primary'}"
-                data-action="recurring:toggle" data-id="${payment.id}" title="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}" aria-label="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}">
+                data-action="recurring:toggle" data-id="${UI.esc(payment.id)}" title="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}" aria-label="${payment.is_active ? t('recurring.action.pause') : t('recurring.action.resume')}">
           <i class="fas fa-${payment.is_active ? 'pause' : 'play'}"></i>
         </button>
-        <button type="button" class="btn btn-sm btn-danger" data-action="recurring:delete" data-id="${payment.id}" title="${t('btn.delete')}" aria-label="${t('btn.delete')}">
+        <button type="button" class="btn btn-sm btn-danger" data-action="recurring:delete" data-id="${UI.esc(payment.id)}" title="${t('btn.delete')}" aria-label="${t('btn.delete')}">
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -358,7 +363,7 @@ function showAddRecurringModal(payment = null) {
               <label>${t('recurring.field.account')} *</label>
               <select id="rp-account" required>
                 ${accounts.map(a => `
-                  <option value="${a.id}" ${payment?.account_id === a.id ? 'selected' : ''}>
+                  <option value="${UI.esc(a.id)}" ${payment?.account_id === a.id ? 'selected' : ''}>
                     ${escapeHtmlRecurring(a.name)}
                   </option>
                 `).join('')}
@@ -369,7 +374,7 @@ function showAddRecurringModal(payment = null) {
           <div class="form-row">
             <div class="form-group">
               <label>${t('common.amount')} *</label>
-              <input type="number" id="rp-amount" step="0.01" min="0" value="${payment?.amount || ''}" required>
+              <input type="number" id="rp-amount" step="0.01" min="0" value="${UI.esc(payment?.amount || '')}" required>
             </div>
             <div class="form-group">
               <label>${t('common.type')}</label>
@@ -410,7 +415,7 @@ function showAddRecurringModal(payment = null) {
             </div>
             <div class="form-group" id="day-of-month-group">
               <label>${t('recurring.field.dayOfMonth')}</label>
-              <input type="number" id="rp-day-of-month" min="1" max="31" value="${payment?.day_of_month || ''}">
+              <input type="number" id="rp-day-of-month" min="1" max="31" value="${UI.esc(payment?.day_of_month || '')}">
             </div>
           </div>
 
@@ -421,7 +426,7 @@ function showAddRecurringModal(payment = null) {
             </div>
             <div class="form-group">
               <label>${t('recurring.field.endDate')}</label>
-              <input type="date" id="rp-end-date" value="${payment?.end_date || ''}">
+              <input type="date" id="rp-end-date" value="${UI.esc(payment?.end_date || '')}">
             </div>
           </div>
 
@@ -434,7 +439,7 @@ function showAddRecurringModal(payment = null) {
             </div>
             <div class="form-group">
               <label>${t('recurring.field.notifyBefore')}</label>
-              <input type="number" id="rp-notify-before" min="0" max="30" value="${payment?.notify_before || 3}">
+              <input type="number" id="rp-notify-before" min="0" max="30" value="${UI.esc(payment?.notify_before ?? 3)}">
             </div>
           </div>
 
