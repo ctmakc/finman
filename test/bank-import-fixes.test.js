@@ -414,3 +414,27 @@ describe('OFX: multi-statement files, calendar dates, per-transaction currency, 
     expect(p.rows[0].description).toBe('A &#x110000; B A');
   });
 });
+
+describe('categorizer: whole-word keyword matching', () => {
+  const { categorizeByDescription: cat } = require(path.join(PROJECT_ROOT, 'services', 'importCategorizer.js'));
+
+  test('substrings inside other words no longer hit', () => {
+    expect(cat('TAXI KYIV')).toBe('Transport'); // not "tax"
+    expect(cat('Espresso House')).not.toBe('Fuel'); // not "esso"
+    expect(cat('Магазин Ева')).not.toBe('Utilities'); // not "газ"
+    expect(cat('Parent Teacher Assoc')).not.toBe('Housing'); // not "rent"
+    expect(cat('reporter mag')).not.toBe('Travel'); // not "porter"
+  });
+
+  test('real merchants, plurals, possessives and Cyrillic stems still match', () => {
+    expect(cat('ESSO 1234 OTTAWA')).toBe('Fuel');
+    expect(cat("WENDY'S 123")).toBe('Food & Dining');
+    expect(cat('Restaurants Inc')).toBe('Food & Dining');
+    expect(cat('Canada Revenue Agency')).toBe('Taxes & Government');
+    expect(cat('PROPERTY TAX')).toBe('Taxes & Government');
+    expect(cat('Зарплата за вересень')).toBe('Salary');
+    expect(cat('Газопостачання')).toBe('Utilities');
+    expect(cat('A&W #55')).toBe('Food & Dining');
+    expect(cat('APPLE.COM/BILL')).toBe('Subscriptions');
+  });
+});

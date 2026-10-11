@@ -93,12 +93,28 @@ const KEYWORD_RULES = [
   ['shopping', ['amazon', 'amzn', 'canadian tire', 'ikea', 'best buy', 'home depot', 'rona', 'dollarama', 'winners', 'zara', 'h&m', 'uniqlo', 'shein', 'aliexpress', 'rozetka', 'розетка', 'comfy', 'епіцентр', 'эпицентр', 'одяг', 'одежда', 'clothing', 'shoes']]
 ];
 
+// Keywords match whole words, Unicode-aware: a keyword must start at a word
+// boundary ("TAXI KYIV" is not 'tax', "Espresso" is not 'esso', "Магазин" is
+// not 'газ', "Parent" is not 'rent'). Latin keywords must also end at a word
+// boundary, allowing a plural / possessive ("RESTAURANTS", "WENDY'S").
+// Cyrillic keywords are stems ('зарплат', 'податк', 'аптек'), so they may be
+// followed by any ending.
+const WORD_CHAR = '[\\p{L}\\p{N}]';
+const CYRILLIC = /[\u0400-\u04ff]/;
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+function keywordRegex(word) {
+  const w = word.trim().toLowerCase();
+  const tail = CYRILLIC.test(w) ? '' : `(?:'?s|es)?(?!${WORD_CHAR})`;
+  return new RegExp(`(?<!${WORD_CHAR})${escapeRe(w)}${tail}`, 'u');
+}
+const COMPILED_RULES = KEYWORD_RULES.map(([key, words]) => [key, words.map(keywordRegex)]);
+
 function categorizeByDescription(description) {
   if (!description) return CATEGORY.other;
   const text = String(description).toLowerCase();
-  for (const [key, words] of KEYWORD_RULES) {
-    for (const w of words) {
-      if (text.includes(w)) return CATEGORY[key];
+  for (const [key, patterns] of COMPILED_RULES) {
+    for (const re of patterns) {
+      if (re.test(text)) return CATEGORY[key];
     }
   }
   return CATEGORY.other;
