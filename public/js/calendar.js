@@ -39,8 +39,7 @@ const CalendarModule = {
   async loadEvents() {
     const year = this.currentDate.getFullYear();
     const month = this.currentDate.getMonth();
-    const start = new Date(year, month, 1).toISOString().split('T')[0];
-    const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const { start, end } = UI.monthRange(new Date(year, month, 1));
 
     try {
       const response = await fetch(`/api/calendar/events?start=${start}&end=${end}`, { headers: this.headers() });
@@ -63,7 +62,7 @@ const CalendarModule = {
     const month = this.currentDate.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = new Date().toISOString().split('T')[0];
+    const today = UI.todayYMD();
 
     const loc = this.locale();
     let title;
@@ -135,13 +134,14 @@ const CalendarModule = {
     }
   },
 
+  // Day 1 first: setMonth() on the 31st overflows (Jan 31 + 1 month = Mar 3).
   prevMonth() {
-    this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+    this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - 1, 1);
     this.loadEvents();
   },
 
   nextMonth() {
-    this.currentDate.setMonth(this.currentDate.getMonth() + 1);
+    this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 1);
     this.loadEvents();
   },
 
@@ -169,7 +169,7 @@ const CalendarModule = {
 
   showAddModal(dateStr) {
     document.getElementById('event-form').reset();
-    document.getElementById('event-date').value = dateStr || new Date().toISOString().split('T')[0];
+    document.getElementById('event-date').value = dateStr || UI.todayYMD();
     const cur = document.getElementById('event-currency');
     if (cur) cur.innerHTML = UI.currencyOptions();
     UI.openModal('event-modal');

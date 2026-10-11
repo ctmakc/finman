@@ -258,7 +258,7 @@ async function loadRecurringPayments() {
   const upcoming = await fetchUpcomingPayments(7);
 
   // Просроченные
-  const today = new Date().toISOString().split('T')[0];
+  const today = UI.todayYMD();
   const overdue = payments.filter(p => p.is_active && p.next_payment_date < today);
 
   const overdueSection = document.getElementById('overdue-section');
@@ -422,7 +422,7 @@ function showAddRecurringModal(payment = null) {
           <div class="form-row">
             <div class="form-group">
               <label>${t('recurring.field.startDate')} *</label>
-              <input type="date" id="rp-start-date" value="${payment?.start_date || new Date().toISOString().split('T')[0]}" required>
+              <input type="date" id="rp-start-date" value="${UI.esc(payment?.start_date || UI.todayYMD())}" required>
             </div>
             <div class="form-group">
               <label>${t('recurring.field.endDate')}</label>
@@ -570,8 +570,9 @@ function recurringDateLocale() {
 // «1 дек.» для текущего года, «1 дек. 2025» — для любого другого: иначе
 // просроченный с прошлого года платёж выглядит как будущий.
 function formatDateShort(dateStr) {
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return UI.esc(dateStr || '');
+  // 'YYYY-MM-DD' is a local calendar date (new Date() would read it as UTC).
+  const date = UI.parseYMD(dateStr);
+  if (!date) return '';
   const opts = { day: 'numeric', month: 'short' };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
   return date.toLocaleDateString(recurringDateLocale(), opts);

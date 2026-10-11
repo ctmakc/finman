@@ -258,7 +258,7 @@ function showAddEventModal(investmentId, symbol) {
         <input type="hidden" name="investment_id" value="${Number(investmentId)}">
         <div class="form-group"><label class="form-label" for="ev-type">${t('common.type')}</label><select id="ev-type" name="type" class="form-control"><option value="dividend">${t('inv.event.dividend')}</option><option value="fee">${t('inv.event.fee')}</option><option value="split">${t('inv.event.split')}</option></select></div>
         <div class="form-group"><label class="form-label" for="ev-amount">${t('common.amount')}</label><input type="number" id="ev-amount" name="amount" class="form-control" min="0" step="0.01" placeholder="0.00"></div>
-        <div class="form-group"><label class="form-label" for="ev-date">${t('common.date')}</label><input type="date" id="ev-date" name="date" class="form-control" value="${new Date().toISOString().split('T')[0]}"></div>
+        <div class="form-group"><label class="form-label" for="ev-date">${t('common.date')}</label><input type="date" id="ev-date" name="date" class="form-control" value="${UI.todayYMD()}"></div>
         <div class="form-group"><label class="form-label" for="ev-note">${t('inv.form.note')}</label><input type="text" id="ev-note" name="note" class="form-control" aria-describedby="ev-sym"><small id="ev-sym" class="text-secondary">${sym}</small></div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" data-action="ui:close">${t('btn.cancel')}</button>

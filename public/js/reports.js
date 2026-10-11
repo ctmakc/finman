@@ -105,11 +105,9 @@ const ReportsModule = {
     const typeInfo = this.types.find(rt => rt.id === type);
     document.getElementById('generate-modal-title').textContent = typeInfo ? this.typeLabel(typeInfo, 'name') : t('reports.generate');
 
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    document.getElementById('period-start').value = firstDay;
-    document.getElementById('period-end').value = lastDay;
+    const { start, end } = UI.monthRange(new Date());
+    document.getElementById('period-start').value = start;
+    document.getElementById('period-end').value = end;
 
     UI.openModal('generate-modal');
   },

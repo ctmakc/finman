@@ -310,7 +310,7 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-date" class="form-label">${t('common.date')}</label>
-              <input type="date" id="${modalId}-date" class="form-control" value="${isEditing ? transactionData.date : new Date().toISOString().split('T')[0]}" required>
+              <input type="date" id="${modalId}-date" class="form-control" value="${escapeHtml(isEditing ? String(transactionData.date || '').slice(0, 10) : UI.todayYMD())}" required>
             </div>
             
             <div class="form-group">
@@ -727,7 +727,7 @@ async function fetchTransactions(filters = {}) {
 
             <div class="form-group">
               <label for="${modalId}-date" class="form-label">${t('common.date')}</label>
-              <input type="date" id="${modalId}-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+              <input type="date" id="${modalId}-date" class="form-control" value="${UI.todayYMD()}" required>
             </div>
 
             <div class="form-group">

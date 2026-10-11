@@ -140,7 +140,7 @@ async function showAddExpenseModal(groupId) {
             <select id="expense-paid-by" name="paid_by" class="form-control">${list.map((m) => `<option value="${Number(m.id)}">${UI.esc(m.name)}</option>`).join('')}</select>
           </div>
         </div>
-        <div class="form-group"><label class="form-label" for="expense-date">${t('common.date')}</label><input type="date" id="expense-date" name="date" class="form-control" value="${new Date().toISOString().split('T')[0]}"></div>
+        <div class="form-group"><label class="form-label" for="expense-date">${t('common.date')}</label><input type="date" id="expense-date" name="date" class="form-control" value="${UI.todayYMD()}"></div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" data-action="ui:close">${t('btn.cancel')}</button>
           <button type="submit" class="btn btn-primary">${t('btn.add')}</button>
