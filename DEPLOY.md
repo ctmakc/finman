@@ -20,31 +20,61 @@ drops to uid 1000 (`node`) with `setpriv` and runs `node server.js`. Health:
 (`initDatabase()` -> `lib/migrate.js`, additive, idempotent); the log line is
 `Применены миграции: …`.
 
-## Staging (vps-site)
+## Staging on MMIX-Apps-US (vps-site)
+
+Staging is a demo instance: `site-run` starts the container **without a volume**,
+so the SQLite file lives inside the container and is recreated empty on every
+deploy. Two env flags turn that into a feature instead of a blank screen:
+
+| Env | Value | Effect |
+|---|---|---|
+| `DEMO_SEED_ON_EMPTY` | `1` | After migrations, if `users` is empty, seed the demo household (`lib/demoSeed.js`): user `demo`, 3 accounts, ~190 transactions over 6 months, budgets, goals, car loan, TFSA portfolio, subscriptions, rules, family with `demo-partner`. A DB with any user is never touched. |
+| `DEMO_MODE` | `1` | `/api/health` and `/api/health/demo` report `demo:true`; billing/AI answers carry `_meta.demo`. The frontend uses `GET /api/health/demo` for the "Demo instance — data resets on every deploy" banner. |
+| `DEMO_PASSWORD` | optional | Password for `demo` / `demo-partner` (default `finman-demo-2026`). |
+
+Required secrets in the env file (names only, values live in
+`~/.config/vps-migration/env/finman.env` on the workstation and are shipped as
+`/srv/apps/finman.env.json`): `JWT_SECRET`, `SESSION_SECRET`, `ENCRYPTION_KEY`
+(64 hex), `NODE_ENV=production`, `CORS_ORIGIN=https://finman.apps.mmix.biz`.
+Optional: `AI_PROVIDER` + its key (Gemini/Ollama/OpenAI-compatible, never
+Anthropic by default), `LOG_LEVEL`.
 
 ```bash
-# env file: KEY=<json string> per line; at minimum the 3 secrets
-#   JWT_SECRET, SESSION_SECRET, ENCRYPTION_KEY (64 hex), plus
-#   NODE_ENV=production, CORS_ORIGIN=https://finman.apps.mmix.biz
+# env file: KEY=<json string> per line
 $EDITOR ~/.config/vps-migration/env/finman.env
 
-vps-site app finman /path/to/finman-checkout        # build on the workstation, ship, swap without downtime
-vps-site hosts finman finman.apps.mmix.biz          # first host is primary
+vps-site app finman /path/to/finman-checkout \
+  --env DEMO_SEED_ON_EMPTY=1 --env DEMO_MODE=1 \
+  --env NODE_ENV=production --env CORS_ORIGIN=https://finman.apps.mmix.biz
+                                                     # build on the workstation, ship, swap without downtime;
+                                                     # --env extras are kept in the registry for later `env`/`app` calls.
+                                                     # Add --idle off on demo days so the first visitor never waits
+                                                     # for a cold start (the idle stop keeps the container filesystem).
+vps-site hosts finman finman.apps.mmix.biz          # first host is primary (hosts WITHOUT args rewrites the list)
 vps-site check finman                                # HTTP status per hostname
-vps-site logs finman 100
+vps-site logs finman 100                             # look for "demo seed: household created"
 vps-site env finman                                  # push changed env, restart, no rebuild
 vps-site rollback finman                             # previous image
 ```
 
-Note on data: `server/site-run` starts the container with no volume mount, so
-the staging SQLite file lives in the container filesystem and is recreated
-empty on every deploy. That is fine for smoke tests and previews. If staging
-ever needs to keep accounts between deploys, `site-run` has to gain a
-`-v finman-data:/app/data` option; the entrypoint already handles a root-owned
-volume.
+Checks after a staging deploy:
+
+```bash
+curl -s https://finman.apps.mmix.biz/api/health        # data.demo:true, data.seeded_at set
+curl -s https://finman.apps.mmix.biz/api/health/demo   # message: "Demo instance — data resets on every deploy"
+# log in: username demo, password = DEMO_PASSWORD (default finman-demo-2026)
+```
+
+Staging data resets on every deploy and every container restart that recreates
+the filesystem; anything a reviewer enters disappears with the next `vps-site
+app`. That is intended. If staging ever needs to keep accounts between deploys,
+`site-run` has to gain a `-v finman-data:/app/data` option; the entrypoint
+already handles a root-owned volume — and then `DEMO_SEED_ON_EMPTY` seeds only
+the very first boot, because the users table is no longer empty afterwards.
 
 `finman` is not registered in `sites.json` yet; the first `vps-site app` call
-registers it and assigns a port.
+registers it and assigns a port. Never set `DEMO_SEED_ON_EMPTY` or `DEMO_MODE`
+on docker-1 (`app.finman.money`).
 
 ## Production cutover (docker-1, preserves the existing user)
 
