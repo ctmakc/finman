@@ -234,18 +234,31 @@ router.delete('/:id', async (req, res) => {
 // Статистика
 router.get('/stats/summary', async (req, res) => {
   try {
-    const total = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ?', [req.user.id]);
-    const pending = await get('SELECT COUNT(*) as count FROM receipts WHERE user_id = ? AND is_processed = 0', [req.user.id]);
+    // Фронт (public/js/receipts.js) читает total / processed / pending / totalAmount.
+    // Старые имена оставлены для совместимости.
+    const agg = await get(
+      `SELECT COUNT(*) as total,
+              COALESCE(SUM(CASE WHEN is_processed = 1 THEN 1 ELSE 0 END), 0) as processed,
+              COALESCE(SUM(CASE WHEN is_processed = 0 THEN 1 ELSE 0 END), 0) as pending,
+              COALESCE(SUM(total_amount), 0) as total_amount
+       FROM receipts WHERE user_id = ?`,
+      [req.user.id]
+    );
     const thisMonth = await get(
-      `SELECT COUNT(*) as count, SUM(total_amount) as total FROM receipts
+      `SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total FROM receipts
        WHERE user_id = ? AND receipt_date >= date('now', 'start of month')`,
       [req.user.id]
     );
 
     res.json({
-      totalReceipts: total.count,
-      pendingReceipts: pending.count,
-      thisMonthCount: thisMonth.count,
+      total: agg.total || 0,
+      processed: agg.processed || 0,
+      pending: agg.pending || 0,
+      totalAmount: Math.round((agg.total_amount || 0) * 100) / 100,
+      // legacy
+      totalReceipts: agg.total || 0,
+      pendingReceipts: agg.pending || 0,
+      thisMonthCount: thisMonth.count || 0,
       thisMonthTotal: thisMonth.total || 0
     });
   } catch (error) {

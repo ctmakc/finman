@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const Debt = require('../models/debt');
+const { todayISO, userTz } = require('../lib/dates');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -13,8 +14,8 @@ router.get('/', async (req, res) => {
   try {
     const includeSettled = req.query.includeSettled === 'true';
     const debts = await Debt.findByUser(req.user.id, includeSettled);
-    const debtsWithInfo = debts.map(d => Debt.calculateDebtInfo ? Debt.calculateDebtInfo(d) : d);
-    res.json(debtsWithInfo);
+    const today = todayISO(userTz(req.user));
+    res.json(debts.map(d => Debt.calculateDebtInfo(d, today)));
   } catch (error) {
     console.error('Ошибка получения долгов:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
@@ -24,7 +25,7 @@ router.get('/', async (req, res) => {
 // Статистика
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await Debt.getUserStats(req.user.id);
+    const stats = await Debt.getUserStats(req.user.id, todayISO(userTz(req.user)));
     res.json(stats);
   } catch (error) {
     console.error('Ошибка статистики:', error);
@@ -51,7 +52,7 @@ router.get('/:id', async (req, res) => {
     if (!debt || debt.user_id !== req.user.id) {
       return res.status(404).json({ message: 'Долг не найден' });
     }
-    res.json(Debt.calculateDebtInfo ? Debt.calculateDebtInfo(debt) : debt);
+    res.json(Debt.calculateDebtInfo(debt, todayISO(userTz(req.user))));
   } catch (error) {
     console.error('Ошибка:', error);
     res.status(500).json({ message: 'Ошибка сервера' });

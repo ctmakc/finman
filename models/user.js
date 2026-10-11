@@ -25,7 +25,7 @@ class User {
     try {
       const user = await get(
         `SELECT id, username, email, full_name, created_at, updated_at,
-                subscription_tier, stripe_customer_id, stripe_subscription_id
+                subscription_tier, stripe_customer_id, stripe_subscription_id, timezone
          FROM users WHERE id = ?`,
         [id]
       );

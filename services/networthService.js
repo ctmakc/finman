@@ -21,6 +21,7 @@
 
 const { query, get, run } = require('../db/database');
 const Currency = require('../models/currency');
+const currencyService = require('./currencyService');
 const money = require('../lib/money');
 
 const DEFAULT_BASE = 'UAH';
@@ -58,6 +59,17 @@ async function convertAmount(amount, fromCurrency, baseCurrency, date, missingRa
     rate = await Currency.getRate(from, baseCurrency, date);
   } catch (e) {
     rate = null;
+  }
+
+  // Нет сохранённого курса -> досеять из провайдера / страховочной таблицы
+  // (CAD/USD/EUR/UAH конвертируются всегда), и только потом 1:1 с флагом.
+  if (rate === null || rate === undefined || !Number.isFinite(Number(rate))) {
+    try {
+      const found = await currencyService.rateOrFallback(from, baseCurrency, date);
+      rate = found ? found.rate : null;
+    } catch (e) {
+      rate = null;
+    }
   }
 
   if (rate === null || rate === undefined || !Number.isFinite(Number(rate))) {

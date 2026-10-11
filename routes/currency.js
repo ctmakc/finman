@@ -2,6 +2,7 @@ const express = require('express');
 const passport = require('passport');
 const Currency = require('../models/currency');
 const Tag = require('../models/tag');
+const currencyService = require('../services/currencyService');
 
 const router = express.Router();
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -55,13 +56,13 @@ router.get('/rates', authenticate, async (req, res) => {
 router.get('/rate/:from/:to', authenticate, async (req, res) => {
   try {
     const { from, to } = req.params;
-    const rate = await Currency.getRate(from, to);
+    const found = await currencyService.rateOrFallback(from, to);
 
-    if (rate === null) {
-      return res.status(404).json({ error: true, message: 'Курс не найден' });
+    if (!found) {
+      return res.status(404).json({ error: true, code: 'RATE_NOT_FOUND', message: `Нет курса ${String(from).toUpperCase()} → ${String(to).toUpperCase()}` });
     }
 
-    res.json({ from, to, rate });
+    res.json({ from: String(from).toUpperCase(), to: String(to).toUpperCase(), rate: found.rate, source: found.source });
   } catch (error) {
     console.error('Ошибка:', error);
     res.status(500).json({ error: true, message: 'Ошибка получения курса' });
@@ -73,16 +74,21 @@ router.get('/convert', authenticate, async (req, res) => {
   try {
     const { amount, from, to } = req.query;
 
-    if (!amount || !from || !to) {
+    if (amount === undefined || !from || !to) {
       return res.status(400).json({
         error: true,
         message: 'Укажите amount, from и to'
       });
     }
 
-    const result = await Currency.convert(parseFloat(amount), from, to);
+    // Нет курса -> 422 с понятным текстом (раньше фронт получал success:false
+    // без result и падал на undefined.toFixed).
+    const result = await currencyService.convert(amount, from, to);
     res.json(result);
   } catch (error) {
+    if (error && error.isOperational) {
+      return res.status(error.status).json({ error: true, code: error.code, message: error.message });
+    }
     console.error('Ошибка:', error);
     res.status(500).json({ error: true, message: 'Ошибка конвертации' });
   }

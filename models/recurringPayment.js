@@ -1,4 +1,5 @@
 const { query, get, run } = require('../db/database');
+const dates = require('../lib/dates');
 
 class RecurringPayment {
   // Создание регулярного платежа
@@ -82,8 +83,7 @@ class RecurringPayment {
 
   // Получение платежей для напоминания (в ближайшие N дней)
   static async getUpcoming(userId, days = 7) {
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + days);
+    const futureDate = dates.addDaysISO(dates.todayISO(), days);
 
     return query(
       `SELECT rp.*, a.name as account_name, a.currency as account_currency
@@ -94,13 +94,13 @@ class RecurringPayment {
          AND rp.next_payment_date <= ?
          AND (rp.end_date IS NULL OR rp.end_date >= date('now'))
        ORDER BY rp.next_payment_date ASC`,
-      [userId, futureDate.toISOString().split('T')[0]]
+      [userId, futureDate]
     );
   }
 
   // Получение просроченных платежей
   static async getOverdue(userId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = dates.todayISO();
 
     return query(
       `SELECT rp.*, a.name as account_name, a.currency as account_currency
@@ -196,7 +196,7 @@ class RecurringPayment {
 
     if (!payment) return { success: false, message: 'Платеж не найден' };
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = dates.todayISO();
     const nextDate = this.calculateNextPaymentDate(
       today,
       payment.frequency,
@@ -269,54 +269,59 @@ class RecurringPayment {
     return { success: true, nextPaymentDate: nextDate };
   }
 
-  // Вычисление следующей даты платежа
-  static calculateNextPaymentDate(fromDate, frequency, dayOfMonth, dayOfWeek, skipCurrent = false) {
-    const date = new Date(fromDate);
+  // Вычисление следующей даты платежа.
+  // today (необязательно) — «сегодня» пользователя: если вычисленная дата уже в
+  // прошлом (платёж заведён со start_date 2024 года), докатываем серию вперёд до
+  // первой даты >= today — иначе карточка показывает «Просрочено: 1 дек.» в октябре.
+  static calculateNextPaymentDate(fromDate, frequency, dayOfMonth, dayOfWeek, skipCurrent = false, today = null) {
+    const base = this._calculateNextPaymentDateRaw(fromDate, frequency, dayOfMonth, dayOfWeek, skipCurrent);
+    const todayStr = today || dates.todayISO();
+    if (base && base < todayStr) {
+      const rolled = dates.rollForward(base, frequency, todayStr, ['monthly', 'quarterly', 'yearly'].includes(frequency) ? dayOfMonth || null : null);
+      return rolled || base;
+    }
+    return base;
+  }
+
+  // Базовый расчёт в UTC-арифметике lib/dates (раньше смесь local/UTC Date
+  // давала сдвиг на день при переходе на зимнее время: 10.10 + 1 мес = 11.11).
+  static _calculateNextPaymentDateRaw(fromDate, frequency, dayOfMonth, dayOfWeek, skipCurrent = false) {
+    const parsed = dates.parseISO(fromDate);
+    if (!parsed) return null;
+    let iso = parsed.toISOString().split('T')[0];
 
     if (skipCurrent) {
       // Переходим к следующему периоду
       switch (frequency) {
-        case 'daily':
-          date.setDate(date.getDate() + 1);
-          break;
-        case 'weekly':
-          date.setDate(date.getDate() + 7);
-          break;
-        case 'biweekly':
-          date.setDate(date.getDate() + 14);
-          break;
-        case 'monthly':
-          date.setMonth(date.getMonth() + 1);
-          break;
-        case 'quarterly':
-          date.setMonth(date.getMonth() + 3);
-          break;
-        case 'yearly':
-          date.setFullYear(date.getFullYear() + 1);
-          break;
+        case 'daily': iso = dates.addDaysISO(iso, 1); break;
+        case 'weekly': iso = dates.addDaysISO(iso, 7); break;
+        case 'biweekly': iso = dates.addDaysISO(iso, 14); break;
+        case 'monthly': iso = dates.addMonthsISO(iso, 1, dayOfMonth || null); break;
+        case 'quarterly': iso = dates.addMonthsISO(iso, 3, dayOfMonth || null); break;
+        case 'yearly': iso = dates.addMonthsISO(iso, 12, dayOfMonth || null); break;
+        default: break;
       }
     }
 
     // Корректировка для конкретного дня
-    if (frequency === 'weekly' && dayOfWeek !== null) {
-      const currentDay = date.getDay();
-      const diff = dayOfWeek - currentDay;
+    if (frequency === 'weekly' && dayOfWeek !== null && dayOfWeek !== undefined) {
+      const currentDay = dates.parseISO(iso).getUTCDay();
+      const diff = Number(dayOfWeek) - currentDay;
       if (diff <= 0 && skipCurrent) {
-        date.setDate(date.getDate() + diff + 7);
+        iso = dates.addDaysISO(iso, diff + 7);
       } else if (diff > 0) {
-        date.setDate(date.getDate() + diff);
+        iso = dates.addDaysISO(iso, diff);
       }
     } else if (['monthly', 'quarterly', 'yearly'].includes(frequency) && dayOfMonth) {
-      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-      date.setDate(Math.min(dayOfMonth, lastDay));
+      iso = dates.addMonthsISO(iso, 0, Number(dayOfMonth));
     }
 
-    return date.toISOString().split('T')[0];
+    return iso;
   }
 
   // Автоматическое создание транзакций для платежей с auto_create
   static async processAutoPayments() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = dates.todayISO();
 
     const duePayments = await query(
       `SELECT * FROM recurring_payments

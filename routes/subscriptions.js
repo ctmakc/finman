@@ -3,6 +3,8 @@ const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
 const subscriptionDetector = require('../services/subscriptionDetector');
+const Subscription = require('../models/subscription');
+const dates = require('../lib/dates');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -10,6 +12,9 @@ router.use(authenticate);
 // Получить все подписки
 router.get('/', async (req, res) => {
   try {
+    const today = dates.todayISO(dates.userTz(req.user));
+    // Автопродляемые подписки с датой списания в прошлом — докатить до будущей.
+    await Subscription.rollForwardStale(req.user.id, today);
     const subscriptions = await query(
       `SELECT s.*, a.name as account_name
        FROM subscriptions s
@@ -22,7 +27,7 @@ router.get('/', async (req, res) => {
       ...s,
       monthlyAmount: calculateMonthlyAmount(s.amount, s.billing_cycle),
       yearlyAmount: calculateYearlyAmount(s.amount, s.billing_cycle),
-      daysUntilBilling: s.next_billing_date ? Math.ceil((new Date(s.next_billing_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
+      ...Subscription.billingInfo(s, today)
     }));
 
     res.json(enriched);
@@ -34,6 +39,8 @@ router.get('/', async (req, res) => {
 // Статистика подписок
 router.get('/stats', async (req, res) => {
   try {
+    const today = dates.todayISO(dates.userTz(req.user));
+    await Subscription.rollForwardStale(req.user.id, today);
     const active = await query(
       'SELECT * FROM subscriptions WHERE user_id = ? AND is_active = 1',
       [req.user.id]
@@ -49,8 +56,8 @@ router.get('/stats', async (req, res) => {
 
     const upcoming = active.filter(s => {
       if (!s.next_billing_date) return false;
-      const days = Math.ceil((new Date(s.next_billing_date) - new Date()) / (1000 * 60 * 60 * 24));
-      return days >= 0 && days <= 7;
+      const days = dates.diffDays(today, String(s.next_billing_date).slice(0, 10));
+      return days !== null && days >= 0 && days <= 7;
     });
 
     res.json({
@@ -80,7 +87,7 @@ router.post('/', async (req, res) => {
   try {
     const { name, description, amount, currency, billing_cycle, category, icon, color, start_date, reminder_days, auto_renew, account_id, url, notes } = req.body;
 
-    const nextBilling = calculateNextBillingDate(start_date, billing_cycle);
+    const nextBilling = Subscription.firstBillingDate(start_date, billing_cycle, dates.todayISO(dates.userTz(req.user)));
 
     const result = await run(
       `INSERT INTO subscriptions (user_id, name, description, amount, currency, billing_cycle, category, icon, color, start_date, next_billing_date, reminder_days, auto_renew, account_id, url, notes)
@@ -134,14 +141,15 @@ router.post('/:id/payment', async (req, res) => {
     if (!sub) return res.status(404).json({ message: 'Подписка не найдена' });
 
     const { amount, payment_date, transaction_id } = req.body;
+    const todayStr = dates.todayISO(dates.userTz(req.user));
 
     await run(
       'INSERT INTO subscription_payments (subscription_id, amount, payment_date, transaction_id) VALUES (?, ?, ?, ?)',
-      [req.params.id, amount || sub.amount, payment_date || new Date().toISOString().split('T')[0], transaction_id]
+      [req.params.id, amount || sub.amount, payment_date || todayStr, transaction_id]
     );
 
-    // Обновить следующую дату оплаты
-    const nextBilling = calculateNextBillingDate(payment_date || new Date().toISOString().split('T')[0], sub.billing_cycle);
+    // Обновить следующую дату оплаты: дата оплаты + цикл, но не раньше сегодня.
+    const nextBilling = Subscription.nextAfterPayment(payment_date || todayStr, sub.billing_cycle, todayStr);
     await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
 
     res.json({ message: 'Платёж записан' });
@@ -194,16 +202,6 @@ function calculateYearlyAmount(amount, cycle) {
   }
 }
 
-function calculateNextBillingDate(fromDate, cycle) {
-  const date = new Date(fromDate);
-  switch (cycle) {
-    case 'weekly': date.setDate(date.getDate() + 7); break;
-    case 'monthly': date.setMonth(date.getMonth() + 1); break;
-    case 'quarterly': date.setMonth(date.getMonth() + 3); break;
-    case 'yearly': date.setFullYear(date.getFullYear() + 1); break;
-    default: date.setMonth(date.getMonth() + 1);
-  }
-  return date.toISOString().split('T')[0];
-}
+// Логика дат списания — в models/subscription.js (перекат до даты >= сегодня).
 
 module.exports = router;
