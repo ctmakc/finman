@@ -73,50 +73,50 @@ const ForecastModule = {
     if (s.confidence) {
       confidenceHtml = `
         <div class="detail-item">
-          <span class="label">Коридор прогноза (±)</span>
+          <span class="label">${t('forecast.band')}</span>
           <span class="value">${this.fmt(s.confidence.endBand)}</span>
           <small>${this.fmt(s.confidence.projectedLower)} … ${this.fmt(s.confidence.projectedUpper)}</small>
         </div>
         <div class="detail-item ${s.worstCasePoint < 0 ? 'warning' : ''}">
-          <span class="label">Худший сценарий</span>
+          <span class="label">${t('forecast.worstCase')}</span>
           <span class="value ${s.worstCasePoint < 0 ? 'negative' : ''}">${this.fmt(s.worstCasePoint)}</span>
           <small>${s.worstCaseDate || ''}</small>
         </div>
         <div class="detail-item">
-          <span class="label">Модель</span>
-          <span class="value">${s.model === 'seasonal_trend' ? 'сезонность+тренд' : 'средняя'}</span>
-          <small>тренд/день: ${this.fmt(s.trendPerDay || 0)}</small>
+          <span class="label">${t('forecast.model')}</span>
+          <span class="value">${s.model === 'seasonal_trend' ? t('forecast.model.seasonal') : t('forecast.model.average')}</span>
+          <small>${t('forecast.trendPerDay', { value: this.fmt(s.trendPerDay || 0) })}</small>
         </div>`;
     }
 
     container.innerHTML = `
       <div class="forecast-main">
         <div class="forecast-current">
-          <span class="label">Текущий баланс</span>
+          <span class="label">${t('forecast.currentBalance')}</span>
           <span class="value">${this.fmt(s.currentBalance)}</span>
         </div>
         <div class="forecast-arrow ${isPositive ? 'up' : 'down'}">${isPositive ? '↗' : '↘'}</div>
         <div class="forecast-projected">
-          <span class="label">Прогноз</span>
+          <span class="label">${t('forecast.projected')}</span>
           <span class="value ${isPositive ? 'positive' : 'negative'}">${this.fmt(s.projectedBalance)}</span>
         </div>
       </div>
       <div class="forecast-details">
         <div class="detail-item">
-          <span class="label">Изменение</span>
+          <span class="label">${t('forecast.change')}</span>
           <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${this.fmt(s.change)} (${s.changePercent}%)</span>
         </div>
         <div class="detail-item warning">
-          <span class="label">Минимум баланса</span>
+          <span class="label">${t('forecast.lowest')}</span>
           <span class="value">${this.fmt(s.lowestPoint)}</span>
           <small>${s.lowestDate || ''}</small>
         </div>
         <div class="detail-item">
-          <span class="label">Ср. расход/день</span>
+          <span class="label">${t('forecast.avgExpense')}</span>
           <span class="value negative">${this.fmt(s.avgDailyExpense)}</span>
         </div>
         <div class="detail-item">
-          <span class="label">Ср. доход/день</span>
+          <span class="label">${t('forecast.avgIncome')}</span>
           <span class="value positive">${this.fmt(s.avgDailyIncome)}</span>
         </div>
         ${confidenceHtml}
@@ -136,7 +136,7 @@ const ForecastModule = {
     }
 
     const datasets = [{
-      label: 'Баланс',
+      label: t('forecast.chart.balance'),
       data: data.map(d => d.balance),
       borderColor: '#5D5CDE',
       backgroundColor: 'rgba(93, 92, 222, 0.1)',
@@ -149,7 +149,7 @@ const ForecastModule = {
     const hasBand = data.length && data[0].balanceUpper !== undefined;
     if (hasBand) {
       datasets.push({
-        label: 'Верхняя граница',
+        label: t('forecast.chart.upper'),
         data: data.map(d => d.balanceUpper),
         borderColor: 'rgba(93, 92, 222, 0.25)',
         borderDash: [4, 4],
@@ -160,7 +160,7 @@ const ForecastModule = {
         order: 2
       });
       datasets.push({
-        label: 'Нижняя граница',
+        label: t('forecast.chart.lower'),
         data: data.map(d => d.balanceLower),
         borderColor: 'rgba(93, 92, 222, 0.25)',
         borderDash: [4, 4],
@@ -200,28 +200,28 @@ const ForecastModule = {
     const summary = (this.anomalies && this.anomalies.summary) || null;
 
     if (!list.length) {
-      container.innerHTML = `<div class="empty-state">✅ Аномалий не обнаружено</div>`;
+      container.innerHTML = `<div class="empty-state"><i class="fas fa-check-circle"></i> ${t('forecast.noAnomalies')}</div>`;
       return;
     }
 
-    const sevLabel = { high: '🔴 Высокая', medium: '🟠 Средняя', low: '🟡 Низкая' };
+    const sevLabel = { high: t('forecast.sev.high'), medium: t('forecast.sev.medium'), low: t('forecast.sev.low') };
     const typeLabel = {
-      amount_outlier: 'Крупная транзакция',
-      duplicate_charge: 'Повтор списания',
-      subscription_hike: 'Рост цены подписки'
+      amount_outlier: t('forecast.anomaly.amount_outlier'),
+      duplicate_charge: t('forecast.anomaly.duplicate_charge'),
+      subscription_hike: t('forecast.anomaly.subscription_hike')
     };
 
     const summaryHtml = summary ? `
       <div class="anomalies-summary">
-        Всего: <strong>${summary.total}</strong> ·
-        🔴 ${summary.high} · 🟠 ${summary.medium} · 🟡 ${summary.low}
+        ${t('common.total')}: <strong>${summary.total}</strong> ·
+        ${sevLabel.high}: ${summary.high} · ${sevLabel.medium}: ${summary.medium} · ${sevLabel.low}: ${summary.low}
       </div>` : '';
 
     container.innerHTML = summaryHtml + list.map(a => `
       <div class="anomaly-item severity-${a.severity}">
         <div class="anomaly-head">
-          <span class="anomaly-type">${typeLabel[a.type] || a.type}</span>
-          <span class="anomaly-sev">${sevLabel[a.severity] || a.severity}</span>
+          <span class="anomaly-type">${typeLabel[a.type] || this.escape(a.type)}</span>
+          <span class="anomaly-sev">${sevLabel[a.severity] || this.escape(a.severity)}</span>
         </div>
         <div class="anomaly-reason">${this.escape(a.reason)}</div>
         <div class="anomaly-meta">
@@ -236,22 +236,22 @@ const ForecastModule = {
     const container = document.getElementById('trends-summary');
     if (!container || !this.trends) return;
 
-    const t = this.trends.trends;
+    const tr = this.trends.trends;
     const p = this.trends.prediction;
 
     container.innerHTML = `
       <div class="trends-grid">
         <div class="trend-card">
-          <div class="trend-header"><span>📈 Доходы</span><span class="${t.income.direction === 'up' ? 'positive' : 'negative'}">${t.income.direction === 'up' ? '↑' : '↓'} ${t.income.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong>${this.fmt(p.nextMonthIncome)}</strong></div>
+          <div class="trend-header"><span>${t('forecast.trend.income')}</span><span class="${tr.income.direction === 'up' ? 'positive' : 'negative'}">${tr.income.direction === 'up' ? '↑' : '↓'} ${tr.income.percent}%</span></div>
+          <div class="trend-prediction">${t('forecast.prediction')}: <strong>${this.fmt(p.nextMonthIncome)}</strong></div>
         </div>
         <div class="trend-card">
-          <div class="trend-header"><span>📉 Расходы</span><span class="${t.expense.direction === 'down' ? 'positive' : 'negative'}">${t.expense.direction === 'up' ? '↑' : '↓'} ${t.expense.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong>${this.fmt(p.nextMonthExpense)}</strong></div>
+          <div class="trend-header"><span>${t('forecast.trend.expense')}</span><span class="${tr.expense.direction === 'down' ? 'positive' : 'negative'}">${tr.expense.direction === 'up' ? '↑' : '↓'} ${tr.expense.percent}%</span></div>
+          <div class="trend-prediction">${t('forecast.prediction')}: <strong>${this.fmt(p.nextMonthExpense)}</strong></div>
         </div>
         <div class="trend-card">
-          <div class="trend-header"><span>💰 Сбережения</span><span class="${t.savings.direction === 'up' ? 'positive' : 'negative'}">${t.savings.direction === 'up' ? '↑' : '↓'} ${t.savings.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${this.fmt(p.nextMonthSavings)}</strong></div>
+          <div class="trend-header"><span>${t('forecast.trend.savings')}</span><span class="${tr.savings.direction === 'up' ? 'positive' : 'negative'}">${tr.savings.direction === 'up' ? '↑' : '↓'} ${tr.savings.percent}%</span></div>
+          <div class="trend-prediction">${t('forecast.prediction')}: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${this.fmt(p.nextMonthSavings)}</strong></div>
         </div>
       </div>
     `;
@@ -275,8 +275,8 @@ const ForecastModule = {
       data: {
         labels: months.map(m => m.month),
         datasets: [
-          { label: 'Доходы', data: months.map(m => m.income), backgroundColor: 'rgba(56, 193, 114, 0.7)' },
-          { label: 'Расходы', data: months.map(m => m.expense), backgroundColor: 'rgba(227, 52, 47, 0.7)' }
+          { label: t('forecast.trend.income'), data: months.map(m => m.income), backgroundColor: 'rgba(56, 193, 114, 0.7)' },
+          { label: t('forecast.trend.expense'), data: months.map(m => m.expense), backgroundColor: 'rgba(227, 52, 47, 0.7)' }
         ]
       },
       options: {
@@ -310,11 +310,11 @@ const ForecastModule = {
     return `
       <div class="forecast-page">
         <div class="page-header">
-          <h1>🔮 Прогнозирование</h1>
+          <h1><i class="fas fa-chart-area"></i> ${t('forecast.title')}</h1>
           <div class="period-buttons">
-            <button class="btn period-btn" type="button" data-action="forecast:period" data-days="7">7 дней</button>
-            <button class="btn period-btn active" type="button" data-action="forecast:period" data-days="30">30 дней</button>
-            <button class="btn period-btn" type="button" data-action="forecast:period" data-days="90">90 дней</button>
+            <button class="btn period-btn" type="button" data-action="forecast:period" data-days="7">${t('forecast.days', { n: 7 })}</button>
+            <button class="btn period-btn active" type="button" data-action="forecast:period" data-days="30">${t('forecast.days', { n: 30 })}</button>
+            <button class="btn period-btn" type="button" data-action="forecast:period" data-days="90">${t('forecast.days', { n: 90 })}</button>
           </div>
         </div>
 
@@ -322,17 +322,17 @@ const ForecastModule = {
         <div class="card" id="forecast-summary"></div>
 
         <div class="card">
-          <h3>📊 Прогноз баланса (с доверительным коридором)</h3>
+          <h3>${t('forecast.balanceChart')}</h3>
           <div class="chart-container" style="height:300px"><canvas id="forecast-chart"></canvas></div>
         </div>
 
         <div class="card">
-          <h3>⚠️ Аномалии транзакций</h3>
+          <h3>${t('forecast.anomaliesTitle')}</h3>
           <div id="anomalies-list"></div>
         </div>
 
         <div class="card">
-          <h3>📈 Тренды и прогнозы на следующий месяц</h3>
+          <h3>${t('forecast.trendsTitle')}</h3>
           <div id="trends-summary"></div>
           <div class="chart-container" style="height:250px;margin-top:1rem"><canvas id="trends-chart"></canvas></div>
         </div>

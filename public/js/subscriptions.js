@@ -54,16 +54,16 @@ const SubscriptionsModule = {
 
     const toolbar = `
       <div class="sub-toolbar">
-        <button type="button" class="btn btn-secondary" data-action="subs:detect"><i class="fas fa-search"></i> Найти подписки в тратах</button>
+        <button type="button" class="btn btn-secondary" data-action="subs:detect"><i class="fas fa-search"></i> ${t('subs.detect')}</button>
       </div>
       <div id="sub-detect-results"></div>`;
 
     if (this.subscriptions.length === 0) {
       container.innerHTML = toolbar + UI.emptyState({
         icon: 'fa-box-open',
-        title: 'Нет активных подписок',
-        text: 'Добавьте подписку вручную или найдите регулярные списания в своих транзакциях.',
-        action: { label: 'Добавить подписку', action: 'subs:add', icon: 'fa-plus' }
+        title: t('subs.empty.title'),
+        text: t('subs.empty.body'),
+        action: { label: t('subs.add'), action: 'subs:add', icon: 'fa-plus' }
       });
       return;
     }
@@ -72,10 +72,10 @@ const SubscriptionsModule = {
       <div class="card subscription-card" data-id="${sub.id}" style="border-left: 4px solid ${this.safeColor(sub.color)}">
         <div class="subscription-header">
           <div class="subscription-info">
-            <span class="subscription-icon">${UI.esc(sub.icon || '📦')}</span>
+            <span class="subscription-icon">${sub.icon ? UI.esc(sub.icon) : '<i class="fas fa-box"></i>'}</span>
             <div>
               <h3>${UI.esc(sub.name)}</h3>
-              <small>${UI.esc(sub.category || 'Без категории')}</small>
+              <small>${UI.esc(sub.category || t('subs.noCategory'))}</small>
             </div>
           </div>
           <div class="subscription-amount">
@@ -84,13 +84,13 @@ const SubscriptionsModule = {
           </div>
         </div>
         <div class="subscription-details">
-          <span>Следующий платёж: <strong>${UI.esc(sub.next_billing_date || 'Не указан')}</strong></span>
+          <span>${t('subs.nextPayment')}: <strong>${UI.esc(sub.next_billing_date || t('subs.notSet'))}</strong></span>
           <span>${this.dueLabel(sub.daysUntilBilling)}</span>
         </div>
         <div class="subscription-actions">
-          <button type="button" class="btn btn-sm" data-action="subs:pay" data-id="${sub.id}">✓ Оплачено</button>
-          <button type="button" class="btn btn-sm btn-secondary" data-action="subs:edit" data-id="${sub.id}" aria-label="Редактировать" title="Редактировать">✏️</button>
-          <button type="button" class="btn btn-sm btn-danger" data-action="subs:cancel" data-id="${sub.id}" aria-label="Отменить подписку" title="Отменить">✕</button>
+          <button type="button" class="btn btn-sm" data-action="subs:pay" data-id="${sub.id}"><i class="fas fa-check"></i> ${t('subs.markPaid')}</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-action="subs:edit" data-id="${sub.id}" aria-label="${t('btn.edit')}" title="${t('btn.edit')}"><i class="fas fa-pen"></i></button>
+          <button type="button" class="btn btn-sm btn-danger" data-action="subs:cancel" data-id="${sub.id}" aria-label="${t('subs.cancelSub')}" title="${t('subs.cancelSub')}"><i class="fas fa-times"></i></button>
         </div>
       </div>
     `).join('');
@@ -99,12 +99,12 @@ const SubscriptionsModule = {
   renderStats() {
     const container = document.getElementById('subscriptions-stats');
     if (!container) return;
-    const t = this.totals();
-    const count = this.stats && typeof this.stats.activeCount === 'number' ? this.stats.activeCount : t.activeCount;
+    const sums = this.totals();
+    const count = this.stats && typeof this.stats.activeCount === 'number' ? this.stats.activeCount : sums.activeCount;
     container.innerHTML = `
-      <div class="stat-card"><div class="stat-value">${count}</div><div class="stat-label">Активных</div></div>
-      <div class="stat-card"><div class="stat-value">${UI.moneyList(t.monthly)}</div><div class="stat-label">В месяц</div></div>
-      <div class="stat-card"><div class="stat-value">${UI.moneyList(t.yearly)}</div><div class="stat-label">В год</div></div>
+      <div class="stat-card"><div class="stat-value">${count}</div><div class="stat-label">${t('subs.stat.active')}</div></div>
+      <div class="stat-card"><div class="stat-value">${UI.moneyList(sums.monthly)}</div><div class="stat-label">${t('subs.stat.monthly')}</div></div>
+      <div class="stat-card"><div class="stat-value">${UI.moneyList(sums.yearly)}</div><div class="stat-label">${t('subs.stat.yearly')}</div></div>
     `;
   },
 
@@ -112,14 +112,14 @@ const SubscriptionsModule = {
   dueLabel(days) {
     if (days == null || !Number.isFinite(Number(days))) return '';
     const d = Number(days);
-    if (d === 0) return '⚠️ Сегодня';
-    if (d < 0) return `⚠️ Просрочен на ${-d} дн.`;
-    return `через ${d} дн.`;
+    if (d === 0) return t('subs.due.today');
+    if (d < 0) return t('subs.due.overdue', { n: -d });
+    return t('subs.due.in', { n: d });
   },
 
   getCycleLabel(cycle) {
-    const labels = { weekly: 'нед', biweekly: '2 нед', monthly: 'мес', quarterly: 'квартал', yearly: 'год' };
-    return labels[cycle] || cycle;
+    const known = ['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
+    return known.includes(cycle) ? t('subs.cycle.' + cycle) : cycle;
   },
 
   safeColor(c) {
@@ -131,14 +131,14 @@ const SubscriptionsModule = {
   // Найти регулярные списания в транзакциях (кандидаты в подписки).
   async detect() {
     const box = document.getElementById('sub-detect-results');
-    if (box) box.innerHTML = '<div class="ai-loading">Ищу регулярные списания…</div>';
+    if (box) box.innerHTML = `<div class="ai-loading">${t('subs.detecting')}</div>`;
     try {
       const response = await fetch('/api/subscriptions/detect', { headers: this.headers() });
       const data = await response.json();
       this.candidates = data.candidates || [];
       this.renderCandidates(data);
     } catch (error) {
-      if (box) box.innerHTML = '<div class="ai-error">Не удалось проанализировать траты</div>';
+      if (box) box.innerHTML = `<div class="ai-error">${t('subs.detectError')}</div>`;
     }
   },
 
@@ -147,19 +147,19 @@ const SubscriptionsModule = {
     if (!box) return;
     const cands = (data && data.candidates) || [];
     if (!cands.length) {
-      box.innerHTML = '<div class="empty-state"><p>Регулярных списаний не найдено 👍</p></div>';
+      box.innerHTML = `<div class="empty-state"><p>${t('subs.noCandidates')}</p></div>`;
       return;
     }
     const monthly = UI.sumByCurrency(cands, c => Number(c.amount) * UI.monthlyFactor(c.billingCycle), 'currency');
     box.innerHTML = `
-      <div class="sub-detect-head">Найдено ${cands.length} — потенциально <strong>${UI.moneyList(monthly)}/мес</strong></div>
+      <div class="sub-detect-head">${t('subs.found', { n: cands.length, amount: `<strong>${UI.moneyList(monthly)}` })}</strong></div>
       ${cands.map((c, i) => `
         <div class="card sub-candidate">
           <div class="sub-candidate-info">
             <strong>${UI.esc(c.description)}</strong>
-            <small>${UI.esc(UI.money(c.amount, c.currency))} · ${UI.esc(this.getCycleLabel(c.billingCycle))} · ${c.occurrences}× · ~${c.avgGapDays} дн</small>
+            <small>${UI.esc(UI.money(c.amount, c.currency))} · ${UI.esc(this.getCycleLabel(c.billingCycle))} · ${c.occurrences}× · ${t('subs.everyDays', { n: c.avgGapDays })}</small>
           </div>
-          <button type="button" class="btn btn-sm btn-primary" data-action="subs:add-detected" data-index="${i}">+ Добавить</button>
+          <button type="button" class="btn btn-sm btn-primary" data-action="subs:add-detected" data-index="${i}"><i class="fas fa-plus"></i> ${t('btn.add')}</button>
         </div>`).join('')}`;
   },
 
@@ -183,7 +183,7 @@ const SubscriptionsModule = {
       await this.loadStats();
       await this.detect();
     } catch (error) {
-      alert('Ошибка добавления подписки');
+      alert(t('subs.addError'));
     }
   },
 
@@ -195,7 +195,7 @@ const SubscriptionsModule = {
   showAddModal() {
     document.getElementById('subscription-form').reset();
     document.getElementById('subscription-id').value = '';
-    document.getElementById('subscription-modal-title').textContent = 'Новая подписка';
+    document.getElementById('subscription-modal-title').textContent = t('subs.modal.new');
     this.fillCurrencySelect(UI.baseCurrency());
     UI.openModal('subscription-modal');
   },
@@ -212,7 +212,7 @@ const SubscriptionsModule = {
     document.getElementById('sub-start-date').value = sub.start_date;
     document.getElementById('sub-color').value = this.safeColor(sub.color);
     this.fillCurrencySelect(sub.currency);
-    document.getElementById('subscription-modal-title').textContent = 'Редактировать подписку';
+    document.getElementById('subscription-modal-title').textContent = t('subs.modal.edit');
     UI.openModal('subscription-modal');
   },
 
@@ -240,12 +240,12 @@ const SubscriptionsModule = {
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert('Ошибка сохранения');
+      alert(t('subs.saveError'));
     }
   },
 
   async markPaid(id) {
-    if (!confirm('Отметить как оплаченную?')) return;
+    if (!confirm(t('subs.confirmPaid'))) return;
     try {
       await fetch(`/api/subscriptions/${Number(id)}/pay`, {
         method: 'POST',
@@ -254,18 +254,18 @@ const SubscriptionsModule = {
       });
       await this.loadSubscriptions();
     } catch (error) {
-      alert('Ошибка');
+      alert(t('msg.error'));
     }
   },
 
   async cancel(id) {
-    if (!confirm('Отменить подписку?')) return;
+    if (!confirm(t('subs.confirmCancel'))) return;
     try {
       await fetch(`/api/subscriptions/${Number(id)}/cancel`, { method: 'POST', headers: this.headers() });
       await this.loadSubscriptions();
       await this.loadStats();
     } catch (error) {
-      alert('Ошибка');
+      alert(t('msg.error'));
     }
   },
 
@@ -273,32 +273,32 @@ const SubscriptionsModule = {
     return `
       <div class="subscriptions-page">
         <div class="page-header">
-          <h1>📦 Подписки</h1>
-          <button type="button" class="btn btn-primary" data-action="subs:add">+ Добавить</button>
+          <h1><i class="fas fa-box"></i> ${t('subs.title')}</h1>
+          <button type="button" class="btn btn-primary" data-action="subs:add"><i class="fas fa-plus"></i> ${t('btn.add')}</button>
         </div>
         <div class="stats-grid" id="subscriptions-stats"></div>
         <div id="subscriptions-list"></div>
       </div>
       <div class="modal-backdrop" id="subscription-modal" hidden>
         <div class="modal">
-          <div class="modal-header"><h2 class="modal-title" id="subscription-modal-title">Новая подписка</h2><button type="button" class="modal-close" data-action="ui:close" aria-label="Закрыть">&times;</button></div>
+          <div class="modal-header"><h2 class="modal-title" id="subscription-modal-title">${t('subs.modal.new')}</h2><button type="button" class="modal-close" data-action="ui:close" aria-label="${t('btn.close')}">&times;</button></div>
           <div class="modal-body">
             <form id="subscription-form" data-submit="subs:save">
               <input type="hidden" id="subscription-id">
-              <div class="form-group"><label for="sub-name">Название</label><input type="text" id="sub-name" class="form-control" required></div>
+              <div class="form-group"><label for="sub-name">${t('common.name')}</label><input type="text" id="sub-name" class="form-control" required></div>
               <div class="form-row">
-                <div class="form-group"><label for="sub-amount">Сумма</label><input type="number" id="sub-amount" class="form-control" step="0.01" required></div>
-                <div class="form-group"><label for="sub-currency">Валюта</label><select id="sub-currency" class="form-control">${UI.currencyOptions()}</select></div>
+                <div class="form-group"><label for="sub-amount">${t('common.amount')}</label><input type="number" id="sub-amount" class="form-control" step="0.01" required></div>
+                <div class="form-group"><label for="sub-currency">${t('common.currency')}</label><select id="sub-currency" class="form-control">${UI.currencyOptions()}</select></div>
               </div>
               <div class="form-row">
-                <div class="form-group"><label for="sub-cycle">Период</label><select id="sub-cycle" class="form-control"><option value="monthly">Ежемесячно</option><option value="yearly">Ежегодно</option><option value="weekly">Еженедельно</option><option value="quarterly">Ежеквартально</option></select></div>
-                <div class="form-group"><label for="sub-start-date">Дата начала</label><input type="date" id="sub-start-date" class="form-control" required></div>
+                <div class="form-group"><label for="sub-cycle">${t('subs.form.cycle')}</label><select id="sub-cycle" class="form-control"><option value="monthly">${t('subs.cycleOpt.monthly')}</option><option value="yearly">${t('subs.cycleOpt.yearly')}</option><option value="weekly">${t('subs.cycleOpt.weekly')}</option><option value="quarterly">${t('subs.cycleOpt.quarterly')}</option></select></div>
+                <div class="form-group"><label for="sub-start-date">${t('subs.form.startDate')}</label><input type="date" id="sub-start-date" class="form-control" required></div>
               </div>
               <div class="form-row">
-                <div class="form-group"><label for="sub-category">Категория</label><select id="sub-category" class="form-control"><option value="">Выберите...</option><option>Стриминг</option><option>Музыка</option><option>Облако</option><option>Софт</option><option>Игры</option><option>Другое</option></select></div>
-                <div class="form-group"><label for="sub-color">Цвет</label><input type="color" id="sub-color" class="form-control" value="#5D5CDE"></div>
+                <div class="form-group"><label for="sub-category">${t('common.category')}</label><select id="sub-category" class="form-control"><option value="">${t('subs.form.choose')}</option>${['streaming', 'music', 'cloud', 'software', 'games', 'other'].map(c => `<option>${t('subs.cat.' + c)}</option>`).join('')}</select></div>
+                <div class="form-group"><label for="sub-color">${t('subs.form.color')}</label><input type="color" id="sub-color" class="form-control" value="#5D5CDE"></div>
               </div>
-              <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+              <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="ui:close">${t('btn.cancel')}</button><button type="submit" class="btn btn-primary">${t('btn.save')}</button></div>
             </form>
           </div>
         </div>

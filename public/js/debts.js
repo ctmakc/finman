@@ -64,19 +64,19 @@ async function renderDebtsPage() {
     mainContent.innerHTML = `
       <div class="debts-page">
         <div class="page-header">
-          <h1><i class="fas fa-hand-holding-usd"></i> Долги</h1>
-          <button type="button" class="btn btn-primary" data-action="debts:add"><i class="fas fa-plus"></i> Добавить</button>
+          <h1><i class="fas fa-hand-holding-usd"></i> ${t('debts.title')}</h1>
+          <button type="button" class="btn btn-primary" data-action="debts:add"><i class="fas fa-plus"></i> ${t('btn.add')}</button>
         </div>
         <div class="stats-grid">${renderDebtStats(summary)}</div>
         <div class="card-grid" id="debts-list">
           ${list.length === 0
-            ? UI.emptyState({ icon: 'fa-hand-holding-usd', title: 'Нет долгов', text: 'Записывайте кредиты и займы: остаток и срок считаются по платежам.', action: { label: 'Добавить долг', action: 'debts:add', icon: 'fa-plus' } })
+            ? UI.emptyState({ icon: 'fa-hand-holding-usd', title: t('debts.empty.title'), text: t('debts.empty.body'), action: { label: t('debts.addDebt'), action: 'debts:add', icon: 'fa-plus' } })
             : list.map((d) => renderDebtCard(d)).join('')}
         </div>
       </div>`;
   } catch (e) {
     console.error('debts:', e);
-    mainContent.innerHTML = '<div class="alert alert-error">Ошибка загрузки</div>';
+    mainContent.innerHTML = `<div class="alert alert-error">${t('msg.loadError')}</div>`;
   }
 }
 
@@ -90,9 +90,9 @@ function renderDebtStats(summary) {
     net[c] = summary.byCurrency[c].net;
   });
   return `
-    <div class="stat-card stat-over"><div class="stat-icon"><i class="fas fa-arrow-up"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(iOwe)}</div><div class="stat-label">Я должен</div></div></div>
-    <div class="stat-card stat-ok"><div class="stat-icon"><i class="fas fa-arrow-down"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(oweMe)}</div><div class="stat-label">Мне должны</div></div></div>
-    <div class="stat-card"><div class="stat-icon"><i class="fas fa-balance-scale"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(net, { signed: true })}</div><div class="stat-label">Баланс</div></div></div>`;
+    <div class="stat-card stat-over"><div class="stat-icon"><i class="fas fa-arrow-up"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(iOwe)}</div><div class="stat-label">${t('debts.stat.iOwe')}</div></div></div>
+    <div class="stat-card stat-ok"><div class="stat-icon"><i class="fas fa-arrow-down"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(oweMe)}</div><div class="stat-label">${t('debts.stat.oweMe')}</div></div></div>
+    <div class="stat-card"><div class="stat-icon"><i class="fas fa-balance-scale"></i></div><div class="stat-data"><div class="stat-value">${UI.moneyList(net, { signed: true })}</div><div class="stat-label">${t('common.balance')}</div></div></div>`;
 }
 
 function renderDebtCard(d) {
@@ -100,28 +100,28 @@ function renderDebtCard(d) {
   const cur = d.currency;
   const cardClass = ['card', p.isPaid ? 'debt-paid' : '', p.isOverdue ? 'debt-overdue budget-over' : ''].filter(Boolean).join(' ');
   const due = d.due_date
-    ? `<p class="debt-due${p.isOverdue ? ' overdue' : ''}"><i class="fas fa-${p.isOverdue ? 'exclamation-circle' : 'calendar'}"></i> Срок: ${UI.esc(d.due_date)}${p.isOverdue ? ' (просрочено!)' : ''}</p>`
+    ? `<p class="debt-due${p.isOverdue ? ' overdue' : ''}"><i class="fas fa-${p.isOverdue ? 'exclamation-circle' : 'calendar'}"></i> ${t('debts.due')}: ${UI.esc(d.due_date)}${p.isOverdue ? ` (${t('debts.overdue')})` : ''}</p>`
     : '';
   const status = p.isPaid
-    ? '<p class="debt-remaining text-success"><i class="fas fa-check-circle"></i> Выплачено!</p>'
-    : `<p class="debt-remaining">Осталось: <strong>${UI.esc(UI.money(p.remaining, cur))}</strong></p>`;
+    ? `<p class="debt-remaining text-success"><i class="fas fa-check-circle"></i> ${t('debts.paidOff')}</p>`
+    : `<p class="debt-remaining">${t('common.remaining')}: <strong>${UI.esc(UI.money(p.remaining, cur))}</strong></p>`;
   return `
     <div class="${cardClass}" data-id="${d.id}">
       <div class="card-header">
         <h3 class="card-title">${p.isIOwe ? '<i class="fas fa-arrow-up text-error"></i>' : '<i class="fas fa-arrow-down text-success"></i>'} ${UI.esc(d.name)}</h3>
         <div class="card-actions">
-          ${p.isPaid ? '' : `<button type="button" class="btn btn-sm btn-outline" data-action="debts:pay" data-id="${d.id}" aria-label="Записать платёж" title="Записать платёж"><i class="fas fa-money-bill"></i></button>`}
-          <button type="button" class="btn btn-sm btn-danger" data-action="debts:delete" data-id="${d.id}" aria-label="Удалить долг" title="Удалить"><i class="fas fa-trash"></i></button>
+          ${p.isPaid ? '' : `<button type="button" class="btn btn-sm btn-outline" data-action="debts:pay" data-id="${d.id}" aria-label="${t('debts.recordPayment')}" title="${t('debts.recordPayment')}"><i class="fas fa-money-bill"></i></button>`}
+          <button type="button" class="btn btn-sm btn-danger" data-action="debts:delete" data-id="${d.id}" aria-label="${t('debts.deleteDebt')}" title="${t('btn.delete')}"><i class="fas fa-trash"></i></button>
         </div>
       </div>
       ${d.counterparty ? `<p class="text-secondary">${UI.esc(d.counterparty)}</p>` : ''}
       <div class="budget-progress">
-        <div class="progress-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Выплачено ${p.pct}%">
+        <div class="progress-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${t('debts.paidProgress', { pct: p.pct })}">
           <div class="progress-fill progress-ok" style="width: ${p.percent}%"></div>
         </div>
         <div class="progress-labels">
-          <span>Выплачено: ${UI.esc(UI.money(p.paid, cur))}</span>
-          <span>из ${UI.esc(UI.money(p.amount, cur))}</span>
+          <span>${t('debts.paidLabel')}: ${UI.esc(UI.money(p.paid, cur))}</span>
+          <span>${t('debts.of', { amount: UI.esc(UI.money(p.amount, cur)) })}</span>
         </div>
       </div>
       ${due}
@@ -133,34 +133,34 @@ function showAddDebtModal() {
   const today = new Date().toISOString().split('T')[0];
   UI.modal({
     id: 'debt-modal',
-    title: 'Новый долг',
+    title: t('debts.modal.new'),
     body: `
       <form id="debt-form" data-submit="debts:save">
-        <div class="form-group"><label class="form-label" for="debt-name">Название</label><input type="text" id="debt-name" name="name" class="form-control" required></div>
-        <div class="form-group"><label class="form-label" for="debt-type">Тип</label>
+        <div class="form-group"><label class="form-label" for="debt-name">${t('common.name')}</label><input type="text" id="debt-name" name="name" class="form-control" required></div>
+        <div class="form-group"><label class="form-label" for="debt-type">${t('common.type')}</label>
           <select id="debt-type" name="type" class="form-control">
-            <option value="i_owe">Я должен</option>
-            <option value="owe_me">Мне должны</option>
-            <option value="credit">Кредит</option>
-            <option value="loan">Займ</option>
-            <option value="mortgage">Ипотека</option>
+            <option value="i_owe">${t('debts.type.iOwe')}</option>
+            <option value="owe_me">${t('debts.type.oweMe')}</option>
+            <option value="credit">${t('debts.type.credit')}</option>
+            <option value="loan">${t('debts.type.loan')}</option>
+            <option value="mortgage">${t('debts.type.mortgage')}</option>
           </select>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label" for="debt-amount">Сумма</label><input type="number" id="debt-amount" name="amount" class="form-control" required min="1" step="0.01"></div>
-          <div class="form-group"><label class="form-label" for="debt-currency">Валюта</label><select id="debt-currency" name="currency" class="form-control">${UI.currencyOptions()}</select></div>
+          <div class="form-group"><label class="form-label" for="debt-amount">${t('common.amount')}</label><input type="number" id="debt-amount" name="amount" class="form-control" required min="1" step="0.01"></div>
+          <div class="form-group"><label class="form-label" for="debt-currency">${t('common.currency')}</label><select id="debt-currency" name="currency" class="form-control">${UI.currencyOptions()}</select></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label" for="debt-rate">Процент</label><input type="number" id="debt-rate" name="interest_rate" class="form-control" value="0" min="0" step="0.1"></div>
-          <div class="form-group"><label class="form-label" for="debt-counterparty">Кому/от кого</label><input type="text" id="debt-counterparty" name="counterparty" class="form-control"></div>
+          <div class="form-group"><label class="form-label" for="debt-rate">${t('debts.form.rate')}</label><input type="number" id="debt-rate" name="interest_rate" class="form-control" value="0" min="0" step="0.1"></div>
+          <div class="form-group"><label class="form-label" for="debt-counterparty">${t('debts.form.counterparty')}</label><input type="text" id="debt-counterparty" name="counterparty" class="form-control"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label" for="debt-start">Дата начала</label><input type="date" id="debt-start" name="start_date" class="form-control" required value="${today}"></div>
-          <div class="form-group"><label class="form-label" for="debt-due">Срок</label><input type="date" id="debt-due" name="due_date" class="form-control"></div>
+          <div class="form-group"><label class="form-label" for="debt-start">${t('debts.form.startDate')}</label><input type="date" id="debt-start" name="start_date" class="form-control" required value="${today}"></div>
+          <div class="form-group"><label class="form-label" for="debt-due">${t('debts.form.dueDate')}</label><input type="date" id="debt-due" name="due_date" class="form-control"></div>
         </div>
         <div class="form-actions">
-          <button type="button" class="btn btn-outline" data-action="ui:close">Отмена</button>
-          <button type="submit" class="btn btn-primary">Создать</button>
+          <button type="button" class="btn btn-outline" data-action="ui:close">${t('btn.cancel')}</button>
+          <button type="submit" class="btn btn-primary">${t('btn.create')}</button>
         </div>
       </form>`
   });
@@ -171,9 +171,9 @@ async function saveDebt(form) {
   if (!d.due_date) delete d.due_date;
   try {
     const r = await fetchWithAuth('/api/debts', { method: 'POST', body: JSON.stringify(d) });
-    if (!r.ok) throw new Error('Ошибка');
+    if (!r.ok) throw new Error(t('msg.error'));
     UI.closeModal('debt-modal');
-    showNotification('Долг добавлен', 'success');
+    showNotification(t('debts.created'), 'success');
     renderDebtsPage();
   } catch (e) { showNotification(e.message, 'error'); }
 }
@@ -181,14 +181,14 @@ async function saveDebt(form) {
 function showPaymentModal(id) {
   UI.modal({
     id: 'payment-modal',
-    title: 'Платёж',
+    title: t('debts.payment.title'),
     body: `
       <form id="payment-form" data-submit="debts:pay-save">
         <input type="hidden" name="debtId" value="${Number(id)}">
-        <div class="form-group"><label class="form-label" for="payment-amount">Сумма</label><input type="number" id="payment-amount" name="amount" class="form-control" required min="0.01" step="0.01"></div>
+        <div class="form-group"><label class="form-label" for="payment-amount">${t('common.amount')}</label><input type="number" id="payment-amount" name="amount" class="form-control" required min="0.01" step="0.01"></div>
         <div class="form-actions">
-          <button type="button" class="btn btn-outline" data-action="ui:close">Отмена</button>
-          <button type="submit" class="btn btn-primary">Оплатить</button>
+          <button type="button" class="btn btn-outline" data-action="ui:close">${t('btn.cancel')}</button>
+          <button type="submit" class="btn btn-primary">${t('debts.payment.submit')}</button>
         </div>
       </form>`
   });
@@ -198,20 +198,20 @@ async function makePayment(form) {
   const d = Object.fromEntries(new FormData(form));
   try {
     const r = await fetchWithAuth('/api/debts/' + Number(d.debtId) + '/payment', { method: 'POST', body: JSON.stringify({ amount: parseFloat(d.amount) }) });
-    if (!r.ok) throw new Error('Ошибка');
+    if (!r.ok) throw new Error(t('msg.error'));
     UI.closeModal('payment-modal');
-    showNotification('Платёж записан', 'success');
+    showNotification(t('debts.payment.saved'), 'success');
     renderDebtsPage();
   } catch (e) { showNotification(e.message, 'error'); }
 }
 
 async function deleteDebt(id) {
-  if (!confirm('Удалить?')) return;
+  if (!confirm(t('msg.confirmDelete'))) return;
   try {
     await fetchWithAuth('/api/debts/' + Number(id), { method: 'DELETE' });
-    showNotification('Удалено', 'success');
+    showNotification(t('msg.deleted'), 'success');
     renderDebtsPage();
-  } catch (e) { showNotification('Ошибка', 'error'); }
+  } catch (e) { showNotification(t('msg.error'), 'error'); }
 }
 
 // Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
