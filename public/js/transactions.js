@@ -225,19 +225,35 @@ async function fetchTransactions(filters = {}) {
         method: 'POST',
         body: JSON.stringify(transactionData)
       });
-      
+    } catch (error) {
+      if (error && error.status === 401) return null;
+      // No service worker and no network: fetch itself rejects.
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (offline || error instanceof TypeError) return queueTransactionOffline(transactionData);
+      console.error('Could not create the transaction:', error);
+      showNotification(t('transactions.createFailed'), 'error');
+      return null;
+    }
+
+    try {
+      let data = null;
+      try { data = await response.json(); } catch (_) { data = null; }
+
+      // The service worker answers 503 { offline: true } when the network is gone.
+      if (response.status === 503 && data && data.offline) {
+        return queueTransactionOffline(transactionData);
+      }
+
       if (!response.ok) {
-        const data = await response.json();
-        showNotification(data.message || t('transactions.createError'), 'error');
+        const message = (data && (data.message || (data.error && data.error.message))) || t('transactions.createError');
+        showNotification(message, 'error');
         return null;
       }
-      
-      const newTransaction = await response.json();
+
       showNotification(t('transactions.created'), 'success');
-      
-      return newTransaction;
+      return data || {};
     } catch (error) {
-      console.error('Ошибка создания транзакции:', error);
+      console.error('Could not create the transaction:', error);
       showNotification(t('transactions.createFailed'), 'error');
       return null;
     }

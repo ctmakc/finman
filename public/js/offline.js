@@ -143,6 +143,24 @@
     });
   }
 
+  // Items left in 'sending' by a tab that closed mid-replay would never be
+  // picked up again (pending() skips them): put them back to 'pending'.
+  // Call only when no replay is running (start-up). The Idempotency-Key /
+  // clientTxId lets the server drop a duplicate if the first POST did land.
+  async function recoverStuck(store) {
+    var all = await store.getAll();
+    var n = 0;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].status === 'sending') {
+        all[i].status = 'pending';
+        all[i].updatedAt = Date.now();
+        await store.put(all[i]);
+        n++;
+      }
+    }
+    return n;
+  }
+
   async function markSynced(store, clientId, serverId) {
     var it = await store.get(clientId);
     if (!it) return;
@@ -369,9 +387,11 @@
   }
 
   // Реальный sender: POST /api/transactions. Классифицирует ответ:
-  //   2xx                 -> { ok:true, id }
-  //   4xx (кроме 408/429) -> { ok:false, permanent:true }
-  //   5xx / network / 408 -> { ok:false } (ретраим позже)
+  //   2xx                       -> { ok:true, id }
+  //   401                       -> { ok:false } — сессия истекла: ждём логина
+  //                                (app.js initApp снова зовёт sync())
+  //   4xx (кроме 401/408/429)   -> { ok:false, permanent:true }
+  //   5xx / network / 408 / 429 -> { ok:false } (ретраим позже)
   async function httpSender(payload) {
     var token = getToken();
     if (!token) {
@@ -401,6 +421,9 @@
         /* тело может быть пустым — не критично */
       }
       return { ok: true, id: id };
+    }
+    if (resp.status === 401) {
+      return { ok: false, permanent: false, error: 'unauthorized' };
     }
     if (resp.status >= 400 && resp.status < 500 && resp.status !== 408 && resp.status !== 429) {
       return { ok: false, permanent: true, error: 'http_' + resp.status };
@@ -559,14 +582,17 @@
         });
       });
       listenForSwSync();
-      // Догоняем то, что осталось с прошлой сессии.
-      if (isOnline()) {
-        sync();
-      } else {
-        pendingCount(store).then(function (n) {
-          if (n > 0) setIndicator('offline', { remaining: n });
-        });
-      }
+      // Догоняем то, что осталось с прошлой сессии (включая элементы,
+      // застрявшие в 'sending', если вкладку закрыли посреди отправки).
+      recoverStuck(store)
+        .catch(function () {})
+        .then(function () {
+          if (isOnline()) return sync();
+          return pendingCount(store).then(function (n) {
+            if (n > 0) setIndicator('offline', { remaining: n });
+          });
+        })
+        .catch(function () {});
       return api;
     }
 
@@ -598,6 +624,7 @@
     pendingCount: pendingCount,
     count: count,
     markSynced: markSynced,
+    recoverStuck: recoverStuck,
     dequeue: dequeue,
     replayQueue: replayQueue,
     // фабрики хранилищ

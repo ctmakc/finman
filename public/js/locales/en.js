@@ -276,6 +276,8 @@
     'transactions.createError': 'Failed to create transaction',
     'transactions.created': 'Transaction created',
     'transactions.createFailed': 'Something went wrong while creating the transaction',
+    'transactions.offlineQueued': 'You are offline. The transaction is saved on this device and will be sent when you reconnect.',
+    'transactions.offlineNotSaved': 'You are offline and the transaction could not be saved on this device. Please try again when you reconnect.',
     'transactions.updateError': 'Failed to update transaction',
     'transactions.updated': 'Transaction updated',
     'transactions.updateFailed': 'Something went wrong while updating the transaction',

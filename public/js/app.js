@@ -214,6 +214,7 @@ async function initApp() {
   }
 
   renderAuthenticatedUI();
+  replayOfflineQueue();
 
   await Promise.all([
     fetchAccounts(),
@@ -587,10 +588,9 @@ async function fetchWithAuth(url, options = {}) {
   const response = await fetch(url, mergedOptions);
 
   if (response.status === 401) {
-    // Token rejected: back to the login page.
-    localStorage.removeItem('token');
-    appState.isAuthenticated = false;
-    renderLoginPage();
+    // Token rejected: drop the session state (cached base currency, filters…)
+    // and go back to the login page.
+    logout();
     const err = new Error('Your session has expired. Please sign in again.');
     err.status = 401;
     throw err;
@@ -1639,11 +1639,37 @@ function openOnboardingWizard() {
 // ---------------------------------------------------------------------------
 // Session
 // ---------------------------------------------------------------------------
+// Offline queue (offline.js): items queued before a sign-in (or that hit a
+// 401 during replay) are sent as soon as there is a valid session again.
+function replayOfflineQueue() {
+  try {
+    const ctl = typeof window !== 'undefined' && window.offlineSync && window.offlineSync.controller;
+    if (ctl && typeof ctl.sync === 'function') {
+      Promise.resolve(ctl.sync()).catch(() => {});
+    }
+  } catch (e) { /* offline support is optional */ }
+}
+
+// Drops any per-user API responses an older service worker cached.
+function clearApiCaches() {
+  try {
+    if (typeof caches !== 'undefined' && caches && typeof caches.keys === 'function') {
+      caches.keys()
+        .then((keys) => Promise.all(keys.filter((k) => /-api$/.test(k)).map((k) => caches.delete(k))))
+        .catch(() => {});
+    }
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'clear-api-cache' });
+    }
+  } catch (e) { /* ignore */ }
+}
+
 function logout() {
   localStorage.removeItem('token');
 
   appState.isAuthenticated = false;
   appState.user = null;
+  appState.token = null;
   appState.accounts = [];
   appState.accountsByScope = { own: [], shared: [], all: [] };
   appState.transactions = [];
@@ -1651,6 +1677,12 @@ function logout() {
   appState.bankConnections = [];
   appState.supportedBanks = [];
   appState.currencySettings = null;
+  appState.baseCurrency = 'CAD';
+  appState.filters = {
+    startDate: null, endDate: null, accountId: null, category: null, type: null, search: '', page: 1
+  };
+  if (typeof UI !== 'undefined' && UI && typeof UI.resetBaseCurrency === 'function') UI.resetBaseCurrency();
+  clearApiCaches();
 
   closeDrawer();
   document.title = 'Finman';
