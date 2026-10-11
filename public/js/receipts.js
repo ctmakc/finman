@@ -270,11 +270,19 @@ const ReceiptsModule = {
     if (!accountId) return;
 
     try {
-      await fetch(`/api/receipts/${Number(id)}/create-transaction`, {
+      const res = await fetch(`/api/receipts/${Number(id)}/create-transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.headers() },
         body: JSON.stringify({ account_id: parseInt(accountId, 10) })
       });
+      if (!res.ok) {
+        // 409 already booked, 400 zero total / currency mismatch: show the server's reason.
+        let body = null;
+        try { body = await res.json(); } catch (e) { body = null; }
+        alert((body && (body.message || (body.error && body.error.message))) || t('msg.error'));
+        if (res.status === 409) await this.loadReceipts();
+        return;
+      }
       alert(t('receipts.txCreated'));
       await this.loadReceipts();
     } catch (error) {
