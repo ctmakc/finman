@@ -39,6 +39,14 @@
   var STORE_NAME = 'tx_queue';
   var API_URL = '/api/transactions';
 
+  // Translation with a safe fallback: i18n.js is loaded before this module in
+  // the browser; in node (unit tests) it may be absent, so return the key.
+  function tr(key, vars) {
+    var api = typeof root !== 'undefined' && root.i18n;
+    if (api && typeof api.t === 'function') return api.t(key, vars);
+    return key;
+  }
+
   // -----------------------------------------------------------------------
   // Утилиты
   // -----------------------------------------------------------------------
@@ -411,7 +419,7 @@
       el.setAttribute('aria-live', 'polite');
       el.style.cssText =
         'position:fixed;bottom:16px;left:16px;z-index:9999;padding:8px 14px;' +
-        'border-radius:8px;font:13px/1.3 system-ui,sans-serif;color:#fff;' +
+        'border-radius:8px;font:13px/1.3 var(--fm-font-ui, system-ui, sans-serif);color:var(--fm-primary-contrast, #fff);' +
         'box-shadow:0 2px 8px rgba(0,0,0,.25);display:none;transition:opacity .3s';
       root.document.body.appendChild(el);
     }
@@ -423,11 +431,11 @@
     if (!el) return;
     var n = (info && info.remaining) || 0;
     var map = {
-      offline: { bg: '#b45309', text: '⚠ Офлайн' + (n ? ' · в очереди: ' + n : '') },
-      queued: { bg: '#b45309', text: '⏳ В очереди: ' + n + ' (синхр. при сети)' },
-      syncing: { bg: '#5D5CDE', text: '↻ Синхронизация…' + (n ? ' (' + n + ')' : '') },
-      synced: { bg: '#15803d', text: '✓ Синхронизировано' },
-      failed: { bg: '#b91c1c', text: '✕ Часть транзакций не отправлена' },
+      offline: { bg: 'var(--fm-warning, #b45309)', text: tr('offline.offline') + (n ? ' · ' + tr('offline.inQueue', { n: n }) : '') },
+      queued: { bg: 'var(--fm-warning, #b45309)', text: tr('offline.queued', { n: n }) },
+      syncing: { bg: 'var(--fm-primary, #5D5CDE)', text: tr('offline.syncing') + (n ? ' (' + n + ')' : '') },
+      synced: { bg: 'var(--fm-positive, #15803d)', text: tr('offline.synced') },
+      failed: { bg: 'var(--fm-negative, #b91c1c)', text: tr('offline.failed') },
     };
     var conf = map[state];
     if (!conf) {

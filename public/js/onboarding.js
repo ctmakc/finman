@@ -13,30 +13,39 @@
 (function () {
   'use strict';
 
+  // Translation with a safe fallback (i18n.js loads before this module in the
+  // browser; under node the key itself is returned).
+  function tr(key, vars) {
+    var api = typeof window !== 'undefined' && window.i18n;
+    if (api && typeof api.t === 'function') return api.t(key, vars);
+    return key;
+  }
+
+  // Step copy lives in the locale dictionaries (onboarding.* keys); resolved at render time.
   var STEP_META = {
     account: {
-      title: 'Добавьте счёт',
-      desc: 'Создайте первый счёт — карту, наличные или вклад. С него начнётся учёт.',
+      title: 'onboarding.account.title',
+      desc: 'onboarding.account.body',
       icon: 'fa-wallet',
-      cta: 'Создать стартовый счёт',
+      cta: 'onboarding.account.cta',
     },
     transaction: {
-      title: 'Запишите операцию',
-      desc: 'Добавьте первую транзакцию или импортируйте выписку из банка.',
+      title: 'onboarding.transaction.title',
+      desc: 'onboarding.transaction.body',
       icon: 'fa-right-left',
-      cta: 'Перейти к транзакциям',
+      cta: 'onboarding.transaction.cta',
     },
     budget: {
-      title: 'Задайте бюджет',
-      desc: 'Установите лимит расходов по категории, чтобы держать траты под контролем.',
+      title: 'onboarding.budget.title',
+      desc: 'onboarding.budget.body',
       icon: 'fa-chart-pie',
-      cta: 'Перейти к бюджетам',
+      cta: 'onboarding.budget.cta',
     },
     goal: {
-      title: 'Поставьте цель',
-      desc: 'Создайте цель накопления — на отпуск, подушку безопасности или мечту.',
+      title: 'onboarding.goal.title',
+      desc: 'onboarding.goal.body',
       icon: 'fa-piggy-bank',
-      cta: 'Перейти к целям',
+      cta: 'onboarding.goal.cta',
     },
   };
 
@@ -58,8 +67,8 @@
     api: function (path, opts) {
       opts = opts || {};
       var headers = { 'Content-Type': 'application/json' };
-      var t = this.token();
-      if (t) headers.Authorization = 'Bearer ' + t;
+      var tok = this.token();
+      if (tok) headers.Authorization = 'Bearer ' + tok;
       return fetch(path, {
         method: opts.method || 'GET',
         headers: headers,
@@ -229,7 +238,7 @@
           })
           .catch(function () {
             self.setBusy(false);
-            self.showError('Не удалось создать стартовый счёт. Попробуйте ещё раз.');
+            self.showError(tr('onboarding.quickstartError'));
           });
         return;
       }
@@ -272,33 +281,34 @@
 
     ensureStyles: function () {
       if (document.getElementById('ob-styles')) return;
+      // Colours come from the app tokens (public/css/style.css --fm-*), so the
+      // reskin palette and light/dark themes apply; fallbacks keep it usable alone.
       var css =
         '.ob-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;' +
         'justify-content:center;background:rgba(15,23,42,.55);backdrop-filter:blur(2px);' +
-        'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}' +
-        '.ob-card{background:#fff;color:#1e293b;width:min(440px,92vw);border-radius:16px;' +
+        'font-family:var(--fm-font-ui, system-ui, -apple-system, Segoe UI, Roboto, sans-serif);}' +
+        '.ob-card{background:var(--fm-surface, #fff);color:var(--fm-ink, #1e293b);width:min(440px,92vw);border-radius:16px;' +
+        'border:1px solid var(--fm-border, transparent);' +
         'box-shadow:0 20px 60px rgba(0,0,0,.35);padding:28px;position:relative;}' +
         '.ob-close{position:absolute;top:14px;right:16px;border:0;background:transparent;' +
-        'font-size:20px;cursor:pointer;color:#94a3b8;line-height:1;}' +
+        'font-size:20px;cursor:pointer;color:var(--fm-ink-3, #94a3b8);line-height:1;}' +
         '.ob-steps{display:flex;gap:8px;margin-bottom:22px;}' +
-        '.ob-dot{flex:1;height:6px;border-radius:3px;background:#e2e8f0;}' +
-        '.ob-dot.active{background:#5D5CDE;}.ob-dot.done{background:#22C55E;}' +
-        '.ob-icon{width:56px;height:56px;border-radius:14px;background:#eef0fc;color:#5D5CDE;' +
+        '.ob-dot{flex:1;height:6px;border-radius:3px;background:var(--fm-border, #e2e8f0);}' +
+        '.ob-dot.active{background:var(--fm-primary, #5D5CDE);}.ob-dot.done{background:var(--fm-positive, #22C55E);}' +
+        '.ob-icon{width:56px;height:56px;border-radius:14px;background:var(--fm-primary-tint, #eef0fc);color:var(--fm-primary, #5D5CDE);' +
         'display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px;}' +
-        '.ob-title{font-size:20px;font-weight:700;margin:0 0 8px;}' +
-        '.ob-desc{font-size:14px;line-height:1.5;color:#475569;margin:0 0 20px;}' +
-        '.ob-error{display:none;color:#dc2626;font-size:13px;margin-bottom:12px;}' +
+        '.ob-title{font-size:20px;font-weight:700;margin:0 0 8px;font-family:var(--fm-font-display, inherit);}' +
+        '.ob-desc{font-size:14px;line-height:1.5;color:var(--fm-ink-2, #475569);margin:0 0 20px;}' +
+        '.ob-error{display:none;color:var(--fm-negative, #dc2626);font-size:13px;margin-bottom:12px;}' +
         '.ob-actions{display:flex;gap:10px;align-items:center;}' +
-        '.ob-primary{flex:1;background:#5D5CDE;color:#fff;border:0;border-radius:10px;' +
+        '.ob-primary{flex:1;background:var(--fm-primary, #5D5CDE);color:var(--fm-primary-contrast, #fff);border:0;border-radius:10px;' +
         'padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;}' +
         '.ob-primary[disabled]{opacity:.6;cursor:default;}' +
-        '.ob-primary.done{background:#22C55E;}' +
-        '.ob-secondary{background:transparent;border:0;color:#64748b;cursor:pointer;' +
+        '.ob-primary.done{background:var(--fm-positive, #22C55E);}' +
+        '.ob-secondary{background:transparent;border:0;color:var(--fm-ink-2, #64748b);cursor:pointer;' +
         'font-size:14px;padding:10px;}' +
         '.ob-foot{display:flex;justify-content:space-between;margin-top:16px;font-size:13px;}' +
-        '.ob-foot button{background:transparent;border:0;color:#64748b;cursor:pointer;}' +
-        '@media (prefers-color-scheme: dark){.ob-card{background:#1e293b;color:#e2e8f0;}' +
-        '.ob-desc{color:#94a3b8;}.ob-dot{background:#334155;}.ob-icon{background:#312e81;}}';
+        '.ob-foot button{background:transparent;border:0;color:var(--fm-ink-2, #64748b);cursor:pointer;}';
       var style = document.createElement('style');
       style.id = 'ob-styles';
       style.textContent = css;
@@ -328,22 +338,22 @@
         dots += '<div class="' + cls + '"></div>';
       }
 
-      var primaryLabel = done ? 'Готово ✓' : meta.cta;
+      var primaryLabel = done ? tr('onboarding.doneBtn') : tr(meta.cta);
 
       overlay.innerHTML =
         '<div class="ob-card">' +
-        '<button class="ob-close" aria-label="Закрыть">×</button>' +
+        '<button class="ob-close" aria-label="' + tr('btn.close') + '">×</button>' +
         '<div class="ob-steps">' + dots + '</div>' +
         '<div class="ob-icon"><i class="fa-solid ' + meta.icon + '"></i></div>' +
-        '<h2 class="ob-title">' + meta.title + '</h2>' +
-        '<p class="ob-desc">' + meta.desc + '</p>' +
+        '<h2 class="ob-title">' + tr(meta.title) + '</h2>' +
+        '<p class="ob-desc">' + tr(meta.desc) + '</p>' +
         '<div class="ob-error"></div>' +
         '<div class="ob-actions">' +
         '<button class="ob-primary' + (done ? ' done' : '') + '">' + primaryLabel + '</button>' +
         '</div>' +
         '<div class="ob-foot">' +
-        '<button class="ob-prev"' + (this.activeIndex === 0 ? ' style="visibility:hidden"' : '') + '>Назад</button>' +
-        '<button class="ob-skip">' + (isLast ? 'Завершить' : 'Пропустить') + '</button>' +
+        '<button class="ob-prev"' + (this.activeIndex === 0 ? ' style="visibility:hidden"' : '') + '>' + tr('onboarding.back') + '</button>' +
+        '<button class="ob-skip">' + (isLast ? tr('onboarding.finish') : tr('onboarding.skip')) + '</button>' +
         '</div>' +
         '</div>';
 
