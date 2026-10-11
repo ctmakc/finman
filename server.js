@@ -167,10 +167,11 @@ require('./services/authService');
 // При прямом запуске (node server.js) инициализируем здесь.
 // При require из тестов харнес сам вызывает initDatabase() до запросов,
 // чтобы полностью контролировать жизненный цикл временной БД.
+let dbReady = null;
 if (require.main === module) {
   // After migrations: optional demo seed for staging (DEMO_SEED_ON_EMPTY=1,
   // lib/demoSeed.js). Seeds only an empty users table; never throws.
-  initDatabase()
+  dbReady = initDatabase()
     .then(() => require('./lib/demoSeed').bootHook(logger))
     .catch((err) => {
       // Упавшая миграция — не unhandled rejection с живым, но пустым сервером.
@@ -272,37 +273,46 @@ app.use((err, req, res, next) => {
 // При require (тест-харнес) экспортируем app без побочного listen.
 let server = null;
 if (require.main === module) {
-  server = app.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-    console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
+  // Порт открывается только после миграций: иначе первые запросы на свежей
+  // или обновлённой БД падали «no such column: timezone» (17 миграций ещё шли).
+  dbReady.then(() => {
+    server = app.listen(PORT, () => {
+      console.log(`Сервер запущен на порту ${PORT}`);
+      console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
+    });
+
+    // Опциональный фоновый планировщик банковской синхронизации (gated SYNC_ENABLED).
+    try {
+      const syncScheduler = require('./services/syncScheduler');
+      if (syncScheduler.isEnabled()) {
+        syncScheduler.start();
+        logger.info('Bank sync scheduler started');
+      }
+    } catch (e) {
+      logger.warn({ err: e }, 'Sync scheduler not started');
+    }
   });
 
-  // Опциональный фоновый планировщик банковской синхронизации (gated SYNC_ENABLED).
-  try {
-    const syncScheduler = require('./services/syncScheduler');
-    if (syncScheduler.isEnabled()) {
-      syncScheduler.start();
-      logger.info('Bank sync scheduler started');
+  const shutdown = () => {
+    if (!server) {
+      closeDatabase();
+      process.exit(0);
     }
-  } catch (e) {
-    logger.warn({ err: e }, 'Sync scheduler not started');
-  }
+    server.close(() => {
+      closeDatabase();
+      process.exit(0);
+    });
+  };
 
   // Graceful shutdown - закрытие БД при завершении процесса
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-      closeDatabase();
-      process.exit(0);
-    });
+    shutdown();
   });
 
   process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully');
-    server.close(() => {
-      closeDatabase();
-      process.exit(0);
-    });
+    shutdown();
   });
 
   process.on('uncaughtException', (err) => {

@@ -148,4 +148,13 @@ describe('review: money', () => {
     const row = await db.get('SELECT balance FROM accounts WHERE id = ?', [acc]);
     expect(row.balance).toBe(-25);
   });
+
+  test('account currency must be a plain code; lower case is normalised', async () => {
+    const bad = await request.post('/api/accounts').set(auth(ctx.token)).send({ name: 'X', currency: 'US$', balance: 1 });
+    expect(bad.status).toBe(400);
+    const ok = await request.post('/api/accounts').set(auth(ctx.token)).send({ name: 'Y', currency: 'eur', balance: 1 });
+    expect(ok.status).toBe(201);
+    const row = await db.get('SELECT currency FROM accounts WHERE name = ?', ['Y']);
+    expect(row.currency).toBe('EUR');
+  });
 });

@@ -110,6 +110,9 @@ router.post('/', async (req, res) => {
     if (!(await ownsAccount(account_id, req.user.id))) {
       return res.status(404).json({ message: 'Account not found' });
     }
+    if (currency && !/^[A-Za-z]{3,5}$/.test(String(currency))) {
+      return res.status(400).json({ message: 'Currency must be a 3-5 letter code, e.g. CAD' });
+    }
     const nextBilling = Subscription.firstBillingDate(start_date, billing_cycle, dates.todayISO(dates.userTz(req.user)));
 
     const result = await run(

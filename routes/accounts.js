@@ -4,6 +4,7 @@ const Account = require('../models/account');
 const Transaction = require('../models/transaction');
 const { AccountPermission } = require('../models/permission');
 
+const CURRENCY_CODE = /^[A-Za-z]{3,5}$/;
 const router = express.Router();
 
 // Middleware для проверки аутентификации
@@ -49,6 +50,11 @@ router.post('/', authenticate, async (req, res) => {
         message: 'Account name is required' 
       });
     }
+    // Код валюты уходит в Intl и в разметку: только ISO-подобные коды
+    // (раньше принимался 'US$', а с ним и разметка в символе валюты).
+    if (currency !== undefined && currency !== null && currency !== '' && !CURRENCY_CODE.test(String(currency))) {
+      return res.status(400).json({ error: true, message: 'Currency must be a 3-5 letter code, e.g. CAD' });
+    }
     
     // Создание счета: баланс пишется один раз + одна строка type='opening'
     // в леджер (не доход и не расход) — атомарно.
@@ -57,7 +63,7 @@ router.post('/', authenticate, async (req, res) => {
       name,
       accountNumber,
       bankName,
-      currency,
+      currency: currency ? String(currency).toUpperCase() : currency,
       balance: Number(balance) || 0,
       accountType
     });
@@ -135,6 +141,9 @@ router.put('/:id', authenticate, async (req, res) => {
       currency,
       accountType
     } = req.body;
+    if (currency !== undefined && currency !== null && currency !== '' && !CURRENCY_CODE.test(String(currency))) {
+      return res.status(400).json({ error: true, message: 'Currency must be a 3-5 letter code, e.g. CAD' });
+    }
 
     // Получаем владельца счета для обновления
     const { get } = require('../db/database');
@@ -152,7 +161,7 @@ router.put('/:id', authenticate, async (req, res) => {
       name,
       accountNumber,
       bankName,
-      currency,
+      currency: currency ? String(currency).toUpperCase() : currency,
       accountType
     });
 
