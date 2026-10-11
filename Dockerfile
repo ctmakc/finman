@@ -29,8 +29,11 @@ RUN apt-get update \
 # npm rebuild sqlite3 forces a source build if the downloaded prebuilt
 # doesn't load (belt-and-suspenders; usually the prebuilt just works).
 COPY package.json package-lock.json ./
+# Grouped so a failing `npm ci` fails the build ("a && b || c" ran the
+# fallback rebuild after a failed install and the image built without deps).
 RUN npm ci --omit=dev --no-audit --no-fund \
-  && npm rebuild sqlite3 --build-from-source --omit=dev || npm rebuild sqlite3 \
+  && (npm rebuild sqlite3 --build-from-source --omit=dev || npm rebuild sqlite3) \
+  && node -e "require('sqlite3')" \
   && npm cache clean --force
 
 # ---- Stage 2: runtime -----------------------------------------------------
