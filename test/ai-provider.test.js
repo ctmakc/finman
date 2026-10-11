@@ -524,3 +524,43 @@ describe('per-call overrides and guards', () => {
     expect(axios.post.mock.calls[0][1].contents).toEqual([{ role: 'user', parts: [{ text: 'q' }] }]);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('stream lifecycle: client abort + stalled upstream', () => {
+  const { PassThrough } = require('stream');
+  beforeEach(() => {
+    process.env.OPENAI_API_KEY = 'oa-key';
+  });
+
+  test('abort signal cancels the stream: 499 AI_ABORTED, no chunks after the abort', async () => {
+    const body = new PassThrough();
+    axios.post.mockResolvedValue({ data: body });
+    const ac = new AbortController();
+    const chunks = [];
+    const p = provider.chatStream({ messages: [{ role: 'user', content: 'q' }], signal: ac.signal }, (t) => chunks.push(t));
+    await new Promise((r) => setImmediate(r));
+    body.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'one' } }] })}\n\n`);
+    await new Promise((r) => setImmediate(r));
+    ac.abort();
+    body.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'two' } }] })}\n\n`);
+    await expect(p).rejects.toMatchObject({ status: 499, code: 'AI_ABORTED' });
+    expect(chunks).toEqual(['one']);
+    expect(body.destroyed).toBe(true);
+    expect(axios.post.mock.calls[0][2].signal).toBe(ac.signal);
+  });
+
+  test('upstream that goes silent longer than the provider timeout is cut off (502)', async () => {
+    const body = new PassThrough();
+    axios.post.mockResolvedValue({ data: body });
+    const prev = provider._internal.DEFAULTS.openai.timeout;
+    provider._internal.DEFAULTS.openai.timeout = 50;
+    try {
+      const p = provider.chatStream({ messages: [{ role: 'user', content: 'q' }] }, () => {});
+      await new Promise((r) => setImmediate(r));
+      body.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'hel' } }] })}\n\n`);
+      await expect(p).rejects.toMatchObject({ status: 502, code: 'AI_REQUEST_FAILED' });
+    } finally {
+      provider._internal.DEFAULTS.openai.timeout = prev;
+    }
+  });
+});
