@@ -42,7 +42,7 @@
   // server-provided filename when present.
   async function downloadResponse(response, fallbackName) {
     if (!response.ok) {
-      let msg = 'Ошибка экспорта (' + response.status + ')';
+      let msg = t('dataExport.exportError', { status: response.status });
       try {
         const body = await response.json();
         if (body && body.error && body.error.message) msg = body.error.message;
@@ -73,9 +73,9 @@
       try {
         const res = await fetch('/api/export/backup', { headers: authHeaders() });
         await downloadResponse(res, 'finman_full_backup.json');
-        notify('Резервная копия скачана', 'success');
+        notify(t('dataExport.backupDone'), 'success');
       } catch (e) {
-        notify(e.message || 'Не удалось скачать резервную копию', 'error');
+        notify(e.message || t('dataExport.backupFail'), 'error');
       }
     },
 
@@ -83,9 +83,9 @@
       try {
         const res = await fetch('/api/export/csv', { headers: authHeaders() });
         await downloadResponse(res, 'finman_all_data.csv');
-        notify('CSV выгружен', 'success');
+        notify(t('dataExport.csvDone'), 'success');
       } catch (e) {
-        notify(e.message || 'Не удалось выгрузить CSV', 'error');
+        notify(e.message || t('dataExport.csvFail'), 'error');
       }
     },
 
@@ -93,15 +93,15 @@
       try {
         const res = await fetch('/api/export/beancount', { headers: authHeaders() });
         await downloadResponse(res, 'finman.beancount');
-        notify('Beancount-файл выгружен', 'success');
+        notify(t('dataExport.beancountDone'), 'success');
       } catch (e) {
-        notify(e.message || 'Не удалось выгрузить Beancount', 'error');
+        notify(e.message || t('dataExport.beancountFail'), 'error');
       }
     },
 
     async restoreFromFile(file) {
       if (!file) {
-        notify('Выберите файл резервной копии (.json)', 'error');
+        notify(t('dataExport.chooseFile'), 'error');
         return;
       }
       let parsed;
@@ -109,7 +109,7 @@
         const text = await file.text();
         parsed = JSON.parse(text);
       } catch (e) {
-        notify('Файл повреждён или это не JSON', 'error');
+        notify(t('dataExport.badFile'), 'error');
         return;
       }
       try {
@@ -122,12 +122,12 @@
         if (!res.ok || (body && body.success === false)) {
           const msg =
             (body && body.error && body.error.message) ||
-            'Ошибка восстановления (' + res.status + ')';
+            t('dataExport.restoreError', { status: res.status });
           throw new Error(msg);
         }
         const data = (body && body.data) || {};
         const count = data.totalImported != null ? data.totalImported : '?';
-        notify('Восстановлено записей: ' + count, 'success');
+        notify(t('dataExport.restored', { n: count }), 'success');
         // Дайте остальным модулям шанс перечитать данные.
         try {
           document.dispatchEvent(new CustomEvent('finman:data-restored', { detail: data }));
@@ -135,7 +135,7 @@
           /* CustomEvent may be unavailable in very old engines */
         }
       } catch (e) {
-        notify(e.message || 'Не удалось восстановить данные', 'error');
+        notify(e.message || t('dataExport.restoreFail'), 'error');
       }
     },
 
@@ -144,17 +144,17 @@
       if (!container) return;
       container.innerHTML = [
         '<div class="data-export card">',
-        '  <h3>Экспорт и резервные копии</h3>',
-        '  <p class="muted">Скачайте полную копию всех данных или восстановите их из файла.</p>',
+        '  <h3>' + t('dataExport.title') + '</h3>',
+        '  <p class="muted">' + t('dataExport.intro') + '</p>',
         '  <div class="data-export-actions">',
-        '    <button type="button" id="btn-backup-json" class="btn btn-primary">Скачать резервную копию (JSON)</button>',
-        '    <button type="button" id="btn-backup-csv" class="btn btn-secondary">Выгрузить всё в CSV</button>',
-        '    <button type="button" id="btn-backup-beancount" class="btn btn-secondary">Экспорт в Beancount</button>',
+        '    <button type="button" id="btn-backup-json" class="btn btn-primary">' + t('dataExport.downloadJson') + '</button>',
+        '    <button type="button" id="btn-backup-csv" class="btn btn-secondary">' + t('dataExport.downloadCsv') + '</button>',
+        '    <button type="button" id="btn-backup-beancount" class="btn btn-secondary">' + t('dataExport.downloadBeancount') + '</button>',
         '  </div>',
         '  <div class="data-export-restore">',
-        '    <label for="restore-file">Восстановить из резервной копии:</label>',
+        '    <label for="restore-file">' + t('dataExport.restoreLabel') + '</label>',
         '    <input type="file" id="restore-file" accept="application/json,.json" />',
-        '    <button type="button" id="btn-restore" class="btn btn-warning">Восстановить</button>',
+        '    <button type="button" id="btn-restore" class="btn btn-warning">' + t('dataExport.restore') + '</button>',
         '  </div>',
         '</div>',
       ].join('\n');

@@ -25,6 +25,13 @@
       .replace(/'/g, '&#39;');
   }
 
+  // The row mapper below names its token `t`, so keep a stable alias to the translator.
+  function i18nT(key, vars) {
+    return (typeof window !== 'undefined' && window.i18n && typeof window.i18n.t === 'function')
+      ? window.i18n.t(key, vars)
+      : key;
+  }
+
   function authHeaders(extra) {
     const h = { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') };
     if (extra) Object.assign(h, extra);
@@ -45,14 +52,14 @@
     getPage() {
       return (
         '<div class="api-tokens-page">' +
-        '<h2>API-токены</h2>' +
-        '<p class="muted">Personal Access Tokens для публичного REST API ' +
-        '(<code>/api/v1</code>). Используйте заголовок ' +
+        '<h2>' + t('apiTokens.title') + '</h2>' +
+        '<p class="muted">' + t('apiTokens.intro1') + ' ' +
+        '(<code>/api/v1</code>). ' + t('apiTokens.intro2') + ' ' +
         '<code>Authorization: Bearer &lt;token&gt;</code>.</p>' +
         '<div class="api-tokens-create">' +
         '<input id="api-token-name" type="text" maxlength="100" ' +
-        'placeholder="Название токена (напр. «Мобильный скрипт»)" />' +
-        '<button class="btn btn-primary" id="api-token-create-btn">Создать токен</button>' +
+        'placeholder="' + escapeHtml(t('apiTokens.namePlaceholder')) + '" />' +
+        '<button class="btn btn-primary" id="api-token-create-btn">' + t('apiTokens.create') + '</button>' +
         '</div>' +
         '<div id="api-token-new"></div>' +
         '<div id="api-tokens-list"></div>' +
@@ -104,12 +111,12 @@
       const list = document.getElementById('api-tokens-list');
       if (!list) return;
       if (!this.tokens.length) {
-        list.innerHTML = '<div class="empty-state"><p>Токенов пока нет</p></div>';
+        list.innerHTML = '<div class="empty-state"><p>' + t('apiTokens.empty') + '</p></div>';
         return;
       }
       list.innerHTML =
         '<table class="api-tokens-table"><thead><tr>' +
-        '<th>Название</th><th>Создан</th><th>Последнее использование</th><th></th>' +
+        '<th>' + t('common.name') + '</th><th>' + t('apiTokens.created') + '</th><th>' + t('apiTokens.lastUsed') + '</th><th></th>' +
         '</tr></thead><tbody>' +
         this.tokens
           .map(function (t) {
@@ -119,7 +126,7 @@
               '<td>' + fmtDate(t.createdAt) + '</td>' +
               '<td>' + fmtDate(t.lastUsedAt) + '</td>' +
               '<td><button class="btn btn-danger btn-sm" ' +
-              'onclick="ApiTokensModule.revoke(' + Number(t.id) + ')">Отозвать</button></td>' +
+              'onclick="ApiTokensModule.revoke(' + Number(t.id) + ')">' + i18nT('apiTokens.revoke') + '</button></td>' +
               '</tr>'
             );
           })
@@ -131,7 +138,7 @@
       const input = document.getElementById('api-token-name');
       const name = input ? input.value.trim() : '';
       if (!name) {
-        alert('Введите название токена');
+        alert(t('apiTokens.enterName'));
         return;
       }
       try {
@@ -142,7 +149,7 @@
         });
         const body = await res.json();
         if (!res.ok || !body.success) {
-          const msg = (body && body.error && body.error.message) || 'Ошибка создания токена';
+          const msg = (body && body.error && body.error.message) || t('apiTokens.createError');
           alert(msg);
           return;
         }
@@ -150,7 +157,7 @@
         this.showNewToken(body.data.token);
         await this.load();
       } catch (e) {
-        alert('Сетевая ошибка при создании токена');
+        alert(t('apiTokens.networkCreate'));
       }
     },
 
@@ -161,11 +168,11 @@
       const value = String(token.token || '');
       box.innerHTML =
         '<div class="api-token-reveal card">' +
-        '<strong>Токен «' + escapeHtml(token.name) + '» создан.</strong> ' +
-        'Скопируйте его сейчас — больше он не будет показан.' +
+        '<strong>' + t('apiTokens.createdMsg', { name: escapeHtml(token.name) }) + '</strong> ' +
+        t('apiTokens.copyNow') +
         '<div class="api-token-value">' +
         '<code id="api-token-plaintext">' + escapeHtml(value) + '</code> ' +
-        '<button class="btn btn-secondary btn-sm" id="api-token-copy-btn">Копировать</button>' +
+        '<button class="btn btn-secondary btn-sm" id="api-token-copy-btn">' + t('apiTokens.copy') + '</button>' +
         '</div></div>';
       const copyBtn = document.getElementById('api-token-copy-btn');
       if (copyBtn) {
@@ -173,13 +180,13 @@
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(value);
           }
-          copyBtn.textContent = 'Скопировано';
+          copyBtn.textContent = t('apiTokens.copied');
         });
       }
     },
 
     async revoke(id) {
-      if (!confirm('Отозвать этот токен? Приложения, использующие его, потеряют доступ.')) {
+      if (!confirm(t('apiTokens.confirmRevoke'))) {
         return;
       }
       try {
@@ -189,12 +196,12 @@
         });
         const body = await res.json().catch(function () { return {}; });
         if (!res.ok || !body.success) {
-          alert((body && body.error && body.error.message) || 'Не удалось отозвать токен');
+          alert((body && body.error && body.error.message) || t('apiTokens.revokeError'));
           return;
         }
         await this.load();
       } catch (e) {
-        alert('Сетевая ошибка при отзыве токена');
+        alert(t('apiTokens.networkRevoke'));
       }
     },
   };

@@ -14,17 +14,18 @@ function escapeHtml(text) {
 const RulesModule = {
   rules: [],
 
+  // Labels are i18n keys, resolved at render time (t() comes from i18n.js).
   FIELDS: [
-    { value: 'description', label: 'Описание' },
-    { value: 'category', label: 'Категория' },
-    { value: 'amount', label: 'Сумма' },
+    { value: 'description', key: 'common.description' },
+    { value: 'category', key: 'common.category' },
+    { value: 'amount', key: 'common.amount' },
   ],
   OPS: [
-    { value: 'contains', label: 'содержит' },
-    { value: 'equals', label: 'равно' },
-    { value: 'gt', label: 'больше' },
-    { value: 'lt', label: 'меньше' },
-    { value: 'regex', label: 'regex' },
+    { value: 'contains', key: 'rules.op.contains' },
+    { value: 'equals', key: 'rules.op.equals' },
+    { value: 'gt', key: 'rules.op.gt' },
+    { value: 'lt', key: 'rules.op.lt' },
+    { value: 'regex', key: 'rules.op.regex' },
   ],
 
   _authHeaders(json) {
@@ -50,12 +51,12 @@ const RulesModule = {
 
   fieldLabel(v) {
     const f = this.FIELDS.find((x) => x.value === v);
-    return f ? f.label : v;
+    return f ? t(f.key) : v;
   },
 
   opLabel(v) {
     const o = this.OPS.find((x) => x.value === v);
-    return o ? o.label : v;
+    return o ? t(o.key) : v;
   },
 
   render() {
@@ -64,13 +65,13 @@ const RulesModule = {
 
     const toolbar = `
       <div class="rules-toolbar">
-        <button class="btn btn-primary" onclick="RulesModule.apply()">⚡ Применить правила</button>
+        <button class="btn btn-primary" onclick="RulesModule.apply()"><i class="fas fa-bolt"></i> ${t('rules.apply')}</button>
         <span id="rules-apply-result" class="rules-apply-result"></span>
       </div>
       ${this.renderForm()}`;
 
     if (!Array.isArray(this.rules) || this.rules.length === 0) {
-      container.innerHTML = toolbar + `<div class="empty-state"><p>Правил пока нет</p></div>`;
+      container.innerHTML = toolbar + `<div class="empty-state"><p>${t('rules.empty')}</p></div>`;
       return;
     }
 
@@ -86,13 +87,13 @@ const RulesModule = {
             <strong>«${escapeHtml(r.match_value)}»</strong>
             → <strong>${escapeHtml(r.set_category)}</strong>
           </span>
-          <span class="rule-status">${r.is_active ? '✅' : '⏸️'}</span>
+          <span class="rule-status ${r.is_active ? 'text-success' : 'text-secondary'}" title="${r.is_active ? t('rules.active') : t('rules.paused')}"><i class="fas ${r.is_active ? 'fa-check-circle' : 'fa-pause-circle'}"></i></span>
         </div>
         <div class="rule-actions">
           <button class="btn btn-sm" onclick="RulesModule.toggle(${escapeHtml(r.id)})">
-            ${r.is_active ? 'Выключить' : 'Включить'}
+            ${r.is_active ? t('rules.disable') : t('rules.enable')}
           </button>
-          <button class="btn btn-sm btn-danger" onclick="RulesModule.remove(${escapeHtml(r.id)})">Удалить</button>
+          <button class="btn btn-sm btn-danger" onclick="RulesModule.remove(${escapeHtml(r.id)})">${t('btn.delete')}</button>
         </div>
       </div>`
       )
@@ -103,20 +104,20 @@ const RulesModule = {
 
   renderForm() {
     const fieldOpts = this.FIELDS.map(
-      (f) => `<option value="${escapeHtml(f.value)}">${escapeHtml(f.label)}</option>`
+      (f) => `<option value="${escapeHtml(f.value)}">${escapeHtml(t(f.key))}</option>`
     ).join('');
     const opOpts = this.OPS.map(
-      (o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`
+      (o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(t(o.key))}</option>`
     ).join('');
 
     return `
       <form class="rule-form" onsubmit="RulesModule.create(event)">
-        <input type="number" id="rule-priority" placeholder="Приоритет" value="100" min="0" />
+        <input type="number" id="rule-priority" placeholder="${escapeHtml(t('rules.priorityPlaceholder'))}" value="100" min="0" />
         <select id="rule-field">${fieldOpts}</select>
         <select id="rule-op">${opOpts}</select>
-        <input type="text" id="rule-value" placeholder="Значение (напр. Netflix)" required />
-        <input type="text" id="rule-category" placeholder="Категория (напр. Entertainment)" required />
-        <button type="submit" class="btn btn-secondary">Добавить правило</button>
+        <input type="text" id="rule-value" placeholder="${escapeHtml(t('rules.valuePlaceholder'))}" required />
+        <input type="text" id="rule-category" placeholder="${escapeHtml(t('rules.categoryPlaceholder'))}" required />
+        <button type="submit" class="btn btn-secondary">${t('rules.add')}</button>
       </form>`;
   },
 
@@ -143,7 +144,7 @@ const RulesModule = {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(err.message || 'Не удалось создать правило');
+        alert(err.message || t('rules.createError'));
         return;
       }
       await this.load();
@@ -178,7 +179,7 @@ const RulesModule = {
 
   async apply() {
     const out = document.getElementById('rules-apply-result');
-    if (out) out.textContent = 'Применяем…';
+    if (out) out.textContent = t('rules.applying');
     try {
       const res = await fetch('/api/rules/apply', {
         method: 'POST',
@@ -187,11 +188,11 @@ const RulesModule = {
       });
       const data = await res.json();
       if (out) {
-        out.textContent = `Обновлено транзакций: ${data.updated || 0}`;
+        out.textContent = t('rules.updated', { n: data.updated || 0 });
       }
     } catch (error) {
       console.error('Error applying rules:', error);
-      if (out) out.textContent = 'Ошибка применения';
+      if (out) out.textContent = t('rules.applyError');
     }
   },
 };

@@ -158,11 +158,29 @@
     return out;
   }
 
+  // Translator with an English fallback: ui.js is also loaded in node/jsdom
+  // tests where i18n.js is absent.
+  function tr(key, vars, fallback) {
+    var s;
+    if (root.i18n && typeof root.i18n.t === 'function') {
+      s = root.i18n.t(key, vars);
+      if (s !== key) return s;
+    }
+    s = fallback || key;
+    if (vars) {
+      s = s.replace(/\{(\w+)\}/g, function (m, name) {
+        return Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : m;
+      });
+    }
+    return s;
+  }
+
   function mixedCurrencyNote(currencies, subject) {
     var list = uniqueCurrencies(currencies);
     if (list.length < 2) return '';
-    return '<div class="fm-currency-note" role="note">' + esc(subject || 'Счета') + ' ведутся в разных валютах (' + esc(list.join(', ')) +
-      '): итоговые суммы сложены без конвертации и показаны без знака валюты.</div>';
+    var text = tr('ui.mixedCurrencyNote', { subject: esc(subject || tr('ui.accounts', null, 'Accounts')), list: esc(list.join(', ')) },
+      '{subject} are kept in different currencies ({list}): totals are added without conversion and shown without a currency sign.');
+    return '<div class="fm-currency-note" role="note">' + text + '</div>';
   }
 
   function currencyOptions(selected) {
@@ -362,7 +380,7 @@
       '<div class="modal' + (spec.size === 'lg' ? ' modal-lg' : '') + '">' +
         '<div class="modal-header">' +
           '<h2 class="modal-title">' + (spec.rawTitle ? spec.title : esc(spec.title || '')) + '</h2>' +
-          '<button type="button" class="modal-close" data-action="ui:close" aria-label="Закрыть">&times;</button>' +
+          '<button type="button" class="modal-close" data-action="ui:close" aria-label="' + esc(tr('btn.close', null, 'Close')) + '">&times;</button>' +
         '</div>' +
         '<div class="modal-body">' + (spec.body || '') + '</div>' +
         (spec.footer ? '<div class="modal-footer">' + spec.footer + '</div>' : '') +
