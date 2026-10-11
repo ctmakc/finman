@@ -109,6 +109,9 @@ const aiLimiter = rateLimit({
   message: { error: true, message: 'Слишком много AI-запросов, подождите минуту' },
   standardHeaders: true,
   legacyHeaders: false,
+  // Детерминированные GET без LLM (дашборд дёргает их на каждом показе) не
+  // съедают лимит, иначе 4-й показ дашборда за минуту блокировал AI-чат.
+  skip: (req) => req.method === 'GET' && /^\/(alerts|digest|opt-in)(\/|$)/.test(req.path),
 });
 
 // Rate limiting - для аутентификации (более строгий)
@@ -167,7 +170,13 @@ require('./services/authService');
 if (require.main === module) {
   // After migrations: optional demo seed for staging (DEMO_SEED_ON_EMPTY=1,
   // lib/demoSeed.js). Seeds only an empty users table; never throws.
-  initDatabase().then(() => require('./lib/demoSeed').bootHook(logger));
+  initDatabase()
+    .then(() => require('./lib/demoSeed').bootHook(logger))
+    .catch((err) => {
+      // Упавшая миграция — не unhandled rejection с живым, но пустым сервером.
+      logger.error({ err }, 'Database initialisation failed');
+      process.exit(1);
+    });
 }
 
 // Статические файлы

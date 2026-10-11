@@ -945,7 +945,7 @@ function initDatabase() {
           // ai_conversations, ai_messages и т.д.). require внутри, чтобы
           // избежать циклической зависимости на этапе загрузки модуля.
           const { runMigrations } = require('../lib/migrate');
-          runMigrations({ query, get, run })
+          runMigrations({ query, get, run, transaction })
             .then((applied) => {
               if (applied && applied.length) {
                 console.log('Migrations applied:', applied.join(', '));
