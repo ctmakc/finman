@@ -19,6 +19,7 @@
 const { query, get } = require('../db/database');
 const money = require('../lib/money');
 const { isCashflow } = require('../lib/txFilter');
+const fx = require('../lib/fx');
 const logger = require('../lib/logger');
 const Notification = require('../models/notification');
 const emailService = require('./emailService');
@@ -43,9 +44,11 @@ function weekWindow(now) {
 // от того, как именно записан знак в конкретной строке.
 async function buildDigest(userId, { now } = {}) {
   const { start, end } = weekWindow(now);
+  // Операция — в валюте своего счёта; сводка — в базовой валюте пользователя.
+  const conv = await fx.converterForUser(userId);
 
   const txRows = await query(
-    `SELECT t.type, t.amount, t.category
+    `SELECT t.type, t.amount, t.category, a.currency AS currency
        FROM transactions t
        INNER JOIN accounts a ON t.account_id = a.id
       WHERE t.user_id = ?
@@ -61,7 +64,7 @@ async function buildDigest(userId, { now } = {}) {
   for (const row of txRows) {
     // Transfers and opening balances are not cash flow (lib/txFilter).
     if (!isCashflow(row)) continue;
-    const amt = Math.abs(Number(row.amount) || 0);
+    const amt = await conv.convert(Math.abs(Number(row.amount) || 0), row.currency);
     if (row.type === 'income') {
       income = money.add(income, amt);
     } else {
@@ -81,7 +84,7 @@ async function buildDigest(userId, { now } = {}) {
 
   // Статус бюджетов: для каждого активного бюджета — процент использования.
   const budgetRows = await query(
-    `SELECT id, name, amount, spent, notify_at_percent
+    `SELECT id, name, amount, spent, notify_at_percent, currency
        FROM budgets
       WHERE user_id = ? AND is_active = 1
       ORDER BY id ASC`,
@@ -100,6 +103,7 @@ async function buildDigest(userId, { now } = {}) {
       name: b.name,
       amount: money.round(amount),
       spent: money.round(spent),
+      currency: b.currency || conv.baseCurrency,
       percent,
       status,
     };
@@ -111,27 +115,33 @@ async function buildDigest(userId, { now } = {}) {
   );
 
   const billRows = await query(
-    `SELECT id, name, amount, next_payment_date
-       FROM recurring_payments
-      WHERE user_id = ? AND is_active = 1
-        AND next_payment_date >= ?
-        AND next_payment_date <= ?
-      ORDER BY next_payment_date ASC`,
+    `SELECT rp.id, rp.name, rp.amount, rp.next_payment_date, a.currency AS currency
+       FROM recurring_payments rp
+       LEFT JOIN accounts a ON a.id = rp.account_id
+      WHERE rp.user_id = ? AND rp.is_active = 1
+        AND rp.next_payment_date >= ?
+        AND rp.next_payment_date <= ?
+      ORDER BY rp.next_payment_date ASC`,
     [userId, end, upcomingEnd]
   );
 
-  const upcomingBills = billRows.map((p) => ({
-    id: p.id,
-    name: p.name,
-    amount: money.round(Number(p.amount) || 0),
-    date: p.next_payment_date,
-  }));
+  const upcomingBills = [];
+  for (const p of billRows) {
+    upcomingBills.push({
+      id: p.id,
+      name: p.name,
+      amount: await conv.convert(Math.abs(Number(p.amount) || 0), p.currency),
+      date: p.next_payment_date,
+    });
+  }
 
   const upcomingTotal = money.sum(upcomingBills.map((b) => b.amount));
 
   return {
     userId,
     period: { start, end },
+    currency: conv.baseCurrency,
+    missingRates: conv.missingRates,
     income: money.round(income),
     expense: money.round(expense),
     net,
@@ -149,6 +159,7 @@ function renderText(d) {
   const lines = [];
   lines.push(`FinMan weekly summary`);
   lines.push(`Period: ${d.period.start} — ${d.period.end}`);
+  if (d.currency) lines.push(`Amounts in ${d.currency}`);
   lines.push('');
   lines.push(`Income:   ${d.income}`);
   lines.push(`Expenses: ${d.expense}`);
@@ -190,6 +201,7 @@ function renderHtml(d) {
   const parts = [];
   parts.push('<h2>FinMan weekly summary</h2>');
   parts.push(`<p>Period: ${escapeHtml(d.period.start)} — ${escapeHtml(d.period.end)}</p>`);
+  if (d.currency) parts.push(`<p>Amounts in ${escapeHtml(d.currency)}</p>`);
   parts.push('<ul>');
   parts.push(`<li>Income: <b>${d.income}</b></li>`);
   parts.push(`<li>Expenses: <b>${d.expense}</b></li>`);

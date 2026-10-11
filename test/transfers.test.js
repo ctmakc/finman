@@ -92,6 +92,9 @@ describe('Transfers — double-entry money movement', () => {
         `INSERT INTO accounts (user_id,name,currency,balance,account_type,is_active) VALUES (?,?,?,?,?,1)`,
         [local.userId, 'B', 'UAH', 0, 'checking']
       );
+      // getStats sums in the user's base currency; the accounts are UAH, so the
+      // base is UAH too (with base CAD the totals are converted).
+      await ldb.run(`INSERT OR REPLACE INTO user_currency_settings (user_id, base_currency) VALUES (?, 'UAH')`, [local.userId]);
 
       // Один доход, один расход, один перевод.
       await LTransaction.create({ accountId: a.id, userId: local.userId, date: '2026-06-21', amount: 200, type: 'income', category: 'salary', description: 'pay' });
