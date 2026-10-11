@@ -842,8 +842,8 @@ function renderLoginPage() {
     });
   });
 
-  loginForm.addEventListener('submit', handleLogin);
-  registerForm.addEventListener('submit', handleRegister);
+  loginForm.addEventListener('submit', withBusyForm(handleLogin));
+  registerForm.addEventListener('submit', withBusyForm(handleRegister));
 
   revealGoogleSignIn();
 }
@@ -869,6 +869,19 @@ function renderConnectionError(message) {
   `;
   document.getElementById('retry-btn').addEventListener('click', () => initApp());
   document.getElementById('error-logout-btn').addEventListener('click', logout);
+}
+
+// Submit handler wrapper: the form's submit button stays disabled while the
+// request is in flight, so a double click cannot send it twice.
+function withBusyForm(handler) {
+  return (e) => {
+    e.preventDefault();
+    const form = e.currentTarget || e.target;
+    if (typeof UI !== 'undefined' && UI && typeof UI.busy === 'function') {
+      return UI.busy(form, () => handler(e)).catch((err) => console.error(err));
+    }
+    return handler(e);
+  };
 }
 
 async function handleLogin(e) {
@@ -1521,8 +1534,8 @@ function renderSettingsPage() {
     </div>
   `;
 
-  document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
-  document.getElementById('password-form').addEventListener('submit', handlePasswordUpdate);
+  document.getElementById('profile-form').addEventListener('submit', withBusyForm(handleProfileUpdate));
+  document.getElementById('password-form').addEventListener('submit', withBusyForm(handlePasswordUpdate));
   document.getElementById('export-btn').addEventListener('click', handleDataExport);
 
   const exportPeriod = document.getElementById('export-period');

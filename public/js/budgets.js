@@ -419,9 +419,12 @@ function showCreateBudgetModal() {
     if (e.target === modalBackdrop) closeModal();
   });
 
-  modalForm.addEventListener('submit', async (e) => {
+  modalForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    UI.busy(modalForm, () => submitBudgetForm()).catch((err) => console.error(err));
+  });
 
+  async function submitBudgetForm() {
     const budgetData = {
       name: document.getElementById(`${modalId}-name`).value.trim(),
       category: document.getElementById(`${modalId}-category`).value.trim() || null,
@@ -438,7 +441,7 @@ function showCreateBudgetModal() {
       closeModal();
       renderBudgetsPage();
     }
-  });
+  }
 }
 
 // Модальное окно редактирования бюджета
@@ -536,9 +539,12 @@ async function showEditBudgetModal(id) {
     if (e.target === modalBackdrop) closeModal();
   });
 
-  modalForm.addEventListener('submit', async (e) => {
+  modalForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    UI.busy(modalForm, () => submitBudgetForm()).catch((err) => console.error(err));
+  });
 
+  async function submitBudgetForm() {
     const budgetData = {
       name: document.getElementById(`${modalId}-name`).value.trim(),
       category: document.getElementById(`${modalId}-category`).value.trim() || null,
@@ -555,7 +561,7 @@ async function showEditBudgetModal(id) {
       closeModal();
       renderBudgetsPage();
     }
-  });
+  }
 }
 
 // Подтверждение удаления бюджета

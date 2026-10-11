@@ -258,11 +258,21 @@ async function fetchTransactions(filters = {}) {
   }
   
   // Модальное окно создания/редактирования транзакции
+  // showAddTransactionModal()           -> new transaction
+  // showAddTransactionModal('expense')  -> new transaction with the type preset (widgets)
+  // showAddTransactionModal(row)        -> edit an existing income/expense row
   function showAddTransactionModal(transactionData = null) {
-    // Создание модального окна
     const modalId = 'transaction-modal';
+    const presetType = typeof transactionData === 'string' ? transactionData : null;
+    if (typeof transactionData !== 'object') transactionData = null;
     const isEditing = !!transactionData;
-    
+    // Opening balances and transfers have their own sign rules: this form only
+    // knows income/expense, so it would flip -500 into +500. Keep their type
+    // and sign untouched (the Edit button is hidden for them anyway).
+    const lockedType = isEditing && !['income', 'expense'].includes(transactionData.type)
+      ? String(transactionData.type || '') : null;
+    const selectedType = isEditing ? transactionData.type : (presetType === 'income' ? 'income' : 'expense');
+
     const modalHtml = `
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
@@ -286,9 +296,10 @@ async function fetchTransactions(filters = {}) {
             
             <div class="form-group">
               <label for="${modalId}-type" class="form-label">${t('transactions.field.type')}</label>
-              <select id="${modalId}-type" class="form-control" required>
-                <option value="income" ${isEditing && transactionData.type === 'income' ? 'selected' : ''}>${t('common.income')}</option>
-                <option value="expense" ${isEditing && transactionData.type === 'expense' ? 'selected' : ''}>${t('common.expense')}</option>
+              <select id="${modalId}-type" class="form-control" required ${lockedType ? 'disabled' : ''}>
+                ${lockedType ? `<option value="${escapeHtml(lockedType)}" selected>${escapeHtml(lockedType)}</option>` : `
+                <option value="income" ${selectedType === 'income' ? 'selected' : ''}>${t('common.income')}</option>
+                <option value="expense" ${selectedType === 'expense' ? 'selected' : ''}>${t('common.expense')}</option>`}
               </select>
             </div>
             
@@ -361,16 +372,21 @@ async function fetchTransactions(filters = {}) {
       }
     });
     
-    // Обработчик отправки формы
-    modalForm.addEventListener('submit', async (e) => {
+    // Обработчик отправки формы (кнопка заблокирована, пока запрос в пути)
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+      UI.busy(modalForm, () => submitTransactionForm()).catch((err) => console.error(err));
+    });
+
+    async function submitTransactionForm() {
       const accountId = document.getElementById(`${modalId}-account`).value;
-      const type = document.getElementById(`${modalId}-type`).value;
+      const type = lockedType || document.getElementById(`${modalId}-type`).value;
       let amount = parseFloat(document.getElementById(`${modalId}-amount`).value);
       
-      // Если это расход, делаем сумму отрицательной
-      if (type === 'expense') {
+      if (lockedType) {
+        // Keep the original sign of opening/transfer rows.
+        amount = (Number(transactionData.amount) < 0 ? -1 : 1) * Math.abs(amount);
+      } else if (type === 'expense') {
         amount = -Math.abs(amount);
       } else {
         amount = Math.abs(amount);
@@ -409,7 +425,7 @@ async function fetchTransactions(filters = {}) {
           });
         }
       }
-    });
+    }
   }
   
   // Модальное окно импорта транзакций
@@ -520,10 +536,13 @@ async function fetchTransactions(filters = {}) {
       }
     });
     
-    // Обработчик отправки формы
-    modalForm.addEventListener('submit', async (e) => {
+    // Обработчик отправки формы (кнопка заблокирована, пока запрос в пути)
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+      UI.busy(modalForm, () => submitImportForm()).catch((err) => console.error(err));
+    });
+
+    async function submitImportForm() {
       const accountId = document.getElementById(`${modalId}-account`).value;
       const bankType = document.getElementById(`${modalId}-bank-type`).value;
       const file = fileInput.files[0];
@@ -552,7 +571,7 @@ async function fetchTransactions(filters = {}) {
           renderDashboard();
         }
       }
-    });
+    }
   }
   
   // Currency of a transaction row: the API row carries none, so take it from
@@ -604,10 +623,10 @@ async function fetchTransactions(filters = {}) {
         </td>
         <td data-label="${t('common.actions')}" class="tx-cell tx-cell-actions">
           <div class="table-actions">
-            ${isTransfer ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="${t('transactions.editAria')}" title="${t('btn.edit')}">
+            ${(isTransfer || transaction.type === 'opening') ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${escapeHtml(transaction.id)}" aria-label="${t('transactions.editAria')}" title="${t('btn.edit')}">
               <i class="fas fa-edit"></i>
             </button>`}
-            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}" aria-label="${t('transactions.deleteAria')}" title="${t('btn.delete')}">
+            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${escapeHtml(transaction.id)}" aria-label="${t('transactions.deleteAria')}" title="${t('btn.delete')}">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -747,9 +766,12 @@ async function fetchTransactions(filters = {}) {
       if (e.target === modalBackdrop) closeModal();
     });
 
-    modalForm.addEventListener('submit', async (e) => {
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      UI.busy(modalForm, () => submitTransferForm()).catch((err) => console.error(err));
+    });
 
+    async function submitTransferForm() {
       const fromAccountId = document.getElementById(`${modalId}-from`).value;
       const toAccountId = document.getElementById(`${modalId}-to`).value;
       const amount = parseFloat(document.getElementById(`${modalId}-amount`).value);
@@ -784,7 +806,7 @@ async function fetchTransactions(filters = {}) {
           }
         }
       }
-    });
+    }
   }
   
   // Рендеринг пагинации
@@ -841,15 +863,23 @@ async function fetchTransactions(filters = {}) {
     if (!action || !transactionId) return;
     
     switch (action) {
-      case 'edit':
-        // Получение данных транзакции
-        const transactions = await fetchTransactions();
-        const transaction = transactions.find(t => t.id == transactionId);
-        
-        if (transaction) {
+      case 'edit': {
+        // The row may be beyond the first page: load it by id.
+        let transaction = null;
+        try {
+          const response = await fetchWithAuth(`/api/transactions/${encodeURIComponent(transactionId)}`);
+          if (response.ok) transaction = await response.json();
+        } catch (error) {
+          if (!(error && error.status === 401)) console.error('Could not load the transaction:', error);
+        }
+        if (transaction && transaction.data && !transaction.id) transaction = transaction.data;
+        if (transaction && transaction.type !== 'opening' && transaction.type !== 'transfer') {
           showAddTransactionModal(transaction);
+        } else if (!transaction) {
+          showNotification(t('transactions.fetchError'), 'error');
         }
         break;
+      }
         
       case 'delete':
         if (confirm(t('transactions.confirmDelete'))) {

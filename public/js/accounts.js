@@ -193,10 +193,13 @@ async function fetchAccount(accountId) {
       }
     });
     
-    // Обработчик отправки формы
-    modalForm.addEventListener('submit', async (e) => {
+    // Обработчик отправки формы (кнопка заблокирована, пока запрос в пути)
+    modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+      UI.busy(modalForm, () => submitAccountForm()).catch((err) => console.error(err));
+    });
+
+    async function submitAccountForm() {
       const accountFormData = {
         name: document.getElementById(`${modalId}-name`).value,
         accountType: document.getElementById(`${modalId}-type`).value,
@@ -229,7 +232,7 @@ async function fetchAccount(accountId) {
           renderDashboard();
         }
       }
-    });
+    }
   }
   
   // Обработка действий со счетами
