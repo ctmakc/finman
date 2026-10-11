@@ -1,5 +1,17 @@
 const { query, get, run } = require('../db/database');
 
+// Доступ выдаётся только членам общей семьи. Без этого grant на произвольный
+// userId + getAccountUsers раскрывали email и имя любого пользователя.
+async function sharesFamily(userA, userB) {
+  const row = await get(
+    `SELECT 1 AS ok FROM family_members a
+     JOIN family_members b ON a.family_id = b.family_id
+     WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`,
+    [userA, userB]
+  );
+  return Boolean(row);
+}
+
 class AccountPermission {
   // Создание/обновление прав доступа к счету
   static async grant(accountId, userId, permissions, grantedBy) {
@@ -18,6 +30,9 @@ class AccountPermission {
     // Нельзя выдать права самому себе
     if (userId === grantedBy) {
       return { success: false, message: 'You cannot change your own permissions' };
+    }
+    if (!(await sharesFamily(grantedBy, userId))) {
+      return { success: false, message: 'Access can only be shared with members of your family' };
     }
 
     // Проверяем существующие права
@@ -120,12 +135,21 @@ class AccountPermission {
     }
 
     return query(
-      `SELECT ap.*, u.username, u.email, u.full_name
+      // email/имя — только тех, кто сейчас в общей семье с владельцем.
+      `SELECT ap.*, u.username,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM family_members a JOIN family_members b ON a.family_id = b.family_id
+                WHERE a.user_id = ? AND b.user_id = ap.user_id
+              ) THEN u.email END AS email,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM family_members a JOIN family_members b ON a.family_id = b.family_id
+                WHERE a.user_id = ? AND b.user_id = ap.user_id
+              ) THEN u.full_name END AS full_name
        FROM account_permissions ap
        JOIN users u ON ap.user_id = u.id
        WHERE ap.account_id = ?
        ORDER BY ap.created_at DESC`,
-      [accountId]
+      [ownerId, ownerId, accountId]
     );
   }
 
@@ -190,6 +214,9 @@ class BudgetPermission {
 
     if (userId === grantedBy) {
       return { success: false, message: 'You cannot change your own permissions' };
+    }
+    if (!(await sharesFamily(grantedBy, userId))) {
+      return { success: false, message: 'Access can only be shared with members of your family' };
     }
 
     const existing = await get(

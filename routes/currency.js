@@ -44,6 +44,9 @@ router.put('/settings', authenticate, async (req, res) => {
     const settings = await Currency.getUserSettings(req.user.id);
     res.json({ success: true, settings });
   } catch (error) {
+    if (error && error.message === 'Invalid base currency') {
+      return res.status(400).json({ error: true, message: error.message });
+    }
     console.error('Error:', error);
     res.status(500).json({ error: true, message: 'Failed to update settings' });
   }

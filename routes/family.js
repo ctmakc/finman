@@ -44,7 +44,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Получение семьи по ID
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id(\\d+)', authenticate, async (req, res) => {
   try {
     const family = await Family.findById(req.params.id);
 
@@ -67,7 +67,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Обновление семьи
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id(\\d+)', authenticate, async (req, res) => {
   try {
     const { name, description } = req.body;
 
@@ -87,7 +87,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // Удаление семьи
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id(\\d+)', authenticate, async (req, res) => {
   try {
     const deleted = await Family.delete(req.params.id, req.user.id);
 
@@ -105,7 +105,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 // ==================== УЧАСТНИКИ ====================
 
 // Получение участников семьи
-router.get('/:id/members', authenticate, async (req, res) => {
+router.get('/:id(\\d+)/members', authenticate, async (req, res) => {
   try {
     const isMember = await Family.isMember(req.params.id, req.user.id);
     if (!isMember) {
@@ -121,7 +121,7 @@ router.get('/:id/members', authenticate, async (req, res) => {
 });
 
 // Удаление участника
-router.delete('/:id/members/:userId', authenticate, async (req, res) => {
+router.delete('/:id(\\d+)/members/:userId', authenticate, async (req, res) => {
   try {
     const result = await Family.removeMember(
       req.params.id,
@@ -141,7 +141,7 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
 });
 
 // Изменение роли участника
-router.put('/:id/members/:userId/role', authenticate, async (req, res) => {
+router.put('/:id(\\d+)/members/:userId/role', authenticate, async (req, res) => {
   try {
     const { role } = req.body;
 
@@ -164,7 +164,7 @@ router.put('/:id/members/:userId/role', authenticate, async (req, res) => {
 });
 
 // Передача владения
-router.post('/:id/transfer', authenticate, async (req, res) => {
+router.post('/:id(\\d+)/transfer', authenticate, async (req, res) => {
   try {
     const { newOwnerId } = req.body;
 
@@ -186,7 +186,7 @@ router.post('/:id/transfer', authenticate, async (req, res) => {
 });
 
 // Выход из семьи
-router.post('/:id/leave', authenticate, async (req, res) => {
+router.post('/:id(\\d+)/leave', authenticate, async (req, res) => {
   try {
     const result = await Family.leave(req.params.id, req.user.id);
 
@@ -204,7 +204,7 @@ router.post('/:id/leave', authenticate, async (req, res) => {
 // ==================== ПРИГЛАШЕНИЯ ====================
 
 // Регенерация кода приглашения
-router.post('/:id/regenerate-code', authenticate, async (req, res) => {
+router.post('/:id(\\d+)/regenerate-code', authenticate, async (req, res) => {
   try {
     const newCode = await Family.regenerateInviteCode(req.params.id, req.user.id);
 
@@ -243,7 +243,7 @@ router.post('/join', authenticate, async (req, res) => {
 });
 
 // Создание персонального приглашения
-router.post('/:id/invite', authenticate, async (req, res) => {
+router.post('/:id(\\d+)/invite', authenticate, async (req, res) => {
   try {
     const { email, role } = req.body;
 

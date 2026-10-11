@@ -16,8 +16,21 @@ router.use(authenticate);
 // email_enabled и настроен RESEND_API_KEY (иначе тихий no-op).
 // Уважает настройки: weekly_summary как флаг (но через ручной триггер
 // строим всё равно, чтобы пользователь мог проверить), email_enabled — для письма.
+// test-digest шлёт письмо на (непроверенный) email аккаунта: без лимита это
+// рассыльщик спама с домена продукта. 3 письма в час на пользователя.
+const DIGEST_TEST_LIMIT = 3;
+const DIGEST_TEST_WINDOW_MS = 60 * 60 * 1000;
+const digestTestHits = new Map();
+
 router.post('/test-digest', async (req, res) => {
   try {
+    const now = Date.now();
+    const hits = (digestTestHits.get(req.user.id) || []).filter((t) => now - t < DIGEST_TEST_WINDOW_MS);
+    if (hits.length >= DIGEST_TEST_LIMIT) {
+      return res.status(429).json({ message: 'Too many test digests, try again later' });
+    }
+    hits.push(now);
+    digestTestHits.set(req.user.id, hits);
     const result = await digestService.sendDigest(req.user.id, { force: true });
     res.json({
       success: true,
@@ -85,7 +98,7 @@ router.put('/settings', async (req, res) => {
 });
 
 // Отметить как прочитанное
-router.put('/:id/read', async (req, res) => {
+router.put('/:id(\\d+)/read', async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
     if (!notification || notification.user_id !== req.user.id) {
@@ -112,7 +125,7 @@ router.put('/read-all', async (req, res) => {
 });
 
 // Удалить уведомление
-router.delete('/:id', async (req, res) => {
+router.delete('/:id(\\d+)', async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
     if (!notification || notification.user_id !== req.user.id) {

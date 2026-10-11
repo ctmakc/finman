@@ -243,7 +243,14 @@ class Currency {
 
   // Обновить настройки валют пользователя
   static async updateUserSettings(userId, settings) {
-    const { baseCurrency, displayCurrencies, autoConvert } = settings;
+    // Принимаем и camelCase, и snake_case (старый UI слал base_currency, и
+    // смена базовой валюты молча не сохранялась).
+    const baseCurrency = settings.baseCurrency ?? settings.base_currency;
+    const displayCurrencies = settings.displayCurrencies ?? settings.display_currencies;
+    const autoConvert = settings.autoConvert ?? settings.auto_convert;
+    if (baseCurrency !== undefined && !/^[A-Z]{3,5}$/i.test(String(baseCurrency))) {
+      throw new Error('Invalid base currency');
+    }
 
     const fields = [];
     const values = [];
@@ -262,6 +269,10 @@ class Currency {
     }
 
     if (fields.length === 0) return true;
+
+    // Строка настроек создаётся лениво в getUserSettings; без неё UPDATE
+    // ничего не менял, и первое сохранение базовой валюты терялось.
+    await this.getUserSettings(userId);
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
     values.push(userId);

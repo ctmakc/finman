@@ -198,6 +198,10 @@ class Family {
   static async createInvite(familyId, createdBy, email, role = 'member') {
     const canManage = await this.canManage(familyId, createdBy);
     if (!canManage) return null;
+    // Владелец один; admin-приглашение — только от владельца (иначе admin
+    // мог пригласить второго «owner», которого нельзя удалить).
+    if (!['admin', 'member'].includes(role)) return null;
+    if (role === 'admin' && (await this.getUserRole(familyId, createdBy)) !== 'owner') return null;
 
     const token = this.generateInviteToken();
     const expiresAt = new Date();
