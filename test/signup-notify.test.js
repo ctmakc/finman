@@ -228,3 +228,17 @@ describe('signupNotify unit: skip, retry, GA4', () => {
     expect(signupNotify.buildSubject({ username: 'nomail' })).toBe('Signup · finman.money · nomail');
   });
 });
+
+describe('signupNotify: smoke/QA sign-ups are not reported', () => {
+  test('*.test and +smoke addresses skip mail and GA4', async () => {
+    const { notifySignup, isTestSignup } = require('../services/signupNotify');
+    expect(isTestSignup({ email: 'smoke-1@finman-smoke.test' })).toBe(true);
+    expect(isTestSignup({ email: 'owner+smoke1@gmail.com' })).toBe(true);
+    expect(isTestSignup({ email: 'person@example.com' })).toBe(false);
+    expect(isTestSignup({ email: 'test@gmail.com' })).toBe(false);
+    const [mail, ga] = await notifySignup({ id: 1, email: 'smoke-1@finman-smoke.test' }, 'password');
+    expect(mail.reason).toBe('TEST_SIGNUP');
+    expect(ga.skipped).toBe(true);
+  });
+});
+

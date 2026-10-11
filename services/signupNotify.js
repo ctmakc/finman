@@ -145,8 +145,20 @@ const inflight = new Set();
 
 // notifySignup(user, method, opts) -> Promise<[mailResult, ga4Result]>
 // Возвращает промис, но вызывающий код его НЕ ждёт: ошибки логируются внутри.
+// Smoke/QA sign-ups (reserved .test TLD, +smoke aliases) never
+// reach the operator's inbox or GA4: a release smoke on production must not
+// look like a lead.
+function isTestSignup(u) {
+  const email = String((u && u.email) || '').toLowerCase();
+  return /@[^@]+\.test$/.test(email) || /\+smoke[^@]*@/.test(email);
+}
+
 function notifySignup(user, method, opts = {}) {
   const u = user || {};
+  if (isTestSignup(u)) {
+    logger.info({ method }, '[signup-notify] test sign-up, skipped');
+    return Promise.resolve([{ sent: false, skipped: true, reason: 'TEST_SIGNUP' }, { skipped: true }]);
+  }
   const work = Promise.all([
     sendMail(u, method, opts),
     opts.skipGa4 ? Promise.resolve({ skipped: true }) : sendGa4SignUp(method, u.id),
@@ -164,4 +176,4 @@ function flush() {
   return Promise.all(Array.from(inflight));
 }
 
-module.exports = { notifySignup, flush, buildSubject, buildMessage, sendGa4SignUp, sendMail };
+module.exports = { notifySignup, isTestSignup, flush, buildSubject, buildMessage, sendGa4SignUp, sendMail };
