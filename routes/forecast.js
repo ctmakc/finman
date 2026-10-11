@@ -21,61 +21,79 @@ function capPercent(v, max = 999) {
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
-// Прогноз баланса на N дней.
-// УЛУЧШЕННАЯ МОДЕЛЬ (backward-compatible — старые поля сохранены, новые добавлены):
-//   - сезонность по дню недели и дню месяца на историческом дневном net (income-expense);
-//   - линейный тренд по дневному net через МНК;
-//   - доверительный коридор +/- 1 std остатков (модель vs факт), расширяющийся со временем.
+// Balance forecast for N days.
+//
+// Honest projection rules (wave3b):
+//   - Only cash flow is used (type income/expense, no transfers, no opening
+//     balances — lib/txFilter). Expenses are taken as magnitudes (ABS), so a
+//     ledger that stores expenses negative never inflates the balance.
+//   - Daily income / expense = totals over the OBSERVED window (first cash-flow
+//     day in the last 90 days .. today), never the average of active days only:
+//     a one-off salary is spread over the window, not treated as daily income.
+//   - The seasonal/trend model is used only with >= 60 days and >= 40
+//     transactions (confidence 'high'); its trend is frozen after as many
+//     future days as were observed and each day's net is clamped around the
+//     flat average, so a short history cannot be extrapolated into +999 %.
+//   - confidence.level is 'low' (with a reason) under 30 days or 20
+//     transactions, 'medium' under 60 days / 40 transactions, else 'high'.
+//   - Scheduled recurring payments and subscriptions are added on their due days.
 router.get('/balance', async (req, res) => {
   try {
     const { days = 30 } = req.query;
-    const horizon = Math.max(1, parseInt(days) || 30);
+    const horizon = Math.min(365, Math.max(1, parseInt(days) || 30));
     const userId = req.user.id;
     const todayStr = dates.todayISO(dates.userTz(req.user));
 
     // Current balance across accounts in the user's base currency.
     const currentBalance = await networthService.sumAccountsInBase(userId);
+    const startBalance = money.round(currentBalance.total || 0);
 
-    // Период истории для обучения модели (по умолчанию 90 дней).
+    // Training window: the last 90 days of cash flow.
     const HISTORY_DAYS = 90;
     const historyStartStr = dates.addDaysISO(todayStr, -HISTORY_DAYS);
 
-    // Дневные суммы доходов/расходов из истории (только денежный поток).
     const dailyRows = await query(
       `SELECT date,
-              SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END) AS income,
-              SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
+              SUM(CASE WHEN type = 'income'  THEN ABS(amount) ELSE 0 END) AS income,
+              SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) AS expense,
+              COUNT(*) AS count
        FROM transactions
-       WHERE user_id = ? AND date >= ?${CF.sql}
+       WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
        GROUP BY date
        ORDER BY date ASC`,
-      [userId, historyStartStr, ...CF.params]
+      [userId, historyStartStr, todayStr, ...CF.params]
     );
 
-    // Средние расходы за последние 3 месяца (СОХРАНЯЕМ старое поведение для
-    // обратной совместимости полей summary.avgDaily*).
-    const threeMonthsAgoStr = dates.addMonthsISO(todayStr, -3);
-    const avgExpenses = await get(
-      `SELECT AVG(daily_total) as avg FROM (
-        SELECT date, SUM(amount) as daily_total
-        FROM transactions
-        WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
-        GROUP BY date
-      )`,
-      [userId, threeMonthsAgoStr, ...CF.params]
-    );
-    const avgIncome = await get(
-      `SELECT AVG(daily_total) as avg FROM (
-        SELECT date, SUM(amount) as daily_total
-        FROM transactions
-        WHERE user_id = ? AND type = 'income' AND date >= ?${CF.sql}
-        GROUP BY date
-      )`,
-      [userId, threeMonthsAgoStr, ...CF.params]
-    );
+    const txCount = dailyRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+    const totalIncome = money.round(dailyRows.reduce((s, r) => s + (Number(r.income) || 0), 0));
+    const totalExpense = money.round(dailyRows.reduce((s, r) => s + (Number(r.expense) || 0), 0));
+    const firstDate = dailyRows.length ? String(dailyRows[0].date).slice(0, 10) : null;
+    const observedDays = firstDate
+      ? Math.min(HISTORY_DAYS + 1, Math.max(1, (dates.diffDays(firstDate, todayStr) || 0) + 1))
+      : 0;
 
-    // Регулярные платежи. Колонка даты в схеме — next_payment_date; читаем
-    // также next_execution_date для совместимости со старыми данными/кодом.
+    // Daily flow over the whole observed window (not only days with activity).
+    const dailyIncome = observedDays > 0 ? totalIncome / observedDays : 0;
+    const dailyExpense = observedDays > 0 ? totalExpense / observedDays : 0;
+    const flatNet = dailyIncome - dailyExpense;
+
+    // Confidence from the amount of history.
+    const MIN_DAYS = 30;
+    const MIN_TX = 20;
+    let level = 'high';
+    let reason = null;
+    if (txCount === 0) {
+      level = 'low';
+      reason = 'No cash-flow transactions in the last 90 days; the projection only applies scheduled payments.';
+    } else if (observedDays < MIN_DAYS || txCount < MIN_TX) {
+      level = 'low';
+      reason = `Only ${observedDays} day${observedDays === 1 ? '' : 's'} of history and ${txCount} transaction${txCount === 1 ? '' : 's'} (at least ${MIN_DAYS} days and ${MIN_TX} transactions are needed for a reliable projection).`;
+    } else if (observedDays < 60 || txCount < 40) {
+      level = 'medium';
+      reason = `${observedDays} days of history and ${txCount} transactions; the projection uses the average daily flow without seasonality.`;
+    }
+
+    // Scheduled items.
     const recurringPayments = await query(
       `SELECT amount, type, frequency, next_payment_date
        FROM recurring_payments
@@ -83,11 +101,8 @@ router.get('/balance', async (req, res) => {
       [userId]
     );
     for (const p of recurringPayments) {
-      // нормализуем имя поля, на которое опираются helper-функции
       p.next_execution_date = p.next_payment_date || p.next_execution_date;
     }
-
-    // Подписки
     const subscriptions = await query(
       `SELECT amount, billing_cycle, next_billing_date
        FROM subscriptions
@@ -95,58 +110,48 @@ router.get('/balance', async (req, res) => {
       [userId]
     );
 
-    // ---- Обучаем сезонно-трендовую модель на дневном net ----
+    // Seasonal/trend model only on solid history.
     const model = buildSeasonalTrendModel(dailyRows, HISTORY_DAYS);
+    const haveModel = level === 'high' && model.samples >= 14;
+    // Trend is frozen after as many future days as were observed.
+    const trendCap = Math.max(1, Math.min(horizon, observedDays));
+    // Any modelled day stays within [flat - spread, flat + spread].
+    const spread = dailyIncome + dailyExpense;
+    const netLo = Math.min(flatNet, 0) - spread;
+    const netHi = Math.max(flatNet, 0) + spread;
 
-    const dailyExpense = avgExpenses.avg || 0;
-    const dailyIncome = avgIncome.avg || 0;
-
-    // Если истории мало — деградируем к плоской средней (как раньше).
-    const haveModel = model.samples >= 5;
-    const flatNet = dailyIncome - dailyExpense;
+    // Uncertainty band from the day-to-day variation of the observed window
+    // (zero-activity days included), widening with sqrt(step).
+    const residualStd = observedDays >= 2 ? dailySeriesStd(dailyRows, firstDate, observedDays) : 0;
+    const Z = 1;
 
     const forecast = [];
-    let balance = currentBalance.total || 0;
-
-    // Доверительный коридор: +/- z * std остатков, расширяется ~sqrt(шага).
-    const Z = 1; // 1 std (~68%)
-    const residualStd = haveModel ? model.residualStd : 0;
-
+    let balance = startBalance;
     for (let i = 0; i <= horizon; i++) {
       const dateStr = dates.addDaysISO(todayStr, i);
 
-      // Базовый прогноз дневного net из модели (или плоский fallback).
-      const modeledNet = haveModel ? predictNet(model, i) : flatNet;
-
-      // Разносим net на income/expense для обратной совместимости полей.
-      // Fallback-режим: плоские средние. Модельный режим: средний поток
-      // доходов/расходов, скорректированный так, чтобы income - expense
-      // совпадал с прогнозом net модели.
       let dayIncome = dailyIncome;
       let dayExpense = dailyExpense;
       if (haveModel) {
+        const modeled = predictNet(model, Math.min(i, trendCap));
+        const net = Math.max(netLo, Math.min(netHi, modeled));
         dayIncome = Math.max(0, model.avgIncome);
         dayExpense = Math.max(0, model.avgExpense);
-        const drift = modeledNet - (dayIncome - dayExpense);
+        const drift = net - (dayIncome - dayExpense);
         if (drift >= 0) dayIncome += drift;
         else dayExpense += -drift;
       }
 
-      // Добавляем регулярные платежи поверх базового прогноза.
       for (const payment of recurringPayments) {
         if (isPaymentDue(payment, dateStr)) {
-          if (payment.type === 'expense') {
-            dayExpense += payment.amount;
-          } else {
-            dayIncome += payment.amount;
-          }
+          const amt = Math.abs(Number(payment.amount) || 0);
+          if (payment.type === 'expense') dayExpense += amt;
+          else dayIncome += amt;
         }
       }
-
-      // Добавляем подписки
       for (const sub of subscriptions) {
         if (isSubscriptionDue(sub, dateStr)) {
-          dayExpense += sub.amount;
+          dayExpense += Math.abs(Number(sub.amount) || 0);
         }
       }
 
@@ -154,52 +159,57 @@ router.get('/balance', async (req, res) => {
         balance = balance + dayIncome - dayExpense;
       }
 
-      // Ширина коридора растёт как sqrt(дни) — накопление неопределённости.
       const band = money.round(Z * residualStd * Math.sqrt(Math.max(1, i)));
-
       forecast.push({
         date: dateStr,
         balance: money.round(balance),
         income: money.round(dayIncome),
         expense: money.round(dayExpense),
-        // НОВЫЕ поля (доверительный коридор):
         balanceLower: money.round(balance - band),
         balanceUpper: money.round(balance + band),
         confidenceBand: band
       });
     }
 
-    // Статистика
     const endBalance = forecast[forecast.length - 1].balance;
-    const change = money.round(endBalance - (currentBalance.total || 0));
+    const change = money.round(endBalance - startBalance);
     const lowestPoint = Math.min(...forecast.map(f => f.balance));
     const lowestDate = forecast.find(f => f.balance === lowestPoint)?.date;
-    // Худший сценарий по нижней границе коридора.
     const worstCasePoint = Math.min(...forecast.map(f => f.balanceLower));
     const worstCaseDate = forecast.find(f => f.balanceLower === worstCasePoint)?.date;
 
     res.json({
       forecast,
       summary: {
-        currentBalance: currentBalance.total || 0,
+        currentBalance: startBalance,
+        baseCurrency: currentBalance.baseCurrency,
         projectedBalance: endBalance,
         change,
-        // Процент к текущему балансу; при балансе ~0 бессмысленен -> null, иначе |x| <= 999.
-        changePercent: Math.abs(currentBalance.total || 0) >= 1 ? capPercent((change / currentBalance.total) * 100) : null,
+        // Percent of the current balance; meaningless near zero -> null, else |x| <= 999.
+        changePercent: Math.abs(startBalance) >= 1 ? capPercent((change / startBalance) * 100) : null,
         lowestPoint,
         lowestDate,
         avgDailyExpense: money.round(dailyExpense),
         avgDailyIncome: money.round(dailyIncome),
-        // НОВЫЕ поля модели/коридора:
         model: haveModel ? 'seasonal_trend' : 'flat_average',
         confidence: {
+          level,
+          reason,
           residualStd: money.round(residualStd),
-          // конечная ширина коридора (на горизонте прогноза)
           endBand: forecast[forecast.length - 1].confidenceBand,
           projectedLower: forecast[forecast.length - 1].balanceLower,
           projectedUpper: forecast[forecast.length - 1].balanceUpper
         },
+        history: {
+          observedDays,
+          transactionCount: txCount,
+          firstDate,
+          totalIncome,
+          totalExpense,
+          windowDays: HISTORY_DAYS
+        },
         trendPerDay: haveModel ? money.round(model.slope) : 0,
+        trendDaysApplied: haveModel ? trendCap : 0,
         worstCasePoint: money.round(worstCasePoint),
         worstCaseDate
       }
@@ -209,39 +219,53 @@ router.get('/balance', async (req, res) => {
   }
 });
 
-// Прогноз расходов по категориям
+// Expense projection by category: average daily spend over the observed window
+// (first cash-flow day in the last 3 months .. today), not per active day.
 router.get('/expenses', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
+    const horizon = Math.min(365, Math.max(1, parseInt(req.query.days) || 30));
     const userId = req.user.id;
     const todayStr = dates.todayISO(dates.userTz(req.user));
-
-    // Средние расходы по категориям за последние 3 месяца (только денежный поток)
     const threeMonthsAgoStr = dates.addMonthsISO(todayStr, -3);
 
-    const categoryAvg = await query(
+    const first = await get(
+      `SELECT MIN(date) AS d FROM transactions
+       WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}`,
+      [userId, threeMonthsAgoStr, todayStr, ...CF.params]
+    );
+    const firstDate = first && first.d ? String(first.d).slice(0, 10) : null;
+    const windowDays = firstDate ? Math.max(1, (dates.diffDays(firstDate, todayStr) || 0) + 1) : 0;
+
+    const categoryTotals = await query(
       `SELECT category,
-              SUM(amount) as total,
-              COUNT(DISTINCT date) as days,
-              SUM(amount) / COUNT(DISTINCT date) as daily_avg
+              SUM(ABS(amount)) as total,
+              COUNT(*) as count,
+              COUNT(DISTINCT date) as days
        FROM transactions
-       WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
+       WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}
        GROUP BY category
        ORDER BY total DESC`,
-      [userId, threeMonthsAgoStr, ...CF.params]
+      [userId, threeMonthsAgoStr, todayStr, ...CF.params]
     );
 
-    const projections = categoryAvg.map(cat => ({
-      category: cat.category || 'Без категории',
-      currentMonthly: Math.round(cat.daily_avg * 30 * 100) / 100,
-      projected: Math.round(cat.daily_avg * parseInt(days) * 100) / 100,
-      dailyAvg: Math.round(cat.daily_avg * 100) / 100
-    }));
+    const projections = categoryTotals.map(cat => {
+      const dailyAvg = windowDays > 0 ? (Number(cat.total) || 0) / windowDays : 0;
+      return {
+        category: cat.category || 'Uncategorized',
+        total: money.round(cat.total),
+        count: cat.count,
+        currentMonthly: money.round(dailyAvg * 30),
+        projected: money.round(dailyAvg * horizon),
+        dailyAvg: money.round(dailyAvg)
+      };
+    });
 
     res.json({
-      days: parseInt(days),
+      days: horizon,
+      observedDays: windowDays,
+      confidence: windowDays < 30 ? 'low' : 'medium',
       categories: projections,
-      totalProjected: projections.reduce((s, c) => s + c.projected, 0)
+      totalProjected: money.round(projections.reduce((s, c) => s + c.projected, 0))
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -394,7 +418,7 @@ router.get('/trends', async (req, res) => {
         [userId, start, end, ...CF.params]
       );
       const expense = await get(
-        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
+        `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
         [userId, start, end, ...CF.params]
       );
 
@@ -608,6 +632,21 @@ function predictNet(model, step) {
     (model.monthdayFactor[dom] || 0);
 
   return Number.isFinite(val) ? val : 0;
+}
+
+// Std of the daily net series over the observed window, with zero-activity
+// days included (so a quiet week is as informative as a busy one).
+function dailySeriesStd(dailyRows, firstDate, observedDays) {
+  if (!firstDate || observedDays < 2) return 0;
+  const byDate = new Map();
+  for (const r of dailyRows) {
+    byDate.set(String(r.date).slice(0, 10), (Number(r.income) || 0) - (Number(r.expense) || 0));
+  }
+  const series = [];
+  for (let i = 0; i < observedDays; i++) {
+    series.push(byDate.get(dates.addDaysISO(firstDate, i)) || 0);
+  }
+  return stdDevLocal(series);
 }
 
 // Локальные стат-помощники (форкаст не тянет anomalyService).
