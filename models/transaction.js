@@ -35,8 +35,8 @@ class Transaction {
     return transaction(async () => {
       const result = await run(
         `INSERT INTO transactions
-         (account_id, user_id, date, description, category, amount, type)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (account_id, user_id, date, description, category, amount, type, client_tx_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           transactionData.accountId,
           transactionData.userId,
@@ -44,7 +44,8 @@ class Transaction {
           transactionData.description || '',
           transactionData.category || 'Other',
           amount,
-          type
+          type,
+          transactionData.clientTxId || null
         ]
       );
       await Account.updateBalance(

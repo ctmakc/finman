@@ -167,15 +167,36 @@ router.post('/', authenticate, async (req, res) => {
     // счёта (user_id = владелец), поэтому баланс и аналитика владельца сходятся,
     // а контрибьютор видит её через GET /api/accounts/:id/transactions.
     // Знак суммы нормализует модель (expense < 0, income > 0).
-    const newTransaction = await Transaction.create({
-      accountId,
-      userId: account.user_id,
-      date,
-      description,
-      category,
-      amount,
-      type: type || (amount >= 0 ? 'income' : 'expense')
-    });
+    // Идемпотентность: офлайн-очередь повторяет POST с тем же clientTxId /
+    // Idempotency-Key — повтор после потерянного ответа отдаёт ту же строку.
+    const rawKey = req.body.clientTxId || req.get('Idempotency-Key') || '';
+    const clientTxId = String(rawKey).trim().slice(0, 100) || null;
+    const findExisting = () => clientTxId
+      ? get(`SELECT * FROM transactions WHERE user_id = ? AND client_tx_id = ?`, [account.user_id, clientTxId])
+      : null;
+    const existing = await findExisting();
+    if (existing) {
+      return res.status(200).json({ ...existing, accountId: existing.account_id, userId: existing.user_id });
+    }
+
+    let newTransaction;
+    try {
+      newTransaction = await Transaction.create({
+        accountId,
+        userId: account.user_id,
+        date,
+        description,
+        category,
+        amount,
+        type: type || (amount >= 0 ? 'income' : 'expense'),
+        clientTxId
+      });
+    } catch (err) {
+      // Два одновременных повтора: второй упирается в уникальный индекс.
+      const dup = /UNIQUE constraint failed: .*client_tx_id/.test((err && err.message) || '') && await findExisting();
+      if (dup) return res.status(200).json({ ...dup, accountId: dup.account_id, userId: dup.user_id });
+      throw err;
+    }
 
     res.status(201).json(newTransaction);
   } catch (error) {

@@ -129,4 +129,23 @@ describe('review: money', () => {
     expect(RecurringPayment._calculateNextPaymentDateRaw('2026-10-14', 'weekly', null, 3, true)).toBe('2026-10-21');
     expect(RecurringPayment._calculateNextPaymentDateRaw('2026-10-07', 'weekly', null, 0, false)).toBe('2026-10-11');
   });
+
+  test('POST /transactions is idempotent by clientTxId / Idempotency-Key', async () => {
+    const acc = await account('Idem', 'CAD', 0);
+    const body = { accountId: acc, amount: 12.5, type: 'expense', date: '2026-10-02', description: 'coffee' };
+    const a = await request.post('/api/transactions').set(auth(ctx.token)).send({ ...body, clientTxId: 'c-1' });
+    expect(a.status).toBe(201);
+    const b = await request.post('/api/transactions').set(auth(ctx.token)).send({ ...body, clientTxId: 'c-1' });
+    expect(b.status).toBe(200);
+    expect(b.body.id).toBe(a.body.id);
+    const c = await request.post('/api/transactions').set({ ...auth(ctx.token), 'Idempotency-Key': 'c-1' }).send(body);
+    expect(c.body.id).toBe(a.body.id);
+    const [d, e] = await Promise.all([
+      request.post('/api/transactions').set(auth(ctx.token)).send({ ...body, clientTxId: 'c-2' }),
+      request.post('/api/transactions').set(auth(ctx.token)).send({ ...body, clientTxId: 'c-2' }),
+    ]);
+    expect(d.body.id).toBe(e.body.id);
+    const row = await db.get('SELECT balance FROM accounts WHERE id = ?', [acc]);
+    expect(row.balance).toBe(-25);
+  });
 });
