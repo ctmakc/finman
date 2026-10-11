@@ -1,4 +1,4 @@
-// ==================== BILLING / ПОДПИСКА ====================
+// ==================== BILLING / SUBSCRIPTION ====================
 // Панель тарифов и апгрейда. Использует общие хелперы из app.js
 // (fetchWithAuth, showNotification, formatCurrency) с защитным фолбэком,
 // т.к. /api/billing/plans — публичный и может вызываться до логина.
@@ -54,12 +54,12 @@
       const { plans, meta } = await loadPlans();
       const currentTier = _currentUserTier();
       const disabledBanner = meta && meta.billingConfigured === false
-        ? `<div class="alert alert-warning"><i class="fas fa-info-circle"></i> Онлайн-оплата сейчас в демо-режиме (Stripe не настроен). Кнопки апгрейда покажут предупреждение, реальная оплата не произойдёт.</div>`
+        ? `<div class="alert alert-warning"><i class="fas fa-info-circle"></i> ${t('billing.demoBanner')}</div>`
         : '';
       mainContent.innerHTML = `
         <div class="billing-page">
           <div class="page-header">
-            <h1><i class="fas fa-crown"></i> Тарифы и подписка</h1>
+            <h1><i class="fas fa-crown"></i> ${t('billing.title')}</h1>
           </div>
           ${disabledBanner}
           <div class="card-grid billing-plans">
@@ -67,7 +67,7 @@
           </div>
         </div>`;
     } catch (e) {
-      mainContent.innerHTML = '<div class="alert alert-error">Не удалось загрузить тарифы</div>';
+      mainContent.innerHTML = `<div class="alert alert-error">${t('billing.loadError')}</div>`;
     }
   }
 
@@ -82,19 +82,20 @@
 
   function _renderPlanCard(p, currentTier) {
     const isCurrent = p.tier === currentTier || p.id === currentTier;
-    const priceLabel = p.price > 0 ? `${_money(p.price, p.currency)}/мес` : 'Бесплатно';
-    const features = (p.features || []).map((f) => `<li><i class="fas fa-check"></i> ${f}</li>`).join('');
+    const priceLabel = p.price > 0 ? t('billing.perMonth', { price: _money(p.price, p.currency) }) : t('billing.free');
+    const esc = (typeof UI !== 'undefined' && UI.esc) ? UI.esc : (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const features = (p.features || []).map((f) => `<li><i class="fas fa-check"></i> ${esc(f)}</li>`).join('');
     let action;
     if (isCurrent) {
-      action = `<button class="btn btn-outline" disabled>Текущий план</button>`;
+      action = `<button class="btn btn-outline" disabled>${t('billing.currentPlan')}</button>`;
     } else if (p.tier === 'free' || p.id === 'free') {
-      action = `<button class="btn btn-outline" disabled>Базовый</button>`;
+      action = `<button class="btn btn-outline" disabled>${t('billing.basic')}</button>`;
     } else {
-      action = `<button class="btn btn-primary" onclick="startCheckout('${p.id}')"><i class="fas fa-arrow-up"></i> Перейти на ${p.name}</button>`;
+      action = `<button class="btn btn-primary" onclick="startCheckout('${esc(p.id)}')"><i class="fas fa-arrow-up"></i> ${t('billing.upgradeTo', { name: esc(p.name) })}</button>`;
     }
     return `
       <div class="card billing-plan ${isCurrent ? 'billing-plan-current' : ''}">
-        <div class="card-header"><h3 class="card-title">${p.name}</h3></div>
+        <div class="card-header"><h3 class="card-title">${esc(p.name)}</h3></div>
         <div class="billing-price">${priceLabel}</div>
         <ul class="billing-features">${features}</ul>
         <div class="card-footer">${action}</div>
@@ -111,15 +112,15 @@
       const json = await resp.json().catch(() => ({}));
 
       if (resp.status === 503 || (json && json.error && json.error.code === 'BILLING_DISABLED')) {
-        _notify('Онлайн-оплата сейчас недоступна (демо-режим). Stripe не настроен на сервере.', 'error');
+        _notify(t('billing.unavailable'), 'error');
         return;
       }
       if (resp.status === 401) {
-        _notify('Войдите в аккаунт, чтобы оформить подписку', 'error');
+        _notify(t('billing.loginRequired'), 'error');
         return;
       }
       if (!resp.ok) {
-        const msg = (json && json.error && json.error.message) || 'Не удалось начать оплату';
+        const msg = (json && json.error && json.error.message) || t('billing.checkoutFailed');
         _notify(msg, 'error');
         return;
       }
@@ -128,10 +129,10 @@
       if (data.url) {
         window.location.href = data.url; // редирект на Stripe Checkout
       } else {
-        _notify('Сессия оплаты создана, но ссылка не получена', 'error');
+        _notify(t('billing.noUrl'), 'error');
       }
     } catch (e) {
-      _notify('Ошибка при создании сессии оплаты', 'error');
+      _notify(t('billing.checkoutError'), 'error');
     }
   }
 

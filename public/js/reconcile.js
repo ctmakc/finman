@@ -1,4 +1,4 @@
-// ==================== RECONCILE (сверка счёта с выпиской) ====================
+// ==================== RECONCILE (account vs statement) ====================
 // Панель сверки: выбираем счёт, вводим баланс по выписке, видим расхождение
 // (delta) и список непроведённых транзакций. Можно отметить транзакции как
 // проведённые (cleared) или закрыть расхождение одной корректировкой.
@@ -40,27 +40,27 @@ async function renderReconcilePage() {
     mainContent.innerHTML = `
       <div class="reconcile-page">
         <div class="page-header">
-          <h1><i class="fas fa-balance-scale"></i> Сверка счёта</h1>
+          <h1><i class="fas fa-balance-scale"></i> ${t('reconcile.title')}</h1>
         </div>
         <div class="card">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Счёт</label>
+              <label class="form-label" for="reconcile-account">${t('common.account')}</label>
               <select id="reconcile-account" class="form-control">${options || ''}</select>
             </div>
             <div class="form-group">
-              <label class="form-label">Баланс по выписке</label>
+              <label class="form-label" for="reconcile-statement">${t('reconcile.statementBalance')}</label>
               <input type="number" id="reconcile-statement" class="form-control" step="0.01" placeholder="0.00">
             </div>
             <div class="form-group" style="display:flex;align-items:flex-end">
-              <button class="btn btn-primary" onclick="runReconcile()"><i class="fas fa-sync"></i> Сверить</button>
+              <button class="btn btn-primary" onclick="runReconcile()"><i class="fas fa-sync"></i> ${t('reconcile.run')}</button>
             </div>
           </div>
         </div>
         <div id="reconcile-result"></div>
       </div>`;
   } catch (e) {
-    mainContent.innerHTML = '<div class="alert alert-error">Ошибка загрузки</div>';
+    mainContent.innerHTML = `<div class="alert alert-error">${t('msg.loadError')}</div>`;
   }
 }
 
@@ -70,11 +70,11 @@ async function runReconcile() {
     document.getElementById('reconcile-statement').value
   );
   if (!accountId) {
-    showNotification('Выберите счёт', 'error');
+    showNotification(t('reconcile.selectAccount'), 'error');
     return;
   }
   if (!Number.isFinite(statementBalance)) {
-    showNotification('Введите баланс по выписке', 'error');
+    showNotification(t('reconcile.enterBalance'), 'error');
     return;
   }
   _reconcileState = { accountId, statementBalance };
@@ -86,7 +86,7 @@ async function runReconcile() {
     );
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error((json.error && json.error.message) || 'Ошибка сверки');
+      throw new Error((json.error && json.error.message) || t('reconcile.error'));
     }
     box.innerHTML = renderReconcileResult(json.data);
   } catch (e) {
@@ -114,38 +114,36 @@ function renderReconcileResult(data) {
     .join('');
 
   const status = data.reconciled
-    ? '<span class="text-success"><i class="fas fa-check-circle"></i> Сходится</span>'
-    : `<span class="${deltaClass}"><i class="fas fa-exclamation-triangle"></i> Расхождение ${formatCurrency(
-        data.delta
-      )}</span>`;
+    ? `<span class="text-success"><i class="fas fa-check-circle"></i> ${t('reconcile.matches')}</span>`
+    : `<span class="${deltaClass}"><i class="fas fa-exclamation-triangle"></i> ${t('reconcile.differenceOf', { amount: formatCurrency(data.delta) })}</span>`;
 
   return `
     <div class="card">
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-data"><div class="stat-value">${formatCurrency(
           data.clearedBalance
-        )}</div><div class="stat-label">Очищенный баланс</div></div></div>
+        )}</div><div class="stat-label">${t('reconcile.clearedBalance')}</div></div></div>
         <div class="stat-card"><div class="stat-data"><div class="stat-value">${formatCurrency(
           data.statementBalance
-        )}</div><div class="stat-label">По выписке</div></div></div>
+        )}</div><div class="stat-label">${t('reconcile.perStatement')}</div></div></div>
         <div class="stat-card"><div class="stat-data"><div class="stat-value ${deltaClass}">${formatCurrency(
           data.delta
-        )}</div><div class="stat-label">Расхождение</div></div></div>
+        )}</div><div class="stat-label">${t('reconcile.difference')}</div></div></div>
       </div>
       <p style="margin:0.5rem 0">${status}</p>
       ${
         (data.uncleared || []).length === 0
-          ? '<div class="empty-state"><i class="fas fa-check"></i><h3>Все транзакции проведены</h3></div>'
+          ? `<div class="empty-state"><i class="fas fa-check"></i><h3>${t('reconcile.allCleared')}</h3></div>`
           : `<table class="table reconcile-table">
-              <thead><tr><th></th><th>Дата</th><th>Описание</th><th>Категория</th><th>Сумма</th></tr></thead>
+              <thead><tr><th></th><th>${t('common.date')}</th><th>${t('common.description')}</th><th>${t('common.category')}</th><th>${t('common.amount')}</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
             <div class="reconcile-actions" style="margin-top:0.75rem;display:flex;gap:0.5rem">
-              <button class="btn btn-outline" onclick="clearSelectedReconcile()"><i class="fas fa-check"></i> Отметить выбранные</button>
+              <button class="btn btn-outline" onclick="clearSelectedReconcile()"><i class="fas fa-check"></i> ${t('reconcile.markSelected')}</button>
               ${
                 data.reconciled
                   ? ''
-                  : `<button class="btn btn-primary" onclick="postReconcileAdjustment()"><i class="fas fa-wand-magic-sparkles"></i> Закрыть корректировкой</button>`
+                  : `<button class="btn btn-primary" onclick="postReconcileAdjustment()"><i class="fas fa-wand-magic-sparkles"></i> ${t('reconcile.closeWithAdjustment')}</button>`
               }
             </div>`
       }
@@ -157,7 +155,7 @@ async function clearSelectedReconcile() {
     (cb) => parseInt(cb.value, 10)
   );
   if (txIds.length === 0) {
-    showNotification('Ничего не выбрано', 'error');
+    showNotification(t('reconcile.nothingSelected'), 'error');
     return;
   }
   try {
@@ -167,9 +165,9 @@ async function clearSelectedReconcile() {
     );
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error((json.error && json.error.message) || 'Ошибка');
+      throw new Error((json.error && json.error.message) || t('msg.error'));
     }
-    showNotification(`Отмечено: ${json.data.updated}`, 'success');
+    showNotification(t('reconcile.marked', { n: json.data.updated }), 'success');
     runReconcile();
   } catch (e) {
     showNotification(e.message, 'error');
@@ -177,7 +175,7 @@ async function clearSelectedReconcile() {
 }
 
 async function postReconcileAdjustment() {
-  if (!confirm('Создать балансирующую корректировку на величину расхождения?')) return;
+  if (!confirm(t('reconcile.confirmAdjust'))) return;
   try {
     const res = await fetchWithAuth(
       `/api/reconcile/${_reconcileState.accountId}/adjust`,
@@ -188,9 +186,9 @@ async function postReconcileAdjustment() {
     );
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error((json.error && json.error.message) || 'Ошибка');
+      throw new Error((json.error && json.error.message) || t('msg.error'));
     }
-    showNotification('Корректировка создана', 'success');
+    showNotification(t('reconcile.adjustmentCreated'), 'success');
     runReconcile();
   } catch (e) {
     showNotification(e.message, 'error');

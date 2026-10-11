@@ -6,7 +6,17 @@ const CalendarModule = {
   events: [],
   currentDate: new Date(),
   view: 'month',
-  typeIcons: { payment: '💳', income: '💰', reminder: '🔔', goal: '🎯', debt: '📋', subscription: '📦', recurring: '🔄' },
+  typeIcons: { payment: 'fa-credit-card', income: 'fa-sack-dollar', reminder: 'fa-bell', goal: 'fa-bullseye', debt: 'fa-file-invoice', subscription: 'fa-box', recurring: 'fa-rotate' },
+
+  icon(type) {
+    return `<i class="fas ${this.typeIcons[type] || 'fa-calendar'}"></i>`;
+  },
+
+  // BCP-47 locale for Intl, derived from the active UI language.
+  locale() {
+    const lang = (typeof i18n !== 'undefined' && i18n.getLanguage) ? i18n.getLanguage() : 'en';
+    return lang === 'uk' ? 'uk-UA' : lang === 'ru' ? 'ru-RU' : 'en-CA';
+  },
 
   headers() {
     return { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
@@ -55,10 +65,25 @@ const CalendarModule = {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date().toISOString().split('T')[0];
 
-    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-    document.getElementById('calendar-title').textContent = `${monthNames[month]} ${year}`;
+    const loc = this.locale();
+    let title;
+    try {
+      title = new Date(year, month, 1).toLocaleDateString(loc, { month: 'long', year: 'numeric' });
+    } catch (e) {
+      title = `${year}-${String(month + 1).padStart(2, '0')}`;
+    }
+    document.getElementById('calendar-title').textContent = title.charAt(0).toUpperCase() + title.slice(1);
 
-    let html = '<div class="calendar-header-row"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>';
+    // Monday-first weekday headers from Intl (2024-01-01 is a Monday).
+    const weekdays = [];
+    for (let i = 0; i < 7; i++) {
+      try {
+        weekdays.push(new Date(2024, 0, 1 + i).toLocaleDateString(loc, { weekday: 'short' }));
+      } catch (e) {
+        weekdays.push(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'][i]);
+      }
+    }
+    let html = '<div class="calendar-header-row">' + weekdays.map((d) => `<span>${UI.esc(d)}</span>`).join('') + '</div>';
     html += '<div class="calendar-days">';
 
     const startDay = firstDay === 0 ? 6 : firstDay - 1;
@@ -71,7 +96,7 @@ const CalendarModule = {
       const dayEvents = this.events.filter(e => e.event_date === dateStr);
       const isToday = dateStr === today;
 
-      html += `<div class="calendar-day ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-events' : ''}" data-action="cal:day" data-date="${dateStr}" role="button" tabindex="0" aria-label="${dateStr}${dayEvents.length ? ', событий: ' + dayEvents.length : ''}">
+      html += `<div class="calendar-day ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-events' : ''}" data-action="cal:day" data-date="${dateStr}" role="button" tabindex="0" aria-label="${dateStr}${dayEvents.length ? ', ' + t('calendar.eventsCount', { n: dayEvents.length }) : ''}">
         <span class="day-number">${day}</span>
         ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${this.safeColor(e.color)}" title="${UI.esc(e.title)}"></div>`).join('')}
         ${dayEvents.length > 3 ? `<small>+${dayEvents.length - 3}</small>` : ''}
@@ -94,13 +119,13 @@ const CalendarModule = {
       const upcoming = Array.isArray(data) ? data : [];
 
       if (upcoming.length === 0) {
-        container.innerHTML = '<p class="text-secondary">Нет предстоящих событий</p>';
+        container.innerHTML = `<p class="text-secondary">${t('calendar.noUpcoming')}</p>`;
         return;
       }
 
       container.innerHTML = upcoming.map(e => `
         <div class="upcoming-item" style="border-left: 3px solid ${this.safeColor(e.color)}">
-          <span class="event-icon">${this.typeIcons[e.event_type] || '📅'}</span>
+          <span class="event-icon">${this.icon(e.event_type)}</span>
           <div class="event-info"><strong>${UI.esc(e.title)}</strong><small>${UI.esc(e.event_date)}</small></div>
           ${e.amount ? `<span class="event-amount">${this.amount(e)}</span>` : ''}
         </div>
@@ -130,12 +155,12 @@ const CalendarModule = {
 
     document.getElementById('day-events-date').textContent = dateStr;
     document.getElementById('day-events-list').innerHTML = dayEvents.length === 0
-      ? `<p class="text-secondary">Нет событий</p><button type="button" class="btn btn-sm btn-primary" data-action="cal:add" data-date="${dateStr}">+ Событие на этот день</button>`
+      ? `<p class="text-secondary">${t('calendar.noEvents')}</p><button type="button" class="btn btn-sm btn-primary" data-action="cal:add" data-date="${dateStr}"><i class="fas fa-plus"></i> ${t('calendar.addForDay')}</button>`
       : dayEvents.map(e => `
         <div class="day-event-item">
-          <span>${this.typeIcons[e.event_type] || '📅'}</span>
+          <span>${this.icon(e.event_type)}</span>
           <div><strong>${UI.esc(e.title)}</strong>${e.amount ? ` - ${this.amount(e)}` : ''}<br><small>${UI.esc(e.description || e.event_type)}</small></div>
-          ${e.source ? '' : `<button type="button" class="btn btn-sm btn-icon" data-action="cal:complete" data-id="${e.id}" aria-label="Отметить выполненным" title="Выполнено">✓</button>`}
+          ${e.source ? '' : `<button type="button" class="btn btn-sm btn-icon" data-action="cal:complete" data-id="${e.id}" aria-label="${t('calendar.markDone')}" title="${t('calendar.done')}"><i class="fas fa-check"></i></button>`}
         </div>
       `).join('');
 
@@ -171,7 +196,7 @@ const CalendarModule = {
       UI.closeModal('event-modal');
       await this.loadEvents();
     } catch (error) {
-      alert('Ошибка');
+      alert(t('msg.error'));
     }
   },
 
@@ -181,50 +206,50 @@ const CalendarModule = {
       await this.loadEvents();
       UI.closeModal('day-modal');
     } catch (error) {
-      alert('Ошибка');
+      alert(t('msg.error'));
     }
   },
 
   getPage() {
     return `
       <div class="calendar-page">
-        <div class="page-header"><h1>📅 Финансовый календарь</h1>
-          <button type="button" class="btn btn-primary" data-action="cal:add">+ Событие</button>
+        <div class="page-header"><h1>${t('calendar.title')}</h1>
+          <button type="button" class="btn btn-primary" data-action="cal:add"><i class="fas fa-plus"></i> ${t('calendar.addEvent')}</button>
         </div>
         <div class="calendar-container card">
           <div class="calendar-nav">
-            <button type="button" class="btn btn-icon" data-action="cal:prev" aria-label="Предыдущий месяц">◀</button>
+            <button type="button" class="btn btn-icon" data-action="cal:prev" aria-label="${t('calendar.prevMonth')}"><i class="fas fa-chevron-left"></i></button>
             <h2 id="calendar-title"></h2>
-            <button type="button" class="btn btn-icon" data-action="cal:next" aria-label="Следующий месяц">▶</button>
-            <button type="button" class="btn btn-sm" data-action="cal:today">Сегодня</button>
+            <button type="button" class="btn btn-icon" data-action="cal:next" aria-label="${t('calendar.nextMonth')}"><i class="fas fa-chevron-right"></i></button>
+            <button type="button" class="btn btn-sm" data-action="cal:today">${t('calendar.today')}</button>
           </div>
           <div id="calendar-grid"></div>
         </div>
-        <div class="card"><h3>🔔 Предстоящие события</h3><div id="upcoming-events"></div></div>
+        <div class="card"><h3>${t('calendar.upcoming')}</h3><div id="upcoming-events"></div></div>
       </div>
       <div class="modal-backdrop" id="day-modal" hidden>
         <div class="modal">
-          <div class="modal-header"><h2 class="modal-title">События <span id="day-events-date"></span></h2><button type="button" class="modal-close" data-action="ui:close" aria-label="Закрыть">&times;</button></div>
+          <div class="modal-header"><h2 class="modal-title">${t('calendar.events')} <span id="day-events-date"></span></h2><button type="button" class="modal-close" data-action="ui:close" aria-label="${t('btn.close')}">&times;</button></div>
           <div class="modal-body" id="day-events-list"></div>
         </div>
       </div>
       <div class="modal-backdrop" id="event-modal" hidden>
         <div class="modal">
-          <div class="modal-header"><h2 class="modal-title">Новое событие</h2><button type="button" class="modal-close" data-action="ui:close" aria-label="Закрыть">&times;</button></div>
+          <div class="modal-header"><h2 class="modal-title">${t('calendar.newEvent')}</h2><button type="button" class="modal-close" data-action="ui:close" aria-label="${t('btn.close')}">&times;</button></div>
           <div class="modal-body">
             <form id="event-form" data-submit="cal:save">
-              <div class="form-group"><label for="event-title">Название</label><input type="text" id="event-title" class="form-control" required></div>
+              <div class="form-group"><label for="event-title">${t('common.name')}</label><input type="text" id="event-title" class="form-control" required></div>
               <div class="form-row">
-                <div class="form-group"><label for="event-type">Тип</label><select id="event-type" class="form-control"><option value="payment">Платёж</option><option value="income">Доход</option><option value="reminder">Напоминание</option><option value="other">Другое</option></select></div>
-                <div class="form-group"><label for="event-date">Дата</label><input type="date" id="event-date" class="form-control" required></div>
+                <div class="form-group"><label for="event-type">${t('common.type')}</label><select id="event-type" class="form-control"><option value="payment">${t('calendar.type.payment')}</option><option value="income">${t('common.income')}</option><option value="reminder">${t('calendar.type.reminder')}</option><option value="other">${t('common.other')}</option></select></div>
+                <div class="form-group"><label for="event-date">${t('common.date')}</label><input type="date" id="event-date" class="form-control" required></div>
               </div>
               <div class="form-row">
-                <div class="form-group"><label for="event-amount">Сумма</label><input type="number" id="event-amount" class="form-control" step="0.01"></div>
-                <div class="form-group"><label for="event-currency">Валюта</label><select id="event-currency" class="form-control">${UI.currencyOptions()}</select></div>
-                <div class="form-group"><label for="event-color">Цвет</label><input type="color" id="event-color" class="form-control" value="#5D5CDE"></div>
+                <div class="form-group"><label for="event-amount">${t('common.amount')}</label><input type="number" id="event-amount" class="form-control" step="0.01"></div>
+                <div class="form-group"><label for="event-currency">${t('common.currency')}</label><select id="event-currency" class="form-control">${UI.currencyOptions()}</select></div>
+                <div class="form-group"><label for="event-color">${t('calendar.color')}</label><input type="color" id="event-color" class="form-control" value="#5D5CDE"></div>
               </div>
-              <div class="form-group"><label for="event-description">Описание</label><textarea id="event-description" class="form-control"></textarea></div>
-              <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+              <div class="form-group"><label for="event-description">${t('common.description')}</label><textarea id="event-description" class="form-control"></textarea></div>
+              <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="ui:close">${t('btn.cancel')}</button><button type="submit" class="btn btn-primary">${t('btn.save')}</button></div>
             </form>
           </div>
         </div>
