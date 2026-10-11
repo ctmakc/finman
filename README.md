@@ -93,6 +93,27 @@ development they auto-generate (with a warning).
 | `SYNC_ENABLED` | for sync | `true` to enable scheduled bank auto-sync. |
 | `STRIPE_SECRET_KEY` | for billing | Stripe secret key for the subscription/billing flow. |
 | `STRIPE_WEBHOOK_SECRET` | for billing | Stripe webhook signing secret (`whsec_...`). |
+| `DEMO_MODE` | no | Marks a demo instance: `/api/health` returns `demo:true`, billing/AI replies carry `_meta.demo`. |
+| `DEMO_SEED_ON_EMPTY` | no | `1` = at boot, when the `users` table is empty, seed the demo household (user `demo`). For staging without a persistent DB; see DEPLOY.md. Never set on production. |
+| `DEMO_PASSWORD` | no | Password of the seeded `demo` / `demo-partner` accounts (default `finman-demo-2026`). |
+
+### Demo data
+
+`DEMO_SEED_ON_EMPTY=1` makes the server seed a realistic Canadian household the
+first time it starts on an empty database: user `demo` (`demo@finman.money`,
+password `DEMO_PASSWORD`, default `finman-demo-2026`), three accounts (CAD
+chequing, CAD credit card, USD savings), about 190 transactions over the last
+six months (biweekly payroll, weekly groceries, rent, hydro, internet, phone,
+four subscriptions, two credit-card payments as transfers), two budgets, two
+goals, a car loan with five linked payments, a TFSA portfolio (XEQT, VFV, BTC),
+recurring payments, two rules and a two-member family (`demo-partner`). All
+dates are relative to today (`lib/dates.js`), amounts come from a seeded PRNG,
+and everything is written through the model layer (`lib/demoSeed.js`), so
+balances equal opening balance + ledger and analytics exclude the opening rows.
+A database that already has a user is never touched. The same seed runs by hand
+with `node scripts/seed-demo.js` (`--force` adds the demo user next to existing
+users on a local checkout). `GET /api/health/demo` tells the frontend whether
+to show the "Demo instance — data resets" banner.
 
 Generate a strong secret:
 

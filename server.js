@@ -163,7 +163,9 @@ require('./services/authService');
 // При require из тестов харнес сам вызывает initDatabase() до запросов,
 // чтобы полностью контролировать жизненный цикл временной БД.
 if (require.main === module) {
-  initDatabase();
+  // After migrations: optional demo seed for staging (DEMO_SEED_ON_EMPTY=1,
+  // lib/demoSeed.js). Seeds only an empty users table; never throws.
+  initDatabase().then(() => require('./lib/demoSeed').bootHook(logger));
 }
 
 // Статические файлы
