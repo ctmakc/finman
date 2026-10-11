@@ -250,13 +250,14 @@ describe('GET /api/ai/insights/monthly (cached in ai_insights)', () => {
   afterAll(async () => ctx && ctx.close());
   beforeEach(resetMock);
 
-  test('migration 017b created ai_insights with the per-user unique key', async () => {
+  test('ai_insights exists with per-user columns; org_id defaults to 0 (017 + 017d)', async () => {
     const cols = await dbAll(ctx.db, `PRAGMA table_info(ai_insights)`);
     const names = cols.map((c) => c.name);
     expect(names).toEqual(expect.arrayContaining(['user_id', 'period', 'type', 'content', 'model', 'generated_at']));
-    expect(names).not.toContain('org_id');
-    const applied = await dbAll(ctx.db, `SELECT name FROM schema_migrations WHERE name = '017b_ai_insights'`);
-    expect(applied).toHaveLength(1);
+    const org = cols.find((c) => c.name === 'org_id');
+    expect(org && org.dflt_value).toBe('0');
+    const applied = await dbAll(ctx.db, `SELECT name FROM schema_migrations WHERE name IN ('017b_ai_insights', '017d_ai_insights_org_default')`);
+    expect(applied).toHaveLength(2);
   });
 
   test('first call generates (grounded prompt), second call is served from cache', async () => {

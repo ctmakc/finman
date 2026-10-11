@@ -8,6 +8,8 @@
 @import url("/css/parts/finance.css");
 @import url("/css/parts/ai.css");
 @import url("/css/parts/bank-import.css");
+@import url("/css/parts/modals.css");
+@import url("/css/parts/ui-shared.css");
 
 /* --------------------------------------------------------------------------
    TOKENS — LIGHT (default). All historical variable names are preserved and

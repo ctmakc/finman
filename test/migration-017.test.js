@@ -219,3 +219,44 @@ describe('migration 017 — org/google/indexes parity', () => {
     await rawClose(db);
   });
 });
+
+describe('migration 017d — ai_insights.org_id DEFAULT 0 (per-user insights)', () => {
+  test('prod-shaped DB: rows kept, insert without org_id works, 017d recorded once', async () => {
+    const prodFile = tmpDbPath();
+    created.push(prodFile);
+    const seed = await rawOpen(prodFile);
+    await rawExec(seed, fs.readFileSync(FIXTURE, 'utf8'));
+    const pu = await rawRun(seed, `INSERT INTO users (username, email, password) VALUES ('p0', 'p0@x', 'p')`);
+    await rawRun(seed, `INSERT INTO ai_insights (org_id, user_id, period, type, content) VALUES (7, ?, '2026-08', 'monthly_story', 'old')`, [pu.lastID]);
+    await rawClose(seed);
+    const b = await bootApp(prodFile);
+    await b.database.closeDatabase();
+    const db = await rawOpen(prodFile);
+    const kept = await rawAll(db, `SELECT org_id, content FROM ai_insights WHERE user_id = ?`, [pu.lastID]);
+    expect(kept).toEqual([{ org_id: 7, content: 'old' }]);
+    const cols = await rawAll(db, `PRAGMA table_info(ai_insights)`);
+    const org = cols.find((c) => c.name === 'org_id');
+    expect(org.notnull).toBe(1);
+    expect(org.dflt_value).toBe('0');
+    const u = await rawRun(db, `INSERT INTO users (username, email, password) VALUES ('ins1', 'ins1@x', 'p')`);
+    await rawRun(db, `INSERT INTO ai_insights (user_id, period, type, content, model) VALUES (?, '2026-10', 'monthly', 'story', 'm')`, [u.lastID]);
+    const rows = await rawAll(db, `SELECT org_id, period, type FROM ai_insights WHERE user_id = ?`, [u.lastID]);
+    expect(rows).toEqual([{ org_id: 0, period: '2026-10', type: 'monthly' }]);
+    const applied = await rawAll(db, `SELECT COUNT(*) AS n FROM schema_migrations WHERE name = '017d_ai_insights_org_default'`);
+    expect(applied[0].n).toBe(1);
+    await rawClose(db);
+  });
+
+  test('fresh DB: insert without org_id works', async () => {
+    const file = tmpDbPath();
+    created.push(file);
+    const a = await bootApp(file);
+    await a.database.closeDatabase();
+    const db = await rawOpen(file);
+    const u = await rawRun(db, `INSERT INTO users (username, email, password) VALUES ('ins2', 'ins2@x', 'p')`);
+    await rawRun(db, `INSERT INTO ai_insights (user_id, period, type, content) VALUES (?, '2026-09', 'weekly', 'w')`, [u.lastID]);
+    const rows = await rawAll(db, `SELECT org_id FROM ai_insights WHERE user_id = ?`, [u.lastID]);
+    expect(rows[0].org_id).toBe(0);
+    await rawClose(db);
+  });
+});

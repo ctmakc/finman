@@ -46,16 +46,20 @@ module.exports = {
         FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE
       )`);
 
+    // org_id defaults to 0 ("no organization"): wave3 insights are per user
+    // (services/financialInsights.js inserts without org_id). Prod rows keep
+    // their org_id; 017d rebuilds a prod-shaped table to add this default.
     await db.run(`CREATE TABLE IF NOT EXISTS ai_insights (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        org_id INTEGER NOT NULL,
+        org_id INTEGER NOT NULL DEFAULT 0,
         user_id INTEGER NOT NULL,
         period TEXT NOT NULL,
         type TEXT NOT NULL,
         content TEXT NOT NULL,
         model TEXT,
         generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(org_id, user_id, period, type)
+        UNIQUE(org_id, user_id, period, type),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )`);
 
     // ==================== users: Google sign-in + org link ==================
