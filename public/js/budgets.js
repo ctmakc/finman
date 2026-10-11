@@ -22,15 +22,15 @@ async function rollForwardBudgets(period = 'monthly') {
     const data = await response.json();
 
     if (!response.ok) {
-      showNotification(data.message || 'Ошибка переноса остатка', 'error');
+      showNotification(data.message || t('budgets.rollForward.error'), 'error');
       return null;
     }
 
-    showNotification(`Перенесено бюджетов: ${data.rolledCount}`, 'success');
+    showNotification(t('budgets.rollForward.done', { count: data.rolledCount }), 'success');
     return data;
   } catch (error) {
     console.error('Ошибка переноса остатка:', error);
-    showNotification('Произошла ошибка', 'error');
+    showNotification(t('msg.error'), 'error');
     return null;
   }
 }
@@ -40,7 +40,7 @@ async function fetchBudgets() {
   try {
     const response = await fetchWithAuth('/api/budgets');
     if (!response.ok) {
-      throw new Error('Не удалось получить бюджеты');
+      throw new Error('Failed to load budgets');
     }
     const data = await response.json();
     appState.budgets = data;
@@ -56,7 +56,7 @@ async function fetchBudgetStats() {
   try {
     const response = await fetchWithAuth('/api/budgets/stats');
     if (!response.ok) {
-      throw new Error('Не удалось получить статистику');
+      throw new Error('Failed to load budget stats');
     }
     return await response.json();
   } catch (error) {
@@ -76,15 +76,15 @@ async function createBudget(budgetData) {
     const data = await response.json();
 
     if (!response.ok) {
-      showNotification(data.message || 'Ошибка создания бюджета', 'error');
+      showNotification(data.message || t('budgets.createError'), 'error');
       return null;
     }
 
-    showNotification('Бюджет создан', 'success');
+    showNotification(t('budgets.created'), 'success');
     return data.budget;
   } catch (error) {
     console.error('Ошибка создания бюджета:', error);
-    showNotification('Произошла ошибка', 'error');
+    showNotification(t('msg.error'), 'error');
     return null;
   }
 }
@@ -100,15 +100,15 @@ async function updateBudget(id, budgetData) {
     const data = await response.json();
 
     if (!response.ok) {
-      showNotification(data.message || 'Ошибка обновления', 'error');
+      showNotification(data.message || t('budgets.updateError'), 'error');
       return null;
     }
 
-    showNotification('Бюджет обновлен', 'success');
+    showNotification(t('budgets.updated'), 'success');
     return data.budget;
   } catch (error) {
     console.error('Ошибка обновления бюджета:', error);
-    showNotification('Произошла ошибка', 'error');
+    showNotification(t('msg.error'), 'error');
     return null;
   }
 }
@@ -122,15 +122,15 @@ async function deleteBudget(id) {
 
     if (!response.ok) {
       const data = await response.json();
-      showNotification(data.message || 'Ошибка удаления', 'error');
+      showNotification(data.message || t('budgets.deleteError'), 'error');
       return false;
     }
 
-    showNotification('Бюджет удален', 'success');
+    showNotification(t('budgets.deleted'), 'success');
     return true;
   } catch (error) {
     console.error('Ошибка удаления бюджета:', error);
-    showNotification('Произошла ошибка', 'error');
+    showNotification(t('msg.error'), 'error');
     return false;
   }
 }
@@ -147,13 +147,13 @@ async function renderBudgetsPage() {
 
   mainContent.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">Бюджеты</h1>
+      <h1 class="page-title">${t('budgets.title')}</h1>
       <div class="page-header-actions">
-        <button class="btn btn-outline" id="roll-forward-btn" title="Перенести остаток конвертных бюджетов в следующий период">
-          <i class="fas fa-forward"></i> Перенести остаток
+        <button class="btn btn-outline" id="roll-forward-btn" title="${t('budgets.rollForward.hint')}">
+          <i class="fas fa-forward"></i> ${t('budgets.rollForward.btn')}
         </button>
         <button class="btn btn-primary" id="add-budget-btn">
-          <i class="fas fa-plus"></i> Новый бюджет
+          <i class="fas fa-plus"></i> ${t('budgets.new')}
         </button>
       </div>
     </div>
@@ -172,7 +172,7 @@ async function renderBudgetsPage() {
   const rollBtn = document.getElementById('roll-forward-btn');
   if (rollBtn) {
     rollBtn.addEventListener('click', async () => {
-      if (confirm('Перенести остаток конвертных бюджетов в следующий период? Потраченное будет сброшено.')) {
+      if (confirm(t('budgets.rollForward.confirm'))) {
         const result = await rollForwardBudgets('monthly');
         if (result) renderBudgetsPage();
       }
@@ -205,7 +205,7 @@ function renderBudgetStats(stats, budgets) {
         <div class="stat-icon"><i class="fas fa-wallet"></i></div>
         <div class="stat-info">
           <div class="stat-value">${UI.moneyList(totalAmount)}</div>
-          <div class="stat-label">Общий бюджет</div>
+          <div class="stat-label">${t('budgets.stats.total')}</div>
         </div>
       </div>
 
@@ -213,7 +213,7 @@ function renderBudgetStats(stats, budgets) {
         <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
         <div class="stat-info">
           <div class="stat-value">${UI.moneyList(totalSpent)}</div>
-          <div class="stat-label">Потрачено</div>
+          <div class="stat-label">${t('budgets.stats.spent')}</div>
         </div>
       </div>
 
@@ -221,7 +221,7 @@ function renderBudgetStats(stats, budgets) {
         <div class="stat-icon"><i class="fas fa-piggy-bank"></i></div>
         <div class="stat-info">
           <div class="stat-value">${UI.moneyList(totalRemaining)}</div>
-          <div class="stat-label">Осталось</div>
+          <div class="stat-label">${t('common.remaining')}</div>
         </div>
       </div>
 
@@ -229,7 +229,7 @@ function renderBudgetStats(stats, budgets) {
         <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
         <div class="stat-info">
           <div class="stat-value">${stats.overallPercentUsed}%</div>
-          <div class="stat-label">Использовано</div>
+          <div class="stat-label">${t('budgets.stats.used')}</div>
         </div>
       </div>
     </div>
@@ -237,14 +237,14 @@ function renderBudgetStats(stats, budgets) {
     ${stats.overBudgetCount > 0 ? `
       <div class="alert alert-danger">
         <i class="fas fa-exclamation-triangle"></i>
-        ${stats.overBudgetCount} бюджет(ов) превышено!
+        ${t('budgets.alert.over', { n: stats.overBudgetCount })}
       </div>
     ` : ''}
 
     ${stats.nearLimitCount > 0 ? `
       <div class="alert alert-warning">
         <i class="fas fa-exclamation-circle"></i>
-        ${stats.nearLimitCount} бюджет(ов) близки к лимиту
+        ${t('budgets.alert.near', { n: stats.nearLimitCount })}
       </div>
     ` : ''}
   `;
@@ -263,33 +263,33 @@ function renderBudgetCards(budgets) {
       <div class="budget-card budget-${statusClass}">
         <div class="budget-header">
           <div class="budget-info">
-            <h3 class="budget-name">${budget.name}</h3>
-            ${budget.category ? `<span class="budget-category">${budget.category}</span>` : ''}
+            <h3 class="budget-name">${budgetEscapeHtml(budget.name)}</h3>
+            ${budget.category ? `<span class="budget-category">${budgetEscapeHtml(budget.category)}</span>` : ''}
           </div>
           <div class="budget-actions">
-            <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budget.id}" aria-label="Редактировать бюджет">
+            <button class="btn btn-sm btn-outline budget-edit-btn" data-id="${budget.id}" aria-label="${t('budgets.editAria')}">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="btn btn-sm btn-danger budget-delete-btn" data-id="${budget.id}" aria-label="Удалить бюджет">
+            <button class="btn btn-sm btn-danger budget-delete-btn" data-id="${budget.id}" aria-label="${t('budgets.deleteAria')}">
               <i class="fas fa-trash"></i>
             </button>
           </div>
         </div>
 
         <div class="budget-progress">
-          <div class="progress-bar" role="progressbar" aria-valuenow="${pctLabel}" aria-valuemin="0" aria-valuemax="100" aria-label="Использовано бюджета ${pctLabel}%">
+          <div class="progress-bar" role="progressbar" aria-valuenow="${pctLabel}" aria-valuemin="0" aria-valuemax="100" aria-label="${t('budgets.usedAria', { pct: pctLabel })}">
             <div class="progress-fill progress-${statusClass}" style="width: ${progressWidth}%"></div>
           </div>
           <div class="progress-labels">
             <span class="spent">${UI.money(budget.spent, budget.currency)}</span>
             <span class="budget-pct">${pctLabel}%</span>
-            <span class="total">из ${UI.money(budget.amount, budget.currency)}</span>
+            <span class="total">${t('budgets.of', { amount: UI.money(budget.amount, budget.currency) })}</span>
           </div>
         </div>
 
         <div class="budget-footer">
           <span class="budget-remaining ${budget.remaining < 0 ? 'negative' : ''}">
-            ${budget.remaining >= 0 ? 'Осталось: ' : 'Превышено на: '}
+            ${budget.remaining >= 0 ? t('budgets.remainingLabel') : t('budgets.overBy')}
             ${UI.money(Math.abs(budget.remaining), budget.currency)}
           </span>
           <span class="budget-period">${getPeriodLabel(budget.period)}</span>
@@ -297,16 +297,16 @@ function renderBudgetCards(budgets) {
 
         ${budget.rollover ? `
           <div class="budget-rollover">
-            <span class="budget-rollover-badge" title="Конвертный бюджет: остаток переносится">
-              <i class="fas fa-recycle"></i> Перенос
+            <span class="budget-rollover-badge" title="${t('budgets.rollover.badgeTitle')}">
+              <i class="fas fa-recycle"></i> ${t('budgets.rollover.badge')}
             </span>
             ${budget.carryover !== 0 ? `
               <span class="budget-carryover ${budget.carryover < 0 ? 'negative' : ''}">
-                Перенос: ${budget.carryover >= 0 ? '+' : '−'}${UI.money(Math.abs(budget.carryover), budget.currency)}
+                ${t('budgets.rollover.carry')} ${budget.carryover >= 0 ? '+' : '−'}${UI.money(Math.abs(budget.carryover), budget.currency)}
               </span>
             ` : ''}
             <span class="budget-effective-limit">
-              Лимит: ${UI.money(budget.effectiveLimit, budget.currency)}
+              ${t('budgets.rollover.limit')} ${UI.money(budget.effectiveLimit, budget.currency)}
             </span>
           </div>
         ` : ''}
@@ -319,22 +319,16 @@ function renderBudgetCards(budgets) {
 function renderEmptyBudgets() {
   return UI.emptyState({
     icon: 'fa-piggy-bank',
-    title: 'Нет бюджетов',
-    text: 'Создайте первый бюджет, чтобы контролировать свои расходы',
-    action: { label: 'Создать бюджет', action: 'budgets:create', icon: 'fa-plus' }
+    title: t('budgets.empty.title'),
+    text: t('budgets.empty.body'),
+    action: { label: t('budgets.createBtn'), action: 'budgets:create', icon: 'fa-plus' }
   });
 }
 
 // Получение метки периода
 function getPeriodLabel(period) {
-  const labels = {
-    daily: 'Ежедневный',
-    weekly: 'Еженедельный',
-    monthly: 'Ежемесячный',
-    yearly: 'Годовой',
-    custom: 'Произвольный'
-  };
-  return labels[period] || period;
+  const known = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
+  return known.includes(period) ? t('budgets.period.' + period) : period;
 }
 
 // Модальное окно создания бюджета
@@ -345,30 +339,30 @@ function showCreateBudgetModal() {
     <div class="modal-backdrop" id="${modalId}-backdrop">
       <div class="modal" id="${modalId}">
         <div class="modal-header">
-          <h2 class="modal-title">Новый бюджет</h2>
+          <h2 class="modal-title">${t('budgets.new')}</h2>
           <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
         </div>
 
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
-            <label for="${modalId}-name" class="form-label">Название *</label>
-            <input type="text" id="${modalId}-name" class="form-control" placeholder="Например: Продукты" required>
+            <label for="${modalId}-name" class="form-label">${t('common.name')} *</label>
+            <input type="text" id="${modalId}-name" class="form-control" placeholder="${t('budgets.field.namePlaceholder')}" required>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-category" class="form-label">Категория</label>
-            <input type="text" id="${modalId}-category" class="form-control" placeholder="Категория расходов (необязательно)">
-            <small class="form-hint">Оставьте пустым для общего бюджета на все расходы</small>
+            <label for="${modalId}-category" class="form-label">${t('common.category')}</label>
+            <input type="text" id="${modalId}-category" class="form-control" placeholder="${t('budgets.field.categoryPlaceholder')}">
+            <small class="form-hint">${t('budgets.field.categoryHint')}</small>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="${modalId}-amount" class="form-label">Сумма *</label>
+              <label for="${modalId}-amount" class="form-label">${t('common.amount')} *</label>
               <input type="number" id="${modalId}-amount" class="form-control" min="1" step="0.01" required>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-currency" class="form-label">Валюта</label>
+              <label for="${modalId}-currency" class="form-label">${t('common.currency')}</label>
               <select id="${modalId}-currency" class="form-control">
                 ${UI.currencyOptions()}
               </select>
@@ -376,31 +370,31 @@ function showCreateBudgetModal() {
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-period" class="form-label">Период</label>
+            <label for="${modalId}-period" class="form-label">${t('budgets.field.period')}</label>
             <select id="${modalId}-period" class="form-control">
-              <option value="monthly">Ежемесячный</option>
-              <option value="weekly">Еженедельный</option>
-              <option value="daily">Ежедневный</option>
-              <option value="yearly">Годовой</option>
+              <option value="monthly">${t('budgets.period.monthly')}</option>
+              <option value="weekly">${t('budgets.period.weekly')}</option>
+              <option value="daily">${t('budgets.period.daily')}</option>
+              <option value="yearly">${t('budgets.period.yearly')}</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-notify" class="form-label">Уведомлять при достижении (%)</label>
+            <label for="${modalId}-notify" class="form-label">${t('budgets.field.notifyAt')}</label>
             <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="80">
           </div>
 
           <div class="form-group form-group-checkbox">
             <label class="form-check-label">
               <input type="checkbox" id="${modalId}-rollover" class="form-check-input">
-              Переносить остаток (конвертный бюджет)
+              ${t('budgets.field.rollover')}
             </label>
-            <small class="form-hint">Неизрасходованный остаток перейдёт в следующий период</small>
+            <small class="form-hint">${t('budgets.field.rolloverHint')}</small>
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-            <button type="submit" class="btn btn-primary">Создать</button>
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">${t('btn.cancel')}</button>
+            <button type="submit" class="btn btn-primary">${t('btn.create')}</button>
           </div>
         </form>
       </div>
@@ -451,7 +445,7 @@ function showCreateBudgetModal() {
 async function showEditBudgetModal(id) {
   const budget = appState.budgets?.find(b => b.id == id);
   if (!budget) {
-    showNotification('Бюджет не найден', 'error');
+    showNotification(t('budgets.notFound'), 'error');
     return;
   }
 
@@ -461,29 +455,29 @@ async function showEditBudgetModal(id) {
     <div class="modal-backdrop" id="${modalId}-backdrop">
       <div class="modal" id="${modalId}">
         <div class="modal-header">
-          <h2 class="modal-title">Редактировать бюджет</h2>
+          <h2 class="modal-title">${t('budgets.editAria')}</h2>
           <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
         </div>
 
         <form id="${modalId}-form" class="modal-body">
           <div class="form-group">
-            <label for="${modalId}-name" class="form-label">Название *</label>
+            <label for="${modalId}-name" class="form-label">${t('common.name')} *</label>
             <input type="text" id="${modalId}-name" class="form-control" value="${budgetEscapeHtml(budget.name)}" required>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-category" class="form-label">Категория</label>
+            <label for="${modalId}-category" class="form-label">${t('common.category')}</label>
             <input type="text" id="${modalId}-category" class="form-control" value="${budgetEscapeHtml(budget.category || '')}">
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="${modalId}-amount" class="form-label">Сумма *</label>
+              <label for="${modalId}-amount" class="form-label">${t('common.amount')} *</label>
               <input type="number" id="${modalId}-amount" class="form-control" min="1" step="0.01" value="${budget.amount}" required>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-currency" class="form-label">Валюта</label>
+              <label for="${modalId}-currency" class="form-label">${t('common.currency')}</label>
               <select id="${modalId}-currency" class="form-control">
                 ${UI.currencyOptions(budget.currency)}
               </select>
@@ -491,33 +485,33 @@ async function showEditBudgetModal(id) {
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-period" class="form-label">Период</label>
+            <label for="${modalId}-period" class="form-label">${t('budgets.field.period')}</label>
             <select id="${modalId}-period" class="form-control">
-              <option value="monthly" ${budget.period === 'monthly' ? 'selected' : ''}>Ежемесячный</option>
-              <option value="weekly" ${budget.period === 'weekly' ? 'selected' : ''}>Еженедельный</option>
-              <option value="daily" ${budget.period === 'daily' ? 'selected' : ''}>Ежедневный</option>
-              <option value="yearly" ${budget.period === 'yearly' ? 'selected' : ''}>Годовой</option>
+              <option value="monthly" ${budget.period === 'monthly' ? 'selected' : ''}>${t('budgets.period.monthly')}</option>
+              <option value="weekly" ${budget.period === 'weekly' ? 'selected' : ''}>${t('budgets.period.weekly')}</option>
+              <option value="daily" ${budget.period === 'daily' ? 'selected' : ''}>${t('budgets.period.daily')}</option>
+              <option value="yearly" ${budget.period === 'yearly' ? 'selected' : ''}>${t('budgets.period.yearly')}</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="${modalId}-notify" class="form-label">Уведомлять при (%)</label>
+            <label for="${modalId}-notify" class="form-label">${t('budgets.field.notifyAt')}</label>
             <input type="number" id="${modalId}-notify" class="form-control" min="50" max="100" value="${budget.notifyAtPercent}">
           </div>
 
           <div class="form-group form-group-checkbox">
             <label class="form-check-label">
               <input type="checkbox" id="${modalId}-rollover" class="form-check-input" ${budget.rollover ? 'checked' : ''}>
-              Переносить остаток (конвертный бюджет)
+              ${t('budgets.field.rollover')}
             </label>
             ${budget.rollover && budget.carryover !== 0 ? `
-              <small class="form-hint">Текущий перенос: ${UI.money(budget.carryover, budget.currency)}</small>
+              <small class="form-hint">${t('budgets.currentCarry', { amount: UI.money(budget.carryover, budget.currency) })}</small>
             ` : ''}
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-outline" id="${modalId}-cancel">${t('btn.cancel')}</button>
+            <button type="submit" class="btn btn-primary">${t('btn.save')}</button>
           </div>
         </form>
       </div>
@@ -566,7 +560,7 @@ async function showEditBudgetModal(id) {
 
 // Подтверждение удаления бюджета
 async function confirmDeleteBudget(id) {
-  if (confirm('Вы уверены, что хотите удалить этот бюджет?')) {
+  if (confirm(t('budgets.confirmDelete'))) {
     const result = await deleteBudget(id);
     if (result) {
       renderBudgetsPage();
@@ -581,10 +575,10 @@ async function renderBudgetWidget() {
   if (!stats || stats.totalBudgets === 0) {
     return `
       <div class="widget budget-widget">
-        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Бюджеты</h3>
+        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> ${t('budgets.title')}</h3>
         <div class="widget-empty">
-          <p>Нет активных бюджетов</p>
-          <button type="button" class="btn btn-sm btn-primary" data-action="ui:navigate" data-page="budgets">Создать бюджет</button>
+          <p>${t('budgets.widget.empty')}</p>
+          <button type="button" class="btn btn-sm btn-primary" data-action="ui:navigate" data-page="budgets">${t('budgets.createBtn')}</button>
         </div>
       </div>
     `;
@@ -593,7 +587,7 @@ async function renderBudgetWidget() {
   const budgetsHtml = stats.budgets.slice(0, 3).map(budget => `
     <div class="budget-mini budget-${budget.status}">
       <div class="budget-mini-info">
-        <span class="budget-mini-name">${budget.name}</span>
+        <span class="budget-mini-name">${budgetEscapeHtml(budget.name)}</span>
         <span class="budget-mini-progress">${budget.percentUsed}%</span>
       </div>
       <div class="progress-bar-mini">
@@ -605,15 +599,15 @@ async function renderBudgetWidget() {
   return `
     <div class="widget budget-widget">
       <div class="widget-header">
-        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Бюджеты</h3>
-        <a href="#" data-action="ui:navigate" data-page="budgets" class="widget-link">Все</a>
+        <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> ${t('budgets.title')}</h3>
+        <a href="#" data-action="ui:navigate" data-page="budgets" class="widget-link">${t('common.all')}</a>
       </div>
       <div class="widget-content">
         ${budgetsHtml}
       </div>
       ${stats.overBudgetCount > 0 ? `
         <div class="widget-alert alert-danger">
-          ${stats.overBudgetCount} бюджет(ов) превышено
+          ${t('budgets.alert.over', { n: stats.overBudgetCount })}
         </div>
       ` : ''}
     </div>

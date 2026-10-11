@@ -52,14 +52,14 @@ async function fetchTransactions(filters = {}) {
       const response = await fetchWithAuth(`/api/transactions?${params.toString()}`);
       
       if (!response.ok) {
-        throw new Error('Не удалось получить транзакции');
+        throw new Error(t('transactions.fetchError'));
       }
       
       const data = await response.json();
       return data;
     } catch (error) {
       console.error('Ошибка получения транзакций:', error);
-      showNotification('Ошибка получения транзакций', 'error');
+      showNotification(t('transactions.fetchError'), 'error');
       return [];
     }
   }
@@ -114,7 +114,7 @@ async function fetchTransactions(filters = {}) {
         }
         
         // Группировка по категориям
-        const category = transaction.category || 'Без категории';
+        const category = transaction.category || t('transactions.uncategorized');
         if (!stats.transactionsByCategory[category]) {
           stats.transactionsByCategory[category] = {
             income: 0,
@@ -169,17 +169,17 @@ async function fetchTransactions(filters = {}) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка создания транзакции', 'error');
+        showNotification(data.message || t('transactions.createError'), 'error');
         return null;
       }
       
       const newTransaction = await response.json();
-      showNotification('Транзакция успешно создана', 'success');
+      showNotification(t('transactions.created'), 'success');
       
       return newTransaction;
     } catch (error) {
       console.error('Ошибка создания транзакции:', error);
-      showNotification('Произошла ошибка при создании транзакции', 'error');
+      showNotification(t('transactions.createFailed'), 'error');
       return null;
     }
   }
@@ -194,15 +194,15 @@ async function fetchTransactions(filters = {}) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления транзакции', 'error');
+        showNotification(data.message || t('transactions.updateError'), 'error');
         return false;
       }
       
-      showNotification('Транзакция успешно обновлена', 'success');
+      showNotification(t('transactions.updated'), 'success');
       return true;
     } catch (error) {
       console.error('Ошибка обновления транзакции:', error);
-      showNotification('Произошла ошибка при обновлении транзакции', 'error');
+      showNotification(t('transactions.updateFailed'), 'error');
       return false;
     }
   }
@@ -216,15 +216,15 @@ async function fetchTransactions(filters = {}) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка удаления транзакции', 'error');
+        showNotification(data.message || t('transactions.deleteError'), 'error');
         return false;
       }
       
-      showNotification('Транзакция успешно удалена', 'success');
+      showNotification(t('transactions.deleted'), 'success');
       return true;
     } catch (error) {
       console.error('Ошибка удаления транзакции:', error);
-      showNotification('Произошла ошибка при удалении транзакции', 'error');
+      showNotification(t('transactions.deleteFailed'), 'error');
       return false;
     }
   }
@@ -242,17 +242,17 @@ async function fetchTransactions(filters = {}) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка импорта транзакций', 'error');
+        showNotification(data.message || t('transactions.importError'), 'error');
         return null;
       }
       
       const result = await response.json();
-      showNotification(`Успешно импортировано ${result.count} транзакций`, 'success');
+      showNotification(t('transactions.imported', { count: result.count }), 'success');
       
       return result;
     } catch (error) {
       console.error('Ошибка импорта транзакций:', error);
-      showNotification('Произошла ошибка при импорте транзакций', 'error');
+      showNotification(t('transactions.importFailed'), 'error');
       return null;
     }
   }
@@ -267,15 +267,15 @@ async function fetchTransactions(filters = {}) {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">${isEditing ? 'Редактирование транзакции' : 'Создание транзакции'}</h2>
+            <h2 class="modal-title">${isEditing ? t('transactions.modal.editTitle') : t('transactions.modal.createTitle')}</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <form id="${modalId}-form" class="modal-body">
             <div class="form-group">
-              <label for="${modalId}-account" class="form-label">Счет</label>
+              <label for="${modalId}-account" class="form-label">${t('transactions.field.account')}</label>
               <select id="${modalId}-account" class="form-control" required>
-                <option value="">Выберите счет</option>
+                <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
                     ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
@@ -285,25 +285,25 @@ async function fetchTransactions(filters = {}) {
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-type" class="form-label">Тип транзакции</label>
+              <label for="${modalId}-type" class="form-label">${t('transactions.field.type')}</label>
               <select id="${modalId}-type" class="form-control" required>
-                <option value="income" ${isEditing && transactionData.type === 'income' ? 'selected' : ''}>Доход</option>
-                <option value="expense" ${isEditing && transactionData.type === 'expense' ? 'selected' : ''}>Расход</option>
+                <option value="income" ${isEditing && transactionData.type === 'income' ? 'selected' : ''}>${t('common.income')}</option>
+                <option value="expense" ${isEditing && transactionData.type === 'expense' ? 'selected' : ''}>${t('common.expense')}</option>
               </select>
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-amount" class="form-label">Сумма</label>
+              <label for="${modalId}-amount" class="form-label">${t('common.amount')}</label>
               <input type="number" id="${modalId}-amount" class="form-control" step="0.01" value="${isEditing ? Math.abs(transactionData.amount) : ''}" required>
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-date" class="form-label">Дата</label>
+              <label for="${modalId}-date" class="form-label">${t('common.date')}</label>
               <input type="date" id="${modalId}-date" class="form-control" value="${isEditing ? transactionData.date : new Date().toISOString().split('T')[0]}" required>
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-category" class="form-label">Категория</label>
+              <label for="${modalId}-category" class="form-label">${t('common.category')}</label>
               <input type="text" id="${modalId}-category" class="form-control" list="${modalId}-categories" value="${isEditing ? escapeHtml(transactionData.category) : ''}">
               <datalist id="${modalId}-categories">
                 <!-- Категории будут загружены динамически -->
@@ -311,13 +311,13 @@ async function fetchTransactions(filters = {}) {
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-description" class="form-label">Описание</label>
+              <label for="${modalId}-description" class="form-label">${t('common.description')}</label>
               <input type="text" id="${modalId}-description" class="form-control" value="${isEditing ? escapeHtml(transactionData.description) : ''}">
             </div>
             
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-              <button type="submit" class="btn btn-primary">${isEditing ? 'Сохранить' : 'Создать'}</button>
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">${t('btn.cancel')}</button>
+              <button type="submit" class="btn btn-primary">${isEditing ? t('btn.save') : t('btn.create')}</button>
             </div>
           </form>
         </div>
@@ -421,15 +421,15 @@ async function fetchTransactions(filters = {}) {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Импорт транзакций из CSV</h2>
+            <h2 class="modal-title">${t('transactions.import.title')}</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <form id="${modalId}-form" class="modal-body">
             <div class="form-group">
-              <label for="${modalId}-account" class="form-label">Счет</label>
+              <label for="${modalId}-account" class="form-label">${t('transactions.field.account')}</label>
               <select id="${modalId}-account" class="form-control" required>
-                <option value="">Выберите счет</option>
+                <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
                   <option value="${account.id}">
                     ${escapeHtml(account.name)} (${formatCurrency(account.balance, account.currency)})
@@ -439,9 +439,9 @@ async function fetchTransactions(filters = {}) {
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-bank-type" class="form-label">Bank format</label>
+              <label for="${modalId}-bank-type" class="form-label">${t('transactions.import.bankFormat')}</label>
               <select id="${modalId}-bank-type" class="form-control">
-                <option value="generic">Auto-detect</option>
+                <option value="generic">${t('transactions.import.autoDetect')}</option>
                 <option value="rbc">RBC Royal Bank</option>
                 <option value="td">TD Canada Trust</option>
                 <option value="scotiabank">Scotiabank</option>
@@ -457,23 +457,23 @@ async function fetchTransactions(filters = {}) {
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-file" class="form-label">CSV-файл</label>
+              <label for="${modalId}-file" class="form-label">${t('transactions.import.file')}</label>
               <div class="file-upload">
                 <input type="file" id="${modalId}-file" class="file-input" accept=".csv" required>
                 <div class="file-label">
-                  <span id="${modalId}-file-name">Выберите файл</span>
+                  <span id="${modalId}-file-name">${t('transactions.import.chooseFile')}</span>
                 </div>
               </div>
             </div>
             
             <div class="import-info">
-              <p><i class="fas fa-info-circle"></i> Файл должен содержать заголовки и следующие колонки: дата, описание, сумма, категория (опционально).</p>
-              <p>Выберите соответствующий тип банка для корректного импорта данных.</p>
+              <p><i class="fas fa-info-circle"></i> ${t('transactions.import.hint1')}</p>
+              <p>${t('transactions.import.hint2')}</p>
             </div>
             
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-              <button type="submit" class="btn btn-primary">Импортировать</button>
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">${t('btn.cancel')}</button>
+              <button type="submit" class="btn btn-primary">${t('btn.import')}</button>
             </div>
           </form>
         </div>
@@ -497,7 +497,7 @@ async function fetchTransactions(filters = {}) {
       if (fileInput.files.length > 0) {
         fileNameDisplay.textContent = fileInput.files[0].name;
       } else {
-        fileNameDisplay.textContent = 'Выберите файл';
+        fileNameDisplay.textContent = t('transactions.import.chooseFile');
       }
     });
     
@@ -529,7 +529,7 @@ async function fetchTransactions(filters = {}) {
       const file = fileInput.files[0];
       
       if (!accountId || !file) {
-        showNotification('Пожалуйста, выберите счет и файл', 'error');
+        showNotification(t('transactions.import.selectAccountAndFile'), 'error');
         return;
       }
       
@@ -555,6 +555,15 @@ async function fetchTransactions(filters = {}) {
     });
   }
   
+  // Currency of a transaction row: the API row carries none, so take it from
+  // the account (appState.accounts) and fall back to the base currency.
+  function transactionCurrency(transaction) {
+    if (transaction && transaction.currency) return transaction.currency;
+    const accounts = (typeof appState !== 'undefined' && Array.isArray(appState.accounts)) ? appState.accounts : [];
+    const acc = accounts.find(a => String(a.id) === String(transaction && transaction.account_id));
+    return acc && acc.currency ? acc.currency : undefined;
+  }
+
   // Рендеринг списка транзакций
   function renderTransactionsList(transactions) {
     // После рендера вставляем кнопку «Перевод» в тулбар транзакций (см.
@@ -568,8 +577,8 @@ async function fetchTransactions(filters = {}) {
       const isIncome = !isTransfer && transaction.type === 'income';
       // Для перевода знак определяем по сумме строки (списание < 0, зачисление > 0).
       const isInflow = (isTransfer || transaction.type === 'opening') ? transaction.amount >= 0 : isIncome;
-      const category = transaction.category || 'Без категории';
-      const description = transaction.description || 'Без описания';
+      const category = transaction.category || t('transactions.uncategorized');
+      const description = transaction.description || t('transactions.noDescription');
       // Класс/иконка/цвет суммы — отдельно для переводов, чтобы показать их
       // визуально иначе, чем доходы/расходы.
       const rowClass = isTransfer ? 'tx-transfer' : (isIncome ? 'tx-income' : 'tx-expense');
@@ -580,25 +589,25 @@ async function fetchTransactions(filters = {}) {
       const sign = isInflow ? '+' : '−';
       return `
       <tr data-transaction-id="${transaction.id}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
-        <td data-label="Дата" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
-        <td data-label="Описание" class="tx-cell tx-cell-desc">
+        <td data-label="${t('common.date')}" class="tx-cell tx-cell-date">${formatDate(transaction.date)}</td>
+        <td data-label="${t('common.description')}" class="tx-cell tx-cell-desc">
           <span class="tx-direction" aria-hidden="true"><i class="fas fa-${isTransfer ? 'exchange-alt' : 'arrow-' + arrow}"></i></span>
           <span class="tx-desc-text">${escapeHtml(description)}</span>
-          ${isTransfer ? '<span class="chip tx-transfer-badge">Перевод</span>' : ''}
+          ${isTransfer ? `<span class="chip tx-transfer-badge">${t('transactions.transfer')}</span>` : ''}
         </td>
-        <td data-label="Категория" class="tx-cell tx-cell-category">
+        <td data-label="${t('common.category')}" class="tx-cell tx-cell-category">
           <span class="chip tx-category-chip">${escapeHtml(category)}</span>
         </td>
-        <td data-label="Счет" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
-        <td data-label="Сумма" class="text-right tx-cell tx-cell-amount transaction-amount ${amountClass}">
-          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount))}
+        <td data-label="${t('transactions.field.account')}" class="tx-cell tx-cell-account">${escapeHtml(transaction.account_name)}</td>
+        <td data-label="${t('common.amount')}" class="text-right tx-cell tx-cell-amount transaction-amount ${amountClass}">
+          <span class="tx-amount-sign" aria-hidden="true">${sign}</span>${formatCurrency(Math.abs(transaction.amount), transactionCurrency(transaction))}
         </td>
-        <td data-label="Действия" class="tx-cell tx-cell-actions">
+        <td data-label="${t('common.actions')}" class="tx-cell tx-cell-actions">
           <div class="table-actions">
-            ${isTransfer ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="Изменить транзакцию" title="Изменить">
+            ${isTransfer ? '' : `<button class="btn btn-sm btn-icon" data-transaction-action="edit" data-transaction-id="${transaction.id}" aria-label="${t('transactions.editAria')}" title="${t('btn.edit')}">
               <i class="fas fa-edit"></i>
             </button>`}
-            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}" aria-label="Удалить транзакцию" title="Удалить">
+            <button class="btn btn-sm btn-icon btn-danger" data-transaction-action="delete" data-transaction-id="${transaction.id}" aria-label="${t('transactions.deleteAria')}" title="${t('btn.delete')}">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -616,7 +625,7 @@ async function fetchTransactions(filters = {}) {
     const btn = document.createElement('button');
     btn.id = 'transfer-btn';
     btn.className = 'btn btn-sm btn-outline';
-    btn.innerHTML = '<i class="fas fa-exchange-alt"></i> Перевод';
+    btn.innerHTML = `<i class="fas fa-exchange-alt"></i> ${t('transactions.transfer')}`;
     btn.addEventListener('click', showTransferModal);
     // Ставим перед кнопкой импорта, если она есть, иначе в конец тулбара.
     const importBtn = document.getElementById('import-transactions-btn');
@@ -636,7 +645,7 @@ async function fetchTransactions(filters = {}) {
       });
 
       if (!response.ok) {
-        let message = 'Ошибка создания перевода';
+        let message = t('transactions.transfer.createError');
         try {
           const data = await response.json();
           // Поддерживаем оба формата: { message } и { error: { message } }.
@@ -647,11 +656,11 @@ async function fetchTransactions(filters = {}) {
       }
 
       const result = await response.json();
-      showNotification('Перевод выполнен', 'success');
+      showNotification(t('transactions.transfer.done'), 'success');
       return result;
     } catch (error) {
       console.error('Ошибка создания перевода:', error);
-      showNotification('Произошла ошибка при создании перевода', 'error');
+      showNotification(t('transactions.transfer.failed'), 'error');
       return null;
     }
   }
@@ -671,45 +680,45 @@ async function fetchTransactions(filters = {}) {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">Перевод между счетами</h2>
+            <h2 class="modal-title">${t('transactions.transfer.title')}</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
 
           <form id="${modalId}-form" class="modal-body">
             <div class="form-group">
-              <label for="${modalId}-from" class="form-label">Со счёта</label>
+              <label for="${modalId}-from" class="form-label">${t('transactions.transfer.from')}</label>
               <select id="${modalId}-from" class="form-control" required>
-                <option value="">Выберите счёт</option>
+                <option value="">${t('transactions.selectAccount')}</option>
                 ${accountOptions}
               </select>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-to" class="form-label">На счёт</label>
+              <label for="${modalId}-to" class="form-label">${t('transactions.transfer.to')}</label>
               <select id="${modalId}-to" class="form-control" required>
-                <option value="">Выберите счёт</option>
+                <option value="">${t('transactions.selectAccount')}</option>
                 ${accountOptions}
               </select>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-amount" class="form-label">Сумма</label>
+              <label for="${modalId}-amount" class="form-label">${t('common.amount')}</label>
               <input type="number" id="${modalId}-amount" class="form-control" step="0.01" min="0.01" required>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-date" class="form-label">Дата</label>
+              <label for="${modalId}-date" class="form-label">${t('common.date')}</label>
               <input type="date" id="${modalId}-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
             </div>
 
             <div class="form-group">
-              <label for="${modalId}-description" class="form-label">Описание</label>
-              <input type="text" id="${modalId}-description" class="form-control" value="Перевод">
+              <label for="${modalId}-description" class="form-label">${t('common.description')}</label>
+              <input type="text" id="${modalId}-description" class="form-control" value="${t('transactions.transfer')}">
             </div>
 
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-              <button type="submit" class="btn btn-primary">Перевести</button>
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">${t('btn.cancel')}</button>
+              <button type="submit" class="btn btn-primary">${t('transactions.transfer.submit')}</button>
             </div>
           </form>
         </div>
@@ -748,15 +757,15 @@ async function fetchTransactions(filters = {}) {
       const description = document.getElementById(`${modalId}-description`).value;
 
       if (!fromAccountId || !toAccountId) {
-        showNotification('Выберите оба счёта', 'error');
+        showNotification(t('transactions.transfer.selectBoth'), 'error');
         return;
       }
       if (fromAccountId === toAccountId) {
-        showNotification('Нельзя переводить на тот же счёт', 'error');
+        showNotification(t('transactions.transfer.sameAccount'), 'error');
         return;
       }
       if (!(amount > 0)) {
-        showNotification('Сумма перевода должна быть положительной', 'error');
+        showNotification(t('transactions.transfer.positiveAmount'), 'error');
         return;
       }
 
@@ -792,7 +801,7 @@ async function fetchTransactions(filters = {}) {
     // Кнопка "Предыдущая"
     paginationHtml += `
       <li class="pagination-item">
-        <a href="#" class="pagination-link ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}" aria-label="Предыдущая">
+        <a href="#" class="pagination-link ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}" aria-label="${t('transactions.pagination.prev')}">
           <i class="fas fa-chevron-left"></i>
         </a>
       </li>
@@ -812,7 +821,7 @@ async function fetchTransactions(filters = {}) {
     // Кнопка "Следующая"
     paginationHtml += `
       <li class="pagination-item">
-        <a href="#" class="pagination-link ${currentPage >= totalPages ? 'disabled' : ''}" data-page="${currentPage + 1}" aria-label="Следующая">
+        <a href="#" class="pagination-link ${currentPage >= totalPages ? 'disabled' : ''}" data-page="${currentPage + 1}" aria-label="${t('transactions.pagination.next')}">
           <i class="fas fa-chevron-right"></i>
         </a>
       </li>
@@ -843,7 +852,7 @@ async function fetchTransactions(filters = {}) {
         break;
         
       case 'delete':
-        if (confirm('Вы действительно хотите удалить эту транзакцию?')) {
+        if (confirm(t('transactions.confirmDelete'))) {
           const success = await deleteTransaction(transactionId);
           
           if (success) {
@@ -866,10 +875,10 @@ async function fetchTransactions(filters = {}) {
     
     if (filtersForm.classList.contains('hidden')) {
       filtersForm.classList.remove('hidden');
-      toggleButton.innerHTML = '<i class="fas fa-filter"></i> Скрыть фильтры';
+      toggleButton.innerHTML = `<i class="fas fa-filter"></i> ${t('transactions.filters.hide')}`;
     } else {
       filtersForm.classList.add('hidden');
-      toggleButton.innerHTML = '<i class="fas fa-filter"></i> Показать фильтры';
+      toggleButton.innerHTML = `<i class="fas fa-filter"></i> ${t('transactions.filters.show')}`;
     }
   }
   
@@ -925,7 +934,7 @@ async function fetchTransactions(filters = {}) {
       endDate = document.getElementById('export-end-date').value;
       
       if (!startDate || !endDate) {
-        showNotification('Пожалуйста, укажите начальную и конечную даты', 'error');
+        showNotification(t('transactions.export.needDates'), 'error');
         return;
       }
     } else if (period === 'month') {
@@ -946,12 +955,12 @@ async function fetchTransactions(filters = {}) {
     });
     
     if (!transactions.length) {
-      showNotification('Нет данных для экспорта', 'warning');
+      showNotification(t('export.empty'), 'warning');
       return;
     }
     
     // Преобразование в CSV
-    const headers = ['Дата', 'Описание', 'Категория', 'Счет', 'Сумма', 'Тип'];
+    const headers = [t('common.date'), t('common.description'), t('common.category'), t('transactions.field.account'), t('common.amount'), t('common.type')];
     const csvRows = [headers.join(',')];
     
     transactions.forEach(transaction => {
@@ -975,10 +984,10 @@ async function fetchTransactions(filters = {}) {
     const link = document.createElement('a');
     
     link.href = url;
-    link.setAttribute('download', `финансы_${startDate || 'все'}_${endDate || 'все'}.csv`);
+    link.setAttribute('download', `transactions_${startDate || 'all'}_${endDate || 'all'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    showNotification('Данные успешно экспортированы', 'success');
+    showNotification(t('transactions.export.done'), 'success');
   }

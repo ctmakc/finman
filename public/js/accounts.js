@@ -6,13 +6,13 @@ async function fetchAccount(accountId) {
       const response = await fetchWithAuth(`/api/accounts/${accountId}`);
       
       if (!response.ok) {
-        throw new Error('Не удалось получить данные счета');
+        throw new Error(t('accounts.fetchError'));
       }
       
       return await response.json();
     } catch (error) {
       console.error('Ошибка получения счета:', error);
-      showNotification('Ошибка получения счета', 'error');
+      showNotification(t('accounts.fetchError'), 'error');
       return null;
     }
   }
@@ -27,7 +27,7 @@ async function fetchAccount(accountId) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка создания счета', 'error');
+        showNotification(data.message || t('accounts.createError'), 'error');
         return null;
       }
       
@@ -36,11 +36,11 @@ async function fetchAccount(accountId) {
       // Обновление списка счетов
       appState.accounts.push(newAccount);
       
-      showNotification('Счет успешно создан', 'success');
+      showNotification(t('accounts.created'), 'success');
       return newAccount;
     } catch (error) {
       console.error('Ошибка создания счета:', error);
-      showNotification('Произошла ошибка при создании счета', 'error');
+      showNotification(t('accounts.createFailed'), 'error');
       return null;
     }
   }
@@ -55,7 +55,7 @@ async function fetchAccount(accountId) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка обновления счета', 'error');
+        showNotification(data.message || t('accounts.updateError'), 'error');
         return false;
       }
       
@@ -67,11 +67,11 @@ async function fetchAccount(accountId) {
         appState.accounts[index] = updatedAccount;
       }
       
-      showNotification('Счет успешно обновлен', 'success');
+      showNotification(t('accounts.updated'), 'success');
       return true;
     } catch (error) {
       console.error('Ошибка обновления счета:', error);
-      showNotification('Произошла ошибка при обновлении счета', 'error');
+      showNotification(t('accounts.updateFailed'), 'error');
       return false;
     }
   }
@@ -85,18 +85,18 @@ async function fetchAccount(accountId) {
       
       if (!response.ok) {
         const data = await response.json();
-        showNotification(data.message || 'Ошибка удаления счета', 'error');
+        showNotification(data.message || t('accounts.deleteError'), 'error');
         return false;
       }
       
       // Обновление списка счетов
       appState.accounts = appState.accounts.filter(acc => acc.id !== accountId);
       
-      showNotification('Счет успешно удален', 'success');
+      showNotification(t('accounts.deleted'), 'success');
       return true;
     } catch (error) {
       console.error('Ошибка удаления счета:', error);
-      showNotification('Произошла ошибка при удалении счета', 'error');
+      showNotification(t('accounts.deleteFailed'), 'error');
       return false;
     }
   }
@@ -111,56 +111,53 @@ async function fetchAccount(accountId) {
       <div class="modal-backdrop" id="${modalId}-backdrop">
         <div class="modal" id="${modalId}">
           <div class="modal-header">
-            <h2 class="modal-title">${isEditing ? 'Редактирование счета' : 'Создание счета'}</h2>
+            <h2 class="modal-title">${isEditing ? t('accounts.modal.editTitle') : t('accounts.modal.createTitle')}</h2>
             <button type="button" class="modal-close" id="${modalId}-close">&times;</button>
           </div>
           
           <form id="${modalId}-form" class="modal-body">
             <div class="form-group">
-              <label for="${modalId}-name" class="form-label">Название счета</label>
-              <input type="text" id="${modalId}-name" class="form-control" value="${isEditing ? accountData.name : ''}" required>
+              <label for="${modalId}-name" class="form-label">${t('accounts.field.name')}</label>
+              <input type="text" id="${modalId}-name" class="form-control" value="${isEditing ? escapeHtml(accountData.name) : ''}" required>
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-type" class="form-label">Тип счета</label>
+              <label for="${modalId}-type" class="form-label">${t('accounts.field.type')}</label>
               <select id="${modalId}-type" class="form-control">
-                <option value="checking" ${isEditing && accountData.account_type === 'checking' ? 'selected' : ''}>Текущий счет</option>
-                <option value="savings" ${isEditing && accountData.account_type === 'savings' ? 'selected' : ''}>Сберегательный счет</option>
-                <option value="credit" ${isEditing && accountData.account_type === 'credit' ? 'selected' : ''}>Кредитная карта</option>
-                <option value="loan" ${isEditing && accountData.account_type === 'loan' ? 'selected' : ''}>Кредит</option>
+                <option value="checking" ${isEditing && accountData.account_type === 'checking' ? 'selected' : ''}>${t('accounts.type.checking')}</option>
+                <option value="savings" ${isEditing && accountData.account_type === 'savings' ? 'selected' : ''}>${t('accounts.type.savings')}</option>
+                <option value="credit" ${isEditing && accountData.account_type === 'credit' ? 'selected' : ''}>${t('accounts.type.credit')}</option>
+                <option value="loan" ${isEditing && accountData.account_type === 'loan' ? 'selected' : ''}>${t('accounts.type.loan')}</option>
               </select>
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-bank" class="form-label">Банк</label>
-              <input type="text" id="${modalId}-bank" class="form-control" value="${isEditing ? accountData.bank_name || '' : ''}">
+              <label for="${modalId}-bank" class="form-label">${t('accounts.field.bank')}</label>
+              <input type="text" id="${modalId}-bank" class="form-control" value="${isEditing ? escapeHtml(accountData.bank_name || '') : ''}">
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-number" class="form-label">Номер счета</label>
-              <input type="text" id="${modalId}-number" class="form-control" value="${isEditing ? accountData.account_number || '' : ''}">
+              <label for="${modalId}-number" class="form-label">${t('accounts.field.number')}</label>
+              <input type="text" id="${modalId}-number" class="form-control" value="${isEditing ? escapeHtml(accountData.account_number || '') : ''}">
             </div>
             
             <div class="form-group">
-              <label for="${modalId}-currency" class="form-label">Валюта</label>
+              <label for="${modalId}-currency" class="form-label">${t('common.currency')}</label>
               <select id="${modalId}-currency" class="form-control">
-                <option value="RUB" ${isEditing && accountData.currency === 'RUB' ? 'selected' : ''}>Российский рубль (RUB)</option>
-                <option value="USD" ${isEditing && accountData.currency === 'USD' ? 'selected' : ''}>Доллар США (USD)</option>
-                <option value="EUR" ${isEditing && accountData.currency === 'EUR' ? 'selected' : ''}>Евро (EUR)</option>
-                <option value="GBP" ${isEditing && accountData.currency === 'GBP' ? 'selected' : ''}>Фунт стерлингов (GBP)</option>
+                ${UI.currencyOptions(isEditing ? accountData.currency : (appState.baseCurrency || undefined))}
               </select>
             </div>
             
             ${!isEditing ? `
               <div class="form-group">
-                <label for="${modalId}-balance" class="form-label">Начальный баланс</label>
+                <label for="${modalId}-balance" class="form-label">${t('accounts.field.openingBalance')}</label>
                 <input type="number" id="${modalId}-balance" class="form-control" step="0.01" value="0">
               </div>
             ` : ''}
             
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" id="${modalId}-cancel">Отмена</button>
-              <button type="submit" class="btn btn-primary">${isEditing ? 'Сохранить' : 'Создать'}</button>
+              <button type="button" class="btn btn-outline" id="${modalId}-cancel">${t('btn.cancel')}</button>
+              <button type="submit" class="btn btn-primary">${isEditing ? t('btn.save') : t('btn.create')}</button>
             </div>
           </form>
         </div>
@@ -257,7 +254,7 @@ async function fetchAccount(accountId) {
         break;
         
       case 'delete':
-        if (confirm('Вы действительно хотите удалить этот счет? Все связанные транзакции также будут удалены.')) {
+        if (confirm(t('accounts.confirmDelete'))) {
           const success = await deleteAccount(accountId);
           
           if (success) {
