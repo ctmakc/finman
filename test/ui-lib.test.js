@@ -205,3 +205,17 @@ describe('UI money helpers', () => {
     expect(root.querySelector('button').dataset.action).toBe('split:add');
   });
 });
+
+describe('UI converted aggregates (server lib/fx)', () => {
+  test('convertedMoney formats in the response currency; missingRatesNote escapes and lists codes', () => {
+    const UI = loadUI();
+    expect(UI.convertedMoney(1234.5, 'EUR')).toMatch(/€|EUR/);
+    expect(UI.convertedMoney(10, 'US$')).not.toMatch(/</);
+    expect(UI.missingRatesNote([])).toBe('');
+    expect(UI.missingRatesNote(null)).toBe('');
+    const note = UI.missingRatesNote(['xyz', 'XYZ', '<b>']);
+    expect(note).toMatch(/XYZ/);
+    expect(note).not.toMatch(/<b>/);
+    expect((note.match(/XYZ/g) || []).length).toBe(1);
+  });
+});

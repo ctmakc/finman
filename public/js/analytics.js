@@ -1,20 +1,21 @@
 // ==================== ANALYTICS ====================
-// /api/analytics/* sums transactions across ALL accounts without converting
-// currencies. The page formats those figures with a currency only when every
-// account shares one; otherwise it shows plain numbers and says so.
+// /api/analytics/* converts every account's amounts into the user's base
+// currency (server lib/fx) and returns it as `currency`, plus `missingRates`
+// for currencies without an exchange rate (counted 1:1).
 async function renderAnalyticsPage() {
   const mainContent = document.getElementById('main-content');
   mainContent.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     await UI.loadBaseCurrency();
-    const currencies = await UI.loadAccountCurrencies();
     const [overview, byCategoryRaw, compare] = await Promise.all([
       fetchWithAuth('/api/analytics/overview').then(r => r.json()),
       fetchWithAuth('/api/analytics/expenses-by-category').then(r => r.json()),
       fetchWithAuth('/api/analytics/compare').then(r => r.json()),
     ]);
     const byCategory = Array.isArray(byCategoryRaw) ? byCategoryRaw : [];
-    const money = (v) => UI.esc(UI.aggregateMoney(v || 0, currencies));
+    const cur = overview.currency || overview.baseCurrency || (compare && compare.currency);
+    const money = (v) => UI.esc(UI.convertedMoney(v || 0, cur));
+    const missing = [].concat(overview.missingRates || [], (compare && compare.missingRates) || []);
     const esc = UI.esc;
     const goals = overview.savingsGoals || {};
     const debts = overview.debts || {};
@@ -24,7 +25,7 @@ async function renderAnalyticsPage() {
 
     mainContent.innerHTML = `<div class="analytics-page">
       <div class="page-header"><h1><i class="fas fa-chart-bar"></i> ${t('analytics.title')}</h1></div>
-      ${UI.mixedCurrencyNote(currencies)}
+      ${UI.missingRatesNote(missing)}
       <div class="stats-grid">
         <div class="stat-card stat-ok"><div class="stat-icon"><i class="fas fa-arrow-down"></i></div><div class="stat-data"><div class="stat-value">${money(overview.income)}</div><div class="stat-label">${t('common.income')}</div></div></div>
         <div class="stat-card stat-over"><div class="stat-icon"><i class="fas fa-arrow-up"></i></div><div class="stat-data"><div class="stat-value">${money(overview.expense)}</div><div class="stat-label">${t('common.expense')}</div></div></div>

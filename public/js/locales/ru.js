@@ -879,6 +879,7 @@
     'common.account': 'Счёт',
     'common.value': 'Стоимость',
     'ui.accounts': 'Счета',
+    'ui.missingRatesNote': 'Нет курса для {list}: эти суммы учтены в итогах 1:1.',
     'ui.mixedCurrencyNote': '{subject} ведутся в разных валютах ({list}): итоговые суммы сложены без конвертации и показаны без знака валюты.',
     'analytics.title': 'Аналитика',
     'analytics.netPeriod': 'Баланс периода',

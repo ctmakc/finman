@@ -13,13 +13,12 @@ const ReportsModule = {
 
   async init() {
     await UI.loadBaseCurrency();
-    this.currencies = await UI.loadAccountCurrencies();
     await Promise.all([this.loadReports(), this.loadTypes()]);
   },
 
-  // Money formatter for server-side aggregates.
+  // Money formatter: report totals are in the report's currency (server lib/fx).
   fmt(n) {
-    return UI.esc(UI.aggregateMoney(n || 0, this.currencies));
+    return UI.esc(UI.convertedMoney(n || 0, this.reportCurrency));
   },
 
   async loadReports() {
@@ -215,7 +214,8 @@ const ReportsModule = {
     const container = document.getElementById('report-result');
     data = data || {};
     const esc = UI.esc;
-    let html = '<div class="report-content">' + UI.mixedCurrencyNote(this.currencies);
+    this.reportCurrency = data.currency || data.baseCurrency || null;
+    let html = '<div class="report-content">' + UI.missingRatesNote(data.missingRates);
 
     if (type === 'monthly' || type === 'yearly') {
       const s = data.summary || {};

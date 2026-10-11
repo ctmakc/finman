@@ -881,6 +881,7 @@
     'common.account': 'Account',
     'common.value': 'Value',
     'ui.accounts': 'Accounts',
+    'ui.missingRatesNote': 'No exchange rate for {list}: those amounts are counted 1:1 in the totals.',
     'ui.mixedCurrencyNote': '{subject} are kept in different currencies ({list}): totals are added without conversion and shown without a currency sign.',
     'analytics.title': 'Analytics',
     'analytics.netPeriod': 'Net for period',

@@ -879,6 +879,7 @@
     'common.account': 'Рахунок',
     'common.value': 'Вартість',
     'ui.accounts': 'Рахунки',
+    'ui.missingRatesNote': 'Немає курсу для {list}: ці суми враховано в підсумках 1:1.',
     'ui.mixedCurrencyNote': '{subject} ведуться в різних валютах ({list}): підсумкові суми складено без конвертації та показано без знака валюти.',
     'analytics.title': 'Аналітика',
     'analytics.netPeriod': 'Баланс періоду',

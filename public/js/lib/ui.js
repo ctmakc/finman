@@ -249,6 +249,21 @@
     return s;
   }
 
+  // Server aggregates converted to one currency (lib/fx on the server):
+  // format in the response's currency.
+  function convertedMoney(amount, currency) {
+    return money(amount, currency || baseCurrency());
+  }
+
+  // Currencies the server had no exchange rate for (counted 1:1).
+  function missingRatesNote(missing) {
+    var list = uniqueCurrencies(missing);
+    if (!list.length) return '';
+    var text = tr('ui.missingRatesNote', { list: esc(list.join(', ')) },
+      'No exchange rate for {list}: those amounts are counted 1:1 in the totals.');
+    return '<div class="fm-currency-note" role="note">' + text + '</div>';
+  }
+
   function mixedCurrencyNote(currencies, subject) {
     var list = uniqueCurrencies(currencies);
     if (list.length < 2) return '';
@@ -551,6 +566,8 @@
     sumByCurrency: sumByCurrency,
     moneyList: moneyList,
     aggregateMoney: aggregateMoney,
+    convertedMoney: convertedMoney,
+    missingRatesNote: missingRatesNote,
     mixedCurrencyNote: mixedCurrencyNote,
     uniqueCurrencies: uniqueCurrencies,
     currencyOptions: currencyOptions,

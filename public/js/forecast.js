@@ -10,13 +10,10 @@ const ForecastModule = {
     return { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
   },
 
-  // /api/forecast sums balances of ALL accounts without converting currencies,
-  // so figures carry a currency only when every account shares one.
-  currencies: [],
-
+  // /api/forecast converts everything into the user's base currency and
+  // returns it (summary.currency / currency) with missingRates.
   async init() {
     await UI.loadBaseCurrency();
-    this.currencies = await UI.loadAccountCurrencies();
     await Promise.all([this.loadForecast(), this.loadTrends(), this.loadAnomalies()]);
   },
 
@@ -61,7 +58,7 @@ const ForecastModule = {
 
   renderForecast() {
     const note = document.getElementById('forecast-currency-note');
-    if (note) note.innerHTML = UI.mixedCurrencyNote(this.currencies);
+    if (note) note.innerHTML = UI.missingRatesNote(this.forecast && this.forecast.summary && this.forecast.summary.missingRates);
     const container = document.getElementById('forecast-summary');
     if (!container || !this.forecast) return;
 
@@ -292,7 +289,8 @@ const ForecastModule = {
   // ---- helpers ----
   fmt(n) {
     const num = Number(n);
-    return UI.esc(UI.aggregateMoney(Number.isFinite(num) ? num : 0, this.currencies));
+    const cur = (this.forecast && this.forecast.summary && this.forecast.summary.currency) || (this.trends && this.trends.currency);
+    return UI.esc(UI.convertedMoney(Number.isFinite(num) ? num : 0, cur));
   },
 
   escape(str) {
