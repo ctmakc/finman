@@ -125,10 +125,12 @@ const ReportsModule = {
         headers: { 'Content-Type': 'application/json', ...this.headers() },
         body: JSON.stringify(data)
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result) throw new Error((result && result.message) || 'generate failed');
 
       UI.closeModal('generate-modal');
-      this.showReportResult(result.report, data.report_type);
+      // POST /api/reports/generate returns the report body as `data`.
+      this.showReportResult(result.data || result.report, data.report_type);
       await this.loadReports();
     } catch (error) {
       alert(t('reports.generateError'));
@@ -189,10 +191,23 @@ const ReportsModule = {
   async viewReport(id) {
     try {
       const response = await fetch(`/api/reports/${Number(id)}`, { headers: this.headers() });
+      if (!response.ok) throw new Error('load failed');
       const report = await response.json();
-      this.showReportResult(report.file_data, report.report_type);
+      this.showReportResult(this.parseReportData(report.data || report.file_data), report.report_type);
     } catch (error) {
       alert(t('msg.loadError'));
+    }
+  },
+
+  // reports.file_data is stored as a JSON string; tolerate objects and junk.
+  parseReportData(raw) {
+    if (raw && typeof raw === 'object') return raw;
+    if (typeof raw !== 'string' || !raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+      return {};
     }
   },
 

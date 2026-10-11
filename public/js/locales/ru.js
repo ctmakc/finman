@@ -601,6 +601,8 @@
     'subs.saveError': 'Ошибка сохранения',
     'subs.confirmPaid': 'Отметить как оплаченную?',
     'subs.confirmCancel': 'Отменить подписку?',
+    'subs.confirmResume': 'Возобновить подписку?',
+    'subs.resume': 'Возобновить подписку',
     'subs.form.cycle': 'Период',
     'subs.form.startDate': 'Дата начала',
     'subs.form.color': 'Цвет',

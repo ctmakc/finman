@@ -603,6 +603,8 @@
     'subs.saveError': 'Could not save',
     'subs.confirmPaid': 'Mark as paid?',
     'subs.confirmCancel': 'Cancel this subscription?',
+    'subs.confirmResume': 'Resume this subscription?',
+    'subs.resume': 'Resume subscription',
     'subs.form.cycle': 'Billing cycle',
     'subs.form.startDate': 'Start date',
     'subs.form.color': 'Color',

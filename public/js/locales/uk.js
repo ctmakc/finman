@@ -601,6 +601,8 @@
     'subs.saveError': 'Не вдалося зберегти',
     'subs.confirmPaid': 'Позначити як сплачену?',
     'subs.confirmCancel': 'Скасувати підписку?',
+    'subs.confirmResume': 'Відновити підписку?',
+    'subs.resume': 'Відновити підписку',
     'subs.form.cycle': 'Період',
     'subs.form.startDate': 'Дата початку',
     'subs.form.color': 'Колір',
