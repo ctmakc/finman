@@ -834,17 +834,26 @@ async function showImportWizard({ bank = null, presetId = null } = {}) {
     const reparse = document.getElementById('biw-reparse');
     if (reparse) {
       reparse.addEventListener('click', async () => {
-        const mapping = {};
+        // Send every role: the visible ones (null = "—", which clears a preset
+        // role on the server) plus the roles the wizard does not show (fee,
+        // state, transaction type, MCC, ...), so a re-read keeps them.
+        const mapping = { description: [] };
+        const usedByVisible = new Set();
         m.body.querySelectorAll('.bank-map-grid select[data-role]').forEach((sel) => {
-          if (sel.value === '') return;
           const role = sel.dataset.role;
-          const idx = Number(sel.value);
+          const idx = sel.value === '' ? null : Number(sel.value);
+          if (idx != null) usedByVisible.add(idx);
           if (role === 'description' || role === 'description2') {
-            mapping.description = mapping.description || [];
-            mapping.description.push(idx);
+            if (idx != null) mapping.description.push(idx);
           } else {
             mapping[role] = idx;
           }
+        });
+        if (mapping.description.length === 0) mapping.description = null;
+        const prev = p.mapping || {};
+        ['fee', 'balance', 'externalId', 'mcc', 'typeColumn', 'stateColumn'].forEach((role) => {
+          const idx = prev[role];
+          if (Number.isInteger(idx) && !usedByVisible.has(idx)) mapping[role] = idx;
         });
         state.options = {
           mapping,

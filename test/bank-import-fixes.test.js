@@ -37,3 +37,39 @@ describe('ReDoS: number detection on hostile cells', () => {
     expect(p.rows.map((r) => r.amount)).toEqual([1234.56, -45]);
   });
 });
+
+describe('"Re-read with this mapping" keeps the preset roles the wizard does not show', () => {
+  // What the wizard sends: the visible roles only (plus nulls for "—").
+  const visible = (m) => ({ date: m.date, description: m.description, amount: m.amount, debit: null, credit: null, category: null, currency: m.currency ?? null });
+
+  test('Revolut: non-completed rows stay skipped and the fee is still subtracted', () => {
+    const text = read('revolut.csv');
+    const auto = csv.previewCsv(text);
+    const again = csv.previewCsv(text, { presetId: 'revolut', mapping: visible(auto.mapping), dateOrder: 'YMD', hasHeader: true, delimiter: ',' });
+    expect(again.mappingSource).toBe('manual');
+    expect(again.rows.map((r) => [r.amount ?? null, r.skipped])).toEqual(auto.rows.map((r) => [r.amount ?? null, r.skipped]));
+    expect(again.rows.filter((r) => r.skipped)).toHaveLength(2);
+  });
+
+  test('BMO: the DEBIT/CREDIT type column still fixes the sign of unsigned amounts', () => {
+    const text = `First Bank Card,Transaction Type,Date Posted, Transaction Amount,Description\n'5191',DEBIT,20261001,84.17,LOBLAWS\n'5191',CREDIT,20261005,2450.00,PAYROLL\n`;
+    const auto = csv.previewCsv(text);
+    const again = csv.previewCsv(text, { presetId: 'bmo', mapping: visible(auto.mapping), hasHeader: true });
+    expect(again.rows.map((r) => r.amount)).toEqual([-84.17, 2450]);
+  });
+
+  test('Monobank: currency from the amount header and MCC categories survive', () => {
+    const text = read('monobank.csv');
+    const auto = csv.previewCsv(text);
+    const again = csv.previewCsv(text, { presetId: 'monobank', mapping: visible(auto.mapping), dateOrder: 'DMY', hasHeader: true });
+    expect(again.rows.map((r) => [r.currency, r.category])).toEqual(auto.rows.map((r) => [r.currency, r.category]));
+    expect(again.rows[0].currency).toBe('UAH');
+  });
+
+  test('an explicit null clears a preset role (user picked "—")', () => {
+    const text = read('revolut.csv');
+    const auto = csv.previewCsv(text);
+    const again = csv.previewCsv(text, { presetId: 'revolut', mapping: { ...visible(auto.mapping), currency: null } });
+    expect(again.rows.find((r) => !r.skipped).currency).toBeNull();
+  });
+});

@@ -897,7 +897,11 @@ function previewCsv(text, options = {}) {
   let mappingSource = 'auto';
   let baseMapping;
   if (options.mapping && typeof options.mapping === 'object' && Object.keys(options.mapping).length) {
-    baseMapping = options.mapping;
+    // The wizard only exposes a few roles (date, description, amount, ...). A
+    // preset also carries fee, state, type and currency-from-header roles that
+    // the user never sees, so manual choices are laid over the preset instead
+    // of replacing it. An explicit null in the manual mapping clears a role.
+    baseMapping = preset ? { ...preset.mapping, ...options.mapping } : options.mapping;
     mappingSource = 'manual';
   } else if (preset) {
     baseMapping = preset.mapping;
