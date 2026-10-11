@@ -1,4 +1,4 @@
-// public/js/ai.js — AI Financial CFO chat panel + Insights.
+// public/js/ai.js — AI Financial CFO chat panel + Insights + dashboard Insights block.
 // Загружается через <script> в index.html, доступен как глобальный AiCfoModule.
 // Бэкенд отвечает в конверте { success, data } (lib/respond) либо
 // { success:false, error:{ code, message } } при ошибке.
@@ -577,6 +577,258 @@ const AiCfoModule = {
         </div>
       </div>
     `;
+  },
+
+  // --- Dashboard "Insights" block (PORT_PLAN A8/A15) ------------------------
+  // Consumes GET /api/ai/alerts, /api/ai/insights/monthly, /api/ai/insights/weekly.
+  // Rendered into a host element on the dashboard by SmartDashboard.init() through
+  // renderDashboardInsights(hostId). DOM is built with createElement + addEventListener
+  // (no inline handlers, no inline style attributes — bar heights go through the CSSOM).
+
+  async loadAlerts() {
+    const response = await fetch('/api/ai/alerts', { headers: this.authHeaders() });
+    return this.parse(response);
+  },
+
+  async loadDigest() {
+    const response = await fetch('/api/ai/digest', { headers: this.authHeaders() });
+    return this.parse(response);
+  },
+
+  async loadMonthlyInsight({ month, refresh } = {}) {
+    const params = new URLSearchParams();
+    if (month) params.set('month', month);
+    if (refresh) params.set('refresh', '1');
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`/api/ai/insights/monthly${qs}`, { headers: this.authHeaders() });
+    return this.parse(response);
+  },
+
+  async loadWeeklyBrief() {
+    const response = await fetch('/api/ai/insights/weekly', { headers: this.authHeaders() });
+    return this.parse(response);
+  },
+
+  // Compact number formatting for digest figures (no currency: the digest sums all
+  // accounts of the user, so a symbol here would be a guess).
+  fmtFigure(value) {
+    const n = Number(value) || 0;
+    try {
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(n));
+    } catch (e) {
+      return String(Math.round(n));
+    }
+  },
+
+  // Small DOM helper: el('div', 'class-a class-b', 'text') -> HTMLElement
+  el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  },
+
+  // Human label for the digest period "YYYY-MM" (English, matching the new strings).
+  periodLabel(period) {
+    if (!period || !/^\d{4}-\d{2}$/.test(period)) return '';
+    const [y, m] = period.split('-').map((x) => parseInt(x, 10));
+    try {
+      return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    } catch (e) {
+      return period;
+    }
+  },
+
+  // Entry point: builds the block skeleton, loads the three endpoints in parallel, renders.
+  async renderDashboardInsights(hostId) {
+    const host = typeof hostId === 'string' ? document.getElementById(hostId) : hostId;
+    if (!host) return;
+    host.textContent = '';
+    host.classList.add('ai-dash');
+
+    // Header row: eyebrow + period + actions.
+    const head = this.el('div', 'ai-dash-head');
+    const eyebrow = this.el('span', 'ai-dash-eyebrow');
+    eyebrow.appendChild(this.el('span', 'ai-dash-dot'));
+    eyebrow.appendChild(document.createTextNode('Insights'));
+    const period = this.el('span', 'ai-dash-period', '');
+    const actions = this.el('div', 'ai-dash-actions');
+    const refreshBtn = this.el('button', 'btn btn-sm ai-dash-refresh', 'Refresh');
+    refreshBtn.type = 'button';
+    refreshBtn.setAttribute('aria-label', 'Regenerate insights');
+    const askBtn = this.el('button', 'btn btn-sm ai-dash-ask', 'Ask the CFO');
+    askBtn.type = 'button';
+    actions.appendChild(refreshBtn);
+    actions.appendChild(askBtn);
+    head.appendChild(eyebrow);
+    head.appendChild(period);
+    head.appendChild(actions);
+
+    const alerts = this.el('div', 'ai-dash-alerts');
+    alerts.setAttribute('role', 'list');
+    alerts.setAttribute('aria-label', 'Alerts');
+    const grid = this.el('div', 'ai-dash-grid');
+    const monthly = this.el('article', 'ai-dash-panel ai-dash-monthly');
+    const weekly = this.el('article', 'ai-dash-panel ai-dash-weekly');
+    grid.appendChild(monthly);
+    grid.appendChild(weekly);
+
+    host.appendChild(head);
+    host.appendChild(alerts);
+    host.appendChild(grid);
+
+    const navToAi = () => {
+      const link = document.querySelector('[data-page="ai"]');
+      if (link) link.click();
+    };
+    askBtn.addEventListener('click', navToAi);
+
+    const load = async (refresh) => {
+      host.classList.add('is-loading');
+      refreshBtn.disabled = true;
+      this.renderInsightSkeleton(monthly, 3);
+      this.renderInsightSkeleton(weekly, 2);
+      const [alertsRes, monthlyRes, weeklyRes] = await Promise.all([
+        this.loadAlerts().catch((e) => ({ error: e })),
+        this.loadMonthlyInsight({ refresh }).catch((e) => ({ error: e })),
+        this.loadWeeklyBrief().catch((e) => ({ error: e })),
+      ]);
+      period.textContent = alertsRes && !alertsRes.error ? this.periodLabel(alertsRes.period) : '';
+      this.renderAlertsStrip(alerts, alertsRes);
+      this.renderMonthlyPanel(monthly, monthlyRes);
+      this.renderWeeklyPanel(weekly, weeklyRes);
+      host.classList.remove('is-loading');
+      refreshBtn.disabled = false;
+      // Entrance: one short staggered reveal (transform/opacity only; CSS honours reduced motion).
+      host.classList.remove('is-ready');
+      requestAnimationFrame(() => host.classList.add('is-ready'));
+    };
+
+    refreshBtn.addEventListener('click', () => load(true));
+    await load(false);
+  },
+
+  renderInsightSkeleton(panel, lines) {
+    panel.textContent = '';
+    panel.setAttribute('aria-busy', 'true');
+    for (let i = 0; i < lines; i += 1) {
+      panel.appendChild(this.el('div', `ai-dash-skel ai-dash-skel-${i % 3}`));
+    }
+  },
+
+  // Error line shared by the panels: 402 (Pro) and 503 (no provider) are plain notes, not alarms.
+  renderInsightError(panel, err) {
+    panel.textContent = '';
+    panel.removeAttribute('aria-busy');
+    const note = this.el('p', 'ai-dash-note');
+    note.textContent =
+      err && err.code === 'PAYMENT_REQUIRED'
+        ? 'Insights are part of the Pro plan.'
+        : err && err.code === 'AI_NOT_CONFIGURED'
+        ? 'Connect an AI provider on the server to unlock generated insights.'
+        : 'Insights are unavailable right now.';
+    panel.appendChild(note);
+  },
+
+  renderAlertsStrip(container, res) {
+    container.textContent = '';
+    if (!res || res.error) {
+      container.hidden = true;
+      return;
+    }
+    const list = Array.isArray(res.alerts) ? res.alerts : [];
+    container.hidden = false;
+    if (!list.length) {
+      const calm = this.el('div', 'ai-dash-alert ai-dash-alert-calm');
+      calm.setAttribute('role', 'listitem');
+      calm.appendChild(this.el('span', 'ai-dash-alert-bar'));
+      calm.appendChild(this.el('span', 'ai-dash-alert-text', 'No alerts this month. Budgets and spending are on track.'));
+      container.appendChild(calm);
+      return;
+    }
+    list.slice(0, 4).forEach((a) => {
+      const row = this.el('div', `ai-dash-alert ai-dash-alert-${a.severity || 'medium'}`);
+      row.setAttribute('role', 'listitem');
+      row.appendChild(this.el('span', 'ai-dash-alert-bar'));
+      row.appendChild(this.el('span', 'ai-dash-alert-type', String(a.type || 'alert').toUpperCase()));
+      row.appendChild(this.el('span', 'ai-dash-alert-text', a.message || ''));
+      container.appendChild(row);
+    });
+    if (list.length > 4) {
+      container.appendChild(this.el('div', 'ai-dash-alert-more', `+${list.length - 4} more`));
+    }
+  },
+
+  renderMonthlyPanel(panel, res) {
+    if (!res || res.error) return this.renderInsightError(panel, res && res.error);
+    panel.textContent = '';
+    panel.removeAttribute('aria-busy');
+    const insight = res.insight || {};
+
+    const title = this.el('h4', 'ai-dash-title', 'Monthly story');
+    if (res.cached) title.appendChild(this.el('span', 'ai-dash-tag', 'cached'));
+    panel.appendChild(title);
+
+    const figures = this.el('dl', 'ai-dash-figures');
+    const fig = (label, value, cls) => {
+      const wrap = this.el('div', `ai-dash-figure${cls ? ` ${cls}` : ''}`);
+      wrap.appendChild(this.el('dt', null, label));
+      wrap.appendChild(this.el('dd', null, value));
+      figures.appendChild(wrap);
+    };
+    fig('Income', this.fmtFigure(insight.totalIncome), 'in');
+    fig('Spent', this.fmtFigure(insight.totalSpent), 'out');
+    const rate = Number(insight.savingsRate);
+    fig('Savings rate', Number.isFinite(rate) ? `${Math.round(rate * 100)}%` : '—', rate < 0 ? 'out' : '');
+    panel.appendChild(figures);
+
+    panel.appendChild(this.el('p', 'ai-dash-text', insight.text || ''));
+
+    const foot = this.el('div', 'ai-dash-foot');
+    foot.appendChild(
+      this.el('span', 'ai-dash-source', res.aiUsed ? 'Generated from your digest' : 'Computed from your transactions')
+    );
+    panel.appendChild(foot);
+  },
+
+  renderWeeklyPanel(panel, res) {
+    if (!res || res.error) return this.renderInsightError(panel, res && res.error);
+    panel.textContent = '';
+    panel.removeAttribute('aria-busy');
+
+    panel.appendChild(this.el('h4', 'ai-dash-title', 'Weekly brief'));
+
+    // 7-day bar strip from dailyTotals (heights via CSSOM custom property).
+    const daily = Array.isArray(res.dailyTotals) ? res.dailyTotals : [];
+    if (daily.length) {
+      const max = Math.max(...daily.map((d) => Number(d.spent) || 0), 1);
+      const bars = this.el('div', 'ai-dash-bars');
+      bars.setAttribute('role', 'img');
+      bars.setAttribute('aria-label', `Daily spending over the last 7 days, peak ${this.fmtFigure(max)}`);
+      daily.slice(-7).forEach((d) => {
+        const bar = this.el('span', 'ai-dash-bar');
+        // Square-root scale: a single big day (rent) must not flatten the other six to nothing.
+        const pct = Math.max(6, Math.round(Math.sqrt((Number(d.spent) || 0) / max) * 100));
+        bar.style.setProperty('--h', `${pct}%`);
+        bar.title = `${d.date}: ${this.fmtFigure(d.spent)}`;
+        bars.appendChild(bar);
+      });
+      panel.appendChild(bars);
+    }
+
+    const figures = this.el('dl', 'ai-dash-figures ai-dash-figures-compact');
+    const fig = (label, value, cls) => {
+      const wrap = this.el('div', `ai-dash-figure${cls ? ` ${cls}` : ''}`);
+      wrap.appendChild(this.el('dt', null, label));
+      wrap.appendChild(this.el('dd', null, value));
+      figures.appendChild(wrap);
+    };
+    fig('Spent', this.fmtFigure(res.totalSpent), 'out');
+    fig('Earned', this.fmtFigure(res.totalEarned), 'in');
+    fig('Transactions', String(res.transactionCount || 0), '');
+    panel.appendChild(figures);
+
+    panel.appendChild(this.el('p', 'ai-dash-text', res.brief || ''));
   },
 
   // Текущий месяц в формате YYYY-MM (для <input type="month">).

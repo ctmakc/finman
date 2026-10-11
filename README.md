@@ -80,10 +80,16 @@ development they auto-generate (with a warning).
 | `COOKIE_DOMAIN` | no | Domain attribute of the `finman.sid` session cookie (e.g. `.finman.money`). Unset = host-only. |
 | `CORS_ORIGIN` | no | Comma-separated allowed browser origins in production (e.g. `https://app.finman.money,https://finman.money`). `capacitor://localhost` and `http://localhost` (mobile shells) are always allowed. |
 | `LOG_LEVEL` | no | pino level (`info` default). |
-| `AI_PROVIDER` | no | `anthropic` \| `openai` \| `ollama` (default `anthropic`). |
-| `AI_API_KEY` | for AI | API key for the AI provider. Without it, AI endpoints return `503 AI_NOT_CONFIGURED`. |
-| `AI_MODEL` | no | Model id (e.g. `claude-3-5-sonnet-latest`, `gpt-4o-mini`). |
-| `AI_BASE_URL` | no | Override the provider base URL (e.g. Ollama / gateway). |
+| `AI_PROVIDER` | no | `google` \| `gemini-oauth` \| `ollama` \| `openai` \| `anthropic` (opt-in). Empty = auto-detect: google → gemini-oauth → ollama → openai. |
+| `AI_API_KEY` | for AI | Generic key for the chosen provider (Google Gemini by default). Provider-specific keys below win when set. Without any key, AI endpoints return `503 AI_NOT_CONFIGURED`. |
+| `GOOGLE_API_KEY` | for google | Gemini API key (REST `generativelanguage.googleapis.com`). Default model `gemini-2.5-flash`. |
+| `GEMINI_CLIENT_ID` / `GEMINI_CLIENT_SECRET` / `GEMINI_REFRESH_TOKEN` (or `GEMINI_OAUTH_CREDS`) | for gemini-oauth | Google OAuth refresh-token flow (cloudcode-pa). |
+| `OLLAMA_API_KEY` (or `OLLAMA_API_KEY_FILE`) | for ollama | Ollama Cloud key (`https://ollama.com`). A local Ollama needs `AI_BASE_URL` instead of a key. |
+| `OPENAI_API_KEY` | for openai | OpenAI or any OpenAI-compatible server (`AI_BASE_URL` for gateways). |
+| `ANTHROPIC_API_KEY` | optional | Only with `AI_PROVIDER=anthropic`; never selected automatically. |
+| `AI_MODEL` | no | Model id override (e.g. `gemini-2.5-pro`, `gpt-oss:120b`, `gpt-4o-mini`). |
+| `AI_BASE_URL` | no | Base URL override for the env provider (local Ollama, OpenAI-compatible gateway, Gemini proxy). |
+| `AI_MAX_TOKENS` | no | Max output tokens per answer (default `1024`). |
 | `SYNC_ENABLED` | for sync | `true` to enable scheduled bank auto-sync. |
 | `STRIPE_SECRET_KEY` | for billing | Stripe secret key for the subscription/billing flow. |
 | `STRIPE_WEBHOOK_SECRET` | for billing | Stripe webhook signing secret (`whsec_...`). |
@@ -166,10 +172,12 @@ clear error or `503`) until configured — they never break the rest of the app.
 | Investments & net worth | Ready | — |
 | Financial calendar, dashboard widgets, reports | Ready | — |
 | CSV import | Ready | — |
-| Receipt OCR (tesseract.js) | Ready | — |
+| Receipt OCR (tesseract.js) | Ready | Offline fallback; see Receipt vision below. |
 | Manual bank sync (Monobank / Revolut / Tinkoff) | Ready | Per-user bank token entered in-app (encrypted with `ENCRYPTION_KEY`). |
 | **Scheduled bank auto-sync** | Gated | `SYNC_ENABLED=true` + per-user bank tokens. |
-| **AI assistant** | Gated | `AI_API_KEY` (+ `AI_PROVIDER` / `AI_MODEL`). Returns `503 AI_NOT_CONFIGURED` otherwise. Requires `pro` tier. |
+| **AI CFO (chat, streaming, plan, what-if, categorize, insights)** | Gated | Any configured provider (see AI vars). Returns `503 AI_NOT_CONFIGURED` otherwise. The `pro` tier is required only when billing (`STRIPE_SECRET_KEY`) is configured; without billing every authenticated user gets AI. |
+| **Insights block (digest, alerts, monthly story, weekly brief)** | Ready | `GET /api/ai/digest`, `/alerts`, `/insights/monthly` (cached in `ai_insights`), `/insights/weekly`. Digest and alerts are deterministic; stories fall back to deterministic text without a provider. |
+| **Receipt vision** | Gated | Uses the AI provider's vision (google / gemini-oauth / openai) first, tesseract.js fallback. |
 | **Billing / subscription tiers** | Gated | `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. |
 | **Anomaly detection** | Gated | Authenticated; functionality depends on the F7 feature stream. |
 

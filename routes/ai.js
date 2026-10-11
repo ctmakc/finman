@@ -11,6 +11,10 @@
 //   POST /api/ai/categorize   body { accepted: [{transactionId, category}] } -> { applied, appliedIds }
 //   GET  /api/ai/summary      ?month=YYYY-MM -> { month, stats, narrative, aiUsed }
 //   GET  /api/ai/conversations              -> список разговоров пользователя
+//   GET  /api/ai/digest                     -> { digest, alerts }  deterministic signals (PORT_PLAN A8)
+//   GET  /api/ai/alerts                     -> { alerts }
+//   GET  /api/ai/insights/monthly ?month=YYYY-MM&refresh=1 -> { insight, cached, aiUsed }  (cached in ai_insights)
+//   GET  /api/ai/insights/weekly            -> { brief, totalSpent, totalEarned, transactionCount, aiUsed }
 //   GET  /api/ai/conversations/:id          -> разговор с сообщениями
 //
 // Если AI-провайдер не настроен — корректный 503 AI_NOT_CONFIGURED (через AppError).
@@ -24,6 +28,7 @@ const { AppError } = require('../middleware/error');
 const aiService = require('../services/aiService');
 const provider = require('../lib/ai/provider');
 const AiConversation = require('../models/aiConversation');
+const insights = require('../services/financialInsights');
 
 // Обёртка для async-хендлеров: пробрасывает ошибки в errorHandler.
 function wrap(fn) {
@@ -136,6 +141,54 @@ router.get(
     const month = (req.query && req.query.month) || undefined;
     const result = await aiService.monthlyNarrative(req.user.id, month);
     return ok(res, result);
+  })
+);
+
+// --- PORT_PLAN A8: grounded digest + proactive alerts + monthly/weekly stories --------
+// Deterministic endpoints work without an AI provider; the story endpoints degrade
+// to a deterministic text (aiUsed:false) when no provider is configured.
+
+// GET /api/ai/digest — the full deterministic digest + derived alerts.
+router.get(
+  '/digest',
+  wrap(async (req, res) => {
+    const digest = await insights.buildDigest(req.user.id);
+    return ok(res, { digest, alerts: insights.deriveAlerts(digest) });
+  })
+);
+
+// GET /api/ai/alerts — ranked actionable alerts only (for the dashboard strip).
+router.get(
+  '/alerts',
+  wrap(async (req, res) => {
+    const digest = await insights.buildDigest(req.user.id);
+    return ok(res, { alerts: insights.deriveAlerts(digest), period: digest.period });
+  })
+);
+
+// GET /api/ai/insights/monthly — monthly financial story, cached per user+month in ai_insights.
+// Query: month=YYYY-MM (default: current month), refresh=1 to regenerate.
+router.get(
+  '/insights/monthly',
+  wrap(async (req, res) => {
+    const q = req.query || {};
+    if (q.month !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(q.month))) {
+      throw new AppError(400, 'INVALID_MONTH', 'Query "month" must be YYYY-MM (month 01-12)');
+    }
+    const result = await insights.monthlyInsight(req.user.id, {
+      month: q.month,
+      refresh: q.refresh === '1' || q.refresh === 'true',
+    });
+    return ok(res, { ...result, aiConfigured: provider.isConfigured() });
+  })
+);
+
+// GET /api/ai/insights/weekly — last-7-days brief grounded on the digest.
+router.get(
+  '/insights/weekly',
+  wrap(async (req, res) => {
+    const result = await insights.weeklyBrief(req.user.id);
+    return ok(res, { ...result, aiConfigured: provider.isConfigured() });
   })
 );
 

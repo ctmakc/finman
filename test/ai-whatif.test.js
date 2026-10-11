@@ -52,11 +52,13 @@ describe('AI What-if simulator', () => {
   });
 
   test('free tier -> 402', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     await setTier(ctx.db, ctx.userId, 'free');
     const res = await request.post('/api/ai/whatif')
       .set('Authorization', `Bearer ${ctx.token}`)
       .send({ cuts: [{ category: 'Dining', percent: 20 }] });
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
     await setTier(ctx.db, ctx.userId, 'pro');
   });
 

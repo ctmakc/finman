@@ -18,6 +18,20 @@ const SmartDashboard = {
     await Promise.all([this.loadWidgets(), this.loadAvailable()]);
     // Гидратируем signature-hero из тех же widget-данных (single source of truth).
     this.hydrateHero();
+    this.renderInsightsBlock();
+  },
+
+  // Dashboard "Insights" block (monthly story + weekly brief + alerts) — rendered by the AI
+  // module from /api/ai/alerts + /api/ai/insights/*. Degrades silently when the module is absent.
+  renderInsightsBlock() {
+    const host = document.getElementById('dashboard-insights');
+    if (!host) return;
+    const ai = (typeof window !== 'undefined' && window.AiCfoModule) || null;
+    if (ai && typeof ai.renderDashboardInsights === 'function') {
+      ai.renderDashboardInsights(host).catch((error) => console.error('Error rendering insights:', error));
+    } else {
+      host.hidden = true;
+    }
   },
 
   // Форматирование суммы в гривне с табличными цифрами.
@@ -423,6 +437,7 @@ const SmartDashboard = {
     return `
       <div class="smart-dashboard">
         ${this.renderHero()}
+        <section id="dashboard-insights" class="ai-dash" aria-label="Insights"></section>
         <div class="page-header">
           <h1>📊 Дашборд</h1>
           <div class="btn-group">

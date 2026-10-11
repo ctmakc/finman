@@ -63,9 +63,11 @@ describe('AI Money Plan', () => {
   });
 
   test('free tier -> 402 PAYMENT_REQUIRED', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_gate'; // billing on -> Pro gate active
     await setTier(ctx.db, ctx.userId, 'free');
     const res = await request.get('/api/ai/plan').set('Authorization', `Bearer ${ctx.token}`);
     expect(res.status).toBe(402);
+    delete process.env.STRIPE_SECRET_KEY;
     await setTier(ctx.db, ctx.userId, 'pro');
   });
 
