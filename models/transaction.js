@@ -3,6 +3,7 @@ const { query, get, run, transaction } = require('../db/database');
 const Account = require('./account');
 const money = require('../lib/money');
 const { AppError } = require('../middleware/error');
+const { cashflowOnly } = require('../lib/txFilter');
 
 // Знак хранимой суммы задаётся типом (единое правило для всех писателей —
 // UI, импорт, чеки, регулярные платежи):
@@ -390,8 +391,12 @@ class Transaction {
       let sql = '';
       const params = [userId];
 
-      // Базовые условия фильтрации
-      let whereClause = 'WHERE t.user_id = ?';
+      // Base filter: the user's cash flow only (no transfers, no opening
+      // balances — lib/txFilter), so stats never show an "Opening balance"
+      // category or a transfer leg as income/expense.
+      const CFT = cashflowOnly('t');
+      let whereClause = 'WHERE t.user_id = ?' + CFT.sql;
+      params.push(...CFT.params);
       
       if (accountId) {
         whereClause += ' AND t.account_id = ?';
@@ -414,7 +419,7 @@ class Transaction {
           SELECT
             t.category,
             t.type,
-            SUM(t.amount) as total_amount,
+            SUM(ABS(t.amount)) as total_amount,
             COUNT(*) as count
           FROM transactions t
           ${whereClause}

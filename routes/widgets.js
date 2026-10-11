@@ -396,7 +396,7 @@ async function getCashflowData(userId, period, tz) {
     [userId, start, ...CF.params]
   );
   const expense = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
+    `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
     [userId, start, ...CF.params]
   );
   const incomeTotal = (income && income.total) || 0;
@@ -420,7 +420,7 @@ async function getBudgetData(userId) {
 async function getExpensesData(userId, period, tz) {
   const start = periodStart(period, tz);
   const result = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
+    `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
     [userId, start, ...CF.params]
   );
   return { total: (result && result.total) || 0, period };
@@ -474,7 +474,7 @@ async function getUpcomingData(userId, tz) {
 async function getTopCategoriesData(userId, period, tz) {
   const start = periodStart(period, tz);
   const rows = await query(
-    `SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as total, COUNT(*) as count
+    `SELECT COALESCE(category, 'Uncategorized') as category, SUM(ABS(amount)) as total, COUNT(*) as count
      FROM transactions
      WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
      GROUP BY category
@@ -549,7 +549,7 @@ async function getChartExpensesData(userId, tz) {
     const end = dates.endOfMonthISO(start);
 
     const result = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
+      `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
       [userId, start, end, ...CF.params]
     );
     data.push({ month: start.substring(0, 7), amount: (result && result.total) || 0 });

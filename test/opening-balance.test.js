@@ -128,6 +128,41 @@ describe('opening balance semantics', () => {
     expect(anomalies.filter((a) => a.type === 'amount_outlier')).toHaveLength(0);
   });
 
+  test('transactions stats summary (category) excludes opening/transfer rows and reports expense magnitudes', async () => {
+    // Expense created through the API is stored negative (sign by type).
+    const tx = await ctx.request
+      .post('/api/transactions')
+      .set(AUTH(ctx.token))
+      .send({ accountId, date: today, amount: 40, type: 'expense', category: 'Groceries', description: 'Milk' });
+    expect(tx.status).toBe(201);
+    expect(tx.body.amount).toBe(-40);
+
+    const stats = await ctx.request
+      .get('/api/transactions/stats/summary?groupBy=category')
+      .set(AUTH(ctx.token));
+    expect(stats.status).toBe(200);
+    expect(stats.body.map((r) => r.category)).not.toContain('Opening balance');
+    expect(stats.body.every((r) => r.type === 'income' || r.type === 'expense')).toBe(true);
+    const groceries = stats.body.find((r) => r.category === 'Groceries');
+    expect(groceries).toMatchObject({ type: 'expense', total_amount: 40, count: 1 });
+
+    // Analytics overview and widgets report the expense as a positive magnitude.
+    const ov = await ctx.request
+      .get(`/api/analytics/overview?startDate=2000-01-01&endDate=${today}`)
+      .set(AUTH(ctx.token));
+    expect(ov.body.expense).toBe(40);
+    expect(ov.body.income).toBe(0);
+    const cf = await ctx.request.get('/api/widgets/cashflow/data?period=year').set(AUTH(ctx.token));
+    expect(cf.body.expense).toBe(40);
+    expect(cf.body.net).toBe(-40);
+    const cats = await ctx.request
+      .get(`/api/analytics/expenses-by-category?startDate=2000-01-01&endDate=${today}`)
+      .set(AUTH(ctx.token));
+    expect(cats.body).toEqual([{ category: 'Groceries', total: 40, count: 1 }]);
+    await db.run('DELETE FROM transactions WHERE id = ?', [tx.body.id]);
+    await db.run('UPDATE accounts SET balance = 2500 WHERE id = ?', [accountId]);
+  });
+
   test('net worth includes the opening balances', async () => {
     const res = await ctx.request.get('/api/networth/current').set(AUTH(ctx.token));
     expect(res.status).toBe(200);
