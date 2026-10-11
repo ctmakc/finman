@@ -80,7 +80,10 @@ function initCharts(statsData) {
 
   // Income vs expense by month
   function initIncomeExpenseChart(transactionsByMonth) {
-    const ctx = document.getElementById('income-expense-chart').getContext('2d');
+    const canvas = document.getElementById('income-expense-chart');
+    // No canvas / no 2D context (old WebView, headless): skip the chart quietly.
+    const ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return;
     if (window.Chart && Chart.getChart) { const _ex = Chart.getChart(ctx.canvas); if (_ex) _ex.destroy(); }
 
     const ink2 = fmToken('--fm-ink-2', '#545A6B');
@@ -166,7 +169,10 @@ function initCharts(statsData) {
 
   // Expenses by category (doughnut)
   function initExpenseCategoriesChart(transactionsByCategory) {
-    const ctx = document.getElementById('expense-categories-chart').getContext('2d');
+    const canvas = document.getElementById('expense-categories-chart');
+    // No canvas / no 2D context (old WebView, headless): skip the chart quietly.
+    const ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return;
     if (window.Chart && Chart.getChart) { const _ex = Chart.getChart(ctx.canvas); if (_ex) _ex.destroy(); }
 
     const ink2 = fmToken('--fm-ink-2', '#545A6B');

@@ -354,18 +354,25 @@ function renderAuthenticatedUI() {
     e.stopPropagation();
     setMoreMenu(!more.classList.contains('open'));
   });
-  document.addEventListener('click', (e) => {
-    if (more.classList.contains('open') && !more.contains(e.target)) setMoreMenu(false);
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (more.classList.contains('open')) {
+  // Document-level listeners survive re-renders of the shell (every login
+  // rebuilds it), so they are added once and look the elements up each time.
+  if (!appState._shellDocListeners) {
+    appState._shellDocListeners = true;
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('nav-more');
+      if (menu && menu.classList.contains('open') && !menu.contains(e.target)) setMoreMenu(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const menu = document.getElementById('nav-more');
+      if (menu && menu.classList.contains('open')) {
         setMoreMenu(false);
-        moreBtn.focus();
+        const btn = document.getElementById('nav-more-btn');
+        if (btn) btn.focus();
       }
       if (isDrawerOpen()) closeDrawer();
-    }
-  });
+    });
+  }
 
   // Drawer (mobile / tablet)
   document.getElementById('mobile-menu-toggle').addEventListener('click', () => {
@@ -572,17 +579,21 @@ async function fetchWithAuth(url, options = {}) {
     throw err;
   }
 
-  const defaultOptions = {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  };
+  // A FormData body needs the browser's multipart boundary: never force JSON on it.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const defaultHeaders = { 'Authorization': `Bearer ${token}` };
+  if (!isFormData) defaultHeaders['Content-Type'] = 'application/json';
+  const defaultOptions = { headers: defaultHeaders };
 
   const mergedOptions = { ...defaultOptions, ...options };
 
   if (options.headers) {
     mergedOptions.headers = { ...defaultOptions.headers, ...options.headers };
+    if (isFormData) {
+      Object.keys(mergedOptions.headers).forEach((k) => {
+        if (k.toLowerCase() === 'content-type') delete mergedOptions.headers[k];
+      });
+    }
   }
 
   const response = await fetch(url, mergedOptions);

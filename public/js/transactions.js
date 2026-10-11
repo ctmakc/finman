@@ -1028,6 +1028,14 @@ async function fetchTransactions(filters = {}) {
     renderTransactionsPage();
   }
   
+  // One quoted CSV cell. Text starting with = + - @ TAB or CR is prefixed with
+  // ' so spreadsheet apps do not evaluate it as a formula (CSV injection).
+  function csvCell(value) {
+    let text = String(value == null ? '' : value);
+    if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
   // Экспорт данных
   async function handleDataExport() {
     const period = document.getElementById('export-period').value;
@@ -1044,21 +1052,15 @@ async function fetchTransactions(filters = {}) {
         return;
       }
     } else if (period === 'month') {
-      const now = new Date();
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      ({ start: startDate, end: endDate } = UI.monthRange(new Date()));
     } else if (period === 'year') {
-      const now = new Date();
-      startDate = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-      endDate = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
+      const year = new Date().getFullYear();
+      startDate = `${year}-01-01`;
+      endDate = `${year}-12-31`;
     }
     
-    // Получение транзакций за указанный период
-    const transactions = await fetchTransactions({
-      startDate,
-      endDate,
-      limit: 10000 // Большое значение для получения всех транзакций
-    });
+    // Every page (the API caps a page at 500 rows).
+    const transactions = await fetchAllTransactions({ startDate, endDate });
     
     if (!transactions.length) {
       showNotification(t('export.empty'), 'warning');
@@ -1071,12 +1073,12 @@ async function fetchTransactions(filters = {}) {
     
     transactions.forEach(transaction => {
       const rowData = [
-        transaction.date,
-        `"${(transaction.description || '').replace(/"/g, '""')}"`,
-        `"${(transaction.category || '').replace(/"/g, '""')}"`,
-        `"${(transaction.account_name || '').replace(/"/g, '""')}"`,
-        transaction.amount,
-        transaction.type
+        csvCell(transaction.date),
+        csvCell(transaction.description),
+        csvCell(transaction.category),
+        csvCell(transaction.account_name),
+        Number(transaction.amount) || 0,
+        csvCell(transaction.type)
       ];
       
       csvRows.push(rowData.join(','));
@@ -1096,4 +1098,8 @@ async function fetchTransactions(filters = {}) {
     document.body.removeChild(link);
     
     showNotification(t('transactions.export.done'), 'success');
+  }
+  // Pure helpers for node/jsdom unit tests.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { computeTransactionStats, csvCell, transactionCurrency, renderTransactionsList };
   }
