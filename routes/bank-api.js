@@ -24,6 +24,7 @@ const path = require('path');
 const BankConnection = require('../models/bankConnection');
 const Account = require('../models/account');
 const CustomBank = require('../models/customBank');
+const Transaction = require('../models/transaction');
 const bankApiConfig = require('../config/bank-api-config');
 const bankApiService = require('../services/bankApiService');
 const csvImportService = require('../services/csvImportService');
@@ -459,7 +460,11 @@ router.post('/import/commit', authenticate, async (req, res) => {
       const category = String(r.category || 'Other').trim().slice(0, 100) || 'Other';
       const rounded = money.round(amount);
       const type = r.type === 'income' || r.type === 'expense' ? r.type : rounded >= 0 ? 'income' : 'expense';
-      prepared.push({ date, description, category, amount: rounded, type, fingerprint: csvImportService.fingerprintOf(date, rounded, description) });
+      // Same rule as every other writer (models/transaction.js): the type
+      // fixes the sign, expense < 0 and income > 0. A row sent as
+      // { type:'income', amount:-50 } must not store a negative income.
+      const signed = Transaction.signedAmount(rounded, type) || 0;
+      prepared.push({ date, description, category, amount: signed, type, fingerprint: csvImportService.fingerprintOf(date, signed, description) });
     });
     if (errors.length && prepared.length === 0) return res.status(400).json({ error: true, message: errors[0].message, errors });
 

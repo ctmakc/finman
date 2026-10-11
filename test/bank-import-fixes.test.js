@@ -304,6 +304,31 @@ describe('HTTP: bank sync and commit with identical transactions', () => {
     expect(one.body.rows.map((r) => r.currency)).toEqual(['USD']);
   });
 
+  test('/import/commit applies the type sign rule: expense < 0, income > 0', async () => {
+    const acc = await seedAccount(ctx, { bank: 'RBC Royal Bank', currency: 'CAD', balance: 100 });
+    const res = await ctx.request
+      .post('/api/bank-api/import/commit')
+      .set(auth)
+      .send({
+        accountId: acc,
+        rows: [
+          { date: '2026-10-01', description: 'Refund?', amount: -50, type: 'income' },
+          { date: '2026-10-02', description: 'Shop', amount: 20, type: 'expense' },
+          { date: '2026-10-03', description: 'No type', amount: -5 }
+        ]
+      });
+    expect(res.body).toMatchObject({ inserted: 3, balanceDelta: 25 });
+    const stored = await new Promise((resolve, reject) =>
+      ctx.db.all(`SELECT amount, type FROM transactions WHERE account_id = ? ORDER BY date`, [acc], (e, r) => (e ? reject(e) : resolve(r)))
+    );
+    expect(stored).toEqual([
+      { amount: 50, type: 'income' },
+      { amount: -20, type: 'expense' },
+      { amount: -5, type: 'expense' }
+    ]);
+    expect((await dbGet(ctx, `SELECT balance FROM accounts WHERE id = ?`, [acc])).balance).toBe(125);
+  });
+
   test('syncScheduler.runOnce inserts both identical operations and is idempotent', async () => {
     const scheduler = require(path.join(PROJECT_ROOT, 'services', 'syncScheduler.js'));
     const { userId } = ctx;
