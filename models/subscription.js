@@ -14,33 +14,43 @@ function cycleOf(cycle) {
   return CYCLES.includes(cycle) ? cycle : 'monthly';
 }
 
-// Сдвиг на один цикл вперёд от даты.
-function addCycle(iso, cycle) {
+// День месяца, к которому привязана серия (день start_date): после 02-28
+// следующая дата снова 03-31, а не 03-28. null для невалидной даты.
+function anchorDayOf(startDate) {
+  const d = dates.parseISO(startDate);
+  return d ? d.getUTCDate() : null;
+}
+
+// Сдвиг на один цикл вперёд от даты (anchorDay — день месяца серии).
+function addCycle(iso, cycle, anchorDay = null) {
   const c = cycleOf(cycle);
   if (c === 'weekly') return dates.addDaysISO(iso, 7);
-  if (c === 'quarterly') return dates.addMonthsISO(iso, 3);
-  if (c === 'yearly') return dates.addMonthsISO(iso, 12);
-  return dates.addMonthsISO(iso, 1);
+  if (c === 'quarterly') return dates.addMonthsISO(iso, 3, anchorDay);
+  if (c === 'yearly') return dates.addMonthsISO(iso, 12, anchorDay);
+  return dates.addMonthsISO(iso, 1, anchorDay);
 }
 
 const Subscription = {
   CYCLES,
   addCycle,
+  anchorDayOf,
 
   // Первая дата списания для новой подписки: ближайшая дата серии
   // start_date + k*cycle, которая >= today (start_date в будущем — сама start_date).
   firstBillingDate(startDate, cycle, today = null) {
     const todayStr = today || dates.todayISO();
-    const start = dates.parseISO(startDate) ? startDate : todayStr;
-    return dates.rollForward(String(start).slice(0, 10), cycleOf(cycle), todayStr);
+    const start = String(dates.parseISO(startDate) ? startDate : todayStr).slice(0, 10);
+    return dates.rollForward(start, cycleOf(cycle), todayStr, anchorDayOf(start));
   },
 
   // После оплаты: следующая дата = дата оплаты + цикл, но не раньше сегодня.
-  nextAfterPayment(paymentDate, cycle, today = null) {
+  // startDate задаёт день месяца серии: оплата 01-31 -> 02-28 -> 03-31.
+  nextAfterPayment(paymentDate, cycle, today = null, startDate = null) {
     const todayStr = today || dates.todayISO();
     const base = dates.parseISO(paymentDate) ? String(paymentDate).slice(0, 10) : todayStr;
-    const next = addCycle(base, cycle);
-    return dates.rollForward(next, cycleOf(cycle), todayStr);
+    const anchor = anchorDayOf(startDate) || anchorDayOf(base);
+    const next = addCycle(base, cycle, anchor);
+    return dates.rollForward(next, cycleOf(cycle), todayStr, anchor);
   },
 
   // Поля для карточки: daysUntilBilling (целые дни, 0 = сегодня), isDueToday, isOverdue.
@@ -69,7 +79,7 @@ const Subscription = {
     let updated = 0;
     for (const s of stale) {
       const from = String(s.next_billing_date || s.start_date).slice(0, 10);
-      const next = dates.rollForward(from, cycleOf(s.billing_cycle), todayStr);
+      const next = dates.rollForward(from, cycleOf(s.billing_cycle), todayStr, anchorDayOf(s.start_date));
       if (next && next !== s.next_billing_date) {
         await run(
           `UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
