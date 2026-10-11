@@ -33,10 +33,10 @@ const AiCfoModule = {
       const err = (body && body.error) || {};
       const message =
         err.code === 'AI_NOT_CONFIGURED'
-          ? 'ИИ-провайдер не настроен. Добавьте AI_API_KEY в настройках сервера.'
+          ? t('ai.err.notConfigured')
           : err.code === 'PAYMENT_REQUIRED'
-          ? 'AI-CFO доступен на тарифе Pro.'
-          : (err.message || `Ошибка запроса (${response.status})`);
+          ? t('ai.err.pro')
+          : (err.message || t('ai.err.request', { status: response.status }));
       const e = new Error(message);
       e.code = err.code;
       throw e;
@@ -114,7 +114,7 @@ const AiCfoModule = {
         done = true;
         if (onDone) onDone({ conversationId: this.conversationId, reply: payload.reply != null ? payload.reply : full });
       } else if (event === 'error') {
-        const e = new Error(payload.message || 'Ошибка стриминга');
+        const e = new Error(payload.message || t('ai.err.stream'));
         e.code = payload.code;
         throw e;
       }
@@ -188,7 +188,7 @@ const AiCfoModule = {
         },
         onDone: ({ reply }) => {
           const finalText = reply != null && reply !== '' ? reply : acc;
-          if (textEl) textEl.textContent = finalText || '(пустой ответ)';
+          if (textEl) textEl.textContent = finalText || t('ai.emptyReply');
           this.scrollMessages();
         },
       });
@@ -208,7 +208,7 @@ const AiCfoModule = {
     if (this.loading) return;
     this.setLoading(true);
     const container = document.getElementById('ai-categorize');
-    if (container) container.innerHTML = '<div class="ai-loading">Анализирую неразмеченные транзакции…</div>';
+    if (container) container.innerHTML = `<div class="ai-loading">${t('ai.categorize.loading')}</div>`;
 
     try {
       const data = await this.loadCategorize();
@@ -236,7 +236,7 @@ const AiCfoModule = {
     try {
       const res = await this.applyCategorize(accepted);
       if (container) {
-        container.innerHTML = `<div class="ai-note">Применено категорий: ${res.applied || 0}.</div>`;
+        container.innerHTML = `<div class="ai-note">${t('ai.categorize.applied', { n: res.applied || 0 })}</div>`;
       }
     } catch (err) {
       if (container) container.innerHTML = `<div class="ai-error">${this.escape(err.message)}</div>`;
@@ -249,7 +249,7 @@ const AiCfoModule = {
     if (this.loading) return;
     this.setLoading(true);
     const container = document.getElementById('ai-summary');
-    if (container) container.innerHTML = '<div class="ai-loading">Собираю историю месяца…</div>';
+    if (container) container.innerHTML = `<div class="ai-loading">${t('ai.summary.loading')}</div>`;
 
     try {
       const input = document.getElementById('ai-summary-month');
@@ -267,7 +267,7 @@ const AiCfoModule = {
     if (this.loading) return;
     this.setLoading(true);
     const container = document.getElementById('ai-insights');
-    if (container) container.innerHTML = '<div class="ai-loading">Анализирую ваши данные…</div>';
+    if (container) container.innerHTML = `<div class="ai-loading">${t('ai.insights.loading')}</div>`;
 
     try {
       const data = await this.loadInsights();
@@ -290,7 +290,7 @@ const AiCfoModule = {
     if (this.loading) return;
     this.setLoading(true);
     const container = document.getElementById('ai-plan');
-    if (container) container.innerHTML = '<div class="ai-loading">Составляю ваш финансовый план…</div>';
+    if (container) container.innerHTML = `<div class="ai-loading">${t('ai.plan.loading')}</div>`;
     try {
       const data = await this.loadPlan();
       this.renderPlan(data);
@@ -307,32 +307,33 @@ const AiCfoModule = {
     const p = data.plan || {};
     const cur = (p.goals && p.goals[0] && p.goals[0].currency) ||
                 (p.debts && p.debts[0] && p.debts[0].currency) || '';
-    const fmt = (n) => (n === null || n === undefined ? '—' : `${this.escape(String(n))} ${this.escape(cur)}`.trim());
+    const fmt = (n) => this.fmtMoney(n, cur);
+    const perMonth = t('ai.plan.perMonth');
     const rows = [];
-    rows.push(`<div class="ai-plan-stat"><span>Норма сбережений</span><strong>${this.escape(String(p.currentSavingsRate))}%</strong></div>`);
-    rows.push(`<div class="ai-plan-stat"><span>Цель</span><strong>${this.escape(String(p.targetSavingsRate))}% · ${fmt(p.targetMonthlySavings)}/мес</strong></div>`);
+    rows.push(`<div class="ai-plan-stat"><span>${t('ai.plan.savingsRate')}</span><strong>${this.escape(String(p.currentSavingsRate))}%</strong></div>`);
+    rows.push(`<div class="ai-plan-stat"><span>${t('ai.plan.target')}</span><strong>${this.escape(String(p.targetSavingsRate))}% · ${fmt(p.targetMonthlySavings)}${perMonth}</strong></div>`);
     if (typeof p.savingsGap === 'number' && p.savingsGap > 0) {
-      rows.push(`<div class="ai-plan-stat ai-plan-warn"><span>Нужно ужаться</span><strong>${fmt(p.savingsGap)}/мес</strong></div>`);
+      rows.push(`<div class="ai-plan-stat ai-plan-warn"><span>${t('ai.plan.cut')}</span><strong>${fmt(p.savingsGap)}${perMonth}</strong></div>`);
     }
     let goalsHtml = '';
     (p.goals || []).forEach((g) => {
-      goalsHtml += `<li>🎯 <strong>${this.escape(g.name)}</strong> — ${fmt(g.remaining)} осталось` +
-        `${g.monthlyNeeded ? `, ${fmt(g.monthlyNeeded)}/мес` : ''}` +
-        `${g.monthsLeft ? ` (${this.escape(String(g.monthsLeft))} мес)` : ''}</li>`;
+      goalsHtml += `<li><strong>${this.escape(g.name)}</strong> — ${t('ai.plan.remaining', { amount: fmt(g.remaining) })}` +
+        `${g.monthlyNeeded ? `, ${fmt(g.monthlyNeeded)}${perMonth}` : ''}` +
+        `${g.monthsLeft ? ` ${t('ai.plan.monthsLeft', { n: this.escape(String(g.monthsLeft)) })}` : ''}</li>`;
     });
     let debtsHtml = '';
-    (p.debts || []).forEach((d, i) => {
-      debtsHtml += `<li>${i === 0 ? '🔥' : '•'} <strong>${this.escape(d.name)}</strong> — ${fmt(d.remaining)}</li>`;
+    (p.debts || []).forEach((d) => {
+      debtsHtml += `<li><strong>${this.escape(d.name)}</strong> — ${fmt(d.remaining)}</li>`;
     });
     const aiHtml = (data.aiConfigured && data.planText)
       ? `<div class="ai-plan-ai">${this.escape(data.planText).replace(/\n/g, '<br>')}</div>`
-      : '<div class="ai-plan-note">Подключите AI-провайдера (env AI_API_KEY), чтобы получить персональный план от CFO.</div>';
+      : `<div class="ai-plan-note">${t('ai.plan.connect')}</div>`;
     container.innerHTML = `
       <div class="ai-plan-card">
-        <h4>📋 Ваш финансовый план</h4>
+        <h4>${t('ai.plan.title')}</h4>
         <div class="ai-plan-stats">${rows.join('')}</div>
-        ${goalsHtml ? `<div class="ai-plan-section"><h5>Цели</h5><ul>${goalsHtml}</ul></div>` : ''}
-        ${debtsHtml ? `<div class="ai-plan-section"><h5>Долги (сначала крупные)</h5><ul>${debtsHtml}</ul></div>` : ''}
+        ${goalsHtml ? `<div class="ai-plan-section"><h5>${t('ai.plan.goals')}</h5><ul>${goalsHtml}</ul></div>` : ''}
+        ${debtsHtml ? `<div class="ai-plan-section"><h5>${t('ai.plan.debts')}</h5><ul>${debtsHtml}</ul></div>` : ''}
         ${aiHtml}
       </div>`;
   },
@@ -342,16 +343,16 @@ const AiCfoModule = {
     if (!container) return;
     container.innerHTML = `
       <div class="ai-whatif-form">
-        <h4>🔮 Что если…</h4>
+        <h4>${t('ai.whatif.title')}</h4>
         <div class="ai-whatif-row">
-          <input id="wi-category" class="form-control" type="text" placeholder="Категория (напр. Dining)" aria-label="Категория">
-          <input id="wi-percent" class="form-control ai-whatif-num" type="number" min="0" max="100" value="20" aria-label="Процент сокращения">
-          <span class="ai-whatif-unit">% урезать</span>
+          <input id="wi-category" class="form-control" type="text" placeholder="${this.escape(t('ai.whatif.categoryPh'))}" aria-label="${this.escape(t('ai.whatif.categoryAria'))}">
+          <input id="wi-percent" class="form-control ai-whatif-num" type="number" min="0" max="100" value="20" aria-label="${this.escape(t('ai.whatif.percentAria'))}">
+          <span class="ai-whatif-unit">${t('ai.whatif.cut')}</span>
         </div>
         <div class="ai-whatif-row">
-          <input id="wi-extra" class="form-control ai-whatif-num" type="number" min="0" value="0" aria-label="Доп. сбережения в месяц">
-          <span class="ai-whatif-unit">доп. ₴/мес</span>
-          <button type="button" id="ai-whatif-run" class="btn btn-primary" onclick="AiCfoModule.handleWhatifRun()">Симулировать</button>
+          <input id="wi-extra" class="form-control ai-whatif-num" type="number" min="0" value="0" aria-label="${this.escape(t('ai.whatif.extraAria'))}">
+          <span class="ai-whatif-unit">${t('ai.whatif.extra', { cur: this.escape(this.baseCurrency()) })}</span>
+          <button type="button" id="ai-whatif-run" class="btn btn-primary" onclick="AiCfoModule.handleWhatifRun()">${t('ai.whatif.run')}</button>
         </div>
         <div id="ai-whatif-result"></div>
       </div>`;
@@ -365,7 +366,7 @@ const AiCfoModule = {
     const extra = Number(val('wi-extra') || 0);
     const cuts = category ? [{ category, percent }] : [];
     const out = document.getElementById('ai-whatif-result');
-    if (out) out.innerHTML = '<div class="ai-loading">Считаю сценарий…</div>';
+    if (out) out.innerHTML = `<div class="ai-loading">${t('ai.whatif.loading')}</div>`;
     this.setLoading(true);
     try {
       const response = await fetch('/api/ai/whatif', {
@@ -389,21 +390,22 @@ const AiCfoModule = {
     const b = r.baseline || {};
     const s = r.scenario || {};
     const fmt = (n) => (n === null || n === undefined ? '—' : this.escape(String(n)));
+    const money = (n) => this.fmtMoney(n);
     let goals = '';
     (r.goals || []).forEach((g) => {
-      const sooner = g.monthsSaved && g.monthsSaved > 0 ? ` — на ${this.escape(String(g.monthsSaved))} мес быстрее` : '';
-      goals += `<li>🎯 <strong>${this.escape(g.name)}</strong>: ${fmt(g.monthsBaseline)} → <strong>${fmt(g.monthsScenario)}</strong> мес${sooner}</li>`;
+      const sooner = g.monthsSaved && g.monthsSaved > 0 ? ` — ${t('ai.whatif.sooner', { n: this.escape(String(g.monthsSaved)) })}` : '';
+      goals += `<li><strong>${this.escape(g.name)}</strong>: ${fmt(g.monthsBaseline)} → <strong>${fmt(g.monthsScenario)}</strong> ${t('ai.whatif.months')}${sooner}</li>`;
     });
     const ai = (data.aiConfigured && data.narrative)
       ? `<div class="ai-plan-ai">${this.escape(data.narrative).replace(/\n/g, '<br>')}</div>` : '';
     out.innerHTML = `
       <div class="ai-whatif-card">
         <div class="ai-whatif-ba">
-          <div class="ai-whatif-col"><span>Сейчас</span><strong>${fmt(b.monthlyNet)} ₴</strong><em>${fmt(b.savingsRate)}%</em></div>
+          <div class="ai-whatif-col"><span>${t('ai.whatif.now')}</span><strong>${money(b.monthlyNet)}</strong><em>${fmt(b.savingsRate)}%</em></div>
           <div class="ai-whatif-arrow">→</div>
-          <div class="ai-whatif-col ai-whatif-after"><span>Сценарий</span><strong>${fmt(s.monthlyNet)} ₴</strong><em>${fmt(s.savingsRate)}%</em></div>
+          <div class="ai-whatif-col ai-whatif-after"><span>${t('ai.whatif.scenario')}</span><strong>${money(s.monthlyNet)}</strong><em>${fmt(s.savingsRate)}%</em></div>
         </div>
-        ${s.monthlyFreed ? `<p class="ai-whatif-freed">Высвобождается <strong>${fmt(s.monthlyFreed)} ₴/мес</strong></p>` : ''}
+        ${s.monthlyFreed ? `<p class="ai-whatif-freed">${t('ai.whatif.freed', { amount: `<strong>${money(s.monthlyFreed)}</strong>` })}</p>` : ''}
         ${goals ? `<ul class="ai-whatif-goals">${goals}</ul>` : ''}
         ${ai}
       </div>`;
@@ -431,7 +433,7 @@ const AiCfoModule = {
     const div = document.createElement('div');
     div.className = `ai-msg ai-msg-${role}`;
     const who =
-      role === 'user' ? 'Вы' : role === 'assistant' ? 'CFO' : 'Ошибка';
+      role === 'user' ? t('ai.you') : role === 'assistant' ? t('ai.cfo.short') : t('ai.roleError');
     const roleSpan = document.createElement('span');
     roleSpan.className = 'ai-msg-role';
     roleSpan.textContent = who;
@@ -452,25 +454,25 @@ const AiCfoModule = {
     const cats = a.topCategories || [];
 
     let html = '<div class="ai-insights-card">';
-    html += '<h4>Анализ трат</h4>';
-    html += `<div class="ai-insights-summary">Доход: <b>${a.recentIncome || 0}</b> · Расход: <b>${a.recentExpense || 0}</b> · Сбережения: <b>${a.savingsRate || 0}%</b></div>`;
+    html += `<h4>${t('ai.insights.title')}</h4>`;
+    html += `<div class="ai-insights-summary">${t('common.income')}: <b>${this.fmtFigure(a.recentIncome)}</b> · ${t('common.expense')}: <b>${this.fmtFigure(a.recentExpense)}</b> · ${t('ai.insights.savings')}: <b>${this.escape(String(a.savingsRate || 0))}%</b></div>`;
 
     if (cats.length) {
       html += '<ul class="ai-cat-list">';
       cats.forEach((c) => {
-        html += `<li><span>${this.escape(c.category)}</span><span>${c.total} (${c.sharePercent}%)</span></li>`;
+        html += `<li><span>${this.escape(c.category)}</span><span>${this.fmtFigure(c.total)} (${this.escape(String(c.sharePercent))}%)</span></li>`;
       });
       html += '</ul>';
     }
 
     if (a.budgetsOverLimit && a.budgetsOverLimit.length) {
-      html += `<div class="ai-warning">Превышен бюджет: ${a.budgetsOverLimit.map((b) => this.escape(b)).join(', ')}</div>`;
+      html += `<div class="ai-warning">${t('ai.insights.overBudget', { list: a.budgetsOverLimit.map((b) => this.escape(b)).join(', ') })}</div>`;
     }
 
     if (data && data.insight) {
       html += `<div class="ai-insight-text">${this.escape(data.insight)}</div>`;
     } else if (data && data.aiConfigured === false) {
-      html += '<div class="ai-note">Подключите AI-провайдера, чтобы получить персональные рекомендации.</div>';
+      html += `<div class="ai-note">${t('ai.insights.connect')}</div>`;
     }
 
     html += '</div>';
@@ -487,22 +489,22 @@ const AiCfoModule = {
       const cats = (data && data.categories) || [];
       let msg;
       if (!cats.length) {
-        msg = 'Нет категорий для сопоставления — сначала создайте категории.';
+        msg = t('ai.categorize.noCategories');
       } else if (!total) {
-        msg = 'Все транзакции уже размечены 🎉';
+        msg = t('ai.categorize.allDone');
       } else {
-        msg = 'ИИ не нашёл уверенных совпадений для неразмеченных транзакций.';
+        msg = t('ai.categorize.noMatches');
       }
       container.innerHTML = `<div class="ai-note">${this.escape(msg)}</div>`;
       return;
     }
 
-    let html = '<div class="ai-cat-suggest"><h4>Предложения категорий</h4><ul class="ai-cat-suggest-list">';
+    let html = `<div class="ai-cat-suggest"><h4>${t('ai.categorize.title')}</h4><ul class="ai-cat-suggest-list">`;
     suggestions.forEach((s) => {
       html += `<li>
         <label>
           <input type="checkbox" checked data-tx="${Number(s.transactionId)}" data-cat="${this.escape(s.suggestedCategory)}">
-          <span class="ai-cat-desc">${this.escape(s.description || '(без описания)')}</span>
+          <span class="ai-cat-desc">${this.escape(s.description || t('ai.categorize.noDesc'))}</span>
           <span class="ai-cat-amt">${this.escape(String(s.amount))}</span>
           <span class="ai-cat-arrow">→</span>
           <span class="ai-cat-name">${this.escape(s.suggestedCategory)}</span>
@@ -510,7 +512,7 @@ const AiCfoModule = {
       </li>`;
     });
     html += '</ul>';
-    html += '<button id="ai-apply-cat-btn" class="btn btn-primary" onclick="AiCfoModule.handleApplyCategorize()">Применить выбранные</button>';
+    html += `<button id="ai-apply-cat-btn" class="btn btn-primary" onclick="AiCfoModule.handleApplyCategorize()">${t('ai.categorize.apply')}</button>`;
     html += '</div>';
     container.innerHTML = html;
   },
@@ -521,17 +523,17 @@ const AiCfoModule = {
     const stats = (data && data.stats) || {};
 
     let html = '<div class="ai-summary-card">';
-    html += `<h4>История денег · ${this.escape((data && data.month) || '')}</h4>`;
+    html += `<h4>${t('ai.summary.title', { month: this.escape((data && data.month) || '') })}</h4>`;
     if (data && data.narrative) {
       html += `<p class="ai-summary-text">${this.escape(data.narrative)}</p>`;
     }
-    html += `<div class="ai-summary-stats">Доход: <b>${stats.totalIncome || 0}</b> · Расход: <b>${stats.totalExpense || 0}</b> · Нетто: <b>${stats.netFlow || 0}</b> · Сбережения: <b>${stats.savingsRate || 0}%</b></div>`;
+    html += `<div class="ai-summary-stats">${t('common.income')}: <b>${this.fmtFigure(stats.totalIncome)}</b> · ${t('common.expense')}: <b>${this.fmtFigure(stats.totalExpense)}</b> · ${t('ai.summary.net')}: <b>${this.fmtFigure(stats.netFlow)}</b> · ${t('ai.insights.savings')}: <b>${this.escape(String(stats.savingsRate || 0))}%</b></div>`;
     const top = (stats.topCategories || [])[0];
     if (top) {
-      html += `<div class="ai-summary-top">Топ-категория: ${this.escape(top.category)} (${top.total})</div>`;
+      html += `<div class="ai-summary-top">${t('ai.summary.top', { category: this.escape(top.category), total: this.fmtFigure(top.total) })}</div>`;
     }
     if (data && data.aiUsed === false) {
-      html += '<div class="ai-note">Подключите AI-провайдера для развёрнутой истории.</div>';
+      html += `<div class="ai-note">${t('ai.summary.connect')}</div>`;
     }
     html += '</div>';
     container.innerHTML = html;
@@ -545,21 +547,41 @@ const AiCfoModule = {
       .replace(/"/g, '&quot;');
   },
 
+  // User's base currency (lib/ui.js caches /api/currency/settings; app.js keeps appState).
+  baseCurrency() {
+    try {
+      if (typeof UI !== 'undefined' && typeof UI.baseCurrency === 'function') return UI.baseCurrency();
+      if (typeof appState !== 'undefined' && appState.baseCurrency) return appState.baseCurrency;
+    } catch (e) { /* ignore */ }
+    return 'CAD';
+  },
+
+  // Money in the given (or base) currency, HTML-escaped; '—' when there is no value.
+  fmtMoney(value, currency) {
+    if (value === null || value === undefined || value === '') return '—';
+    const cur = currency || this.baseCurrency();
+    try {
+      if (typeof UI !== 'undefined' && typeof UI.money === 'function') return this.escape(UI.money(value, cur));
+      if (typeof formatCurrency === 'function') return this.escape(formatCurrency(value, cur));
+    } catch (e) { /* fall through */ }
+    return this.escape(`${value} ${cur}`.trim());
+  },
+
   render() {
     const container = document.getElementById('ai-cfo-content');
     if (!container) return;
     const defaultMonth = this.currentMonth();
     container.innerHTML = `
-      <div class="ai-cfo" role="region" aria-label="AI Финансовый директор">
+      <div class="ai-cfo" role="region" aria-label="${this.escape(t('ai.cfo.title'))}">
         <div class="ai-header">
-          <h3>🤖 AI Финансовый директор</h3>
-          <div class="ai-actions" role="group" aria-label="Действия ассистента">
-            <button type="button" id="ai-plan-btn" class="btn btn-primary" onclick="AiCfoModule.handlePlan()">📋 Мой план</button>
-            <button type="button" id="ai-whatif-btn" class="btn btn-secondary" onclick="AiCfoModule.handleWhatif()">🔮 Что если</button>
-            <button type="button" id="ai-insights-btn" class="btn btn-secondary" onclick="AiCfoModule.handleInsights()">Инсайты</button>
-            <button type="button" id="ai-categorize-btn" class="btn btn-secondary" onclick="AiCfoModule.handleCategorize()">Авто-категоризация</button>
-            <button type="button" id="ai-summary-btn" class="btn btn-secondary" onclick="AiCfoModule.handleSummary()">Сводка за месяц</button>
-            <input id="ai-summary-month" class="form-control ai-month-input" type="month" aria-label="Месяц для сводки" value="${this.escape(defaultMonth)}">
+          <h3>${t('ai.cfo.title')}</h3>
+          <div class="ai-actions" role="group" aria-label="${this.escape(t('ai.cfo.actions'))}">
+            <button type="button" id="ai-plan-btn" class="btn btn-primary" onclick="AiCfoModule.handlePlan()">${t('ai.plan.btn')}</button>
+            <button type="button" id="ai-whatif-btn" class="btn btn-secondary" onclick="AiCfoModule.handleWhatif()">${t('ai.whatif.btn')}</button>
+            <button type="button" id="ai-insights-btn" class="btn btn-secondary" onclick="AiCfoModule.handleInsights()">${t('ai.insights.btn')}</button>
+            <button type="button" id="ai-categorize-btn" class="btn btn-secondary" onclick="AiCfoModule.handleCategorize()">${t('ai.categorize.btn')}</button>
+            <button type="button" id="ai-summary-btn" class="btn btn-secondary" onclick="AiCfoModule.handleSummary()">${t('ai.summary.btn')}</button>
+            <input id="ai-summary-month" class="form-control ai-month-input" type="month" aria-label="${this.escape(t('ai.summary.monthAria'))}" value="${this.escape(defaultMonth)}">
           </div>
         </div>
         <div id="ai-plan" class="ai-plan"></div>
@@ -570,10 +592,10 @@ const AiCfoModule = {
         <div id="ai-messages" class="ai-messages" aria-live="polite" aria-atomic="false"></div>
         <div class="ai-input-row">
           <input id="ai-input" class="form-control" type="text"
-                 autocomplete="off" enterkeyhint="send" aria-label="Сообщение AI-директору"
-                 placeholder="Спросите CFO о ваших финансах…"
+                 autocomplete="off" enterkeyhint="send" aria-label="${this.escape(t('ai.cfo.inputAria'))}"
+                 placeholder="${this.escape(t('ai.cfo.placeholder'))}"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();AiCfoModule.handleSend();}">
-          <button type="button" id="ai-send-btn" class="btn btn-primary" onclick="AiCfoModule.handleSend()">Отправить</button>
+          <button type="button" id="ai-send-btn" class="btn btn-primary" onclick="AiCfoModule.handleSend()">${t('ai.send')}</button>
         </div>
       </div>
     `;
