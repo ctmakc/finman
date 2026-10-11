@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const passport = require('passport');
-const { query, run } = require('../db/database');
+const { query, run, transaction } = require('../db/database');
+const Account = require('../models/account');
+const Transaction = require('../models/transaction');
 const backupService = require('../services/backupService');
 const ledgerExport = require('../services/ledgerExport');
 const { AppError } = require('../middleware/error');
@@ -121,33 +123,51 @@ router.get('/full/json', async (req, res) => {
   } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
 });
 
+// Импорт CSV (формат нашего же экспорта /transactions/csv). Счёт должен
+// принадлежать пользователю; строки идут через Transaction.bulkCreate —
+// знак по типу (Расход < 0, Доход > 0), баланс счёта двигается на сумму
+// импорта, всё в одной транзакции БД.
 router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' }), async (req, res) => {
   try {
     const { accountId } = req.query;
     if (!accountId) return res.status(400).json({ message: 'Укажите счёт' });
-    const lines = req.body.split('\n').filter(l => l.trim()).slice(1);
-    let imported = 0;
+    const account = await Account.findById(accountId, req.user.id);
+    if (!account) return res.status(404).json({ message: 'Счёт не найден' });
+
+    const lines = String(req.body || '').replace(/^\ufeff/, '').split('\n').filter(l => l.trim()).slice(1);
+    const rows = [];
     for (const line of lines) {
-      try {
-        const parts = line.split(',');
-        if (parts.length < 4) continue;
-        const [date, description, category, amount, type] = parts;
-        await run('INSERT INTO transactions (user_id, account_id, date, description, category, amount, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [req.user.id, accountId, date, description.replace(/"/g, ''), category, Math.abs(parseFloat(amount)), type && type.includes('Доход') ? 'income' : 'expense']);
-        imported++;
-      } catch (e) {}
+      const parts = line.split(',');
+      if (parts.length < 4) continue;
+      const [date, description, category, amount, type] = parts;
+      const num = parseFloat(amount);
+      if (!date || !Number.isFinite(num)) continue;
+      rows.push({
+        accountId: account.id,
+        userId: req.user.id,
+        date: date.trim(),
+        description: (description || '').replace(/"/g, ''),
+        category: (category || '').trim() || 'Прочее',
+        amount: num,
+        type: type && type.includes('Доход') ? 'income' : 'expense'
+      });
     }
-    res.json({ imported });
+    const saved = rows.length ? await Transaction.bulkCreate(rows) : [];
+    res.json({ imported: saved.length });
   } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
 });
 
 router.post('/full/json', express.json({ limit: '10mb' }), async (req, res) => {
   try {
-    const data = req.body, userId = req.user.id, results = { accounts: 0, budgets: 0, goals: 0, debts: 0 };
-    if (data.accounts) for (const a of data.accounts) { try { await run('INSERT INTO accounts (user_id, name, bank_name, currency, balance, account_type) VALUES (?, ?, ?, ?, ?, ?)', [userId, a.name, a.bank_name, a.currency, a.balance, a.account_type]); results.accounts++; } catch(e){} }
-    if (data.budgets) for (const b of data.budgets) { try { await run('INSERT INTO budgets (user_id, name, category, amount, period, start_date, currency) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, b.name, b.category, b.amount, b.period, b.start_date, b.currency]); results.budgets++; } catch(e){} }
-    if (data.savingsGoals) for (const g of data.savingsGoals) { try { await run('INSERT INTO savings_goals (user_id, name, target_amount, current_amount, currency, target_date) VALUES (?, ?, ?, ?, ?, ?)', [userId, g.name, g.target_amount, g.current_amount || 0, g.currency, g.target_date]); results.goals++; } catch(e){} }
-    if (data.debts) for (const d of data.debts) { try { await run('INSERT INTO debts (user_id, name, type, amount, paid_amount, currency, start_date, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, d.name, d.type, d.amount, d.paid_amount || 0, d.currency, d.start_date, d.due_date]); results.debts++; } catch(e){} }
+    const data = req.body || {}, userId = req.user.id, results = { accounts: 0, budgets: 0, goals: 0, debts: 0 };
+    // Все вставки — одной транзакцией БД (иначе чужие bare run() попадают в
+    // середину нашей серии и ROLLBACK кого-то другого может их снести).
+    await transaction(async () => {
+      if (Array.isArray(data.accounts)) for (const a of data.accounts) { try { await run('INSERT INTO accounts (user_id, name, bank_name, currency, balance, account_type) VALUES (?, ?, ?, ?, ?, ?)', [userId, a.name, a.bank_name, a.currency, a.balance, a.account_type]); results.accounts++; } catch(e){} }
+      if (Array.isArray(data.budgets)) for (const b of data.budgets) { try { await run('INSERT INTO budgets (user_id, name, category, amount, period, start_date, currency) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, b.name, b.category, b.amount, b.period, b.start_date, b.currency]); results.budgets++; } catch(e){} }
+      if (Array.isArray(data.savingsGoals)) for (const g of data.savingsGoals) { try { await run('INSERT INTO savings_goals (user_id, name, target_amount, current_amount, currency, target_date) VALUES (?, ?, ?, ?, ?, ?)', [userId, g.name, g.target_amount, g.current_amount || 0, g.currency, g.target_date]); results.goals++; } catch(e){} }
+      if (Array.isArray(data.debts)) for (const d of data.debts) { try { await run('INSERT INTO debts (user_id, name, type, amount, paid_amount, currency, start_date, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, d.name, d.type, d.amount, d.paid_amount || 0, d.currency, d.start_date, d.due_date]); results.debts++; } catch(e){} }
+    });
     res.json({ message: 'Импорт завершён', results });
   } catch (error) { console.error(error); res.status(500).json({ message: 'Ошибка сервера' }); }
 });

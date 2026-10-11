@@ -1,4 +1,4 @@
-const { query, get, run } = require('../db/database');
+const { query, get, run, transaction } = require('../db/database');
 const money = require('../lib/money');
 
 class Account {
@@ -24,6 +24,48 @@ class Account {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Создание счёта пользователем с начальным балансом.
+  // Баланс записывается ОДИН раз (в accounts.balance), а в леджер ложится
+  // одна строка type='opening' на ту же сумму — без повторного инкремента
+  // баланса. Строка нужна, чтобы SUM(amount) по счёту сходился с балансом
+  // (reconcile, Beancount-экспорт), и исключена из доходов/расходов во всей
+  // аналитике, которая фильтрует type IN ('income','expense'). Атомарно.
+  static async createWithOpeningBalance(accountData) {
+    const balance = money.round(accountData.balance || 0);
+    return transaction(async () => {
+      const result = await run(
+        `INSERT INTO accounts
+         (user_id, name, account_number, bank_name, currency, balance, account_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          accountData.userId,
+          accountData.name,
+          accountData.accountNumber || '',
+          accountData.bankName || '',
+          accountData.currency || 'UAH',
+          balance,
+          accountData.accountType || 'checking'
+        ]
+      );
+      if (balance !== 0) {
+        await run(
+          `INSERT INTO transactions
+           (account_id, user_id, date, description, category, amount, type)
+           VALUES (?, ?, ?, ?, ?, ?, 'opening')`,
+          [
+            result.id,
+            accountData.userId,
+            accountData.openingDate || new Date().toISOString().split('T')[0],
+            'Начальный баланс',
+            'Начальный баланс',
+            balance
+          ]
+        );
+      }
+      return { id: result.id, ...accountData, balance };
+    });
   }
   
   // Получение всех счетов пользователя

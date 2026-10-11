@@ -187,20 +187,35 @@ router.post('/:id/create-transaction', async (req, res) => {
       return res.status(400).json({ message: 'Укажите счёт' });
     }
 
-    // Создаём транзакцию
-    const txResult = await run(
-      `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
-       VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
-      [req.user.id, account_id, receipt.total_amount, receipt.merchant || 'Чек', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
-    );
+    // Счёт должен принадлежать текущему пользователю (иначе чек B списывал
+    // деньги со счёта A). 404 — счёта нет, 403 — чужой.
+    const account = await get('SELECT id, user_id FROM accounts WHERE id = ?', [account_id]);
+    if (!account) return res.status(404).json({ message: 'Счёт не найден' });
+    if (account.user_id !== req.user.id) return res.status(403).json({ message: 'Нет доступа к этому счёту' });
 
-    // Обновляем баланс счёта
-    await run('UPDATE accounts SET balance = balance - ? WHERE id = ?', [receipt.total_amount, account_id]);
+    // Три записи — одной транзакцией БД. Расход хранится со знаком минус
+    // (единое правило: дельта баланса = хранимая сумма).
+    const { transaction } = require('../db/database');
+    const money = require('../lib/money');
+    const amount = -Math.abs(money.round(receipt.total_amount));
+    const txId = await transaction(async () => {
+      const txResult = await run(
+        `INSERT INTO transactions (user_id, account_id, type, amount, description, category, date)
+         VALUES (?, ?, 'expense', ?, ?, ?, ?)`,
+        [req.user.id, account_id, amount, receipt.merchant || 'Чек', category || receipt.category || 'other', receipt.receipt_date || new Date().toISOString().split('T')[0]]
+      );
+      await run(
+        'UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+        [amount, account_id, req.user.id]
+      );
+      await run(
+        'UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+        [txResult.id, req.params.id, req.user.id]
+      );
+      return txResult.id;
+    });
 
-    // Связываем чек с транзакцией
-    await run('UPDATE receipts SET transaction_id = ?, is_processed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [txResult.id, req.params.id]);
-
-    res.json({ transaction_id: txResult.id, message: 'Транзакция создана' });
+    res.json({ transaction_id: txId, message: 'Транзакция создана' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

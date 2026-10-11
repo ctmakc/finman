@@ -224,11 +224,44 @@ describe('POST /api/billing/checkout', () => {
 describe('billingService.handleWebhook (Stripe mocked)', () => {
   beforeEach(() => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
-    delete process.env.STRIPE_WEBHOOK_SECRET; // dev path: parse body as-is
+    // Подпись обязательна: без STRIPE_WEBHOOK_SECRET вебхук отвергается (400).
+    // Мок constructEvent просто парсит тело.
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_dummy';
     stripeState.constructEventImpl = null;
   });
   afterEach(() => {
     delete process.env.STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+  });
+
+  test('without STRIPE_WEBHOOK_SECRET an unsigned body is refused (400), tier unchanged', async () => {
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+    const ctx = await makeApp();
+    try {
+      const billing = require('../services/billingService');
+      const forged = {
+        type: 'checkout.session.completed',
+        data: { object: { metadata: { userId: String(ctx.userId), tier: 'family' }, customer: 'cus_fake', subscription: 'sub_fake' } },
+      };
+      await expect(
+        billing.handleWebhook(Buffer.from(JSON.stringify(forged)), undefined)
+      ).rejects.toMatchObject({ code: 'WEBHOOK_SECRET_MISSING', status: 400 });
+
+      // И через HTTP: тот же 400 в стандартном конверте.
+      const res = await ctx.request
+        .post('/api/billing/webhook')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify(forged));
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('WEBHOOK_SECRET_MISSING');
+
+      const dbHelpers = require('../db/database');
+      const user = await dbHelpers.get('SELECT subscription_tier FROM users WHERE id = ?', [ctx.userId]);
+      expect(user.subscription_tier).toBe('free');
+    } finally {
+      await ctx.close();
+    }
   });
 
   test('checkout.session.completed updates users.subscription_tier', async () => {

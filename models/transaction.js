@@ -4,11 +4,33 @@ const Account = require('./account');
 const money = require('../lib/money');
 const { AppError } = require('../middleware/error');
 
+// Знак хранимой суммы задаётся типом (единое правило для всех писателей —
+// UI, импорт, чеки, регулярные платежи):
+//   expense  -> amount < 0      income -> amount > 0
+//   transfer -> знак ноги как есть (списание < 0, зачисление > 0)
+//   opening  -> как есть (начальный баланс кредитки может быть отрицательным)
+// Дельта баланса счёта всегда равна хранимой сумме, поэтому балансы и
+// SUM(amount) по счёту (reconcile) сходятся без знаний о типе.
+function normalizeType(type, amount) {
+  if (type) return type;
+  return Number(amount) >= 0 ? 'income' : 'expense';
+}
+function signedAmount(amount, type) {
+  const abs = Math.abs(money.round(amount));
+  if (type === 'expense') return -abs;
+  if (type === 'income') return abs;
+  return money.round(amount);
+}
+
 class Transaction {
+  static normalizeType = normalizeType;
+  static signedAmount = signedAmount;
+
   // Создание транзакции
   static async create(transactionData) {
-    // Округляем сумму до копеек (хранимая транзакция и баланс — точные до 2 знаков).
-    const amount = money.round(transactionData.amount);
+    // Округляем сумму до копеек, знак — по типу.
+    const type = normalizeType(transactionData.type, transactionData.amount);
+    const amount = signedAmount(transactionData.amount, type);
     return transaction(async () => {
       const result = await run(
         `INSERT INTO transactions
@@ -21,7 +43,7 @@ class Transaction {
           transactionData.description || '',
           transactionData.category || 'Прочее',
           amount,
-          transactionData.type || (amount >= 0 ? 'income' : 'expense')
+          type
         ]
       );
       await Account.updateBalance(
@@ -29,7 +51,7 @@ class Transaction {
         transactionData.userId,
         amount
       );
-      return { id: result.id, ...transactionData, amount };
+      return { id: result.id, ...transactionData, amount, type };
     });
   }
   
@@ -38,7 +60,8 @@ class Transaction {
     return transaction(async () => {
       const results = [];
       for (const tx of transactions) {
-        const amount = money.round(tx.amount);
+        const type = normalizeType(tx.type, tx.amount);
+        const amount = signedAmount(tx.amount, type);
         const result = await run(
           `INSERT INTO transactions
            (account_id, user_id, date, description, category, amount, type)
@@ -50,13 +73,13 @@ class Transaction {
             tx.description || '',
             tx.category || 'Прочее',
             amount,
-            tx.type || (amount >= 0 ? 'income' : 'expense')
+            type
           ]
         );
         if (!tx.skipBalanceUpdate) {
           await Account.updateBalance(tx.accountId, tx.userId, amount);
         }
-        results.push({ id: result.id, ...tx, amount });
+        results.push({ id: result.id, ...tx, amount, type });
       }
       return results;
     });
@@ -229,66 +252,128 @@ class Transaction {
     }
   }
   
-  // Обновление транзакции
+  // Обновление транзакции.
+  // Обычная строка: знак новой суммы — по (новому или текущему) типу, дельта
+  // баланса = новая_сумма − старая_сумма (смена типа переносит сумму на другую
+  // сторону). Нога перевода: см. updateTransferLegs — правятся обе ноги.
   static async update(id, userId, transactionData) {
-    try {
-      // Получить текущую транзакцию
-      const currentTransaction = await this.findById(id, userId);
-      
-      if (!currentTransaction) {
-        throw new Error('Транзакция не найдена');
-      }
-      
-      return transaction(async () => {
-        // Вычислить разницу для обновления баланса (округлённую до копеек).
-        let balanceDifference = 0;
-        let newAmount;
-        if (transactionData.amount !== undefined) {
-          newAmount = money.round(transactionData.amount);
-          balanceDifference = money.sub(newAmount, currentTransaction.amount);
-        }
+    const currentTransaction = await this.findById(id, userId);
 
+    if (!currentTransaction) {
+      throw new Error('Транзакция не найдена');
+    }
+
+    if (currentTransaction.transfer_id) {
+      return this.updateTransferLegs(currentTransaction, userId, transactionData);
+    }
+
+    const newType = transactionData.type || currentTransaction.type;
+    const hasAmount = transactionData.amount !== undefined;
+    let newAmount = currentTransaction.amount;
+    if (hasAmount || transactionData.type) {
+      newAmount = signedAmount(hasAmount ? transactionData.amount : currentTransaction.amount, newType);
+    }
+    const balanceDifference = money.sub(newAmount, currentTransaction.amount);
+
+    return transaction(async () => {
+      const updateFields = [];
+      const params = [];
+      if (transactionData.date) { updateFields.push('date = ?'); params.push(transactionData.date); }
+      if (transactionData.description !== undefined) { updateFields.push('description = ?'); params.push(transactionData.description); }
+      if (transactionData.category) { updateFields.push('category = ?'); params.push(transactionData.category); }
+      if (newAmount !== currentTransaction.amount) { updateFields.push('amount = ?'); params.push(newAmount); }
+      if (newType !== currentTransaction.type) { updateFields.push('type = ?'); params.push(newType); }
+      updateFields.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(id);
+      params.push(userId);
+
+      const result = await run(
+        `UPDATE transactions
+         SET ${updateFields.join(', ')}
+         WHERE id = ? AND user_id = ?`,
+        params
+      );
+
+      if (balanceDifference !== 0) {
+        await Account.updateBalance(currentTransaction.account_id, userId, balanceDifference);
+      }
+      return result.changes > 0;
+    });
+  }
+
+  // Правка перевода через любую из его ног. Обе строки с этим transfer_id
+  // меняются вместе: дата/описание/категория — одинаково; сумма — по модулю
+  // (списание остаётся < 0, зачисление > 0), оба баланса сдвигаются на свои
+  // дельты. Тип ноги перевода менять нельзя (AppError 400).
+  static async updateTransferLegs(leg, userId, transactionData) {
+    if (transactionData.type && transactionData.type !== 'transfer') {
+      throw new AppError(400, 'TRANSFER_TYPE_LOCKED', 'Тип ноги перевода изменить нельзя — удалите перевод и создайте транзакцию');
+    }
+    let newAbs = null;
+    if (transactionData.amount !== undefined) {
+      newAbs = Math.abs(money.round(transactionData.amount));
+      if (!(newAbs > 0)) {
+        throw new AppError(400, 'INVALID_AMOUNT', 'Сумма перевода должна быть положительной');
+      }
+    }
+
+    return transaction(async () => {
+      const legs = await query(
+        `SELECT id, account_id, amount FROM transactions WHERE transfer_id = ? AND user_id = ?`,
+        [leg.transfer_id, userId]
+      );
+      let changed = 0;
+      for (const row of legs) {
         const updateFields = [];
         const params = [];
         if (transactionData.date) { updateFields.push('date = ?'); params.push(transactionData.date); }
         if (transactionData.description !== undefined) { updateFields.push('description = ?'); params.push(transactionData.description); }
         if (transactionData.category) { updateFields.push('category = ?'); params.push(transactionData.category); }
-        if (transactionData.amount !== undefined) { updateFields.push('amount = ?'); params.push(newAmount); }
-        if (transactionData.type) { updateFields.push('type = ?'); params.push(transactionData.type); }
+        if (newAbs !== null) {
+          const newAmount = row.amount < 0 ? -newAbs : newAbs;
+          const delta = money.sub(newAmount, row.amount);
+          if (delta !== 0) {
+            updateFields.push('amount = ?'); params.push(newAmount);
+            await Account.updateBalance(row.account_id, userId, delta);
+          }
+        }
         updateFields.push('updated_at = CURRENT_TIMESTAMP');
-        params.push(id);
-        params.push(userId);
-
+        params.push(row.id, userId);
         const result = await run(
-          `UPDATE transactions
-           SET ${updateFields.join(', ')}
-           WHERE id = ? AND user_id = ?`,
+          `UPDATE transactions SET ${updateFields.join(', ')} WHERE id = ? AND user_id = ?`,
           params
         );
-
-        if (balanceDifference !== 0) {
-          await Account.updateBalance(currentTransaction.account_id, userId, balanceDifference);
-        }
-        return result.changes > 0;
-      });
-    } catch (error) {
-      throw error;
-    }
+        changed += result.changes;
+      }
+      return changed > 0;
+    });
   }
-  
-  // Удаление транзакции
+
+  // Удаление транзакции. Нога перевода удаляется вместе с парной: обе строки
+  // и оба баланса — атомарно, иначе остаётся «сирота» и деньги появляются из
+  // воздуха на счёте-получателе.
   static async delete(id, userId) {
     const row = await this.findById(id, userId);
     if (!row) {
       throw new Error('Транзакция не найдена');
     }
     return transaction(async () => {
-      const result = await run(
-        `DELETE FROM transactions WHERE id = ? AND user_id = ?`,
-        [id, userId]
-      );
-      await Account.updateBalance(row.account_id, userId, -row.amount);
-      return result.changes > 0;
+      const legs = row.transfer_id
+        ? await query(
+            `SELECT id, account_id, amount FROM transactions WHERE transfer_id = ? AND user_id = ?`,
+            [row.transfer_id, userId]
+          )
+        : [row];
+      let changes = 0;
+      for (const leg of legs) {
+        const result = await run(
+          `DELETE FROM transactions WHERE id = ? AND user_id = ?`,
+          [leg.id, userId]
+        );
+        changes += result.changes;
+        await Account.updateBalance(leg.account_id, userId, -leg.amount);
+      }
+      return changes > 0;
     });
   }
   

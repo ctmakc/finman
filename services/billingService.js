@@ -220,7 +220,8 @@ async function resolveUserId(obj) {
 }
 
 // Обрабатывает Stripe-вебхук. rawBody — Buffer/строка сырого тела, sig — заголовок.
-// При наличии STRIPE_WEBHOOK_SECRET проверяем подпись; иначе (dev) парсим как есть.
+// Подпись обязательна: без STRIPE_WEBHOOK_SECRET вебхук отвергается (400) —
+// иначе любой неподписанный POST поднимал бы тир пользователя.
 async function handleWebhook(rawBody, sig) {
   const stripe = getStripe();
   if (!stripe) {
@@ -233,20 +234,19 @@ async function handleWebhook(rawBody, sig) {
 
   let event;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
-  if (webhookSecret) {
-    try {
-      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    } catch (err) {
-      logger.warn({ err: err.message }, 'Stripe webhook signature verification failed');
-      throw new AppError(400, 'WEBHOOK_INVALID_SIGNATURE', 'Invalid webhook signature');
-    }
-  } else {
-    // Без секрета — только в dev: доверяем телу как есть.
-    try {
-      event = typeof rawBody === 'string' ? JSON.parse(rawBody) : JSON.parse(rawBody.toString('utf8'));
-    } catch (err) {
-      throw new AppError(400, 'WEBHOOK_INVALID_BODY', 'Invalid webhook body');
-    }
+  if (!webhookSecret) {
+    logger.warn('Stripe webhook received but STRIPE_WEBHOOK_SECRET is not set — refusing unsigned body');
+    throw new AppError(
+      400,
+      'WEBHOOK_SECRET_MISSING',
+      'Webhook signature cannot be verified: STRIPE_WEBHOOK_SECRET is not configured'
+    );
+  }
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Stripe webhook signature verification failed');
+    throw new AppError(400, 'WEBHOOK_INVALID_SIGNATURE', 'Invalid webhook signature');
   }
 
   const type = event && event.type;
