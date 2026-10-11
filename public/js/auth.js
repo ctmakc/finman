@@ -63,6 +63,10 @@ async function handleProfileUpdate(e) {
         return;
       }
       
+      // Сервер отзывает старые токены при смене пароля и отдаёт новый.
+      const updated = await response.json().catch(() => ({}));
+      if (updated && updated.token) localStorage.setItem('token', updated.token);
+
       // Очистка полей формы
       document.getElementById('settings-current-password').value = '';
       document.getElementById('settings-new-password').value = '';

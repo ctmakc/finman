@@ -63,4 +63,21 @@ describe('PUT /api/auth/me email uniqueness', () => {
     const me = await ctx.request.get('/api/auth/me').set('Authorization', `Bearer ${ctx.token}`);
     expect(me.body.email).toBe('new@example.com');
   });
+
+  test('password change revokes older tokens and hands the session a new one', async () => {
+    const res = await ctx.request
+      .put('/api/auth/me')
+      .set('Authorization', `Bearer ${ctx.token}`)
+      .send({ password: 'newpass123', currentPassword: 'password123' });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+    const old = await ctx.request.get('/api/auth/me').set('Authorization', `Bearer ${ctx.token}`);
+    expect(old.status).toBe(401);
+    const fresh = await ctx.request.get('/api/auth/me').set('Authorization', `Bearer ${res.body.token}`);
+    expect(fresh.status).toBe(200);
+    const login = await ctx.request.post('/api/auth/login').send({ username: 'testuser', password: 'newpass123' });
+    expect(login.status).toBe(200);
+    const viaLogin = await ctx.request.get('/api/auth/me').set('Authorization', `Bearer ${login.body.token}`);
+    expect(viaLogin.status).toBe(200);
+  });
 });

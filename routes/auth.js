@@ -8,6 +8,14 @@ const { notifySignup } = require('../services/signupNotify');
 
 const router = express.Router();
 
+// One payload for every sign-in path: { id, tv } — tv is users.token_version,
+// bumped on password change so older tokens are rejected (authService).
+function signToken(user) {
+  return jwt.sign({ id: user.id, tv: Number(user.token_version || 0) }, config.jwtSecret, {
+    expiresIn: config.jwtExpiration
+  });
+}
+
 // Валидация токена (для frontend)
 router.get('/validate', passport.authenticate('jwt', { session: false }), (req, res) => {
   res.json({ valid: true, user: { id: req.user.id, username: req.user.username } });
@@ -38,10 +46,8 @@ router.get('/google/callback', (req, res, next) => {
       return fail(reason);
     }
     try {
-      // Тот же payload, что и у входа по паролю: { id }.
-      const token = jwt.sign({ id: user.id }, config.jwtSecret, {
-        expiresIn: config.jwtExpiration
-      });
+      // Тот же payload, что и у входа по паролю.
+      const token = signToken(user);
       // Токен уезжает во фрагменте URL — так он не попадает в серверные логи.
       return res.redirect(config.google.successRedirect + '#token=' + encodeURIComponent(token));
     } catch (e) {
@@ -115,9 +121,7 @@ router.post('/register', async (req, res) => {
     });
     
     // Создание токена JWT
-    const token = jwt.sign({ id: newUser.id }, config.jwtSecret, {
-      expiresIn: config.jwtExpiration
-    });
+    const token = signToken(newUser);
 
     // Уведомление оператора о регистрации (письмо владельцу; ответ не ждёт).
     notifySignup(
@@ -159,9 +163,7 @@ router.post('/login', (req, res, next) => {
     }
     
     // Создание токена JWT
-    const token = jwt.sign({ id: user.id }, config.jwtSecret, {
-      expiresIn: config.jwtExpiration
-    });
+    const token = signToken(user);
     
     // Отправка токена и данных пользователя
     return res.json({
@@ -264,7 +266,9 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
         username: updatedUser.username,
         email: updatedUser.email,
         fullName: updatedUser.full_name,
-        updatedAt: updatedUser.updated_at
+        updatedAt: updatedUser.updated_at,
+        // Пароль сменён: старые токены отозваны, эта сессия получает новый.
+        ...(password ? { token: signToken(updatedUser) } : {})
       });
     } else {
       res.status(400).json({ 

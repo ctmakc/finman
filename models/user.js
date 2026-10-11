@@ -33,7 +33,7 @@ class User {
       const user = await get(
         `SELECT id, username, email, full_name, created_at, updated_at,
                 subscription_tier, stripe_customer_id, stripe_subscription_id, timezone,
-                google_id, avatar_url
+                google_id, avatar_url, token_version
          FROM users WHERE id = ?`,
         [id]
       );
@@ -131,6 +131,8 @@ class User {
         const hashedPassword = await bcrypt.hash(userData.password, bcryptRounds());
         updateFields.push('password = ?');
         params.push(hashedPassword);
+        // Every token issued before the password change stops working.
+        updateFields.push('token_version = COALESCE(token_version, 0) + 1');
       }
       
       updateFields.push('updated_at = CURRENT_TIMESTAMP');

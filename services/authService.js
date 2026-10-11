@@ -125,6 +125,10 @@ passport.use(new JwtStrategy(jwtOptions, async function(jwtPayload, done) {
     if (!user) {
       return done(null, false);
     }
+    // Revoked by a password change (users.token_version, migration 020).
+    if (Number(jwtPayload.tv || 0) !== Number(user.token_version || 0)) {
+      return done(null, false);
+    }
 
     // Пользователь найден
     return done(null, user);
