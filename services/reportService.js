@@ -17,6 +17,8 @@
 const { query, get, run } = require('../db/database');
 const money = require('../lib/money');
 const { isCashflow } = require('../lib/txFilter');
+const fx = require('../lib/fx');
+const networthService = require('./networthService');
 const { AppError } = require('../middleware/error');
 
 const SUPPORTED_TYPES = ['monthly', 'annual'];
@@ -60,31 +62,43 @@ async function buildReportData(userId, opts = {}) {
   const reportType = normalizeType(opts.reportType);
   const { start, end } = resolvePeriod(reportType, opts.periodStart, opts.periodEnd);
 
-  // 1) Транзакции за период
+  // 1) Транзакции за период. Валюта операции = валюта её счёта; все суммы
+  // отчёта — в базовой валюте пользователя (lib/fx).
+  const conv = await fx.converterForUser(userId);
   const transactions = await query(
-    `SELECT date, description, category, amount, type
-       FROM transactions
-      WHERE user_id = ? AND date >= ? AND date <= ?
-      ORDER BY date`,
+    `SELECT t.date, t.description, t.category, t.amount, t.type, a.currency AS currency
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.date >= ? AND t.date <= ?
+      ORDER BY t.date`,
     [userId, start, end]
   );
 
   // Only cash flow: transfers and opening balances are excluded (lib/txFilter).
   const cashflow = transactions.filter(isCashflow);
-  const incomeRows = cashflow.filter((t) => t.type === 'income');
-  const expenseRows = cashflow.filter((t) => t.type === 'expense');
-
-  const income = money.sum(incomeRows.map((t) => t.amount));
-  const expenses = money.sum(expenseRows.map((t) => t.amount));
+  let income = 0;
+  let expenses = 0;
+  // category -> { currency -> raw sum } (для бюджетов в их собственной валюте)
+  const byCategoryRaw = {};
+  const byCategoryMap = {};
+  for (const t of cashflow) {
+    const amt = Math.abs(Number(t.amount) || 0);
+    const inBase = await conv.convert(amt, t.currency);
+    if (t.type === 'income') {
+      income = money.add(income, inBase);
+      continue;
+    }
+    expenses = money.add(expenses, inBase);
+    const cat = t.category || 'Uncategorized';
+    byCategoryMap[cat] = money.add(byCategoryMap[cat] || 0, inBase);
+    const cur = t.currency || conv.baseCurrency;
+    byCategoryRaw[cat] = byCategoryRaw[cat] || {};
+    byCategoryRaw[cat][cur] = money.add(byCategoryRaw[cat][cur] || 0, amt);
+  }
   const net = money.sub(income, expenses);
   const savingsRate = income > 0 ? money.round(money.div(net, income) * 100) : 0;
 
   // 2) Разбивка расходов по категориям
-  const byCategoryMap = {};
-  for (const t of expenseRows) {
-    const cat = t.category || 'Uncategorized';
-    byCategoryMap[cat] = money.add(byCategoryMap[cat] || 0, t.amount);
-  }
   const categoryBreakdown = Object.entries(byCategoryMap)
     .map(([category, total]) => ({
       category,
@@ -93,51 +107,47 @@ async function buildReportData(userId, opts = {}) {
     }))
     .sort((a, b) => b.total - a.total);
 
-  // 3) Бюджеты vs факт (по категориям, расходы в периоде)
+  // 3) Бюджеты vs факт (по категориям, расходы в периоде, в валюте бюджета)
   const budgets = await query(
-    'SELECT name, category, amount FROM budgets WHERE user_id = ? AND is_active = 1',
+    'SELECT name, category, amount, currency FROM budgets WHERE user_id = ? AND is_active = 1',
     [userId]
   );
-  const budgetVsActual = budgets.map((b) => {
-    const spent = money.round(byCategoryMap[b.category] || 0);
+  const budgetVsActual = [];
+  for (const b of budgets) {
+    const budgetCurrency = b.currency || conv.baseCurrency;
+    let spent = 0;
+    for (const [cur, amt] of Object.entries(byCategoryRaw[b.category] || {})) {
+      spent = money.add(spent, await conv.convert(amt, cur, budgetCurrency));
+    }
     const limit = money.round(b.amount);
-    return {
+    budgetVsActual.push({
       name: b.name,
       category: b.category,
+      currency: budgetCurrency,
       limit,
       spent,
       remaining: money.sub(limit, spent),
       percentUsed: limit > 0 ? money.round(money.div(spent, limit) * 100) : 0,
       overBudget: spent > limit,
-    };
-  });
+    });
+  }
 
-  // 4) Net worth (счета + ручные активы − долги)
-  const accounts = await query(
-    'SELECT name, balance FROM accounts WHERE user_id = ? AND is_active = 1',
-    [userId]
-  );
-  const manualAssets = await query(
-    'SELECT name, value FROM manual_assets WHERE user_id = ? AND is_active = 1',
-    [userId]
-  );
-  const debts = await query(
-    'SELECT name, amount, paid_amount FROM debts WHERE user_id = ? AND is_active = 1',
-    [userId]
-  );
-
-  const totalAccounts = money.sum(accounts.map((a) => a.balance));
-  const totalManualAssets = money.sum(manualAssets.map((a) => a.value));
-  const totalAssets = money.add(totalAccounts, totalManualAssets);
-  const totalLiabilities = money.sum(
-    debts.map((d) => money.sub(d.amount, d.paid_amount || 0))
-  );
-  const netWorth = money.sub(totalAssets, totalLiabilities);
+  // 4) Net worth — networthService (каждый компонент в базовой валюте;
+  // в обязательства идут только долги «я должен», не «мне должны»).
+  const nw = await networthService.computeNetWorth(userId, { baseCurrency: conv.baseCurrency });
+  const totalAccounts = nw.assetsBreakdown.accounts;
+  const totalManualAssets = nw.assetsBreakdown.manual;
+  const totalAssets = nw.totalAssets;
+  const totalLiabilities = nw.totalLiabilities;
+  const netWorth = nw.netWorth;
+  const missingRates = Array.from(new Set([...conv.missingRates, ...(nw.missingRates || [])]));
 
   return {
     reportType,
     title: periodTitle(reportType, start, end),
     period: { start, end },
+    currency: conv.baseCurrency,
+    missingRates,
     generatedAt: new Date().toISOString(),
     summary: {
       income,
@@ -154,6 +164,8 @@ async function buildReportData(userId, opts = {}) {
       netWorth,
       breakdown: {
         accounts: totalAccounts,
+        investments: nw.assetsBreakdown.investments,
+        savings: nw.assetsBreakdown.savings,
         manualAssets: totalManualAssets,
         liabilities: totalLiabilities,
       },
@@ -205,6 +217,9 @@ function renderReportPdf(reportData) {
         .fontSize(10)
         .fillColor('#666')
         .text(`Generated: ${d.generatedAt || new Date().toISOString()}`);
+      if (d.currency) {
+        doc.text(`Amounts in ${d.currency}${(d.missingRates || []).length ? ` (no rate for ${d.missingRates.join(', ')}: counted 1:1)` : ''}`);
+      }
       doc.fillColor('#000');
       doc.moveDown(1);
 
@@ -256,6 +271,8 @@ function renderReportPdf(reportData) {
       doc.moveDown(0.4);
       doc.fontSize(11);
       doc.text(`Accounts:         ${fmtMoney(nwb.accounts || 0)}`);
+      if (nwb.investments) doc.text(`Investments:      ${fmtMoney(nwb.investments)}`);
+      if (nwb.savings) doc.text(`Savings goals:    ${fmtMoney(nwb.savings)}`);
       doc.text(`Manual assets:    ${fmtMoney(nwb.manualAssets || 0)}`);
       doc.text(`Total assets:     ${fmtMoney(nw.totalAssets || 0)}`);
       doc.text(`Liabilities:      ${fmtMoney(nw.totalLiabilities || 0)}`);

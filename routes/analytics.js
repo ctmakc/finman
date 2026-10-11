@@ -3,14 +3,15 @@
 const express = require('express');
 const router = express.Router();
 const passport = require('passport');
-const { query, get } = require('../db/database');
+const { query } = require('../db/database');
 const dates = require('../lib/dates');
+const money = require('../lib/money');
 const { cashflowOnly } = require('../lib/txFilter');
 const networthService = require('../services/networthService');
+const fx = require('../lib/fx');
 
 // Фильтр денежного потока: только income/expense, без переводов и строк
 // «Начальный баланс» (иначе +658 % к прошлому месяцу и категория-призрак).
-const CF = cashflowOnly();
 const CFT = cashflowOnly('t');
 
 // Границы периода по умолчанию — текущий месяц в часовом поясе пользователя.
@@ -31,6 +32,24 @@ function pctChange(curr, prev) {
   return Math.max(-999, Math.min(999, Math.round(v * 100) / 100));
 }
 
+// Суммы по категориям в базовой валюте: группируем по (категория, валюта
+// счёта), переводим каждую группу и сливаем обратно. Каждая строка несёт
+// currency = базовая валюта пользователя.
+async function categoryTotals(userId, type, start, end) {
+  const conv = await fx.converterForUser(userId);
+  const rows = await query(`
+    SELECT t.category AS category, a.currency AS currency, SUM(ABS(t.amount)) as total, COUNT(*) as count
+    FROM transactions t
+    LEFT JOIN accounts a ON a.id = t.account_id
+    WHERE t.user_id = ? AND t.type = ? AND t.date BETWEEN ? AND ?${CFT.sql}
+    GROUP BY t.category, a.currency
+  `, [userId, type, start, end, ...CFT.params]);
+  const merged = await conv.regroup(rows, { keys: ['category'], amounts: ['total'], counts: ['count'] });
+  return merged
+    .map((r) => ({ ...r, currency: conv.baseCurrency }))
+    .sort((a, b) => b.total - a.total);
+}
+
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
@@ -40,45 +59,57 @@ router.get('/overview', async (req, res) => {
     const userId = req.user.id;
     const { start, end } = defaultRange(req);
 
-    // Доходы и расходы (только денежный поток)
-    const totals = await get(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as total_expense,
+    // Доходы и расходы (только денежный поток). Сумма каждой валюты счёта
+    // переводится в базовую валюту пользователя (lib/fx).
+    const conv = await fx.converterForUser(userId);
+    const totalsRows = await query(`
+      SELECT
+        a.currency AS currency,
+        COALESCE(SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END), 0) as total_income,
+        COALESCE(SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END), 0) as total_expense,
         COUNT(*) as transaction_count
-      FROM transactions
-      WHERE user_id = ? AND date BETWEEN ? AND ?${CF.sql}
-    `, [userId, start, end, ...CF.params]);
+      FROM transactions t
+      LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.date BETWEEN ? AND ?${CFT.sql}
+      GROUP BY a.currency
+    `, [userId, start, end, ...CFT.params]);
+    const totals = await conv.totals(totalsRows, ['total_income', 'total_expense'], { counts: ['transaction_count'] });
 
     // Total balance across accounts, converted into the user's base currency
     // (FX via networthService; missing rates fall back 1:1 and are flagged).
-    const balance = await networthService.sumAccountsInBase(userId);
+    const balance = await networthService.sumAccountsInBase(userId, { baseCurrency: conv.baseCurrency });
 
-    // Количество активных целей и их прогресс
-    const goals = await get(`
-      SELECT COUNT(*) as count,
+    // Количество активных целей и их прогресс (каждая цель — в своей валюте)
+    const goalRows = await query(`
+      SELECT currency, COUNT(*) as count,
         COALESCE(SUM(current_amount), 0) as saved,
         COALESCE(SUM(target_amount), 0) as target
       FROM savings_goals WHERE user_id = ? AND is_active = 1 AND is_completed = 0
+      GROUP BY currency
     `, [userId]);
+    const goals = await conv.totals(goalRows, ['saved', 'target'], { counts: ['count'] });
 
-    // Активные долги
-    const debts = await get(`
-      SELECT 
+    // Активные долги (каждый — в своей валюте)
+    const debtRows = await query(`
+      SELECT currency,
         COALESCE(SUM(CASE WHEN type IN ('i_owe', 'credit', 'mortgage', 'loan') THEN amount - paid_amount ELSE 0 END), 0) as i_owe,
         COALESCE(SUM(CASE WHEN type = 'owe_me' THEN amount - paid_amount ELSE 0 END), 0) as owe_me
       FROM debts WHERE user_id = ? AND is_active = 1 AND is_paid = 0
+      GROUP BY currency
     `, [userId]);
+    const debts = await conv.totals(debtRows, ['i_owe', 'owe_me']);
+    const missingRates = Array.from(new Set([...(balance.missingRates || []), ...conv.missingRates]));
 
     res.json({
       period: { start, end },
       income: totals.total_income,
       expense: totals.total_expense,
-      netIncome: totals.total_income - totals.total_expense,
+      netIncome: money.sub(totals.total_income, totals.total_expense),
       transactionCount: totals.transaction_count,
       totalBalance: balance.total,
-      baseCurrency: balance.baseCurrency,
-      missingRates: balance.missingRates,
+      currency: conv.baseCurrency,
+      baseCurrency: conv.baseCurrency,
+      missingRates,
       savingsGoals: {
         count: goals.count,
         saved: goals.saved,
@@ -88,7 +119,7 @@ router.get('/overview', async (req, res) => {
       debts: {
         iOwe: debts.i_owe,
         oweMe: debts.owe_me,
-        net: debts.owe_me - debts.i_owe
+        net: money.sub(debts.owe_me, debts.i_owe)
       }
     });
   } catch (error) {
@@ -102,14 +133,7 @@ router.get('/expenses-by-category', async (req, res) => {
   try {
     const { start, end } = defaultRange(req);
 
-    const data = await query(`
-      SELECT category, SUM(ABS(amount)) as total, COUNT(*) as count
-      FROM transactions
-      WHERE user_id = ? AND type = 'expense' AND date BETWEEN ? AND ?${CF.sql}
-      GROUP BY category
-      ORDER BY total DESC
-    `, [req.user.id, start, end, ...CF.params]);
-
+    const data = await categoryTotals(req.user.id, 'expense', start, end);
     res.json(data);
   } catch (error) {
     console.error('Error:', error);
@@ -122,14 +146,7 @@ router.get('/income-by-category', async (req, res) => {
   try {
     const { start, end } = defaultRange(req);
 
-    const data = await query(`
-      SELECT category, SUM(amount) as total, COUNT(*) as count
-      FROM transactions
-      WHERE user_id = ? AND type = 'income' AND date BETWEEN ? AND ?${CF.sql}
-      GROUP BY category
-      ORDER BY total DESC
-    `, [req.user.id, start, end, ...CF.params]);
-
+    const data = await categoryTotals(req.user.id, 'income', start, end);
     res.json(data);
   } catch (error) {
     console.error('Error:', error);
@@ -147,30 +164,34 @@ router.get('/trends', async (req, res) => {
     let groupBy, dateFormat;
     switch (period) {
       case 'weekly':
-        groupBy = "strftime('%Y-%W', date)";
+        groupBy = "strftime('%Y-%W', t.date)";
         dateFormat = 'week';
         break;
       case 'monthly':
-        groupBy = "strftime('%Y-%m', date)";
+        groupBy = "strftime('%Y-%m', t.date)";
         dateFormat = 'month';
         break;
       default:
-        groupBy = 'date';
+        groupBy = 't.date';
         dateFormat = 'day';
     }
 
-    const data = await query(`
-      SELECT 
+    const conv = await fx.converterForUser(req.user.id);
+    const rows = await query(`
+      SELECT
         ${groupBy} as period,
-        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
-        SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) as expense
-      FROM transactions
-      WHERE user_id = ? AND date >= ?${CF.sql}
-      GROUP BY ${groupBy}
+        a.currency AS currency,
+        SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END) as income,
+        SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END) as expense
+      FROM transactions t
+      LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.date >= ?${CFT.sql}
+      GROUP BY ${groupBy}, a.currency
       ORDER BY period ASC
-    `, [req.user.id, startDate, ...CF.params]);
+    `, [req.user.id, startDate, ...CFT.params]);
+    const data = await conv.regroup(rows, { keys: ['period'], amounts: ['income', 'expense'] });
 
-    res.json({ period: dateFormat, data });
+    res.json({ period: dateFormat, currency: conv.baseCurrency, baseCurrency: conv.baseCurrency, missingRates: conv.missingRates, data });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -187,22 +208,27 @@ router.get('/compare', async (req, res) => {
 
     // Месяц к месяцу — только денежный поток: начальный баланс счёта и переводы
     // между счетами не доход и не расход.
-    const thisMonth = await get(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as expense
-      FROM transactions WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
-    `, [req.user.id, thisMonthStart, today, ...CF.params]);
-
-    const lastMonth = await get(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as expense
-      FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?${CF.sql}
-    `, [req.user.id, lastMonthStart, lastMonthEnd, ...CF.params]);
+    const conv = await fx.converterForUser(req.user.id);
+    const sumRange = async (from, to) => {
+      const rows = await query(`
+        SELECT a.currency AS currency,
+          COALESCE(SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END), 0) as income,
+          COALESCE(SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END), 0) as expense
+        FROM transactions t
+        LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.user_id = ? AND t.date >= ? AND t.date <= ?${CFT.sql}
+        GROUP BY a.currency
+      `, [req.user.id, from, to, ...CFT.params]);
+      return conv.totals(rows, ['income', 'expense']);
+    };
+    const thisMonth = await sumRange(thisMonthStart, today);
+    const lastMonth = await sumRange(lastMonthStart, lastMonthEnd);
 
     res.json({
       period: { thisMonth: { start: thisMonthStart, end: today }, lastMonth: { start: lastMonthStart, end: lastMonthEnd } },
+      currency: conv.baseCurrency,
+      baseCurrency: conv.baseCurrency,
+      missingRates: conv.missingRates,
       thisMonth,
       lastMonth,
       changes: {
@@ -223,7 +249,7 @@ router.get('/top-expenses', async (req, res) => {
     const { start, end } = defaultRange(req);
 
     const data = await query(`
-      SELECT t.*, a.name as account_name
+      SELECT t.*, a.name as account_name, a.currency AS currency
       FROM transactions t
       LEFT JOIN accounts a ON t.account_id = a.id
       WHERE t.user_id = ? AND t.type = 'expense' AND t.date BETWEEN ? AND ?${CFT.sql}

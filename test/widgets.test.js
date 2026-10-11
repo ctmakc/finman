@@ -292,6 +292,8 @@ describe('widgets: данные виджетов (cashflow / top_categories / up
       `INSERT INTO accounts (user_id, name, currency, balance, is_active) VALUES (?, 'acc', 'UAH', 1000, 1)`,
       [ctx.userId]
     );
+    // Суммы виджетов — в базовой валюте пользователя; счёт в гривнах -> база UAH.
+    await db.run(`INSERT OR REPLACE INTO user_currency_settings (user_id, base_currency) VALUES (?, 'UAH')`, [ctx.userId]);
     const accId = acc.id;
 
     await db.run(

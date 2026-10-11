@@ -158,7 +158,7 @@ describe('opening balance semantics', () => {
     const cats = await ctx.request
       .get(`/api/analytics/expenses-by-category?startDate=2000-01-01&endDate=${today}`)
       .set(AUTH(ctx.token));
-    expect(cats.body).toEqual([{ category: 'Groceries', total: 40, count: 1 }]);
+    expect(cats.body).toEqual([{ category: 'Groceries', total: 40, count: 1, currency: 'CAD' }]);
     await db.run('DELETE FROM transactions WHERE id = ?', [tx.body.id]);
     await db.run('UPDATE accounts SET balance = 2500 WHERE id = ?', [accountId]);
   });

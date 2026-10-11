@@ -188,14 +188,27 @@ describe('DEMO_SEED_ON_EMPTY — in-process seed', () => {
       [demo.id]
     );
     expect(sums.opening).not.toBe(0);
+    // The demo has a USD account: /overview converts each account currency into
+    // the base currency (CAD), so the reference sums are converted the same way.
+    const fx = require(path.join(ROOT, 'lib', 'fx.js'));
+    const conv = await fx.converterForUser(demo.id);
+    const perCurrency = await database.query(
+      `SELECT a.currency AS currency,
+         COALESCE(SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) END), 0) AS income,
+         COALESCE(SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) END), 0) AS expense
+       FROM transactions t JOIN accounts a ON a.id = t.account_id
+       WHERE t.user_id = ? GROUP BY a.currency`,
+      [demo.id]
+    );
+    const base = await conv.totals(perCurrency, ['income', 'expense']);
 
     const res = await supertest(app)
       .get('/api/analytics/overview?startDate=2000-01-01&endDate=2099-12-31')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(Math.round(res.body.income * 100)).toBe(Math.round(sums.income * 100));
+    expect(Math.round(res.body.income * 100)).toBe(Math.round(base.income * 100));
     // /overview returns expense as the signed ledger sum (negative); compare magnitudes.
-    expect(Math.round(Math.abs(res.body.expense) * 100)).toBe(Math.round(sums.expense * 100));
+    expect(Math.round(Math.abs(res.body.expense) * 100)).toBe(Math.round(base.expense * 100));
     expect(Math.round(res.body.income * 100)).not.toBe(Math.round((sums.income + sums.opening) * 100));
 
     const health = await supertest(app).get('/api/health');

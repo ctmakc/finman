@@ -334,6 +334,8 @@ describe('money integrity: budget spent rounds', () => {
       amount: 500,
       period: 'monthly',
       startDate: periodStart,
+      // Расходы считаются в валюте бюджета; счёт в UAH -> бюджет тоже UAH.
+      currency: 'UAH',
     });
 
     // Три расхода, дающие float-дрейф при наивном суммировании.

@@ -17,6 +17,8 @@ const { ok } = require('../lib/respond');
 const dates = require('../lib/dates');
 const { cashflowOnly } = require('../lib/txFilter');
 const networthService = require('../services/networthService');
+const fx = require('../lib/fx');
+const money = require('../lib/money');
 const { AppError } = require('../middleware/error');
 
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -362,7 +364,7 @@ function periodStart(period, tz) {
 }
 
 // Единый фильтр денежного потока: без переводов и начального баланса.
-const CF = cashflowOnly();
+const CFT = cashflowOnly('t');
 
 // Balance and net worth are reported in the user's base currency
 // (networthService converts each account/asset/debt via the FX service;
@@ -389,22 +391,45 @@ async function getNetWorthData(userId) {
   };
 }
 
+// Income / expense since `start`, converted per account currency into the
+// user's base currency (lib/fx).
+async function cashflowTotals(userId, start, end = null) {
+  const conv = await fx.converterForUser(userId);
+  const params = [userId, start];
+  let endSql = '';
+  if (end) {
+    endSql = ' AND t.date <= ?';
+    params.push(end);
+  }
+  const rows = await query(
+    `SELECT a.currency AS currency,
+            SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END) AS income,
+            SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END) AS expense
+     FROM transactions t
+     LEFT JOIN accounts a ON a.id = t.account_id
+     WHERE t.user_id = ? AND t.date >= ?${endSql}${CFT.sql}
+     GROUP BY a.currency`,
+    [...params, ...CFT.params]
+  );
+  const tot = await conv.totals(rows, ['income', 'expense']);
+  return {
+    income: tot.income || 0,
+    expense: tot.expense || 0,
+    currency: conv.baseCurrency,
+    missingRates: conv.missingRates
+  };
+}
+
 async function getCashflowData(userId, period, tz) {
   const start = periodStart(period, tz);
-  const income = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ?${CF.sql}`,
-    [userId, start, ...CF.params]
-  );
-  const expense = await get(
-    `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
-    [userId, start, ...CF.params]
-  );
-  const incomeTotal = (income && income.total) || 0;
-  const expenseTotal = (expense && expense.total) || 0;
+  const tot = await cashflowTotals(userId, start);
   return {
-    income: incomeTotal,
-    expense: expenseTotal,
-    net: incomeTotal - expenseTotal,
+    income: tot.income,
+    expense: tot.expense,
+    net: money.sub(tot.income, tot.expense),
+    currency: tot.currency,
+    baseCurrency: tot.currency,
+    missingRates: tot.missingRates,
     period
   };
 }
@@ -418,21 +443,13 @@ async function getBudgetData(userId) {
 }
 
 async function getExpensesData(userId, period, tz) {
-  const start = periodStart(period, tz);
-  const result = await get(
-    `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}`,
-    [userId, start, ...CF.params]
-  );
-  return { total: (result && result.total) || 0, period };
+  const tot = await cashflowTotals(userId, periodStart(period, tz));
+  return { total: tot.expense, currency: tot.currency, baseCurrency: tot.currency, missingRates: tot.missingRates, period };
 }
 
 async function getIncomeData(userId, period, tz) {
-  const start = periodStart(period, tz);
-  const result = await get(
-    `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ?${CF.sql}`,
-    [userId, start, ...CF.params]
-  );
-  return { total: (result && result.total) || 0, period };
+  const tot = await cashflowTotals(userId, periodStart(period, tz));
+  return { total: tot.income, currency: tot.currency, baseCurrency: tot.currency, missingRates: tot.missingRates, period };
 }
 
 async function getGoalsData(userId) {
@@ -454,39 +471,48 @@ async function getUpcomingData(userId, tz) {
 
   // ВАЖНО: колонка recurring_payments — next_payment_date (а не *_execution_date).
   const recurring = await query(
-    `SELECT name as title, amount, next_payment_date as date FROM recurring_payments
-     WHERE user_id = ? AND is_active = 1 AND next_payment_date >= ? AND next_payment_date <= ? LIMIT 5`,
+    `SELECT rp.name as title, rp.amount, a.currency AS currency, rp.next_payment_date as date
+     FROM recurring_payments rp
+     LEFT JOIN accounts a ON a.id = rp.account_id
+     WHERE rp.user_id = ? AND rp.is_active = 1 AND rp.next_payment_date >= ? AND rp.next_payment_date <= ? LIMIT 5`,
     [userId, today, weekLater]
   );
   const subscriptions = await query(
-    `SELECT name as title, amount, next_billing_date as date FROM subscriptions
+    `SELECT name as title, amount, currency, next_billing_date as date FROM subscriptions
      WHERE user_id = ? AND is_active = 1 AND next_billing_date IS NOT NULL
        AND next_billing_date >= ? AND next_billing_date <= ? LIMIT 5`,
     [userId, today, weekLater]
   );
 
   const items = [...recurring, ...subscriptions]
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
     .slice(0, 5);
   return { items };
 }
 
 async function getTopCategoriesData(userId, period, tz) {
   const start = periodStart(period, tz);
+  const conv = await fx.converterForUser(userId);
   const rows = await query(
-    `SELECT COALESCE(category, 'Uncategorized') as category, SUM(ABS(amount)) as total, COUNT(*) as count
-     FROM transactions
-     WHERE user_id = ? AND type = 'expense' AND date >= ?${CF.sql}
-     GROUP BY category
-     ORDER BY total DESC
-     LIMIT 5`,
-    [userId, start, ...CF.params]
+    `SELECT COALESCE(t.category, 'Uncategorized') as category, a.currency AS currency,
+            SUM(ABS(t.amount)) as total, COUNT(*) as count
+     FROM transactions t
+     LEFT JOIN accounts a ON a.id = t.account_id
+     WHERE t.user_id = ? AND t.type = 'expense' AND t.date >= ?${CFT.sql}
+     GROUP BY COALESCE(t.category, 'Uncategorized'), a.currency`,
+    [userId, start, ...CFT.params]
   );
-  const grand = rows.reduce((s, r) => s + (r.total || 0), 0);
+  const merged = (await conv.regroup(rows, { keys: ['category'], amounts: ['total'], counts: ['count'] }))
+    .sort((x, y) => y.total - x.total)
+    .slice(0, 5);
+  const grand = money.sum(merged.map((r) => r.total || 0));
   return {
     period,
     total: grand,
-    categories: rows.map((r) => ({
+    currency: conv.baseCurrency,
+    baseCurrency: conv.baseCurrency,
+    missingRates: conv.missingRates,
+    categories: merged.map((r) => ({
       category: r.category,
       total: r.total || 0,
       count: r.count,
@@ -495,47 +521,95 @@ async function getTopCategoriesData(userId, period, tz) {
   };
 }
 
+// Monthly equivalent of one charge per billing frequency (weekly is 52/12,
+// not 1; quarterly is 1/3).
+const MONTHLY_FACTOR = {
+  daily: 365 / 12,
+  weekly: 52 / 12,
+  biweekly: 26 / 12,
+  monthly: 1,
+  quarterly: 1 / 3,
+  yearly: 1 / 12,
+  annual: 1 / 12
+};
+
+function monthlyEquivalent(amount, cycle) {
+  const factor = MONTHLY_FACTOR[cycle] !== undefined ? MONTHLY_FACTOR[cycle] : 1;
+  return (Number(amount) || 0) * factor;
+}
+
+// Список — первые 5 подписок; monthlyTotal — по ВСЕМ активным подпискам,
+// каждая приведена к месяцу по своей периодичности и к базовой валюте.
 async function getSubscriptionsData(userId) {
-  const subs = await query(
-    'SELECT * FROM subscriptions WHERE user_id = ? AND is_active = 1 LIMIT 5',
+  const conv = await fx.converterForUser(userId);
+  const all = await query(
+    'SELECT * FROM subscriptions WHERE user_id = ? AND is_active = 1 ORDER BY next_billing_date, id',
     [userId]
   );
-  const monthlyTotal = subs.reduce((s, sub) => {
-    if (sub.billing_cycle === 'monthly') return s + sub.amount;
-    if (sub.billing_cycle === 'yearly') return s + sub.amount / 12;
-    return s + sub.amount;
-  }, 0);
-  return { subscriptions: subs, monthlyTotal };
+  let monthlyTotal = 0;
+  for (const sub of all) {
+    monthlyTotal = money.add(monthlyTotal, await conv.convert(monthlyEquivalent(sub.amount, sub.billing_cycle), sub.currency));
+  }
+  return {
+    subscriptions: all.slice(0, 5),
+    count: all.length,
+    monthlyTotal,
+    currency: conv.baseCurrency,
+    baseCurrency: conv.baseCurrency,
+    missingRates: conv.missingRates
+  };
 }
 
 async function getInvestmentsData(userId) {
+  const conv = await fx.converterForUser(userId);
   const portfolios = await query(
     'SELECT * FROM investment_portfolios WHERE user_id = ? AND is_active = 1',
     [userId]
   );
-  let totalValue = 0;
-  for (const p of portfolios) {
-    const val = await get(
-      'SELECT SUM(quantity * COALESCE(current_price, buy_price)) as total FROM investments WHERE portfolio_id = ? AND is_active = 1',
-      [p.id]
-    );
-    totalValue += (val && val.total) || 0;
-  }
-  return { portfolioCount: portfolios.length, totalValue };
-}
-
-async function getDebtsData(userId) {
-  const debts = await query(
-    `SELECT * FROM debts WHERE user_id = ? AND is_active = 1 AND is_paid = 0 LIMIT 5`,
+  const rows = await query(
+    `SELECT i.currency AS currency, SUM(i.quantity * COALESCE(i.current_price, i.buy_price)) AS total
+     FROM investments i
+     JOIN investment_portfolios p ON p.id = i.portfolio_id
+     WHERE p.user_id = ? AND p.is_active = 1 AND i.is_active = 1
+     GROUP BY i.currency`,
     [userId]
   );
-  const totalOwed = debts.reduce((s, d) => s + (d.amount - d.paid_amount), 0);
-  return { debts, totalOwed };
+  const tot = await conv.totals(rows, ['total']);
+  return {
+    portfolioCount: portfolios.length,
+    totalValue: tot.total || 0,
+    currency: conv.baseCurrency,
+    baseCurrency: conv.baseCurrency,
+    missingRates: conv.missingRates
+  };
+}
+
+// Список — первые 5 долгов; totalOwed — по всем, в базовой валюте.
+async function getDebtsData(userId) {
+  const conv = await fx.converterForUser(userId);
+  const all = await query(
+    `SELECT * FROM debts WHERE user_id = ? AND is_active = 1 AND is_paid = 0 ORDER BY id`,
+    [userId]
+  );
+  let totalOwed = 0;
+  for (const d of all) {
+    totalOwed = money.add(totalOwed, await conv.convert(money.sub(d.amount, d.paid_amount || 0), d.currency));
+  }
+  return {
+    debts: all.slice(0, 5),
+    count: all.length,
+    totalOwed,
+    currency: conv.baseCurrency,
+    baseCurrency: conv.baseCurrency,
+    missingRates: conv.missingRates
+  };
 }
 
 async function getRecentData(userId) {
   const transactions = await query(
-    'SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 10',
+    `SELECT t.*, a.currency AS currency FROM transactions t
+     LEFT JOIN accounts a ON a.id = t.account_id
+     WHERE t.user_id = ? ORDER BY t.date DESC, t.id DESC LIMIT 10`,
     [userId]
   );
   return { transactions };
@@ -544,17 +618,15 @@ async function getRecentData(userId) {
 async function getChartExpensesData(userId, tz) {
   const data = [];
   const thisMonthStart = dates.startOfMonthISO(dates.todayISO(tz));
+  let currency = null;
   for (let i = 5; i >= 0; i--) {
     const start = dates.addMonthsISO(thisMonthStart, -i, 1);
     const end = dates.endOfMonthISO(start);
-
-    const result = await get(
-      `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
-      [userId, start, end, ...CF.params]
-    );
-    data.push({ month: start.substring(0, 7), amount: (result && result.total) || 0 });
+    const tot = await cashflowTotals(userId, start, end);
+    currency = tot.currency;
+    data.push({ month: start.substring(0, 7), amount: tot.expense });
   }
-  return { data };
+  return { data, currency, baseCurrency: currency };
 }
 
 async function getChartBalanceData(userId) {

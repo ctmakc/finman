@@ -55,6 +55,9 @@ async function seedFinance(db, userId) {
     [userId, 'Main Card', 'UAH', 5000, 'card']
   );
   const accountId = acc.id;
+  // Сводка считается в базовой валюте пользователя; счёт в гривнах, поэтому
+  // база — UAH (иначе суммы ниже переводятся в CAD и цифры теста меняются).
+  await dbRun(db, `INSERT OR REPLACE INTO user_currency_settings (user_id, base_currency) VALUES (?, 'UAH')`, [userId]);
 
   // Окно [NOW-7d, NOW]: берём offset 1..5 с запасом, чтобы time-of-day не выкинул граничные.
   const txs = [

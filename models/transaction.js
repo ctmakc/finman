@@ -161,7 +161,7 @@ class Transaction {
       } = options;
       
       let sql = `
-        SELECT t.*, a.name as account_name
+        SELECT t.*, a.name as account_name, a.currency AS currency
         FROM transactions t
         JOIN accounts a ON t.account_id = a.id
         WHERE t.user_id = ?
@@ -244,7 +244,7 @@ class Transaction {
   static async findById(id, userId) {
     try {
       const transaction = await get(
-        `SELECT t.*, a.name as account_name
+        `SELECT t.*, a.name as account_name, a.currency AS currency
          FROM transactions t
          JOIN accounts a ON t.account_id = a.id
          WHERE t.id = ? AND t.user_id = ?`,
@@ -435,24 +435,31 @@ class Transaction {
         params.push(endDate);
       }
       
+      // Суммы группируются ещё и по валюте счёта, затем каждая группа
+      // переводится в базовую валюту пользователя (lib/fx) и группы сливаются:
+      // 100 CAD + 4000 UAH — это не «4100». Каждая строка несёт currency = база.
+      const from = 'FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id';
+      let regroupSpec;
+
       // Статистика по категориям
       if (groupBy === 'category') {
         sql = `
           SELECT
             t.category,
             t.type,
+            a.currency AS currency,
             SUM(ABS(t.amount)) as total_amount,
             COUNT(*) as count
-          FROM transactions t
+          ${from}
           ${whereClause}
-          GROUP BY t.category, t.type
-          ORDER BY t.type, total_amount DESC
+          GROUP BY t.category, t.type, a.currency
         `;
-      } 
+        regroupSpec = { keys: ['category', 'type'], amounts: ['total_amount'], counts: ['count'] };
+      }
       // Статистика по датам (день, месяц, год)
       else {
         let dateFormat = '';
-        
+
         if (groupBy === 'day') {
           dateFormat = '%Y-%m-%d';
         } else if (groupBy === 'month') {
@@ -460,21 +467,28 @@ class Transaction {
         } else if (groupBy === 'year') {
           dateFormat = '%Y';
         }
-        
+
         sql = `
           SELECT
             strftime('${dateFormat}', t.date) as period,
             t.type,
-            SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,
+            a.currency AS currency,
+            SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END) as income,
             SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END) as expense
-          FROM transactions t
+          ${from}
           ${whereClause}
-          GROUP BY period, t.type
+          GROUP BY period, t.type, a.currency
           ORDER BY period
         `;
+        regroupSpec = { keys: ['period', 'type'], amounts: ['income', 'expense'] };
       }
-      
-      const stats = await query(sql, params);
+
+      const rows = await query(sql, params);
+      const conv = await require('../lib/fx').converterForUser(userId);
+      const stats = (await conv.regroup(rows, regroupSpec)).map((r) => ({ ...r, currency: conv.baseCurrency }));
+      if (groupBy === 'category') {
+        stats.sort((x, y) => (x.type < y.type ? -1 : x.type > y.type ? 1 : y.total_amount - x.total_amount));
+      }
       return stats;
     } catch (error) {
       throw error;

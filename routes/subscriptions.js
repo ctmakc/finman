@@ -172,7 +172,7 @@ router.post('/:id/payment', async (req, res) => {
     );
 
     // Обновить следующую дату оплаты: дата оплаты + цикл, но не раньше сегодня.
-    const nextBilling = Subscription.nextAfterPayment(payment_date || todayStr, sub.billing_cycle, todayStr);
+    const nextBilling = Subscription.nextAfterPayment(payment_date || todayStr, sub.billing_cycle, todayStr, sub.start_date);
     await run('UPDATE subscriptions SET next_billing_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextBilling, req.params.id]);
 
     res.json({ message: 'Payment recorded' });

@@ -6,10 +6,43 @@ const money = require('../lib/money');
 const dates = require('../lib/dates');
 const { cashflowOnly } = require('../lib/txFilter');
 const networthService = require('../services/networthService');
+const fx = require('../lib/fx');
 
 // Фильтр денежного потока (без переводов и начального баланса): иначе
 // стартовый баланс счёта выглядит как доход и прогноз даёт «+116.8 % за 30 дней».
 const CF = cashflowOnly();
+const CFT = cashflowOnly('t');
+
+// SQL expression (alias t = transactions): 1 when the transaction is an
+// occurrence of a scheduled item that the forecast overlay will add again:
+//   - an active recurring payment that has not ended (end_date >= today, the
+//     first bound parameter) on the same account and of the same type, whose
+//     amount is within 5 % and whose name equals the description or whose
+//     category equals the transaction category (models/recurringPayment.js
+//     creates its transactions with description = name, category = category
+//     or 'Recurring payment');
+//   - a transaction linked to a payment of an active subscription, or an
+//     expense whose description equals an active subscription name (same
+//     account when the subscription has one) with the amount within 5 %.
+const SCHEDULED_MATCH_SQL = `(CASE WHEN EXISTS (
+    SELECT 1 FROM recurring_payments rp
+    WHERE rp.user_id = t.user_id AND rp.is_active = 1
+      AND (rp.end_date IS NULL OR rp.end_date >= ?)
+      AND rp.account_id = t.account_id AND rp.type = t.type
+      AND ABS(ABS(t.amount) - ABS(rp.amount)) <= 0.05 * ABS(rp.amount) + 0.005
+      AND (LOWER(TRIM(COALESCE(t.description, ''))) = LOWER(TRIM(rp.name))
+           OR COALESCE(t.category, '') = COALESCE(rp.category, 'Recurring payment'))
+  ) OR EXISTS (
+    SELECT 1 FROM subscription_payments sp
+    JOIN subscriptions s ON s.id = sp.subscription_id
+    WHERE sp.transaction_id = t.id AND s.is_active = 1
+  ) OR (t.type = 'expense' AND EXISTS (
+    SELECT 1 FROM subscriptions s
+    WHERE s.user_id = t.user_id AND s.is_active = 1
+      AND (s.account_id IS NULL OR s.account_id = t.account_id)
+      AND LOWER(TRIM(COALESCE(t.description, ''))) = LOWER(TRIM(s.name))
+      AND ABS(ABS(t.amount) - ABS(s.amount)) <= 0.05 * ABS(s.amount) + 0.005
+  )) THEN 1 ELSE 0 END)`;
 
 // Процент с защитой от абсурда: |x| <= 999, не-число -> null.
 function capPercent(v, max = 999) {
@@ -48,26 +81,48 @@ router.get('/balance', async (req, res) => {
     const currentBalance = await networthService.sumAccountsInBase(userId);
     const startBalance = money.round(currentBalance.total || 0);
 
-    // Training window: the last 90 days of cash flow.
+    // Training window: the last 90 days of cash flow, converted per account
+    // currency into the base currency of the starting balance.
     const HISTORY_DAYS = 90;
     const historyStartStr = dates.addDaysISO(todayStr, -HISTORY_DAYS);
+    const conv = fx.createConverter(currentBalance.baseCurrency);
 
-    const dailyRows = await query(
-      `SELECT date,
-              SUM(CASE WHEN type = 'income'  THEN ABS(amount) ELSE 0 END) AS income,
-              SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) AS expense,
+    // Each row is flagged `scheduled` when it is an occurrence of an active
+    // recurring payment or subscription (see SCHEDULED_MATCH_SQL).
+    const historyRows = await query(
+      `SELECT t.date AS date,
+              a.currency AS currency,
+              ${SCHEDULED_MATCH_SQL} AS scheduled,
+              SUM(CASE WHEN t.type = 'income'  THEN ABS(t.amount) ELSE 0 END) AS income,
+              SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END) AS expense,
               COUNT(*) AS count
-       FROM transactions
-       WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
-       GROUP BY date
-       ORDER BY date ASC`,
-      [userId, historyStartStr, todayStr, ...CF.params]
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.user_id = ? AND t.date >= ? AND t.date <= ?${CFT.sql}
+       GROUP BY t.date, a.currency, scheduled
+       ORDER BY t.date ASC`,
+      [todayStr, userId, historyStartStr, todayStr, ...CFT.params]
     );
 
-    const txCount = dailyRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
-    const totalIncome = money.round(dailyRows.reduce((s, r) => s + (Number(r.income) || 0), 0));
-    const totalExpense = money.round(dailyRows.reduce((s, r) => s + (Number(r.expense) || 0), 0));
-    const firstDate = dailyRows.length ? String(dailyRows[0].date).slice(0, 10) : null;
+    // Double counting: a transaction created from a recurring payment (or a
+    // paid subscription) is both in the 90-day history and in the overlay that
+    // adds the same item on its next due dates. Such transactions are kept out
+    // of the observed average (the average then describes the unscheduled
+    // flow) and the scheduled items come only from the overlay below. The
+    // observation window and the transaction count still use every row.
+    const txCount = historyRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+    const firstDate = historyRows.length ? String(historyRows[0].date).slice(0, 10) : null;
+    const observed = await conv.regroup(
+      historyRows.filter((r) => !Number(r.scheduled)),
+      { keys: ['date'], amounts: ['income', 'expense'], counts: ['count'] }
+    );
+    const scheduledHistory = await conv.totals(
+      historyRows.filter((r) => Number(r.scheduled)),
+      ['income', 'expense'],
+      { counts: ['count'] }
+    );
+    const totalIncome = money.round(observed.reduce((s, r) => s + (Number(r.income) || 0), 0));
+    const totalExpense = money.round(observed.reduce((s, r) => s + (Number(r.expense) || 0), 0));
     const observedDays = firstDate
       ? Math.min(HISTORY_DAYS + 1, Math.max(1, (dates.diffDays(firstDate, todayStr) || 0) + 1))
       : 0;
@@ -76,6 +131,8 @@ router.get('/balance', async (req, res) => {
     const dailyIncome = observedDays > 0 ? totalIncome / observedDays : 0;
     const dailyExpense = observedDays > 0 ? totalExpense / observedDays : 0;
     const flatNet = dailyIncome - dailyExpense;
+    // Zero-filled daily series (a quiet day is a 0, not a missing sample).
+    const series = zeroFilledSeries(observed, firstDate, observedDays);
 
     // Confidence from the amount of history.
     const MIN_DAYS = 30;
@@ -93,25 +150,12 @@ router.get('/balance', async (req, res) => {
       reason = `${observedDays} days of history and ${txCount} transactions; the projection uses the average daily flow without seasonality.`;
     }
 
-    // Scheduled items.
-    const recurringPayments = await query(
-      `SELECT amount, type, frequency, next_payment_date
-       FROM recurring_payments
-       WHERE user_id = ? AND is_active = 1`,
-      [userId]
-    );
-    for (const p of recurringPayments) {
-      p.next_execution_date = p.next_payment_date || p.next_execution_date;
-    }
-    const subscriptions = await query(
-      `SELECT amount, billing_cycle, next_billing_date
-       FROM subscriptions
-       WHERE user_id = ? AND is_active = 1`,
-      [userId]
-    );
+    // Scheduled items: every occurrence inside the horizon, in base currency.
+    const horizonEnd = dates.addDaysISO(todayStr, horizon);
+    const scheduled = await scheduledOverlay(userId, todayStr, horizonEnd, conv);
 
     // Seasonal/trend model only on solid history.
-    const model = buildSeasonalTrendModel(dailyRows, HISTORY_DAYS);
+    const model = buildSeasonalTrendModel(series, todayStr);
     const haveModel = level === 'high' && model.samples >= 14;
     // Trend is frozen after as many future days as were observed.
     const trendCap = Math.max(1, Math.min(horizon, observedDays));
@@ -122,7 +166,7 @@ router.get('/balance', async (req, res) => {
 
     // Uncertainty band from the day-to-day variation of the observed window
     // (zero-activity days included), widening with sqrt(step).
-    const residualStd = observedDays >= 2 ? dailySeriesStd(dailyRows, firstDate, observedDays) : 0;
+    const residualStd = observedDays >= 2 ? stdDevLocal(series.map((p) => p.income - p.expense)) : 0;
     const Z = 1;
 
     const forecast = [];
@@ -133,7 +177,7 @@ router.get('/balance', async (req, res) => {
       let dayIncome = dailyIncome;
       let dayExpense = dailyExpense;
       if (haveModel) {
-        const modeled = predictNet(model, Math.min(i, trendCap));
+        const modeled = predictNet(model, Math.min(i, trendCap), todayStr, i);
         const net = Math.max(netLo, Math.min(netHi, modeled));
         dayIncome = Math.max(0, model.avgIncome);
         dayExpense = Math.max(0, model.avgExpense);
@@ -142,17 +186,10 @@ router.get('/balance', async (req, res) => {
         else dayExpense += -drift;
       }
 
-      for (const payment of recurringPayments) {
-        if (isPaymentDue(payment, dateStr)) {
-          const amt = Math.abs(Number(payment.amount) || 0);
-          if (payment.type === 'expense') dayExpense += amt;
-          else dayIncome += amt;
-        }
-      }
-      for (const sub of subscriptions) {
-        if (isSubscriptionDue(sub, dateStr)) {
-          dayExpense += Math.abs(Number(sub.amount) || 0);
-        }
+      const due = scheduled.get(dateStr);
+      if (due) {
+        dayIncome += due.income;
+        dayExpense += due.expense;
       }
 
       if (i > 0) {
@@ -182,7 +219,9 @@ router.get('/balance', async (req, res) => {
       forecast,
       summary: {
         currentBalance: startBalance,
+        currency: currentBalance.baseCurrency,
         baseCurrency: currentBalance.baseCurrency,
+        missingRates: Array.from(new Set([...(currentBalance.missingRates || []), ...conv.missingRates])),
         projectedBalance: endBalance,
         change,
         // Percent of the current balance; meaningless near zero -> null, else |x| <= 999.
@@ -206,6 +245,13 @@ router.get('/balance', async (req, res) => {
           firstDate,
           totalIncome,
           totalExpense,
+          // Occurrences of scheduled items found in the history; they are
+          // projected by the overlay, not by the daily average.
+          scheduledExcluded: {
+            count: scheduledHistory.count || 0,
+            income: money.round(scheduledHistory.income || 0),
+            expense: money.round(scheduledHistory.expense || 0)
+          },
           windowDays: HISTORY_DAYS
         },
         trendPerDay: haveModel ? money.round(model.slope) : 0,
@@ -236,17 +282,21 @@ router.get('/expenses', async (req, res) => {
     const firstDate = first && first.d ? String(first.d).slice(0, 10) : null;
     const windowDays = firstDate ? Math.max(1, (dates.diffDays(firstDate, todayStr) || 0) + 1) : 0;
 
-    const categoryTotals = await query(
-      `SELECT category,
-              SUM(ABS(amount)) as total,
-              COUNT(*) as count,
-              COUNT(DISTINCT date) as days
-       FROM transactions
-       WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}
-       GROUP BY category
-       ORDER BY total DESC`,
-      [userId, threeMonthsAgoStr, todayStr, ...CF.params]
+    const conv = await fx.converterForUser(userId);
+    const categoryRows = await query(
+      `SELECT t.category AS category,
+              a.currency AS currency,
+              SUM(ABS(t.amount)) as total,
+              COUNT(*) as count
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.user_id = ? AND t.type = 'expense' AND t.date >= ? AND t.date <= ?${CFT.sql}
+       GROUP BY t.category, a.currency`,
+      [userId, threeMonthsAgoStr, todayStr, ...CFT.params]
     );
+    const categoryTotals = (await conv.regroup(categoryRows, {
+      keys: ['category'], amounts: ['total'], counts: ['count']
+    })).sort((x, y) => y.total - x.total);
 
     const projections = categoryTotals.map(cat => {
       const dailyAvg = windowDays > 0 ? (Number(cat.total) || 0) / windowDays : 0;
@@ -262,6 +312,9 @@ router.get('/expenses', async (req, res) => {
 
     res.json({
       days: horizon,
+      currency: conv.baseCurrency,
+      baseCurrency: conv.baseCurrency,
+      missingRates: conv.missingRates,
       observedDays: windowDays,
       confidence: windowDays < 30 ? 'low' : 'medium',
       categories: projections,
@@ -407,26 +460,30 @@ router.get('/trends', async (req, res) => {
     const todayStr = dates.todayISO(dates.userTz(req.user));
     const thisMonthStart = dates.startOfMonthISO(todayStr);
 
-    // Данные за последние 6 месяцев (только денежный поток)
+    // Данные за последние 6 месяцев (только денежный поток, в базовой валюте)
+    const conv = await fx.converterForUser(userId);
     const months = [];
     for (let i = 5; i >= 0; i--) {
       const start = dates.addMonthsISO(thisMonthStart, -i, 1);
       const end = dates.endOfMonthISO(start);
 
-      const income = await get(
-        `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?${CF.sql}`,
-        [userId, start, end, ...CF.params]
+      const rows = await query(
+        `SELECT a.currency AS currency,
+                SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END) AS income,
+                SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END) AS expense
+         FROM transactions t
+         LEFT JOIN accounts a ON a.id = t.account_id
+         WHERE t.user_id = ? AND t.date >= ? AND t.date <= ?${CFT.sql}
+         GROUP BY a.currency`,
+        [userId, start, end, ...CFT.params]
       );
-      const expense = await get(
-        `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
-        [userId, start, end, ...CF.params]
-      );
+      const tot = await conv.totals(rows, ['income', 'expense']);
 
       months.push({
         month: start.substring(0, 7),
-        income: income.total || 0,
-        expense: expense.total || 0,
-        savings: (income.total || 0) - (expense.total || 0)
+        income: tot.income || 0,
+        expense: tot.expense || 0,
+        savings: money.sub(tot.income || 0, tot.expense || 0)
       });
     }
 
@@ -440,6 +497,9 @@ router.get('/trends', async (req, res) => {
     const nextMonthExpense = predictNext(months.map(m => m.expense));
 
     res.json({
+      currency: conv.baseCurrency,
+      baseCurrency: conv.baseCurrency,
+      missingRates: conv.missingRates,
       months,
       trends: {
         income: { direction: incomesTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(incomesTrend)) ?? 0) },
@@ -458,35 +518,86 @@ router.get('/trends', async (req, res) => {
 });
 
 // Вспомогательные функции
-function isPaymentDue(payment, dateStr) {
-  if (!payment.next_execution_date) return false;
-  const nextDate = new Date(payment.next_execution_date);
-  const checkDate = new Date(dateStr);
 
-  if (payment.frequency === 'daily') return true;
-  if (payment.frequency === 'weekly') {
-    return nextDate.getDay() === checkDate.getDay();
+// Dates of a series inside [fromISO, toISO]. The series starts at nextISO and
+// steps by frequency (lib/dates.PERIODS); each occurrence is computed from
+// nextISO directly (k-th step), so month-end clamping never drifts: with
+// anchorDay 31 the series is 01-31, 02-28, 03-31. endISO (inclusive) stops
+// the series. Unknown frequencies are treated as monthly.
+function occurrencesBetween(nextISO, frequency, fromISO, toISO, { endISO = null, anchorDay = null } = {}) {
+  const out = [];
+  const next = dates.parseISO(nextISO) ? dates.toISO(dates.parseISO(nextISO)) : null;
+  if (!next) return out;
+  const last = endISO && endISO < toISO ? endISO : toISO;
+  const period = dates.PERIODS[frequency] || dates.PERIODS.monthly;
+  const anchor = period.months ? (anchorDay || dates.parseISO(next).getUTCDate()) : null;
+  for (let k = 0; k < 2000; k++) {
+    const d = period.days
+      ? dates.addDaysISO(next, k * period.days)
+      : dates.addMonthsISO(next, k * period.months, anchor);
+    if (d > last) break;
+    if (d >= fromISO) out.push(d);
   }
-  if (payment.frequency === 'monthly') {
-    return nextDate.getDate() === checkDate.getDate();
-  }
-  return payment.next_execution_date === dateStr;
+  return out;
 }
 
-function isSubscriptionDue(sub, dateStr) {
-  if (!sub.next_billing_date) return false;
-  const nextDate = new Date(sub.next_billing_date);
-  const checkDate = new Date(dateStr);
-
-  if (sub.billing_cycle === 'monthly') {
-    return nextDate.getDate() === checkDate.getDate();
-  }
-  if (sub.billing_cycle === 'yearly') {
-    return nextDate.getDate() === checkDate.getDate() && nextDate.getMonth() === checkDate.getMonth();
-  }
-  return sub.next_billing_date === dateStr;
+function dayOf(iso) {
+  const d = dates.parseISO(iso);
+  return d ? d.getUTCDate() : null;
 }
 
+// Map date -> { income, expense } of scheduled items between todayStr and
+// endStr, in the converter's currency. Recurring payments are in the currency
+// of their account; subscriptions carry their own currency.
+async function scheduledOverlay(userId, todayStr, endStr, conv) {
+  const byDate = new Map();
+  const add = (date, kind, amount) => {
+    const cur = byDate.get(date) || { income: 0, expense: 0 };
+    cur[kind] = money.add(cur[kind], amount);
+    byDate.set(date, cur);
+  };
+
+  const recurring = await query(
+    `SELECT rp.amount, rp.type, rp.frequency, rp.next_payment_date, rp.start_date,
+            rp.end_date, rp.day_of_month, a.currency AS currency
+     FROM recurring_payments rp
+     LEFT JOIN accounts a ON a.id = rp.account_id
+     WHERE rp.user_id = ? AND rp.is_active = 1`,
+    [userId]
+  );
+  for (const p of recurring) {
+    const amount = await conv.convert(Math.abs(Number(p.amount) || 0), p.currency);
+    if (!amount) continue;
+    const anchorDay = Number(p.day_of_month) || dayOf(p.start_date) || null;
+    const kind = p.type === 'income' ? 'income' : 'expense';
+    const when = occurrencesBetween(p.next_payment_date, p.frequency, todayStr, endStr, {
+      endISO: p.end_date ? String(p.end_date).slice(0, 10) : null,
+      anchorDay
+    });
+    for (const d of when) add(d, kind, amount);
+  }
+
+  const subscriptions = await query(
+    `SELECT amount, currency, billing_cycle, next_billing_date, start_date
+     FROM subscriptions
+     WHERE user_id = ? AND is_active = 1 AND next_billing_date IS NOT NULL`,
+    [userId]
+  );
+  for (const sub of subscriptions) {
+    const amount = await conv.convert(Math.abs(Number(sub.amount) || 0), sub.currency);
+    if (!amount) continue;
+    const when = occurrencesBetween(sub.next_billing_date, sub.billing_cycle || 'monthly', todayStr, endStr, {
+      anchorDay: dayOf(sub.start_date)
+    });
+    for (const d of when) add(d, 'expense', amount);
+  }
+
+  return byDate;
+}
+
+// Percent change between the first and second half of the series. The base is
+// taken by magnitude: savings going from -100 to -50 is an improvement (+50 %),
+// dividing by the negative base would report it as "down".
 function calculateTrend(values) {
   if (values.length < 2) return 0;
   const first = values.slice(0, Math.floor(values.length / 2));
@@ -494,7 +605,7 @@ function calculateTrend(values) {
   const avgFirst = first.reduce((a, b) => a + b, 0) / first.length;
   const avgSecond = second.reduce((a, b) => a + b, 0) / second.length;
   if (avgFirst === 0) return 0;
-  return ((avgSecond - avgFirst) / avgFirst) * 100;
+  return ((avgSecond - avgFirst) / Math.abs(avgFirst)) * 100;
 }
 
 function predictNext(values) {
@@ -514,17 +625,23 @@ function predictNext(values) {
 
 // ==================== СЕЗОННО-ТРЕНДОВАЯ МОДЕЛЬ ====================
 //
-// buildSeasonalTrendModel(dailyRows, historyDays) -> {
+// buildSeasonalTrendModel(series, todayStr) -> {
 //   slope, intercept,            // линейный тренд по дневному net (МНК)
 //   weekdayFactor[7],            // аддитивная сезонность по дню недели
 //   monthdayFactor{1..31},       // аддитивная сезонность по дню месяца
 //   residualStd,                 // std остатков (модель vs факт) -> коридор
-//   samples, avgIncome, avgExpense, originIndex
+//   samples, avgIncome, avgExpense
 // }
 //
+// series — дневной ряд БЕЗ пропусков (zeroFilledSeries): день без операций —
+// это 0, а не отсутствующая точка; иначе средние считаются только по активным
+// дням (доход 125–173 в день при реальных 65.93).
+// Даты — строки 'YYYY-MM-DD', день недели/месяца — через dates.parseISO +
+// getUTC*, чтобы результат не зависел от TZ процесса (в Торонто
+// new Date('YYYY-MM-DD') — это вечер предыдущего дня).
+//
 // Идея: net(t) ≈ intercept + slope*t + weekdayFactor[dow] + monthdayFactor[dom].
-// Сезонные факторы — отклонения средних по группе от общего среднего.
-function buildSeasonalTrendModel(dailyRows, historyDays) {
+function buildSeasonalTrendModel(series, todayStr) {
   const model = {
     slope: 0,
     intercept: 0,
@@ -533,31 +650,25 @@ function buildSeasonalTrendModel(dailyRows, historyDays) {
     residualStd: 0,
     samples: 0,
     avgIncome: 0,
-    avgExpense: 0,
-    originIndex: 0
+    avgExpense: 0
   };
 
-  if (!Array.isArray(dailyRows) || dailyRows.length === 0) {
+  if (!Array.isArray(series) || series.length === 0) {
     return model;
   }
 
-  // Опорная дата = сегодня; индекс дня = смещение в днях (отрицательное в прошлом).
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const points = dailyRows.map((r) => {
-    const d = new Date(r.date);
-    d.setHours(0, 0, 0, 0);
-    const dayIndex = Math.round((d - today) / (1000 * 60 * 60 * 24)); // <= 0
+  const points = series.map((r) => {
+    const iso = String(r.date).slice(0, 10);
+    const d = dates.parseISO(iso);
     const income = Number(r.income) || 0;
     const expense = Number(r.expense) || 0;
     return {
-      t: dayIndex,
+      t: dates.diffDays(todayStr, iso), // <= 0
       net: income - expense,
       income,
       expense,
-      dow: d.getDay(),
-      dom: d.getDate()
+      dow: d.getUTCDay(),
+      dom: d.getUTCDate()
     };
   });
 
@@ -615,18 +726,16 @@ function buildSeasonalTrendModel(dailyRows, historyDays) {
   return model;
 }
 
-// Прогноз дневного net на step дней вперёд (step >= 0; 0 = сегодня).
-function predictNet(model, step) {
-  const t = step; // опора в today => индекс будущего дня = +step
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() + step);
-  const dow = date.getDay();
-  const dom = date.getDate();
+// Прогноз дневного net. trendStep — шаг тренда (может быть заморожен),
+// dayStep — реальный сдвиг дня от todayStr (для дня недели/месяца).
+function predictNet(model, trendStep, todayStr, dayStep = trendStep) {
+  const d = dates.parseISO(dates.addDaysISO(todayStr, dayStep));
+  const dow = d.getUTCDay();
+  const dom = d.getUTCDate();
 
   const val =
     model.intercept +
-    model.slope * t +
+    model.slope * trendStep +
     (model._grandMeanResid || 0) +
     (model.weekdayFactor[dow] || 0) +
     (model.monthdayFactor[dom] || 0);
@@ -634,19 +743,24 @@ function predictNet(model, step) {
   return Number.isFinite(val) ? val : 0;
 }
 
-// Std of the daily net series over the observed window, with zero-activity
-// days included (so a quiet week is as informative as a busy one).
-function dailySeriesStd(dailyRows, firstDate, observedDays) {
-  if (!firstDate || observedDays < 2) return 0;
+// Daily series over the observed window with zero-activity days filled in.
+function zeroFilledSeries(rows, firstDate, observedDays) {
+  if (!firstDate || observedDays < 1) return [];
   const byDate = new Map();
-  for (const r of dailyRows) {
-    byDate.set(String(r.date).slice(0, 10), (Number(r.income) || 0) - (Number(r.expense) || 0));
+  for (const r of rows) {
+    byDate.set(String(r.date).slice(0, 10), r);
   }
   const series = [];
   for (let i = 0; i < observedDays; i++) {
-    series.push(byDate.get(dates.addDaysISO(firstDate, i)) || 0);
+    const date = dates.addDaysISO(firstDate, i);
+    const r = byDate.get(date);
+    series.push({
+      date,
+      income: r ? Number(r.income) || 0 : 0,
+      expense: r ? Number(r.expense) || 0 : 0
+    });
   }
-  return stdDevLocal(series);
+  return series;
 }
 
 // Локальные стат-помощники (форкаст не тянет anomalyService).
@@ -663,3 +777,11 @@ function stdDevLocal(nums) {
 }
 
 module.exports = router;
+// Pure helpers, exported for tests.
+module.exports._internals = {
+  occurrencesBetween,
+  calculateTrend,
+  buildSeasonalTrendModel,
+  predictNet,
+  zeroFilledSeries
+};

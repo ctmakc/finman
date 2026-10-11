@@ -80,7 +80,9 @@ describe('subscriptions: next_billing_date rolls forward', () => {
     expect(res.status).toBe(200);
     const row = await db.get(`SELECT next_billing_date FROM subscriptions WHERE id = ?`, [created.body.id]);
     expect(row.next_billing_date > today).toBe(true);
-    expect(row.next_billing_date).toBe(dates.rollForward(dates.addMonthsISO(today, 1), 'monthly', today));
+    // Серия привязана к дню start_date (5-е): оплата сегодня -> следующее 5-е
+    // через месяц, а не «сегодня + месяц» (дрейф дня списания).
+    expect(row.next_billing_date).toBe(dates.rollForward(dates.addMonthsISO(today, 1, 5), 'monthly', today, 5));
     const pay = await db.get(`SELECT payment_date FROM subscription_payments WHERE subscription_id = ?`, [created.body.id]);
     expect(pay.payment_date).toBe(today);
     // Старая дата оплаты -> следующая всё равно >= сегодня.

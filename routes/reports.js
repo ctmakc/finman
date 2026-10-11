@@ -5,8 +5,20 @@ const { query, get, run } = require('../db/database');
 const { cashflowOnly, isCashflow } = require('../lib/txFilter');
 
 // Cash flow only: no transfers, no opening balances (lib/txFilter).
-const CF = cashflowOnly();
 const reportService = require('../services/reportService');
+const networthService = require('../services/networthService');
+const fx = require('../lib/fx');
+const money = require('../lib/money');
+const dates = require('../lib/dates');
+
+const CFT = cashflowOnly('t');
+
+// Bad report input -> 400 instead of a 500 with a RangeError.
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -124,7 +136,7 @@ router.post('/generate', async (req, res, next) => {
       generated_at: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status === 400 ? 400 : 500).json({ message: error.message });
   }
 });
 
@@ -175,138 +187,211 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Генераторы отчётов
+//
+// Every money total is in the user's base currency: a transaction is in the
+// currency of its account, so rows carry a.currency and are converted
+// (lib/fx) before they are added up.
+
+// Year from a year (2026, '2026') or a date ('2026-10-01'): the UI sends the
+// period start date for the yearly report.
+function parseYear(value) {
+  const m = /^(\d{4})(?:$|-)/.exec(String(value == null ? '' : value).trim());
+  const year = m ? Number(m[1]) : NaN;
+  if (!Number.isInteger(year) || year < 1900 || year > 2999) {
+    throw badRequest('period_start must be a year (YYYY) or a date (YYYY-MM-DD)');
+  }
+  return year;
+}
+
 async function generateMonthlyReport(userId, start, end) {
+  const conv = await fx.converterForUser(userId);
   const transactions = await query(
-    `SELECT * FROM transactions WHERE user_id = ? AND date >= ? AND date <= ? ORDER BY date`,
+    `SELECT t.*, a.currency AS currency
+     FROM transactions t
+     LEFT JOIN accounts a ON a.id = t.account_id
+     WHERE t.user_id = ? AND t.date >= ? AND t.date <= ? ORDER BY t.date`,
     [userId, start, end]
   );
 
   const cashflow = transactions.filter(isCashflow);
-  const income = cashflow.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const expenses = cashflow.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0);
-
+  let income = 0;
+  let expenses = 0;
   const byCategory = {};
-  cashflow.filter(t => t.type === 'expense').forEach(t => {
-    byCategory[t.category] = (byCategory[t.category] || 0) + Math.abs(t.amount);
-  });
+  const expenseRows = [];
+  for (const t of cashflow) {
+    const amountBase = await conv.convert(Math.abs(Number(t.amount) || 0), t.currency);
+    if (t.type === 'income') {
+      income = money.add(income, amountBase);
+    } else {
+      expenses = money.add(expenses, amountBase);
+      byCategory[t.category] = money.add(byCategory[t.category] || 0, amountBase);
+      expenseRows.push({ ...t, amountBase });
+    }
+  }
 
-  const accounts = await query('SELECT name, balance FROM accounts WHERE user_id = ?', [userId]);
+  const accounts = await query('SELECT name, balance, currency FROM accounts WHERE user_id = ?', [userId]);
+  const savings = money.sub(income, expenses);
 
   return {
     period: { start, end },
-    summary: { income, expenses, savings: income - expenses, savingsRate: income > 0 ? ((income - expenses) / income * 100).toFixed(1) : 0 },
+    currency: conv.baseCurrency,
+    summary: { income, expenses, savings, savingsRate: income > 0 ? (savings / income * 100).toFixed(1) : 0 },
     transactionCount: cashflow.length,
     expensesByCategory: byCategory,
     accountBalances: accounts,
-    topExpenses: cashflow.filter(t => t.type === 'expense').sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 10)
+    topExpenses: expenseRows.sort((a, b) => b.amountBase - a.amountBase).slice(0, 10),
+    missingRates: conv.missingRates
   };
 }
 
-async function generateYearlyReport(userId, year) {
-  const start = `${year}-01-01`;
-  const end = `${year}-12-31`;
+async function generateYearlyReport(userId, yearInput) {
+  const year = parseYear(yearInput);
+  const conv = await fx.converterForUser(userId);
 
   const monthlyData = [];
   for (let m = 1; m <= 12; m++) {
     const monthStart = `${year}-${String(m).padStart(2, '0')}-01`;
-    const monthEnd = new Date(year, m, 0).toISOString().split('T')[0];
+    const monthEnd = dates.endOfMonthISO(monthStart);
 
-    const income = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?${CF.sql}`,
-      [userId, monthStart, monthEnd, ...CF.params]
+    const rows = await query(
+      `SELECT a.currency AS currency,
+              SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END) AS income,
+              SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END) AS expenses
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.user_id = ? AND t.date >= ? AND t.date <= ?${CFT.sql}
+       GROUP BY a.currency`,
+      [userId, monthStart, monthEnd, ...CFT.params]
     );
-    const expenses = await get(
-      `SELECT SUM(ABS(amount)) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
-      [userId, monthStart, monthEnd, ...CF.params]
-    );
+    const tot = await conv.totals(rows, ['income', 'expenses']);
 
     monthlyData.push({
       month: m,
-      income: income.total || 0,
-      expenses: expenses.total || 0,
-      savings: (income.total || 0) - (expenses.total || 0)
+      income: tot.income || 0,
+      expenses: tot.expenses || 0,
+      savings: money.sub(tot.income || 0, tot.expenses || 0)
     });
   }
 
-  const totalIncome = monthlyData.reduce((s, m) => s + m.income, 0);
-  const totalExpenses = monthlyData.reduce((s, m) => s + m.expenses, 0);
+  const totalIncome = money.sum(monthlyData.map((m) => m.income));
+  const totalExpenses = money.sum(monthlyData.map((m) => m.expenses));
 
   return {
     year,
-    summary: { totalIncome, totalExpenses, totalSavings: totalIncome - totalExpenses, avgMonthlyIncome: totalIncome / 12, avgMonthlyExpenses: totalExpenses / 12 },
-    monthlyData
+    currency: conv.baseCurrency,
+    summary: {
+      totalIncome,
+      totalExpenses,
+      totalSavings: money.sub(totalIncome, totalExpenses),
+      avgMonthlyIncome: money.round(totalIncome / 12),
+      avgMonthlyExpenses: money.round(totalExpenses / 12)
+    },
+    monthlyData,
+    missingRates: conv.missingRates
   };
 }
 
 async function generateCategoryReport(userId, start, end) {
-  const expenses = await query(
-    `SELECT category, SUM(ABS(amount)) as total, COUNT(*) as count
-     FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}
-     GROUP BY category ORDER BY total DESC`,
-    [userId, start, end, ...CF.params]
+  const conv = await fx.converterForUser(userId);
+  const rows = await query(
+    `SELECT t.category AS category, a.currency AS currency, SUM(ABS(t.amount)) as total, COUNT(*) as count
+     FROM transactions t
+     LEFT JOIN accounts a ON a.id = t.account_id
+     WHERE t.user_id = ? AND t.type = 'expense' AND t.date >= ? AND t.date <= ?${CFT.sql}
+     GROUP BY t.category, a.currency`,
+    [userId, start, end, ...CFT.params]
   );
+  const expenses = (await conv.regroup(rows, { keys: ['category'], amounts: ['total'], counts: ['count'] }))
+    .sort((a, b) => b.total - a.total);
 
-  const total = expenses.reduce((s, e) => s + e.total, 0);
+  const total = money.sum(expenses.map((e) => e.total));
 
   return {
     period: { start, end },
+    currency: conv.baseCurrency,
     totalExpenses: total,
-    categories: expenses.map(e => ({ ...e, percent: total > 0 ? (e.total / total * 100).toFixed(1) : 0 }))
+    categories: expenses.map(e => ({ ...e, percent: total > 0 ? (e.total / total * 100).toFixed(1) : 0 })),
+    missingRates: conv.missingRates
   };
 }
 
+// Net worth: totals come from networthService (every component converted into
+// the base currency); the lists keep each item's own currency.
 async function generateNetWorthReport(userId) {
   const snapshots = await query(
     'SELECT * FROM networth_snapshots WHERE user_id = ? ORDER BY snapshot_date DESC LIMIT 12',
     [userId]
   );
 
-  const accounts = await query('SELECT name, type, balance FROM accounts WHERE user_id = ?', [userId]);
-  const debts = await query(
-    'SELECT name, type, amount, paid_amount FROM debts WHERE user_id = ? AND is_active = 1',
+  const accounts = await query(
+    'SELECT name, account_type, balance, currency FROM accounts WHERE user_id = ? AND is_active = 1',
     [userId]
   );
-  const assets = await query('SELECT name, type, value FROM manual_assets WHERE user_id = ? AND is_active = 1', [userId]);
+  const debts = await query(
+    'SELECT name, type, amount, paid_amount, currency FROM debts WHERE user_id = ? AND is_active = 1',
+    [userId]
+  );
+  const assets = await query(
+    'SELECT name, type, value, currency FROM manual_assets WHERE user_id = ? AND is_active = 1',
+    [userId]
+  );
 
-  const totalAccounts = accounts.reduce((s, a) => s + a.balance, 0);
-  const totalDebts = debts.reduce((s, d) => s + (d.amount - d.paid_amount), 0);
-  const totalAssets = assets.reduce((s, a) => s + a.value, 0);
+  const nw = await networthService.computeNetWorth(userId);
 
   return {
-    currentNetWorth: totalAccounts + totalAssets - totalDebts,
-    breakdown: { accounts: totalAccounts, manualAssets: totalAssets, debts: totalDebts },
+    currency: nw.baseCurrency,
+    currentNetWorth: nw.netWorth,
+    totalAssets: nw.totalAssets,
+    totalLiabilities: nw.totalLiabilities,
+    breakdown: {
+      accounts: nw.assetsBreakdown.accounts,
+      investments: nw.assetsBreakdown.investments,
+      savings: nw.assetsBreakdown.savings,
+      manualAssets: nw.assetsBreakdown.manual,
+      debts: nw.liabilitiesBreakdown.debts
+    },
     accountsList: accounts,
     debtsList: debts,
     assetsList: assets,
-    history: snapshots.reverse()
+    history: snapshots.reverse(),
+    missingRates: nw.missingRates
   };
 }
 
+// Spending per budget is counted in the budget's own currency.
 async function generateBudgetReport(userId, start, end) {
   const budgets = await query('SELECT * FROM budgets WHERE user_id = ?', [userId]);
+  const conv = await fx.converterForUser(userId);
 
-  const budgetStatus = await Promise.all(budgets.map(async b => {
-    const spent = await get(
-      `SELECT SUM(ABS(amount)) as total FROM transactions
-       WHERE user_id = ? AND type = 'expense' AND category = ? AND date >= ? AND date <= ?${CF.sql}`,
-      [userId, b.category, start, end, ...CF.params]
+  const budgetStatus = [];
+  for (const b of budgets) {
+    const rows = await query(
+      `SELECT a.currency AS currency, SUM(ABS(t.amount)) as total
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.user_id = ? AND t.type = 'expense' AND t.category = ? AND t.date >= ? AND t.date <= ?${CFT.sql}
+       GROUP BY a.currency`,
+      [userId, b.category, start, end, ...CFT.params]
     );
+    const spent = (await conv.totals(rows, ['total'], { to: b.currency || conv.baseCurrency })).total || 0;
 
-    return {
+    budgetStatus.push({
       name: b.name,
       category: b.category,
+      currency: b.currency || conv.baseCurrency,
       limit: b.amount,
-      spent: spent.total || 0,
-      remaining: b.amount - (spent.total || 0),
-      percentUsed: ((spent.total || 0) / b.amount * 100).toFixed(1)
-    };
-  }));
+      spent,
+      remaining: money.sub(b.amount, spent),
+      percentUsed: b.amount > 0 ? (spent / b.amount * 100).toFixed(1) : '0.0'
+    });
+  }
 
   return {
     period: { start, end },
     budgets: budgetStatus,
     overBudget: budgetStatus.filter(b => b.spent > b.limit),
-    underBudget: budgetStatus.filter(b => b.spent <= b.limit)
+    underBudget: budgetStatus.filter(b => b.spent <= b.limit),
+    missingRates: conv.missingRates
   };
 }
 
@@ -349,22 +434,28 @@ async function generateInvestmentReport(userId) {
 }
 
 async function generateTaxReport(userId, start, end) {
+  const conv = await fx.converterForUser(userId);
   const income = await query(
-    `SELECT * FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?${CF.sql} ORDER BY date`,
-    [userId, start, end, ...CF.params]
+    `SELECT t.*, a.currency AS currency
+     FROM transactions t
+     LEFT JOIN accounts a ON a.id = t.account_id
+     WHERE t.user_id = ? AND t.type = 'income' AND t.date >= ? AND t.date <= ?${CFT.sql} ORDER BY t.date`,
+    [userId, start, end, ...CFT.params]
   );
 
-  const totalIncome = income.reduce((s, t) => s + t.amount, 0);
-
-  // Группировка по месяцам
+  let totalIncome = 0;
   const byMonth = {};
-  income.forEach(t => {
-    const month = t.date.substring(0, 7);
-    byMonth[month] = (byMonth[month] || 0) + t.amount;
-  });
+  for (const t of income) {
+    const amountBase = await conv.convert(Math.abs(Number(t.amount) || 0), t.currency);
+    t.amountBase = amountBase;
+    totalIncome = money.add(totalIncome, amountBase);
+    const month = String(t.date).substring(0, 7);
+    byMonth[month] = money.add(byMonth[month] || 0, amountBase);
+  }
 
   return {
     period: { start, end },
+    currency: conv.baseCurrency,
     totalIncome,
     transactionCount: income.length,
     incomeByMonth: Object.entries(byMonth).map(([month, amount]) => ({ month, amount })),
@@ -373,8 +464,16 @@ async function generateTaxReport(userId, start, end) {
       fop3: totalIncome * 0.05,
       fop2: totalIncome * 0.18 + totalIncome * 0.22 * 0.22,
       esv: Math.min(totalIncome * 0.22, 1474 * 22 * 12)
-    }
+    },
+    missingRates: conv.missingRates
   };
 }
 
 module.exports = router;
+module.exports._internals = {
+  parseYear,
+  generateMonthlyReport,
+  generateYearlyReport,
+  generateNetWorthReport,
+  generateBudgetReport
+};

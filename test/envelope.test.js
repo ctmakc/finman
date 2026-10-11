@@ -96,40 +96,69 @@ describe('envelope/rollover: формат бюджета', () => {
 });
 
 describe('envelope/rollover: Budget.rollForward', () => {
-  let ctx, db, Budget;
+  // rollForward закрывает ПРЕДЫДУЩИЙ период относительно today и считает его
+  // расходы по транзакциям (раньше брался сохранённый spent текущего периода,
+  // а повторный вызов добавлял перенос ещё раз). Поэтому здесь не сырой spent,
+  // а расходы сентября при today = 2026-10-15 (детерминированно).
+  const TODAY = '2026-10-15';
+  let ctx, db, Budget, accountId;
+
+  // Бюджет, начатый задолго до закрываемого периода.
+  async function seedRolloverBudget(fields) {
+    const res = await db.run(
+      `INSERT INTO budgets
+         (user_id, name, category, amount, spent, period, start_date, currency, notify_at_percent, rollover, carryover, is_active)
+       VALUES (?, ?, ?, ?, 0, ?, '2026-01-01', 'UAH', 80, ?, ?, 1)`,
+      [ctx.userId, fields.name, fields.category, fields.amount, fields.period || 'monthly',
+        fields.rollover === 0 ? 0 : 1, fields.carryover || 0]
+    );
+    return res.id;
+  }
+
+  async function spend(category, amount, date) {
+    await db.run(
+      `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
+       VALUES (?, ?, ?, 'x', ?, ?, 'expense')`,
+      [accountId, ctx.userId, date, category, -amount]
+    );
+  }
 
   beforeAll(async () => {
     ctx = await makeApp();
     db = getDb();
     Budget = getBudget();
+    const acc = await db.run(
+      `INSERT INTO accounts (user_id, name, currency, balance, is_active) VALUES (?, 'UAH card', 'UAH', 0, 1)`,
+      [ctx.userId]
+    );
+    accountId = acc.id;
   });
 
   afterAll(async () => {
     if (ctx) await ctx.close();
   });
 
-  test('остаток переносится в carryover следующего периода, spent сбрасывается', async () => {
-    // amount 1000, carryover 0, spent 700 -> leftover 300 переносится.
-    const id = await seedBudget(db, ctx.userId, {
-      name: 'Продукты', amount: 1000, spent: 700, rollover: 1, carryover: 0,
-    });
+  test('остаток прошлого периода переносится в carryover, spent = текущий период', async () => {
+    // amount 1000, carryover 0, сентябрь потрачено 700 -> leftover 300.
+    const id = await seedRolloverBudget({ name: 'Продукты', category: 'Rf-food', amount: 1000 });
+    await spend('Rf-food', 700, '2026-09-10');
 
-    const rolled = await Budget.rollForward(ctx.userId, 'monthly');
-    expect(rolled.some((r) => r.id === id && r.carryover === 300)).toBe(true);
+    const rolled = await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
+    expect(rolled.some((r) => r.id === id && r.carryover === 300 && r.period === '2026-09-01')).toBe(true);
 
     const budget = await Budget.findById(id, ctx.userId);
     expect(budget.carryover).toBe(300);
     expect(budget.spent).toBe(0);
     expect(budget.effectiveLimit).toBe(1300); // 1000 + 300
+    expect(budget.lastRolledPeriod).toBe('2026-09-01');
   });
 
   test('перерасход переносится ОТРИЦАТЕЛЬНЫМ carryover', async () => {
-    // amount 500, carryover 0, spent 650 -> leftover -150.
-    const id = await seedBudget(db, ctx.userId, {
-      name: 'Перерасход', amount: 500, spent: 650, rollover: 1, carryover: 0,
-    });
+    // amount 500, carryover 0, сентябрь потрачено 650 -> leftover -150.
+    const id = await seedRolloverBudget({ name: 'Перерасход', category: 'Rf-over', amount: 500 });
+    await spend('Rf-over', 650, '2026-09-20');
 
-    await Budget.rollForward(ctx.userId, 'monthly');
+    await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
 
     const budget = await Budget.findById(id, ctx.userId);
     expect(budget.carryover).toBe(-150);
@@ -138,31 +167,95 @@ describe('envelope/rollover: Budget.rollForward', () => {
   });
 
   test('накопленный перенос аккумулируется за два периода', async () => {
-    // amount 1000, начинаем с carryover 200, spent 500.
-    // leftover = 1000 + 200 - 500 = 700 после первого rollForward.
-    const id = await seedBudget(db, ctx.userId, {
-      name: 'Накопление', amount: 1000, spent: 500, rollover: 1, carryover: 200,
-    });
+    // amount 1000, начинаем с carryover 200, сентябрь 500.
+    // leftover = 1000 + 200 - 500 = 700 после закрытия сентября.
+    const id = await seedRolloverBudget({ name: 'Накопление', category: 'Rf-acc', amount: 1000, carryover: 200 });
+    await spend('Rf-acc', 500, '2026-09-05');
 
-    await Budget.rollForward(ctx.userId, 'monthly');
+    await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
     let budget = await Budget.findById(id, ctx.userId);
     expect(budget.carryover).toBe(700);
     expect(budget.spent).toBe(0);
 
-    // Второй период: тратим 300 -> leftover = 1000 + 700 - 300 = 1400.
-    await db.run(`UPDATE budgets SET spent = 300 WHERE id = ?`, [id]);
-    await Budget.rollForward(ctx.userId, 'monthly');
+    // Октябрь: тратим 300; 3 ноября закрывается октябрь -> 1000 + 700 - 300 = 1400.
+    await spend('Rf-acc', 300, '2026-10-20');
+    await Budget.rollForward(ctx.userId, 'monthly', { today: '2026-11-03' });
     budget = await Budget.findById(id, ctx.userId);
     expect(budget.carryover).toBe(1400);
     expect(budget.spent).toBe(0);
   });
 
-  test('не-rollover бюджет НЕ затрагивается rollForward', async () => {
-    const id = await seedBudget(db, ctx.userId, {
-      name: 'Не переносить', amount: 600, spent: 400, rollover: 0, carryover: 0,
-    });
+  test('повторный вызов в том же периоде ничего не меняет (300 не становится 600)', async () => {
+    const id = await seedRolloverBudget({ name: 'Идемпотентность', category: 'Rf-idem', amount: 500 });
+    await spend('Rf-idem', 200, '2026-09-12');
+    await spend('Rf-idem', 40, '2026-10-02'); // текущий период
 
-    const rolled = await Budget.rollForward(ctx.userId, 'monthly');
+    const first = await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
+    expect(first.find((r) => r.id === id).carryover).toBe(300);
+    const second = await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
+    expect(second.some((r) => r.id === id)).toBe(false);
+
+    const budget = await Budget.findById(id, ctx.userId);
+    expect(budget.carryover).toBe(300);
+    expect(budget.spent).toBe(40); // расходы октября, а не 0 и не сентябрь
+  });
+
+  test('1-го числа закрывается прошлый месяц, а не только что начавшийся', async () => {
+    const id = await seedRolloverBudget({ name: 'Первое число', category: 'Rf-first', amount: 1000 });
+    await spend('Rf-first', 900, '2026-10-30');
+
+    await Budget.rollForward(ctx.userId, 'monthly', { today: '2026-11-01' });
+    const budget = await Budget.findById(id, ctx.userId);
+    // Октябрь: 1000 - 900 = 100 (раньше ноябрь с нулём трат давал 1000).
+    expect(budget.carryover).toBe(100);
+    expect(budget.lastRolledPeriod).toBe('2026-10-01');
+  });
+
+  test('пропущенные периоды закрываются по очереди', async () => {
+    const id = await seedRolloverBudget({ name: 'Пропуски', category: 'Rf-gap', amount: 100 });
+    await db.run(`UPDATE budgets SET last_rolled_period = '2026-07-01' WHERE id = ?`, [id]);
+    await spend('Rf-gap', 30, '2026-08-15');
+    await spend('Rf-gap', 120, '2026-09-15');
+
+    await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
+    const budget = await Budget.findById(id, ctx.userId);
+    // август: 100 + 0 - 30 = 70; сентябрь: 100 + 70 - 120 = 50.
+    expect(budget.carryover).toBe(50);
+    expect(budget.lastRolledPeriod).toBe('2026-09-01');
+  });
+
+  test('бюджет, начатый в текущем периоде, не переносится', async () => {
+    const res = await db.run(
+      `INSERT INTO budgets (user_id, name, category, amount, period, start_date, currency, rollover, carryover, is_active)
+       VALUES (?, 'Новый', 'Rf-new', 100, 'monthly', '2026-10-03', 'UAH', 1, 0, 1)`,
+      [ctx.userId]
+    );
+    const rolled = await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
+    expect(rolled.some((r) => r.id === res.id)).toBe(false);
+  });
+
+  test('расходы в другой валюте считаются в валюте бюджета', async () => {
+    const id = await seedRolloverBudget({ name: 'FX', category: 'Rf-fx', amount: 5000 });
+    const cad = await db.run(
+      `INSERT INTO accounts (user_id, name, currency, balance, is_active) VALUES (?, 'CAD chq', 'CAD', 0, 1)`,
+      [ctx.userId]
+    );
+    await db.run(
+      `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
+       VALUES (?, ?, '2026-09-10', 'x', 'Rf-fx', -100, 'expense')`,
+      [cad.id, ctx.userId]
+    );
+    await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
+    const budget = await Budget.findById(id, ctx.userId);
+    // 100 CAD — это не 100 UAH: в гривнах трата намного больше 100.
+    expect(budget.carryover).toBeLessThan(5000 - 1000);
+  });
+
+  test('не-rollover бюджет НЕ затрагивается rollForward', async () => {
+    const id = await seedRolloverBudget({ name: 'Не переносить', category: 'Rf-no', amount: 600, rollover: 0 });
+    await db.run(`UPDATE budgets SET spent = 400 WHERE id = ?`, [id]);
+
+    const rolled = await Budget.rollForward(ctx.userId, 'monthly', { today: TODAY });
     expect(rolled.some((r) => r.id === id)).toBe(false);
 
     const budget = await Budget.findById(id, ctx.userId);
@@ -172,24 +265,24 @@ describe('envelope/rollover: Budget.rollForward', () => {
   });
 
   test('rollForward переносит только бюджеты выбранного периода', async () => {
-    const monthlyId = await seedBudget(db, ctx.userId, {
-      name: 'Месячный конверт', amount: 1000, spent: 600, rollover: 1, period: 'monthly',
-    });
-    const weeklyId = await seedBudget(db, ctx.userId, {
-      name: 'Недельный конверт', amount: 200, spent: 50, rollover: 1, period: 'weekly',
-    });
+    const monthlyId = await seedRolloverBudget({ name: 'Месячный конверт', category: 'Rf-m', amount: 1000 });
+    const weeklyId = await seedRolloverBudget({ name: 'Недельный конверт', category: 'Rf-w', amount: 200, period: 'weekly' });
+    await spend('Rf-m', 600, '2026-09-08');
+    // 2026-10-15 — четверг; прошлая неделя — пн 10-05 .. вс 10-11.
+    await spend('Rf-w', 50, '2026-10-07');
 
-    await Budget.rollForward(ctx.userId, 'weekly');
+    await Budget.rollForward(ctx.userId, 'weekly', { today: TODAY });
 
     const monthly = await Budget.findById(monthlyId, ctx.userId);
     const weekly = await Budget.findById(weeklyId, ctx.userId);
 
     // Месячный не тронут (мы переносили только weekly).
-    expect(monthly.spent).toBe(600);
     expect(monthly.carryover).toBe(0);
+    expect(monthly.lastRolledPeriod).toBe(null);
     // Недельный перенесён: leftover = 200 - 50 = 150.
     expect(weekly.spent).toBe(0);
     expect(weekly.carryover).toBe(150);
+    expect(weekly.lastRolledPeriod).toBe('2026-10-05');
   });
 });
 
@@ -226,25 +319,27 @@ describe('envelope/rollover: HTTP /api/budgets', () => {
     expect(created).toHaveProperty('effectiveLimit', 1000);
   });
 
-  test('POST /api/budgets/roll-forward переносит остаток по транзакциям', async () => {
-    // Счёт + категория «Кафе»; бюджет 1000 rollover, трат на 400 в этом месяце.
+  test('POST /api/budgets/roll-forward переносит остаток прошлого месяца по транзакциям', async () => {
+    // Счёт + категория «Кафе»; бюджет 1000 rollover с прошлого месяца, трат на
+    // 400 в прошлом месяце. Перенос закрывает прошлый месяц (день пользователя).
+    const dates = require('../lib/dates');
+    const today = dates.todayISO(dates.DEFAULT_TZ);
+    const prevMonthStart = dates.addMonthsISO(dates.startOfMonthISO(today), -1, 1);
     const acct = await db.run(
       `INSERT INTO accounts (user_id, name, currency, balance, is_active)
-       VALUES (?, 'Тест-счёт', 'UAH', 0, 1)`,
+       VALUES (?, 'Тест-счёт', 'CAD', 0, 1)`,
       [ctx.userId]
     );
-    const today = new Date().toISOString().split('T')[0];
-    const monthStart = `${today.slice(0, 7)}-05`; // 5-е число текущего месяца
     await db.run(
       `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
        VALUES (?, ?, ?, 'кофе', 'Кафе', 400, 'expense')`,
-      [acct.id, ctx.userId, monthStart]
+      [acct.id, ctx.userId, dates.addDaysISO(prevMonthStart, 4)]
     );
 
     const budgetRes = await ctx.request
       .post('/api/budgets')
       .set(AUTH(ctx.token))
-      .send({ name: 'Кафе-конверт', amount: 1000, period: 'monthly', category: 'Кафе', rollover: true });
+      .send({ name: 'Кафе-конверт', amount: 1000, period: 'monthly', category: 'Кафе', rollover: true, startDate: prevMonthStart, currency: 'CAD' });
     const budgetId = budgetRes.body.budget.id;
 
     const rollRes = await ctx.request
@@ -258,10 +353,19 @@ describe('envelope/rollover: HTTP /api/budgets', () => {
 
     const after = rollRes.body.budgets.find((b) => b.id === budgetId);
     expect(after).toBeTruthy();
-    // leftover = 1000 - 400 = 600 переносится, spent сброшен в 0.
+    // leftover = 1000 - 400 = 600 переносится; трат в текущем месяце нет.
     expect(after.carryover).toBe(600);
     expect(after.spent).toBe(0);
     expect(after.effectiveLimit).toBe(1600);
+
+    // Повторное нажатие кнопки — ничего не переносит.
+    const again = await ctx.request
+      .post('/api/budgets/roll-forward')
+      .set(AUTH(ctx.token))
+      .send({ period: 'monthly' });
+    expect(again.status).toBe(200);
+    expect(again.body.rolled.some((r) => r.id === budgetId)).toBe(false);
+    expect(again.body.budgets.find((b) => b.id === budgetId).carryover).toBe(600);
   });
 
   test('POST /api/budgets/roll-forward с невалидным периодом -> 400', async () => {

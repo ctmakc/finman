@@ -1,6 +1,7 @@
 const express = require('express');
 const passport = require('passport');
 const Budget = require('../models/budget');
+const dates = require('../lib/dates');
 
 const router = express.Router();
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
@@ -38,7 +39,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/stats', authenticate, async (req, res) => {
   try {
     // Сначала пересчитаем потраченное
-    await Budget.recalculateSpent(req.user.id);
+    await Budget.recalculateSpent(req.user.id, null, dates.todayISO(dates.userTz(req.user)));
 
     const stats = await Budget.getStats(req.user.id);
     res.json(stats);
@@ -55,9 +56,10 @@ router.get('/stats', authenticate, async (req, res) => {
 router.get('/active', authenticate, async (req, res) => {
   try {
     // Пересчитываем потраченное перед выдачей
-    await Budget.recalculateSpent(req.user.id);
+    const today = dates.todayISO(dates.userTz(req.user));
+    await Budget.recalculateSpent(req.user.id, null, today);
 
-    const budgets = await Budget.getActiveBudgets(req.user.id);
+    const budgets = await Budget.getActiveBudgets(req.user.id, today);
     res.json(budgets);
   } catch (error) {
     console.error('Error fetching active budgets:', error);
@@ -109,7 +111,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     // Устанавливаем дату начала если не указана
-    const budgetStartDate = startDate || new Date().toISOString().split('T')[0];
+    const budgetStartDate = startDate || dates.todayISO(dates.userTz(req.user));
 
     const budget = await Budget.create({
       userId: req.user.id,
@@ -200,7 +202,7 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
       return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
-    await Budget.recalculateSpent(req.user.id, budget.category);
+    await Budget.recalculateSpent(req.user.id, budget.category, dates.todayISO(dates.userTz(req.user)));
 
     const updatedBudget = await Budget.findById(id, req.user.id);
 
@@ -220,9 +222,10 @@ router.post('/:id/recalculate', authenticate, async (req, res) => {
 // Пересчет всех бюджетов
 router.post('/recalculate-all', authenticate, async (req, res) => {
   try {
-    await Budget.recalculateSpent(req.user.id);
+    const today = dates.todayISO(dates.userTz(req.user));
+    await Budget.recalculateSpent(req.user.id, null, today);
 
-    const budgets = await Budget.getActiveBudgets(req.user.id);
+    const budgets = await Budget.getActiveBudgets(req.user.id, today);
 
     res.json({
       success: true,
@@ -248,15 +251,18 @@ router.post('/roll-forward', authenticate, async (req, res) => {
       return res.status(400).json({ error: true, message: 'Invalid period' });
     }
 
-    // Сначала актуализируем потраченное, чтобы перенести верный остаток.
-    await Budget.recalculateSpent(req.user.id);
-
-    const rolled = await Budget.rollForward(req.user.id, fromPeriod);
-    const budgets = await Budget.getActiveBudgets(req.user.id);
+    // Закрывается ПРЕДЫДУЩИЙ период (по дню пользователя), остаток считается
+    // по его транзакциям; повторный вызов в том же периоде ничего не меняет
+    // (budgets.last_rolled_period). spent после переноса — текущий период.
+    const today = dates.todayISO(dates.userTz(req.user));
+    const rolled = await Budget.rollForward(req.user.id, fromPeriod, { today });
+    await Budget.recalculateSpent(req.user.id, null, today);
+    const budgets = await Budget.getActiveBudgets(req.user.id, today);
 
     res.json({
       success: true,
       rolledCount: rolled.length,
+      rolled,
       budgets
     });
   } catch (error) {

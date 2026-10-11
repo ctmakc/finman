@@ -28,10 +28,12 @@ describe('pdf-reports: generate + download', () => {
     ctx = await makeApp();
     db = getDb();
 
-    // Счёт для транзакций.
+    // Счёт для транзакций — в базовой валюте (CAD): суммы отчёта переводятся
+    // в базовую валюту, а ожидания ниже — «как есть» (раньше счёт был UAH и
+    // тест закреплял сложение гривен как долларов).
     const acc = await db.run(
       `INSERT INTO accounts (user_id, name, currency, balance, is_active)
-       VALUES (?, 'Main', 'UAH', 1000, 1)`,
+       VALUES (?, 'Main', 'CAD', 1000, 1)`,
       [ctx.userId]
     );
     const accountId = acc.id;
