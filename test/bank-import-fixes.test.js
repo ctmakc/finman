@@ -161,6 +161,53 @@ describe('count-based dedupe keeps legit identical transactions', () => {
   });
 });
 
+describe('CSV parsing: minus signs, stray quotes, indicator columns, dot thousands', () => {
+  test('Unicode minus / en dash / em dash / full-width minus make the amount negative', () => {
+    expect(csv.parseAmount('\u221245.00')).toBe(-45);
+    expect(csv.parseAmount('\u201345.00')).toBe(-45);
+    expect(csv.parseAmount('\u20141 234,56')).toBe(-1234.56);
+    expect(csv.parseAmount('\uff0d12,50')).toBe(-12.5);
+    expect(csv.parseAmount('45.00\u2212')).toBe(-45);
+    expect(csv.parseAmount('\u2014')).toBeNull();
+    const p = csv.previewCsv('Date,Description,Amount\n2026-10-01,Coffee,\u22124.50\n2026-10-02,Salary,2000.00\n');
+    expect(p.rows.map((r) => [r.amount, r.type])).toEqual([[-4.5, 'expense'], [2000, 'income']]);
+  });
+
+  test('a stray quote inside an unquoted cell is literal and does not swallow the file', () => {
+    const t = 'Date,Description,Amount\n2026-10-01,12" PIZZA,-10.00\n2026-10-02,Coffee,-3.00\n2026-10-03,Rent,-1000.00\n2026-10-04,Salary,2000.00\n';
+    expect(csv.detectDelimiter(t)).toBe(',');
+    const p = csv.previewCsv(t);
+    expect(p.stats.valid).toBe(4);
+    expect(p.rows[0]).toMatchObject({ description: '12" PIZZA', amount: -10 });
+    // quoted cells (with leading blanks, doubled quotes, delimiters inside) still work
+    expect(csv.parseCsv('a, "b,c" ,d\nx,"he said ""hi""",y\n', ',')).toEqual([
+      ['a', 'b,c', 'd'],
+      ['x', 'he said "hi"', 'y']
+    ]);
+  });
+
+  test('a "Debit/Credit" word column is the sign indicator, not a debit amount', () => {
+    const p = csv.previewCsv('Date,Description,Amount,Debit/Credit\n2026-10-01,Groceries,84.17,Debit\n2026-10-02,Salary,2000.00,Credit\n');
+    expect(p.mapping.amount).toBe(2);
+    expect(p.mapping.debit == null).toBe(true);
+    expect(p.mapping.typeColumn).toBe(3);
+    expect(p.rows.map((r) => r.amount)).toEqual([-84.17, 2000]);
+    // a numeric Debit column is still a money-out column
+    expect(csv.previewCsv(read('generic-debit-credit.csv')).mapping.debit).toBe(2);
+  });
+
+  test('"2.500" is thousands only when the column writes decimals with a comma', () => {
+    expect(csv.parseAmount('2.500')).toBe(2.5);
+    expect(csv.parseAmount('2.500', { decimalComma: true })).toBe(2500);
+    expect(csv.inferDecimalComma(['-23,45', '1.234,56', '2.500'])).toBe(true);
+    expect(csv.inferDecimalComma(['-23.45', '2.500'])).toBe(false);
+    const de = csv.previewCsv('Datum;Text;Betrag\n09.10.2026;A;-23,45\n10.10.2026;B;2.500\n');
+    expect(de.rows.map((r) => r.amount)).toEqual([-23.45, 2500]);
+    const en = csv.previewCsv('Date,Text,Amount\n2026-10-09,A,-23.45\n2026-10-10,B,2.500\n');
+    expect(en.rows.map((r) => r.amount)).toEqual([-23.45, 2.5]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // HTTP + scheduler
 // ---------------------------------------------------------------------------

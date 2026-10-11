@@ -30,14 +30,31 @@ function stripBom(text) {
   return text && text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
-// Count delimiter occurrences outside quotes on one line.
+// Count delimiter occurrences outside quotes on one line. A quote opens a
+// quoted cell only at the start of a cell (as in parseCsv); a stray quote
+// inside an unquoted cell (12" PIZZA) is a literal character.
 function countOutsideQuotes(line, ch) {
   let n = 0;
   let inQ = false;
+  let atCellStart = true;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
-    if (c === '"') inQ = !inQ;
-    else if (c === ch && !inQ) n++;
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') i++;
+        else inQ = false;
+      }
+      continue;
+    }
+    if (c === ch) {
+      n++;
+      atCellStart = true;
+    } else if (c === '"' && atCellStart) {
+      inQ = true;
+      atCellStart = false;
+    } else if (c !== ' ' && c !== '\t') {
+      atCellStart = false;
+    }
   }
   return n;
 }
@@ -69,6 +86,9 @@ function detectDelimiter(text) {
 }
 
 // RFC-4180-ish parser: quotes, doubled quotes, newlines inside quotes, CRLF.
+// A quote opens a quoted cell only at the start of a cell (leading blanks
+// allowed). Elsewhere it is a literal character, so one stray quote such as
+// 12" PIZZA cannot swallow the rest of the file into a single cell.
 function parseCsv(text, delimiter) {
   const src = stripBom(String(text || ''));
   const d = delimiter || detectDelimiter(src);
@@ -91,8 +111,9 @@ function parseCsv(text, delimiter) {
       }
       continue;
     }
-    if (c === '"') {
+    if (c === '"' && cell.trim() === '') {
       inQ = true;
+      cell = '';
     } else if (c === d) {
       row.push(cell);
       cell = '';
@@ -201,10 +222,20 @@ function inferDateOrder(values) {
   return null;
 }
 
+// Typographic minus signs and dashes that spreadsheets and bank PDFs put in
+// front of amounts: U+2212 minus, U+2012 figure dash, en/em dash, small and
+// full-width hyphen-minus. Without this "−45.00" parsed as +45.
+const MINUS_LIKE = /[\u2212\u2012\u2013\u2014\ufe63\uff0d]/g;
+function normalizeMinus(s) {
+  return String(s).replace(MINUS_LIKE, '-');
+}
+
 // Parse "1,234.56", "1 234,56", "1.234,56", "(45.00)", "-$45.00", "45.00 CR", "45.00-".
-function parseAmount(input) {
+// opts.decimalComma: the column is known to use a comma decimal (see
+// inferDecimalComma), so a lone "2.500" is two thousand five hundred.
+function parseAmount(input, opts) {
   if (input == null) return null;
-  let s = String(input).replace(/[  \s]/g, '').trim();
+  let s = normalizeMinus(input).replace(/[  \s]/g, '').trim();
   if (!s) return null;
   let negative = false;
   let positive = false;
@@ -257,13 +288,28 @@ function parseAmount(input) {
   } else if (hasDot) {
     const parts = s.split('.');
     if (parts.length > 2) s = parts.join(''); // "1.234.567" thousands dots
-    // "1.234" stays a decimal: exports with dot-thousands also carry a comma decimal.
+    else if (opts && opts.decimalComma && parts[1].length === 3) s = parts.join(''); // "2.500" in a "1.234,56" column
+    // Otherwise "1.234" stays a decimal: without column evidence it is ambiguous.
   }
   const n = Number(s);
   if (!Number.isFinite(n)) return null;
   let v = Math.abs(n);
   if (negative && !positive) v = -v;
   return money.round(v);
+}
+
+// Does a money column write decimals with a comma ("-23,45", "1.234,56") and
+// never with a dot ("4.50")? Only then is a lone "2.500" read as thousands.
+function inferDecimalComma(values) {
+  let comma = 0;
+  let dot = 0;
+  for (const v of values) {
+    const t = String(v || '').replace(/[\s\u00a0\u202f]/g, '');
+    if (!t || t.length > MAX_NUMBER_CELL) continue;
+    if (/\d,\d{1,2}(?!\d)/.test(t)) comma++;
+    if (/\d\.\d{1,2}(?!\d)/.test(t)) dot++;
+  }
+  return comma > 0 && dot === 0;
 }
 
 function looksLikeDate(s) {
@@ -279,7 +325,7 @@ const MAX_NUMBER_CELL = 64;
 const NUMBER_CELL = /^[(+-]?\s*(?:[$€£₴A-Z]{1,3}\s*)?[\d.,]+(?:\s+[\d.,]+)*\s*(?:[A-Z]{1,3})?\)?-?$/i;
 
 function looksLikeNumber(s) {
-  const t = String(s || '').trim();
+  const t = normalizeMinus(s || '').trim();
   if (!t || t.length > MAX_NUMBER_CELL) return false;
   if (looksLikeDate(t)) return false;
   return NUMBER_CELL.test(t) && parseAmount(t) !== null;
@@ -544,7 +590,12 @@ function columnStats(dataRows) {
     const avgLen = filled.reduce((a, v) => a + v.length, 0) / n;
     const fillShare = filled.length / Math.max(1, sample.length);
     const hasNeg = filled.some((v) => parseAmount(v) != null && parseAmount(v) < 0);
-    stats.push({ dateShare, ymdShare, numShare, starShare, longDigits, avgLen, fillShare, hasNeg, filled: filled.length });
+    // Cells that are a single debit/credit-style word (Debit, CR, Withdrawal, ...).
+    const wordShare = filled.filter((v) => {
+      const t = norm(v).replace(/\s+/g, '_');
+      return DEBIT_WORDS.includes(t) || CREDIT_WORDS.includes(t);
+    }).length / n;
+    stats.push({ dateShare, ymdShare, numShare, starShare, longDigits, avgLen, fillShare, hasNeg, wordShare, filled: filled.length });
   }
   for (let c = 0; c < columnCount; c++) {
     const next = c + 1;
@@ -658,6 +709,17 @@ function autoMapping(headers, dataRows, hasHeader) {
     mapping.date = pick('date');
     mapping.debit = pick('debit');
     mapping.credit = pick('credit');
+    // A "Debit/Credit" or "Credit" column holding words (Debit, Credit, DR, CR)
+    // is a direction indicator, not money: use it as the type column so it
+    // sets the sign of the amount.
+    for (const role of ['debit', 'credit']) {
+      const i = mapping[role];
+      if (i == null || !stats[i]) continue;
+      if (stats[i].numShare < 0.5 && stats[i].wordShare > 0.5) {
+        if (mapping.typeColumn == null) mapping.typeColumn = i;
+        mapping[role] = null;
+      }
+    }
     mapping.amount = pick('amount');
     if (mapping.amount != null && hs[mapping.amount].includes('fee')) {
       used.delete(mapping.amount);
@@ -756,6 +818,7 @@ function fingerprintOf(date, amount, description) {
 function normalizeRow(cells, idx, options, rowIndex) {
   const out = { index: rowIndex, raw: cells, error: null, skipped: null };
   const cell = (i) => (i == null ? '' : cells[i] ?? '');
+  const numOpts = { decimalComma: !!options.decimalComma };
 
   if (options.skipRow) {
     const reason = options.skipRow(cells, idx);
@@ -782,12 +845,12 @@ function normalizeRow(cells, idx, options, rowIndex) {
 
   let amount = null;
   if (idx.amount != null) {
-    amount = parseAmount(amountRaw);
-    if (amount == null && idx.amountAlt != null) amount = parseAmount(cell(idx.amountAlt));
+    amount = parseAmount(amountRaw, numOpts);
+    if (amount == null && idx.amountAlt != null) amount = parseAmount(cell(idx.amountAlt), numOpts);
   }
   if (amount == null && (idx.debit != null || idx.credit != null)) {
-    const debit = parseAmount(debitRaw);
-    const credit = parseAmount(creditRaw);
+    const debit = parseAmount(debitRaw, numOpts);
+    const credit = parseAmount(creditRaw, numOpts);
     if (debit == null && credit == null) {
       out.error = 'Missing amount';
       return out;
@@ -799,7 +862,7 @@ function normalizeRow(cells, idx, options, rowIndex) {
     return out;
   }
   if (idx.fee != null) {
-    const fee = parseAmount(cell(idx.fee));
+    const fee = parseAmount(cell(idx.fee), numOpts);
     if (fee) amount = money.sub(amount, Math.abs(fee));
   }
   if (idx.sign === 'debit-positive') amount = -amount;
@@ -820,7 +883,7 @@ function normalizeRow(cells, idx, options, rowIndex) {
 
   const currency = idx.fixedCurrency || (idx.currency != null ? cell(idx.currency).toUpperCase() || null : null);
   const externalId = idx.externalId != null ? cell(idx.externalId) || null : null;
-  const balance = idx.balance != null ? parseAmount(cell(idx.balance)) : null;
+  const balance = idx.balance != null ? parseAmount(cell(idx.balance), numOpts) : null;
 
   Object.assign(out, {
     date,
@@ -956,7 +1019,9 @@ function previewCsv(text, options = {}) {
   let dateOrder = options.dateOrder || (preset && preset.dateOrder) || null;
   if (!dateOrder && idx.date != null) dateOrder = inferDateOrder(dataRows.map((r) => r[idx.date])) || 'MDY';
 
-  const normOpts = { dateOrder, skipRow: preset && preset.skipRow ? preset.skipRow : null };
+  const moneyCols = [idx.amount, idx.amountAlt, idx.debit, idx.credit, idx.fee, idx.balance].filter((i) => i != null);
+  const decimalComma = inferDecimalComma(dataRows.flatMap((r) => moneyCols.map((i) => r[i])));
+  const normOpts = { dateOrder, decimalComma, skipRow: preset && preset.skipRow ? preset.skipRow : null };
   const normalized = dataRows.map((cells, i) => normalizeRow(cells, idx, normOpts, hasHeader ? i + 2 : i + 1));
   markDuplicates(normalized, options.existingFingerprints);
 
@@ -1024,6 +1089,7 @@ module.exports = {
   detectHeader,
   parseDate,
   parseAmount,
+  inferDecimalComma,
   inferDateOrder,
   // presets / mapping
   PRESETS,
