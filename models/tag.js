@@ -8,7 +8,7 @@ class Tag {
         `INSERT INTO tags (user_id, name, color) VALUES (?, ?, ?)`,
         [userId, name.trim(), color]
       );
-      return this.findById(result.id);
+      return this.findById(result.id, userId);
     } catch (error) {
       if (error.message.includes('UNIQUE')) {
         return { error: true, message: 'A tag with this name already exists' };
@@ -18,8 +18,8 @@ class Tag {
   }
 
   // Найти по ID
-  static async findById(id) {
-    return get(`SELECT * FROM tags WHERE id = ?`, [id]);
+  static async findById(id, userId) {
+    return get(`SELECT * FROM tags WHERE id = ? AND user_id = ?`, [id, userId]);
   }
 
   // Получить все теги пользователя
@@ -101,7 +101,12 @@ class Tag {
   }
 
   // Установить теги для транзакции (заменяет все существующие)
-  static async setTransactionTags(transactionId, tagIds) {
+  // userId: only the caller's own tags are attached; foreign ids are ignored.
+  static async setTransactionTags(transactionId, tagIds, userId) {
+    const own = await query(`SELECT id FROM tags WHERE user_id = ?`, [userId]);
+    const allowed = new Set(own.map(t => String(t.id)));
+    tagIds = tagIds.filter(id => allowed.has(String(id)));
+
     // Удаляем старые теги
     await run(
       `DELETE FROM transaction_tags WHERE transaction_id = ?`,

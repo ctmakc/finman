@@ -10,6 +10,18 @@ const dates = require('../lib/dates');
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
 
+// 500 without the raw SQLite message (it names tables and constraints).
+function serverError(res, error) {
+  console.error('subscriptions:', error);
+  return res.status(500).json({ message: 'Internal server error' });
+}
+
+// account_id / transaction_id from the body must belong to the caller.
+async function ownsAccount(accountId, userId) {
+  if (accountId === undefined || accountId === null || accountId === '') return true;
+  return Boolean(await get('SELECT id FROM accounts WHERE id = ? AND user_id = ?', [accountId, userId]));
+}
+
 // Получить все подписки
 router.get('/', async (req, res) => {
   try {
@@ -33,7 +45,7 @@ router.get('/', async (req, res) => {
 
     res.json(enriched);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -69,7 +81,7 @@ router.get('/stats', async (req, res) => {
       upcoming
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -79,7 +91,7 @@ router.get('/detect', async (req, res) => {
     const result = await subscriptionDetector.detectRecurring(req.user.id);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -88,6 +100,9 @@ router.post('/', async (req, res) => {
   try {
     const { name, description, amount, currency, billing_cycle, category, icon, color, start_date, reminder_days, auto_renew, account_id, url, notes } = req.body;
 
+    if (!(await ownsAccount(account_id, req.user.id))) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
     const nextBilling = Subscription.firstBillingDate(start_date, billing_cycle, dates.todayISO(dates.userTz(req.user)));
 
     const result = await run(
@@ -98,7 +113,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ id: result.id, message: 'Subscription created' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -109,6 +124,9 @@ router.put('/:id', async (req, res) => {
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     const { name, description, amount, currency, billing_cycle, category, icon, color, reminder_days, auto_renew, account_id, url, notes, is_active } = req.body;
+    if (!(await ownsAccount(account_id, req.user.id))) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
 
     await run(
       `UPDATE subscriptions SET name = ?, description = ?, amount = ?, currency = ?, billing_cycle = ?, category = ?, icon = ?, color = ?, reminder_days = ?, auto_renew = ?, account_id = ?, url = ?, notes = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -117,7 +135,7 @@ router.put('/:id', async (req, res) => {
 
     res.json({ message: 'Subscription updated' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -131,7 +149,7 @@ router.post('/:id/toggle', async (req, res) => {
 
     res.json({ message: sub.is_active ? 'Subscription cancelled' : 'Subscription resumed' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -142,6 +160,10 @@ router.post('/:id/payment', async (req, res) => {
     if (!sub) return res.status(404).json({ message: 'Subscription not found' });
 
     const { amount, payment_date, transaction_id } = req.body;
+    if (transaction_id !== undefined && transaction_id !== null && transaction_id !== '' &&
+        !(await get('SELECT id FROM transactions WHERE id = ? AND user_id = ?', [transaction_id, req.user.id]))) {
+      return res.status(404).json({ message: 'Transaction not found' });
+    }
     const todayStr = dates.todayISO(dates.userTz(req.user));
 
     await run(
@@ -155,7 +177,7 @@ router.post('/:id/payment', async (req, res) => {
 
     res.json({ message: 'Payment recorded' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -163,12 +185,15 @@ router.post('/:id/payment', async (req, res) => {
 router.get('/:id/payments', async (req, res) => {
   try {
     const payments = await query(
-      'SELECT * FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date DESC',
-      [req.params.id]
+      `SELECT p.* FROM subscription_payments p
+       JOIN subscriptions s ON s.id = p.subscription_id
+       WHERE p.subscription_id = ? AND s.user_id = ?
+       ORDER BY p.payment_date DESC`,
+      [req.params.id, req.user.id]
     );
     res.json(payments);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 
@@ -178,7 +203,7 @@ router.delete('/:id', async (req, res) => {
     await run('DELETE FROM subscriptions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     res.json({ message: 'Subscription deleted' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    serverError(res, error);
   }
 });
 

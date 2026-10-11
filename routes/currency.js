@@ -3,9 +3,21 @@ const passport = require('passport');
 const Currency = require('../models/currency');
 const Tag = require('../models/tag');
 const currencyService = require('../services/currencyService');
+const config = require('../config/config');
+const { get } = require('../db/database');
 
 const router = express.Router();
 const authenticate = passport.authenticate('jwt', { session: false });
+
+function isRateAdmin(user) {
+  const email = String(user && user.email || '').toLowerCase();
+  return Boolean(email) && config.adminEmails.includes(email);
+}
+
+async function ownsTransaction(transactionId, userId) {
+  const row = await get(`SELECT id FROM transactions WHERE id = ? AND user_id = ?`, [transactionId, userId]);
+  return Boolean(row);
+}
 
 // ==================== ВАЛЮТЫ ====================
 
@@ -108,16 +120,27 @@ router.post('/fetch-nbu', authenticate, async (req, res) => {
 // Установить курс вручную
 router.post('/rate', authenticate, async (req, res) => {
   try {
+    // currency_rates is one table for every user: a manual rate changes net
+    // worth, forecasts and budgets of all accounts. Only operators listed in
+    // ADMIN_EMAILS may write it.
+    if (!isRateAdmin(req.user)) {
+      return res.status(403).json({ error: true, message: 'Only an administrator can set exchange rates' });
+    }
     const { from, to, rate, date } = req.body;
+    const value = Number(rate);
+    const code = /^[A-Z]{3,5}$/i;
 
-    if (!from || !to || !rate) {
+    if (!from || !to || !code.test(from) || !code.test(to) || !Number.isFinite(value) || value <= 0) {
       return res.status(400).json({
         error: true,
-        message: 'from, to and rate are required'
+        message: 'from, to (currency codes) and a positive rate are required'
       });
     }
+    if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ error: true, message: 'date must be YYYY-MM-DD' });
+    }
 
-    await Currency.saveRate(from, to, parseFloat(rate), 'manual', date);
+    await Currency.saveRate(from, to, value, 'manual', date);
     res.json({ success: true });
   } catch (error) {
     console.error('Error:', error);
@@ -183,7 +206,10 @@ router.put('/tags/:id', authenticate, async (req, res) => {
       return res.status(400).json(result);
     }
 
-    const tag = await Tag.findById(req.params.id);
+    const tag = await Tag.findById(req.params.id, req.user.id);
+    if (!tag) {
+      return res.status(404).json({ error: true, message: 'Tag not found' });
+    }
     res.json({ success: true, tag });
   } catch (error) {
     console.error('Error:', error);
@@ -221,6 +247,9 @@ router.get('/tags/:id/stats', authenticate, async (req, res) => {
 // Получить теги транзакции
 router.get('/transaction/:transactionId/tags', authenticate, async (req, res) => {
   try {
+    if (!(await ownsTransaction(req.params.transactionId, req.user.id))) {
+      return res.status(404).json({ error: true, message: 'Transaction not found' });
+    }
     const tags = await Tag.getTransactionTags(req.params.transactionId);
     res.json(tags);
   } catch (error) {
@@ -238,7 +267,10 @@ router.put('/transaction/:transactionId/tags', authenticate, async (req, res) =>
       return res.status(400).json({ error: true, message: 'tagIds must be an array' });
     }
 
-    await Tag.setTransactionTags(req.params.transactionId, tagIds);
+    if (!(await ownsTransaction(req.params.transactionId, req.user.id))) {
+      return res.status(404).json({ error: true, message: 'Transaction not found' });
+    }
+    await Tag.setTransactionTags(req.params.transactionId, tagIds, req.user.id);
     const tags = await Tag.getTransactionTags(req.params.transactionId);
 
     res.json({ success: true, tags });

@@ -101,6 +101,11 @@ module.exports = {
   // whatever they were created with.
   defaultCurrency: String(process.env.DEFAULT_CURRENCY || 'CAD').toUpperCase(),
 
+  // Operators allowed to write the shared currency_rates table by hand
+  // (POST /api/currency/rate). Comma-separated emails; empty = nobody.
+  adminEmails: String(process.env.ADMIN_EMAILS || '')
+    .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+
   // Session cookie (express-session). Имя и домен совпадают с продом
   // (app.finman.money): COOKIE_DOMAIN пустой -> cookie только для хоста.
   sessionCookieName: 'finman.sid',
