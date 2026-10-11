@@ -329,6 +329,19 @@ describe('HTTP: bank sync and commit with identical transactions', () => {
     expect((await dbGet(ctx, `SELECT balance FROM accounts WHERE id = ?`, [acc])).balance).toBe(125);
   });
 
+  test('legacy /api/transactions/import accepts a multipart CSV (what the Transactions page now sends)', async () => {
+    const acc = await seedAccount(ctx, { bank: 'RBC Royal Bank', currency: 'CAD' });
+    const res = await ctx.request
+      .post('/api/transactions/import')
+      .set(auth)
+      .field('accountId', String(acc))
+      .field('bankType', 'generic')
+      .attach('file', Buffer.from('Date,Description,Amount\n2026-10-01,Coffee,\u22124.50\n2026-10-02,Salary,2000.00\n'), 'statement.csv');
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(2);
+    expect(await countTx(ctx, acc)).toBe(2);
+  });
+
   test('syncScheduler.runOnce inserts both identical operations and is idempotent', async () => {
     const scheduler = require(path.join(PROJECT_ROOT, 'services', 'syncScheduler.js'));
     const { userId } = ctx;
