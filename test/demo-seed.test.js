@@ -268,7 +268,80 @@ describe('DEMO_SEED_ON_EMPTY unset — nothing is seeded', () => {
       await database.closeDatabase();
       rm(dbFile);
     }
+  }, 90000); // a full seed takes ~25s on a loaded shared machine
+});
+
+describe('demo seed safety: atomic cleanup + production guard', () => {
+  afterEach(() => {
+    delete process.env.DEMO_SEED_ON_EMPTY;
+    delete process.env.DEMO_SEED_ALLOW_PRODUCTION;
+    process.env.NODE_ENV = 'test';
   });
+
+  test('a failure late in the seed removes every demo row; the next boot seeds cleanly', async () => {
+    const dbFile = tmpDbPath();
+    const database = await freshDb(dbFile);
+    try {
+      const Family = require(path.join(ROOT, 'models', 'family.js'));
+      const orig = Family.joinByCode;
+      Family.joinByCode = async () => {
+        throw new Error('disk full (simulated)');
+      };
+      process.env.DEMO_SEED_ON_EMPTY = '1';
+      const demoSeed = require(path.join(ROOT, 'lib', 'demoSeed.js'));
+      let r;
+      try {
+        r = await demoSeed.bootHook(silent);
+      } finally {
+        Family.joinByCode = orig;
+      }
+      expect(r).toMatchObject({ seeded: false, reason: 'error' });
+      expect(r.error).toContain('disk full');
+
+      const tables = await database.query(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations')`
+      );
+      for (const { name } of tables) {
+        const n = await database.get(`SELECT COUNT(*) AS n FROM "${name}"`);
+        expect([name, n.n]).toEqual([name, 0]);
+      }
+      expect(await database.query('PRAGMA foreign_key_check')).toEqual([]);
+
+      const again = await demoSeed.bootHook(silent);
+      expect(again.seeded).toBe(true);
+      const users = await database.query('SELECT username FROM users ORDER BY id');
+      expect(users.map((u) => u.username)).toEqual(['demo', 'demo-partner']);
+    } finally {
+      await database.closeDatabase();
+      rm(dbFile);
+    }
+  }, 60000);
+
+  test('NODE_ENV=production refuses DEMO_SEED_ON_EMPTY unless DEMO_SEED_ALLOW_PRODUCTION=1', async () => {
+    const dbFile = tmpDbPath();
+    const database = await freshDb(dbFile);
+    try {
+      const demoSeed = require(path.join(ROOT, 'lib', 'demoSeed.js'));
+      const flags = require(path.join(ROOT, 'lib', 'demoFlag.js'));
+      process.env.DEMO_SEED_ON_EMPTY = '1';
+      process.env.NODE_ENV = 'production';
+      const warns = [];
+      const r = await demoSeed.bootHook({ info() {}, error() {}, warn: (m) => warns.push(m) });
+      expect(r).toEqual({ seeded: false, reason: 'production_refused' });
+      expect(warns.join(' ')).toContain('DEMO_SEED_ALLOW_PRODUCTION');
+      expect(flags.isSeedOnEmpty()).toBe(false);
+      expect((await database.get('SELECT COUNT(*) AS n FROM users')).n).toBe(0);
+
+      process.env.DEMO_SEED_ALLOW_PRODUCTION = '1';
+      expect(flags.isSeedOnEmpty()).toBe(true);
+      process.env.NODE_ENV = 'test';
+      const ok = await demoSeed.bootHook(silent);
+      expect(ok.seeded).toBe(true);
+    } finally {
+      await database.closeDatabase();
+      rm(dbFile);
+    }
+  }, 60000);
 });
 
 describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
