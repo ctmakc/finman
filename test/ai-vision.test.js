@@ -27,6 +27,9 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0
 const JPEG_BYTES = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(16, 1)]);
 const PNG_DATA_URL = `data:image/png;base64,${PNG_MAGIC.toString('base64')}`;
 
+// The caller (routes/receipts.js) grants vision per user (AI opt-in + tier); without it -> tesseract.
+const VISION = { vision: true };
+
 const GOOD_JSON = {
   total: 246.4,
   currency: 'UAH',
@@ -56,7 +59,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 describe('ocrService.processImage — vision first, tesseract fallback', () => {
   test('vision configured + supported -> parsed JSON result, tesseract untouched', async () => {
-    const out = await ocrService.processImage(PNG_DATA_URL);
+    const out = await ocrService.processImage(PNG_DATA_URL, VISION);
     expect(out).toMatchObject({
       ocr_status: 'completed',
       ocr_engine: 'vision',
@@ -79,7 +82,7 @@ describe('ocrService.processImage — vision first, tesseract fallback', () => {
 
   test('fenced ```json answer with prose around it is still parsed', async () => {
     mockProvider._answer = 'Sure! Here it is:\n```json\n' + JSON.stringify(GOOD_JSON) + '\n```\nHope it helps.';
-    const out = await ocrService.processImage(JPEG_BYTES);
+    const out = await ocrService.processImage(JPEG_BYTES, VISION);
     expect(out.ocr_engine).toBe('vision');
     expect(out.total_amount).toBe(246.4);
     expect(mockProvider.vision.mock.calls[0][0].mimeType).toBe('image/jpeg');
@@ -87,7 +90,7 @@ describe('ocrService.processImage — vision first, tesseract fallback', () => {
 
   test('vision returns garbage -> tesseract fallback', async () => {
     mockProvider._answer = 'I cannot read this image.';
-    const out = await ocrService.processImage(JPEG_BYTES);
+    const out = await ocrService.processImage(JPEG_BYTES, VISION);
     expect(out.ocr_engine).toBe('tesseract');
     expect(out.ocr_status).toBe('completed');
     expect(out.total_amount).toBe(246.4);
@@ -97,27 +100,33 @@ describe('ocrService.processImage — vision first, tesseract fallback', () => {
 
   test('vision JSON without total and merchant -> tesseract fallback', async () => {
     mockProvider._answer = JSON.stringify({ total: null, currency: null, date: null, merchant: null, items: [] });
-    const out = await ocrService.processImage(JPEG_BYTES);
+    const out = await ocrService.processImage(JPEG_BYTES, VISION);
     expect(out.ocr_engine).toBe('tesseract');
     expect(ocrService.recognizeBuffer).toHaveBeenCalledTimes(1);
   });
 
   test('vision throws (provider error) -> tesseract fallback, never rejects', async () => {
     mockProvider._answer = new Error('HTTP 429');
-    const out = await ocrService.processImage(JPEG_BYTES);
+    const out = await ocrService.processImage(JPEG_BYTES, VISION);
     expect(out.ocr_engine).toBe('tesseract');
     expect(out.ocr_status).toBe('completed');
   });
 
   test('provider configured but without vision support (e.g. ollama) -> tesseract only', async () => {
     mockProvider._vision = false;
-    const out = await ocrService.processImage(JPEG_BYTES);
+    const out = await ocrService.processImage(JPEG_BYTES, VISION);
     expect(out.ocr_engine).toBe('tesseract');
     expect(mockProvider.vision).not.toHaveBeenCalled();
   });
 
   test('provider not configured -> tesseract only', async () => {
     mockProvider._configured = false;
+    const out = await ocrService.processImage(JPEG_BYTES, VISION);
+    expect(out.ocr_engine).toBe('tesseract');
+    expect(mockProvider.vision).not.toHaveBeenCalled();
+  });
+
+  test('no vision option -> tesseract only: the image never leaves the server by default', async () => {
     const out = await ocrService.processImage(JPEG_BYTES);
     expect(out.ocr_engine).toBe('tesseract');
     expect(mockProvider.vision).not.toHaveBeenCalled();
@@ -130,7 +139,7 @@ describe('ocrService.processImage — vision first, tesseract fallback', () => {
   });
 
   test('empty input -> failed status without calling vision', async () => {
-    const out = await ocrService.processImage(Buffer.alloc(0));
+    const out = await ocrService.processImage(Buffer.alloc(0), VISION);
     expect(out.ocr_status).toBe('failed');
     expect(mockProvider.vision).not.toHaveBeenCalled();
   });
@@ -182,12 +191,32 @@ describe('ocrService.parseVisionJson / detectMimeType (pure)', () => {
 // ---------------------------------------------------------------------------
 describe('POST /api/receipts/upload uses vision results', () => {
   let ctx;
+  let routeOcr;
+  let routeOrigRecognize;
   beforeAll(async () => {
     ctx = await makeApp();
+    // makeApp() reloads services: stub tesseract on the route's own ocrService instance too.
+    routeOcr = require(path.join(PROJECT_ROOT, 'services', 'ocrService'));
+    routeOrigRecognize = routeOcr.recognizeBuffer;
+    routeOcr.recognizeBuffer = jest.fn(async () => TESSERACT_TEXT);
+  });
+  afterAll(() => {
+    if (routeOcr) routeOcr.recognizeBuffer = routeOrigRecognize;
   });
   afterAll(async () => ctx && ctx.close());
 
+  test('user not opted in to AI -> tesseract, vision never called', async () => {
+    const res = await ctx.request
+      .post('/api/receipts/upload')
+      .set('Authorization', `Bearer ${ctx.token}`)
+      .send({ image_data: PNG_DATA_URL });
+    expect(res.status).toBe(201);
+    expect(res.body.merchant).toBe('СІЛЬПО');
+    expect(mockProvider.vision).not.toHaveBeenCalled();
+  });
+
   test('stores merchant/total/date from the vision JSON', async () => {
+    await require('../db/database').run('UPDATE users SET ai_opt_in = 1 WHERE id = ?', [ctx.userId]);
     const res = await ctx.request
       .post('/api/receipts/upload')
       .set('Authorization', `Bearer ${ctx.token}`)
@@ -199,5 +228,60 @@ describe('POST /api/receipts/upload uses vision results', () => {
     expect(res.body.currency).toBe('UAH');
     expect(res.body.receipt_date).toBe('2026-06-19');
     expect(mockProvider.vision).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('receipt dates and "$" (review findings 7-8)', () => {
+  const NOW = new Date(2026, 9, 11); // 2026-10-11 local
+
+  test('validReceiptDate: calendar round-trip + [today-2y, today+1d]', () => {
+    const v = ocrService.validReceiptDate;
+    expect(v(2026, 2, 31, NOW)).toBeNull(); // 31 Feb
+    expect(v(2025, 2, 29, NOW)).toBeNull(); // not a leap year
+    expect(v(2026, 10, 11, NOW)).toBe('2026-10-11');
+    expect(v(2026, 10, 12, NOW)).toBe('2026-10-12'); // +1 day tolerance (time zones)
+    expect(v(2026, 10, 13, NOW)).toBeNull();
+    expect(v(2024, 10, 11, NOW)).toBe('2024-10-11');
+    expect(v(2024, 10, 10, NOW)).toBeNull();
+    expect(v(2062, 6, 19, NOW)).toBeNull();
+  });
+
+  test('vision JSON: impossible or out-of-range dates -> null', () => {
+    const date = (d) => ocrService.parseVisionJson(JSON.stringify({ total: 1, merchant: 'X', date: d }), NOW).receipt_date;
+    expect(date('2026-02-31')).toBeNull();
+    expect(date('2016-06-19')).toBeNull();
+    expect(date('2027-01-01')).toBeNull();
+    expect(date('2026-06-19')).toBe('2026-06-19');
+    expect(date('19.06.2026')).toBe('2026-06-19');
+  });
+
+  test('tesseract text: skips an invalid candidate, ISO not misread as dd-mm-yy', () => {
+    expect(ocrService.detectDate('Tel 31.02.2026  Date 05.10.2026', NOW)).toBe('2026-10-05');
+    expect(ocrService.detectDate('2026-06-19 14:23', NOW)).toBe('2026-06-19');
+    expect(ocrService.detectDate('99.99.9999', NOW)).toBeNull();
+  });
+
+  test('bare "$" -> deployment dollar (DEFAULT_CURRENCY when a dollar, else USD); explicit codes win', () => {
+    const prev = process.env.DEFAULT_CURRENCY;
+    try {
+      jest.isolateModules(() => {
+        process.env.DEFAULT_CURRENCY = 'CAD';
+        const svc = require('../services/ocrService');
+        expect(svc.detectCurrency('TOTAL $12.50')).toBe('CAD');
+        expect(svc.detectCurrency('TOTAL US$12.50')).toBe('USD');
+        expect(svc.detectCurrency('TOTAL 12.50 USD')).toBe('USD');
+        expect(svc.detectCurrency('TOTAL 12,50 грн')).toBe('UAH');
+      });
+      jest.isolateModules(() => {
+        process.env.DEFAULT_CURRENCY = 'UAH';
+        const svc = require('../services/ocrService');
+        expect(svc.detectCurrency('TOTAL $12.50')).toBe('USD');
+        expect(svc.detectCurrency('TOTAL C$12.50')).toBe('CAD');
+      });
+    } finally {
+      if (prev === undefined) delete process.env.DEFAULT_CURRENCY;
+      else process.env.DEFAULT_CURRENCY = prev;
+    }
   });
 });

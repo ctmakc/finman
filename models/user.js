@@ -147,6 +147,23 @@ class User {
     }
   }
   
+  // AI opt-in (migration 017e). Until the user uses/enables AI, nothing about their
+  // finances is sent to the AI provider. Missing column (pre-017e DB) reads as opted out.
+  static async getAiOptIn(id) {
+    try {
+      const row = await get(`SELECT ai_opt_in FROM users WHERE id = ?`, [id]);
+      return Boolean(row && Number(row.ai_opt_in) === 1);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static async setAiOptIn(id, enabled) {
+    const value = enabled ? 1 : 0;
+    const result = await run(`UPDATE users SET ai_opt_in = ? WHERE id = ? AND ai_opt_in IS NOT ?`, [value, id, value]);
+    return result.changes > 0;
+  }
+
   // Проверка пароля
   static async verifyPassword(user, password) {
     try {

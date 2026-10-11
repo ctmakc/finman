@@ -19,7 +19,7 @@ const ENV_KEYS = [
   'GOOGLE_API_KEY', 'GEMINI_API_KEY',
   'GEMINI_CLIENT_ID', 'GEMINI_CLIENT_SECRET', 'GEMINI_REFRESH_TOKEN', 'GEMINI_OAUTH_CREDS',
   'OLLAMA_API_KEY', 'OLLAMA_API_KEY_FILE', 'OLLAMA_BASE_URL',
-  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'AI_ALLOW_HOME_CREDENTIALS', 'HOME',
 ];
 let saved = {};
 
@@ -62,9 +62,28 @@ describe('provider resolution (owner law: google -> gemini-oauth -> ollama -> op
     expect(config()).toMatchObject({ name: 'google', model: 'gemini-2.5-flash', apiKey: 'g-key', configured: true });
   });
 
-  test('generic AI_API_KEY with no AI_PROVIDER -> google (never anthropic)', () => {
-    process.env.AI_API_KEY = 'some-key';
-    expect(provider.resolveProviderName()).toBe('google');
+  test('generic AI_API_KEY with no AI_PROVIDER -> NOT guessed onto any provider (never sent to Google)', async () => {
+    process.env.AI_API_KEY = 'sk-proj-some-openai-key';
+    expect(provider.resolveProviderName()).toBeNull();
+    expect(provider.isConfigured()).toBe(false);
+    await expect(provider.chat({ messages: [{ role: 'user', content: 'hi' }] })).rejects.toMatchObject({
+      status: 503,
+      code: 'AI_NOT_CONFIGURED',
+      message: expect.stringContaining('AI_PROVIDER'),
+    });
+    expect(axios.post).not.toHaveBeenCalled();
+    // a provider-specific key still auto-resolves, and the generic key does not leak into it
+    process.env.OPENAI_API_KEY = 'oa';
+    expect(config()).toMatchObject({ name: 'openai', apiKey: 'oa' });
+  });
+
+  test('AI_API_KEY reaches google only with an explicit AI_PROVIDER=google', () => {
+    process.env.AI_API_KEY = 'g-generic';
+    process.env.AI_PROVIDER = 'google';
+    expect(config()).toMatchObject({ name: 'google', apiKey: 'g-generic', configured: true });
+    process.env.AI_PROVIDER = 'openai';
+    expect(config()).toMatchObject({ name: 'openai', apiKey: 'g-generic' });
+    expect(config({ provider: 'google' })).toMatchObject({ name: 'google', apiKey: 'g-generic' });
   });
 
   test('OLLAMA_API_KEY alone -> ollama cloud at https://ollama.com', () => {
@@ -126,7 +145,33 @@ describe('provider resolution (owner law: google -> gemini-oauth -> ollama -> op
     expect(config()).toMatchObject({ configured: true, apiKey: '', baseURL: 'http://localhost:11434' });
   });
 
-  test('Ollama key file: ~/.ollama/api_key is ignored under NODE_ENV=test, OLLAMA_API_KEY_FILE is honoured', () => {
+  test('home credential files are read only with AI_ALLOW_HOME_CREDENTIALS=1', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), `ai-home-${process.pid}-`));
+    try {
+      fs.mkdirSync(path.join(home, '.ollama'));
+      fs.writeFileSync(path.join(home, '.ollama', 'api_key'), 'home-ollama\n');
+      fs.mkdirSync(path.join(home, '.gemini-home', '.gemini'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.gemini-home', '.gemini', 'oauth_creds.json'), JSON.stringify({ refresh_token: 'home-rt' }));
+      process.env.HOME = home;
+      process.env.GEMINI_CLIENT_ID = 'cid';
+      process.env.GEMINI_CLIENT_SECRET = 'sec';
+      const prevEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production'; // the opt-in, not NODE_ENV, is the guard
+      try {
+        expect(provider.resolveProviderName()).toBeNull();
+        expect(provider.isConfigured('ollama')).toBe(false);
+        process.env.AI_ALLOW_HOME_CREDENTIALS = '1';
+        expect(provider.resolveProviderName()).toBe('gemini-oauth');
+        expect(config({ provider: 'ollama' }).apiKey).toBe('home-ollama');
+      } finally {
+        process.env.NODE_ENV = prevEnv;
+      }
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test('Ollama key file: OLLAMA_API_KEY_FILE is honoured', () => {
     const file = path.join(os.tmpdir(), `ollama-key-${process.pid}.txt`);
     fs.writeFileSync(file, 'file-key\n');
     try {
@@ -182,7 +227,9 @@ describe('google (Gemini REST, API key)', () => {
     expect(out).toEqual({ text: 'Hello from Gemini', provider: 'google', model: 'gemini-2.5-flash' });
     expect(axios.post).toHaveBeenCalledTimes(1);
     const [url, body] = axios.post.mock.calls[0];
-    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=g-key');
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+    expect(url).not.toContain('g-key');
+    expect(axios.post.mock.calls[0][2].headers['x-goog-api-key']).toBe('g-key');
     expect(body.systemInstruction).toEqual({ parts: [{ text: 'SYS' }] });
     expect(body.contents).toEqual([
       { role: 'user', parts: [{ text: 'hi' }] },
@@ -209,7 +256,8 @@ describe('google (Gemini REST, API key)', () => {
     expect(chunks).toEqual(['Hel', 'lo ', 'world']);
     expect(out).toMatchObject({ text: 'Hello world', streamed: true, provider: 'google' });
     const [url, , opts] = axios.post.mock.calls[0];
-    expect(url).toContain(':streamGenerateContent?key=g-key&alt=sse');
+    expect(url).toMatch(/:streamGenerateContent\?alt=sse$/);
+    expect(opts.headers['x-goog-api-key']).toBe('g-key');
     expect(opts.responseType).toBe('stream');
   });
 
@@ -217,8 +265,9 @@ describe('google (Gemini REST, API key)', () => {
     axios.post.mockResolvedValue({ data: geminiReply('{"total":12.5}') });
     const out = await provider.vision({ imageBase64: 'QUJD', mimeType: 'image/png', prompt: 'Read it' });
     expect(out.text).toBe('{"total":12.5}');
-    const [url, body] = axios.post.mock.calls[0];
-    expect(url).toContain(':generateContent?key=g-key');
+    const [url, body, opts] = axios.post.mock.calls[0];
+    expect(url).toMatch(/:generateContent$/);
+    expect(opts.headers['x-goog-api-key']).toBe('g-key');
     expect(body.contents[0].parts[0]).toEqual({ inline_data: { mime_type: 'image/png', data: 'QUJD' } });
     expect(body.contents[0].parts[1]).toEqual({ text: 'Read it' });
   });
@@ -473,5 +522,45 @@ describe('per-call overrides and guards', () => {
     axios.post.mockResolvedValue({ data: geminiReply('ok') });
     await provider.chat({ messages: [{ role: 'system', content: 'leak' }, { role: 'user', content: 'q' }] });
     expect(axios.post.mock.calls[0][1].contents).toEqual([{ role: 'user', parts: [{ text: 'q' }] }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('stream lifecycle: client abort + stalled upstream', () => {
+  const { PassThrough } = require('stream');
+  beforeEach(() => {
+    process.env.OPENAI_API_KEY = 'oa-key';
+  });
+
+  test('abort signal cancels the stream: 499 AI_ABORTED, no chunks after the abort', async () => {
+    const body = new PassThrough();
+    axios.post.mockResolvedValue({ data: body });
+    const ac = new AbortController();
+    const chunks = [];
+    const p = provider.chatStream({ messages: [{ role: 'user', content: 'q' }], signal: ac.signal }, (t) => chunks.push(t));
+    await new Promise((r) => setImmediate(r));
+    body.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'one' } }] })}\n\n`);
+    await new Promise((r) => setImmediate(r));
+    ac.abort();
+    body.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'two' } }] })}\n\n`);
+    await expect(p).rejects.toMatchObject({ status: 499, code: 'AI_ABORTED' });
+    expect(chunks).toEqual(['one']);
+    expect(body.destroyed).toBe(true);
+    expect(axios.post.mock.calls[0][2].signal).toBe(ac.signal);
+  });
+
+  test('upstream that goes silent longer than the provider timeout is cut off (502)', async () => {
+    const body = new PassThrough();
+    axios.post.mockResolvedValue({ data: body });
+    const prev = provider._internal.DEFAULTS.openai.timeout;
+    provider._internal.DEFAULTS.openai.timeout = 50;
+    try {
+      const p = provider.chatStream({ messages: [{ role: 'user', content: 'q' }] }, () => {});
+      await new Promise((r) => setImmediate(r));
+      body.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'hel' } }] })}\n\n`);
+      await expect(p).rejects.toMatchObject({ status: 502, code: 'AI_REQUEST_FAILED' });
+    } finally {
+      provider._internal.DEFAULTS.openai.timeout = prev;
+    }
   });
 });

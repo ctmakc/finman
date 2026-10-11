@@ -7,9 +7,21 @@ const AiCfoModule = {
   conversationId: null,
   loading: false,
 
-  // Вызывается при открытии вкладки/панели ИИ.
+  // Вызывается при открытии вкладки/панели ИИ. Открытие страницы AI CFO = согласие
+  // отправлять данные провайдеру (users.ai_opt_in); до этого дашборд строит истории
+  // детерминированно, без LLM.
   init() {
+    this.setOptIn(true).catch(() => {});
     this.render();
+  },
+
+  async setOptIn(enabled) {
+    const response = await fetch('/api/ai/opt-in', {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify({ enabled: Boolean(enabled) }),
+    });
+    return this.parse(response);
   },
 
   // --- helpers -----------------------------------------------------------
@@ -680,6 +692,17 @@ const AiCfoModule = {
     refreshBtn.setAttribute('aria-label', 'Regenerate insights');
     const askBtn = this.el('button', 'btn btn-sm ai-dash-ask', 'Ask the CFO');
     askBtn.type = 'button';
+    // Shown only while the user has not opted in to AI: the stories below are then
+    // computed locally and nothing is sent to the AI provider.
+    const enableBtn = this.el('button', 'btn btn-sm ai-dash-enable', 'Turn on AI stories');
+    enableBtn.type = 'button';
+    // .btn sets display, so [hidden] alone would not hide it: toggle through the CSSOM.
+    const showEnable = (on) => {
+      enableBtn.hidden = !on;
+      enableBtn.style.display = on ? '' : 'none';
+    };
+    showEnable(false);
+    actions.appendChild(enableBtn);
     actions.appendChild(refreshBtn);
     actions.appendChild(askBtn);
     head.appendChild(eyebrow);
@@ -719,6 +742,8 @@ const AiCfoModule = {
       this.renderAlertsStrip(alerts, alertsRes);
       this.renderMonthlyPanel(monthly, monthlyRes);
       this.renderWeeklyPanel(weekly, weeklyRes);
+      const res = monthlyRes && !monthlyRes.error ? monthlyRes : null;
+      showEnable(Boolean(res && res.aiConfigured && res.aiOptIn === false));
       host.classList.remove('is-loading');
       refreshBtn.disabled = false;
       // Entrance: one short staggered reveal (transform/opacity only; CSS honours reduced motion).
@@ -727,6 +752,17 @@ const AiCfoModule = {
     };
 
     refreshBtn.addEventListener('click', () => load(true));
+    enableBtn.addEventListener('click', async () => {
+      enableBtn.disabled = true;
+      try {
+        await this.setOptIn(true);
+        await load(false);
+      } catch (e) {
+        console.error('AI opt-in failed:', e);
+      } finally {
+        enableBtn.disabled = false;
+      }
+    });
     await load(false);
   },
 

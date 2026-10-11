@@ -451,6 +451,8 @@ async function chat(userId, conversationId, message) {
 //     onChunk(textPiece),
 //     onDone({ conversationId, reply, messages }),
 //   }
+//   callbacks.signal?: AbortSignal — клиент ушёл: апстрим отменяется, ответ ассистента
+//     НЕ сохраняется, onDone не вызывается; возвращается { conversationId, aborted: true }.
 // Возвращает { conversationId, reply, messages } (то же, что chat()).
 // Сообщения сохраняются в БД ПОСЛЕ полной генерации (как и в chat()).
 // --------------------------------------------------------------------------
@@ -459,6 +461,8 @@ async function chatStream(userId, conversationId, message, callbacks = {}) {
   const onStart = typeof callbacks.onStart === 'function' ? callbacks.onStart : () => {};
   const onChunk = typeof callbacks.onChunk === 'function' ? callbacks.onChunk : () => {};
   const onDone = typeof callbacks.onDone === 'function' ? callbacks.onDone : () => {};
+  const signal = callbacks.signal || null;
+  const aborted = () => Boolean(signal && signal.aborted);
 
   if (!message || !String(message).trim()) {
     throw new AppError(400, 'EMPTY_MESSAGE', 'Message must not be empty');
@@ -495,15 +499,22 @@ async function chatStream(userId, conversationId, message, callbacks = {}) {
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({ role: m.role, content: m.content }));
 
+  if (aborted()) return { conversationId: conversation.id, aborted: true };
+
   let reply = '';
   if (typeof provider.chatStream === 'function') {
     // Real token streaming. The provider itself falls back to chunking when the
     // selected backend has no stream path, so callers see one contract.
-    const result = await provider.chatStream(
-      { system, messages: promptMessages, maxTokens: 900 },
-      onChunk
-    );
-    reply = (result && result.text) || '';
+    try {
+      const result = await provider.chatStream(
+        { system, messages: promptMessages, maxTokens: 900, signal: signal || undefined },
+        onChunk
+      );
+      reply = (result && result.text) || '';
+    } catch (err) {
+      if (aborted()) return { conversationId: conversation.id, aborted: true };
+      throw err;
+    }
   } else {
     // Legacy provider contract (chat() only): emulate streaming by chunking the final text.
     const result = await provider.chat({
@@ -513,9 +524,12 @@ async function chatStream(userId, conversationId, message, callbacks = {}) {
     });
     reply = (result && result.text) || '';
     for (const piece of chunkText(reply, STREAM_CHUNK_SIZE)) {
+      if (aborted()) break;
       onChunk(piece);
     }
   }
+
+  if (aborted()) return { conversationId: conversation.id, aborted: true };
 
   await AiConversation.addMessage(conversation.id, 'assistant', reply);
   const messages = await AiConversation.getMessages(conversation.id);

@@ -154,6 +154,62 @@ describe('AI Wave-2 — streaming chat (SSE)', () => {
     expect(rows[1].content).toBe(longReply);
   });
 
+  test('client disconnect aborts the upstream stream; the partial reply is not saved', async () => {
+    ctx = await makeApp();
+    await setTier(ctx.db, ctx.userId, 'pro');
+    const http = require('http');
+    let seenSignal = null;
+    let aborted;
+    const abortedP = new Promise((r) => { aborted = r; });
+    mockProvider.chatStream = jest.fn((args, onChunk) => {
+      seenSignal = args.signal;
+      onChunk('partial ');
+      // Never finishes on its own: only an abort from the route ends it.
+      return new Promise((resolve, reject) => {
+        args.signal.addEventListener('abort', () => {
+          aborted();
+          const e = new Error('aborted');
+          e.code = 'AI_ABORTED';
+          reject(e);
+        });
+      });
+    });
+    const server = ctx.app.listen(0);
+    try {
+      const { port } = server.address();
+      const body = JSON.stringify({ message: 'Long question' });
+      await new Promise((resolve, reject) => {
+        const req = http.request(
+          {
+            port,
+            method: 'POST',
+            path: '/api/ai/chat/stream',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + ctx.token, 'content-length': Buffer.byteLength(body) },
+          },
+          (res) => {
+            res.on('data', (d) => {
+              if (String(d).includes('partial')) {
+                req.destroy(); // the user closed the tab mid-answer
+                resolve();
+              }
+            });
+          }
+        );
+        req.on('error', () => {});
+        req.end(body);
+        setTimeout(() => reject(new Error('no chunk received')), 5000);
+      });
+      await Promise.race([abortedP, new Promise((_, rej) => setTimeout(() => rej(new Error('upstream not aborted')), 5000))]);
+      expect(seenSignal && seenSignal.aborted).toBe(true);
+      await new Promise((r) => setTimeout(r, 100));
+      const rows = await dbAll(ctx.db, `SELECT role FROM ai_messages ORDER BY id`);
+      expect(rows.map((r) => r.role)).toEqual(['user']);
+    } finally {
+      delete mockProvider.chatStream;
+      await new Promise((r) => server.close(r));
+    }
+  });
+
   test('stream reuses provided conversationId on follow-up', async () => {
     ctx = await makeApp();
     await setTier(ctx.db, ctx.userId, 'pro');

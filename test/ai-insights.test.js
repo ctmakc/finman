@@ -246,6 +246,7 @@ describe('GET /api/ai/insights/monthly (cached in ai_insights)', () => {
   beforeAll(async () => {
     ctx = await makeApp();
     await seedFinance(ctx.db, ctx.userId);
+    await dbRun(ctx.db, `UPDATE users SET ai_opt_in = 1 WHERE id = ?`, [ctx.userId]);
   });
   afterAll(async () => ctx && ctx.close());
   beforeEach(resetMock);
@@ -334,7 +335,7 @@ describe('GET /api/ai/insights/monthly (cached in ai_insights)', () => {
     };
     const u = await dbRun(
       ctx.db,
-      `INSERT INTO users (username, email, password, full_name) VALUES ('quota', 'quota@example.com', 'x', 'Quota')`
+      `INSERT INTO users (username, email, password, full_name, ai_opt_in) VALUES ('quota', 'quota@example.com', 'x', 'Quota', 1)`
     );
     await seedFinance(ctx.db, u.id);
     const jwt = require('jsonwebtoken');
@@ -394,6 +395,7 @@ describe('GET /api/ai/insights/weekly', () => {
     await tx(ctx.db, ctx.userId, accountId, yesterday, 'Fun', -50, 'expense', 'Cinema');
     await tx(ctx.db, ctx.userId, accountId, yesterday, 'Income', 1000, 'income', 'Freelance');
     await tx(ctx.db, ctx.userId, accountId, tenDaysAgo, 'Fun', -5000, 'expense', 'Too old for the week');
+    await dbRun(ctx.db, `UPDATE users SET ai_opt_in = 1 WHERE id = ?`, [ctx.userId]);
   });
   afterAll(async () => ctx && ctx.close());
   beforeEach(resetMock);
@@ -420,6 +422,110 @@ describe('GET /api/ai/insights/weekly', () => {
     expect(res.body.data.brief).toContain('3 transactions, spent 300, earned 1000');
     expect(res.body.data.brief).toContain('Groceries (250)');
     expect(mockProvider.chat).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('AI opt-in gate + insight caches', () => {
+  let ctx;
+  const auth = () => ['Authorization', `Bearer ${ctx.token}`];
+  // A fresh app per test: the /api/ai rate limiter (10/min per IP) lives in the app instance.
+  beforeEach(async () => {
+    resetMock();
+    ctx = await makeApp();
+    await seedFinance(ctx.db, ctx.userId);
+    const accRow = await dbAll(ctx.db, `SELECT id FROM accounts WHERE user_id = ? LIMIT 1`, [ctx.userId]);
+    await tx(ctx.db, ctx.userId, accRow[0].id, TODAY, 'Dining', -80, 'expense', 'Lunch');
+  });
+  afterEach(async () => ctx && ctx.close());
+
+  test('not opted in: dashboard endpoints stay deterministic, nothing reaches the provider', async () => {
+    const opt = await ctx.request.get('/api/ai/opt-in').set(...auth());
+    expect(opt.body.data).toEqual({ optIn: false, aiConfigured: true });
+
+    const monthly = await ctx.request.get('/api/ai/insights/monthly?refresh=1').set(...auth());
+    expect(monthly.status).toBe(200);
+    expect(monthly.body.data).toMatchObject({ aiUsed: false, aiOptIn: false, aiConfigured: true });
+    expect(monthly.body.data.insight.text).toContain('earned 12000');
+    const weekly = await ctx.request.get('/api/ai/insights/weekly').set(...auth());
+    expect(weekly.body.data).toMatchObject({ aiUsed: false, aiOptIn: false });
+    const alerts = await ctx.request.get('/api/ai/alerts').set(...auth());
+    expect(alerts.status).toBe(200);
+    const digest = await ctx.request.get('/api/ai/digest').set(...auth());
+    expect(digest.status).toBe(200);
+    expect(mockProvider.chat).not.toHaveBeenCalled();
+    expect(await dbAll(ctx.db, `SELECT id FROM ai_insights WHERE user_id = ?`, [ctx.userId])).toHaveLength(0);
+  });
+
+  test('POST /opt-in validates and toggles; a chat message opts in', async () => {
+    const bad = await ctx.request.post('/api/ai/opt-in').set(...auth()).send({ enabled: 'yes' });
+    expect(bad.status).toBe(400);
+    const on = await ctx.request.post('/api/ai/opt-in').set(...auth()).send({ enabled: true });
+    expect(on.body.data).toEqual({ optIn: true });
+    const off = await ctx.request.post('/api/ai/opt-in').set(...auth()).send({ enabled: false });
+    expect(off.body.data).toEqual({ optIn: false });
+    mockProvider._reply = 'hi';
+    const chat = await ctx.request.post('/api/ai/chat').set(...auth()).send({ message: 'hello' });
+    expect(chat.status).toBe(200);
+    const opt = await ctx.request.get('/api/ai/opt-in').set(...auth());
+    expect(opt.body.data.optIn).toBe(true);
+  });
+
+  test('weekly brief: cached for 6h, regenerated once stale', async () => {
+    await dbRun(ctx.db, `UPDATE users SET ai_opt_in = 1 WHERE id = ?`, [ctx.userId]);
+    mockProvider._reply = 'Week one';
+    const first = await ctx.request.get('/api/ai/insights/weekly').set(...auth());
+    expect(first.body.data).toMatchObject({ brief: 'Week one', aiUsed: true, cached: false });
+    mockProvider._reply = 'Week two';
+    const second = await ctx.request.get('/api/ai/insights/weekly').set(...auth());
+    expect(second.body.data).toMatchObject({ brief: 'Week one', aiUsed: true, cached: true });
+    expect(mockProvider.chat).toHaveBeenCalledTimes(1);
+    await dbRun(ctx.db, `UPDATE ai_insights SET generated_at = datetime('now', '-7 hours') WHERE user_id = ? AND type = 'weekly'`, [ctx.userId]);
+    const third = await ctx.request.get('/api/ai/insights/weekly').set(...auth());
+    expect(third.body.data).toMatchObject({ brief: 'Week two', cached: false });
+    expect(await dbAll(ctx.db, `SELECT id FROM ai_insights WHERE user_id = ? AND type = 'weekly'`, [ctx.userId])).toHaveLength(1);
+  });
+
+  test('monthly: current-month cache expires after 24h; concurrent refreshes upsert one row', async () => {
+    await dbRun(ctx.db, `UPDATE users SET ai_opt_in = 1 WHERE id = ?`, [ctx.userId]);
+    mockProvider._reply = 'Story A';
+    await ctx.request.get('/api/ai/insights/monthly').set(...auth());
+    mockProvider._reply = 'Story B';
+    const cachedRes = await ctx.request.get('/api/ai/insights/monthly').set(...auth());
+    expect(cachedRes.body.data).toMatchObject({ cached: true });
+    expect(cachedRes.body.data.insight.text).toBe('Story A');
+    await dbRun(ctx.db, `UPDATE ai_insights SET generated_at = datetime('now', '-25 hours') WHERE user_id = ? AND type = 'monthly'`, [ctx.userId]);
+    const stale = await ctx.request.get('/api/ai/insights/monthly').set(...auth());
+    expect(stale.body.data).toMatchObject({ cached: false });
+    expect(stale.body.data.insight.text).toBe('Story B');
+
+    mockProvider._reply = 'Story C';
+    const results = await Promise.all(
+      [1, 2, 3].map(() => ctx.request.get('/api/ai/insights/monthly?refresh=1').set(...auth()))
+    );
+    for (const r of results) expect(r.status).toBe(200);
+    const rows = await dbAll(ctx.db, `SELECT content FROM ai_insights WHERE user_id = ? AND type = 'monthly' AND period = ?`, [ctx.userId, THIS]);
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(rows[0].content).text).toBe('Story C');
+  });
+
+  test('monthly: production-shaped cache rows are tolerated (empty -> regenerated, missing figures -> filled)', async () => {
+    await dbRun(ctx.db, `UPDATE users SET ai_opt_in = 1 WHERE id = ?`, [ctx.userId]);
+    await dbRun(ctx.db, `INSERT INTO ai_insights (org_id, user_id, period, type, content) VALUES (5, ?, ?, 'monthly', '{}')`, [ctx.userId, LAST]);
+    mockProvider._reply = 'Regenerated';
+    const res = await ctx.request.get(`/api/ai/insights/monthly?month=${LAST}`).set(...auth());
+    expect(res.body.data).toMatchObject({ cached: false });
+    expect(res.body.data.insight.text).toBe('Regenerated');
+
+    await dbRun(ctx.db, `UPDATE ai_insights SET content = ? WHERE user_id = ? AND period = ? AND org_id = 0`, [
+      JSON.stringify({ text: 'Prod story only' }),
+      ctx.userId,
+      LAST,
+    ]);
+    const filled = await ctx.request.get(`/api/ai/insights/monthly?month=${LAST}`).set(...auth());
+    expect(filled.body.data.cached).toBe(true);
+    expect(filled.body.data.insight).toMatchObject({ text: 'Prod story only', month: LAST, totalIncome: 10000, totalSpent: 800 });
+    expect(Array.isArray(filled.body.data.insight.topMovers)).toBe(true);
   });
 });
 

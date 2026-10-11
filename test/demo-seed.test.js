@@ -104,7 +104,7 @@ describe('DEMO_SEED_ON_EMPTY — in-process seed', () => {
     expect(again.n).toBe(2);
     const txCount = await database.get('SELECT COUNT(*) AS n FROM transactions');
     expect(txCount.n).toBe(first.counts.transactions + 2 * first.counts.transfers + 3 /* openings */ + 6 /* partner */ + 1 /* partner opening */);
-  });
+  }, 180000); // seeds the household: slow on a loaded shared machine
 
   test('demo password works through the model layer', async () => {
     const User = require(path.join(ROOT, 'models', 'user.js'));
@@ -268,7 +268,80 @@ describe('DEMO_SEED_ON_EMPTY unset — nothing is seeded', () => {
       await database.closeDatabase();
       rm(dbFile);
     }
+  }, 180000); // a full seed (force) takes 25-100s on a loaded shared machine
+});
+
+describe('demo seed safety: atomic cleanup + production guard', () => {
+  afterEach(() => {
+    delete process.env.DEMO_SEED_ON_EMPTY;
+    delete process.env.DEMO_SEED_ALLOW_PRODUCTION;
+    process.env.NODE_ENV = 'test';
   });
+
+  test('a failure late in the seed removes every demo row; the next boot seeds cleanly', async () => {
+    const dbFile = tmpDbPath();
+    const database = await freshDb(dbFile);
+    try {
+      const Family = require(path.join(ROOT, 'models', 'family.js'));
+      const orig = Family.joinByCode;
+      Family.joinByCode = async () => {
+        throw new Error('disk full (simulated)');
+      };
+      process.env.DEMO_SEED_ON_EMPTY = '1';
+      const demoSeed = require(path.join(ROOT, 'lib', 'demoSeed.js'));
+      let r;
+      try {
+        r = await demoSeed.bootHook(silent);
+      } finally {
+        Family.joinByCode = orig;
+      }
+      expect(r).toMatchObject({ seeded: false, reason: 'error' });
+      expect(r.error).toContain('disk full');
+
+      const tables = await database.query(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations')`
+      );
+      for (const { name } of tables) {
+        const n = await database.get(`SELECT COUNT(*) AS n FROM "${name}"`);
+        expect([name, n.n]).toEqual([name, 0]);
+      }
+      expect(await database.query('PRAGMA foreign_key_check')).toEqual([]);
+
+      const again = await demoSeed.bootHook(silent);
+      expect(again.seeded).toBe(true);
+      const users = await database.query('SELECT username FROM users ORDER BY id');
+      expect(users.map((u) => u.username)).toEqual(['demo', 'demo-partner']);
+    } finally {
+      await database.closeDatabase();
+      rm(dbFile);
+    }
+  }, 180000);
+
+  test('NODE_ENV=production refuses DEMO_SEED_ON_EMPTY unless DEMO_SEED_ALLOW_PRODUCTION=1', async () => {
+    const dbFile = tmpDbPath();
+    const database = await freshDb(dbFile);
+    try {
+      const demoSeed = require(path.join(ROOT, 'lib', 'demoSeed.js'));
+      const flags = require(path.join(ROOT, 'lib', 'demoFlag.js'));
+      process.env.DEMO_SEED_ON_EMPTY = '1';
+      process.env.NODE_ENV = 'production';
+      const warns = [];
+      const r = await demoSeed.bootHook({ info() {}, error() {}, warn: (m) => warns.push(m) });
+      expect(r).toEqual({ seeded: false, reason: 'production_refused' });
+      expect(warns.join(' ')).toContain('DEMO_SEED_ALLOW_PRODUCTION');
+      expect(flags.isSeedOnEmpty()).toBe(false);
+      expect((await database.get('SELECT COUNT(*) AS n FROM users')).n).toBe(0);
+
+      process.env.DEMO_SEED_ALLOW_PRODUCTION = '1';
+      expect(flags.isSeedOnEmpty()).toBe(true);
+      process.env.NODE_ENV = 'test';
+      const ok = await demoSeed.bootHook(silent);
+      expect(ok.seeded).toBe(true);
+    } finally {
+      await database.closeDatabase();
+      rm(dbFile);
+    }
+  }, 180000);
 });
 
 describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
@@ -308,7 +381,7 @@ describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
     });
     const base = `http://127.0.0.1:${port}`;
     let health = null;
-    for (let i = 0; i < 240; i += 1) {
+    for (let i = 0; i < 600; i += 1) { // up to 150s: the seed is slow on a loaded machine
       try {
         const r = await fetch(`${base}/api/health`);
         if (r.ok) {
@@ -379,5 +452,5 @@ describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
       });
     });
     expect(n).toBe(2);
-  }, 60000);
+  }, 180000);
 });
