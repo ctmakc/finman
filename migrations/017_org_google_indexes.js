@@ -62,6 +62,14 @@ module.exports = {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )`);
 
+    // A DB that already ran wave3/ai's 017b (it sorts after 017_ but was
+    // merged first) has ai_insights WITHOUT org_id: the CREATE above was a
+    // no-op and idx_ai_insights_lookup below would fail with "no such column".
+    // Rebuild it into the canonical shape (rows kept with org_id 0).
+    if (!(await columnExists(db, 'ai_insights', 'org_id'))) {
+      await require('./017d_ai_insights_org_default').rebuildAiInsights(db);
+    }
+
     // ==================== users: Google sign-in + org link ==================
     if (!(await columnExists(db, 'users', 'google_id'))) {
       await db.run(`ALTER TABLE users ADD COLUMN google_id TEXT`);

@@ -260,3 +260,90 @@ describe('migration 017d — ai_insights.org_id DEFAULT 0 (per-user insights)', 
     await rawClose(db);
   });
 });
+
+describe('migration runner atomicity + ai_insights shapes from earlier waves', () => {
+  test('wave3/ai DB (017b ran first, ai_insights without org_id) boots: 017_ rebuilds the table, rows kept', async () => {
+    const file = tmpDbPath();
+    created.push(file);
+    const a = await bootApp(file);
+    await a.database.closeDatabase();
+    // Reshape into what wave3/ai left behind: 017b's table, 017_ and 017d not applied yet.
+    const db = await rawOpen(file);
+    const u = await rawRun(db, `INSERT INTO users (username, email, password) VALUES ('w3', 'w3@x', 'p')`);
+    await rawExec(db, `DROP TABLE ai_insights;
+      CREATE TABLE ai_insights (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+        period TEXT NOT NULL, type TEXT NOT NULL, content TEXT NOT NULL, model TEXT,
+        generated_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, period, type));
+      DELETE FROM schema_migrations WHERE name IN ('017_org_google_indexes', '017d_ai_insights_org_default');`);
+    await rawRun(db, `INSERT INTO ai_insights (user_id, period, type, content) VALUES (?, '2026-09', 'monthly', 'kept')`, [u.lastID]);
+    await rawClose(db);
+
+    const b = await bootApp(file);
+    await b.database.closeDatabase();
+    const db2 = await rawOpen(file);
+    const rows = await rawAll(db2, `SELECT org_id, content FROM ai_insights`);
+    expect(rows).toEqual([{ org_id: 0, content: 'kept' }]);
+    const idx = await rawAll(db2, `SELECT name FROM sqlite_master WHERE type='index' AND name='idx_ai_insights_lookup'`);
+    expect(idx).toHaveLength(1);
+    const applied = await rawAll(db2, `SELECT name FROM schema_migrations WHERE name LIKE '017%' ORDER BY name`);
+    expect(applied.map((r) => r.name)).toEqual(expect.arrayContaining(['017_org_google_indexes', '017d_ai_insights_org_default']));
+    await rawClose(db2);
+  }, 30000);
+
+  test('017d: orphan insight rows and a leftover ai_insights__new do not block boot', async () => {
+    const prodFile = tmpDbPath();
+    created.push(prodFile);
+    const seed = await rawOpen(prodFile);
+    await rawExec(seed, fs.readFileSync(FIXTURE, 'utf8'));
+    const pu = await rawRun(seed, `INSERT INTO users (username, email, password) VALUES ('p1', 'p1@x', 'p')`);
+    await rawRun(seed, `INSERT INTO ai_insights (org_id, user_id, period, type, content) VALUES (1, ?, '2026-08', 'monthly', 'mine')`, [pu.lastID]);
+    await rawRun(seed, `INSERT INTO ai_insights (org_id, user_id, period, type, content) VALUES (1, 999, '2026-08', 'monthly', 'orphan')`);
+    await rawExec(seed, `CREATE TABLE ai_insights__new (id INTEGER PRIMARY KEY)`); // half-done earlier run
+    await rawClose(seed);
+
+    const b = await bootApp(prodFile);
+    await b.database.closeDatabase();
+    const db = await rawOpen(prodFile);
+    expect(await rawAll(db, `SELECT content FROM ai_insights`)).toEqual([{ content: 'mine' }]);
+    expect(await rawAll(db, `SELECT name FROM sqlite_master WHERE name = 'ai_insights__new'`)).toEqual([]);
+    expect(await rawAll(db, `PRAGMA foreign_key_check`)).toEqual([]);
+    await rawClose(db);
+  }, 30000);
+
+  test('a failing migration rolls back completely and is retried on the next boot', async () => {
+    const file = tmpDbPath();
+    created.push(file);
+    const a = await bootApp(file);
+    await a.database.closeDatabase();
+    const db = await rawOpen(file);
+    await rawRun(db, `DELETE FROM schema_migrations WHERE name = '017c_user_timezone'`);
+    await rawClose(db);
+
+    const target = path.join(PROJECT_ROOT, 'migrations', '017c_user_timezone.js');
+    jest.resetModules();
+    jest.doMock(target, () => ({
+      name: '017c_user_timezone',
+      async up(h) {
+        await h.run(`CREATE TABLE half_done (id INTEGER)`);
+        throw new Error('boom mid-migration');
+      },
+    }));
+    process.env.DATABASE_PATH = file;
+    require(path.join(PROJECT_ROOT, 'config', 'config.js'));
+    const database = require(path.join(PROJECT_ROOT, 'db', 'database.js'));
+    await expect(database.initDatabase()).rejects.toThrow(/017c_user_timezone.*boom mid-migration/);
+    await database.closeDatabase();
+    jest.dontMock(target);
+
+    const raw = await rawOpen(file);
+    expect(await rawAll(raw, `SELECT name FROM sqlite_master WHERE name = 'half_done'`)).toEqual([]);
+    expect(await rawAll(raw, `SELECT name FROM schema_migrations WHERE name = '017c_user_timezone'`)).toEqual([]);
+    await rawClose(raw);
+
+    const b = await bootApp(file);
+    await b.database.closeDatabase();
+    const raw2 = await rawOpen(file);
+    expect(await rawAll(raw2, `SELECT name FROM schema_migrations WHERE name = '017c_user_timezone'`)).toHaveLength(1);
+    await rawClose(raw2);
+  }, 30000);
+});
