@@ -1,6 +1,8 @@
 const { query, get, run, transaction } = require('../db/database');
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const money = require('../lib/money');
+const dates = require('../lib/dates');
+const fx = require('../lib/fx');
 
 class Budget {
   // Создание бюджета
@@ -45,10 +47,22 @@ class Budget {
     }
   }
 
-  // Получение активных бюджетов для текущего периода
-  static async getActiveBudgets(userId) {
+  // Сегодняшняя дата в часовом поясе пользователя (users.timezone), не UTC:
+  // вечером в Торонто по UTC уже «завтра», а 1-го числа — уже новый месяц.
+  static async userToday(userId) {
+    let row = null;
     try {
-      const today = new Date().toISOString().split('T')[0];
+      row = await get('SELECT timezone FROM users WHERE id = ?', [userId]);
+    } catch (e) {
+      row = null;
+    }
+    return dates.todayISO(dates.userTz(row));
+  }
+
+  // Получение активных бюджетов для текущего периода
+  static async getActiveBudgets(userId, today = null) {
+    try {
+      today = today || await this.userToday(userId);
 
       const budgets = await query(
         `SELECT * FROM budgets
@@ -80,9 +94,9 @@ class Budget {
   }
 
   // Получение бюджета по категории
-  static async findByCategory(userId, category) {
+  static async findByCategory(userId, category, today = null) {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      today = today || await this.userToday(userId);
 
       const budget = await get(
         `SELECT * FROM budgets
@@ -128,6 +142,7 @@ class Budget {
       startDate: budget.start_date,
       endDate: budget.end_date,
       currency: budget.currency,
+      lastRolledPeriod: budget.last_rolled_period || null,
       notifyAtPercent: budget.notify_at_percent,
       isActive: budget.is_active === 1,
       isOverBudget: spent > effectiveLimit,
@@ -249,39 +264,46 @@ class Budget {
     }
   }
 
-  // Пересчет потраченного на основе транзакций
-  static async recalculateSpent(userId, category = null) {
+  // Расходы бюджета за [startDate, endDate] в ВАЛЮТЕ БЮДЖЕТА: операция — в
+  // валюте своего счёта, поэтому суммы группируются по a.currency и
+  // переводятся (lib/fx). conv — общий конвертер (кэш курсов на вызов).
+  static async spentInRange(userId, budget, startDate, endDate, conv = null) {
+    const converter = conv || fx.createConverter(budget.currency || DEFAULT_CURRENCY);
+    const params = [userId];
+    let categorySql = '';
+    if (budget.category) {
+      categorySql = ' AND t.category = ?';
+      params.push(budget.category);
+    }
+    params.push(startDate, endDate);
+    const rows = await query(
+      `SELECT a.currency AS currency, COALESCE(SUM(ABS(t.amount)), 0) as total
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.user_id = ?${categorySql} AND t.type = 'expense'
+       AND t.date >= ? AND t.date <= ?
+       GROUP BY a.currency`,
+      params
+    );
+    const tot = await converter.totals(rows, ['total'], { to: budget.currency || DEFAULT_CURRENCY });
+    return money.round(tot.total || 0);
+  }
+
+  // Пересчет потраченного на основе транзакций (текущий период, день пользователя)
+  static async recalculateSpent(userId, category = null, today = null) {
     try {
+      today = today || await this.userToday(userId);
       // Получаем активные бюджеты
       const budgets = category
-        ? [await this.findByCategory(userId, category)].filter(Boolean)
-        : await this.getActiveBudgets(userId);
+        ? [await this.findByCategory(userId, category, today)].filter(Boolean)
+        : await this.getActiveBudgets(userId, today);
+      const conv = fx.createConverter(DEFAULT_CURRENCY);
 
       for (const budget of budgets) {
         // Определяем даты периода
-        const { startDate, endDate } = this.getPeriodDates(budget);
-
-        // Считаем сумму расходов по категории за период
-        let sql, params;
-
-        if (budget.category) {
-          sql = `SELECT COALESCE(SUM(ABS(amount)), 0) as total
-                 FROM transactions
-                 WHERE user_id = ? AND category = ? AND type = 'expense'
-                 AND date >= ? AND date <= ?`;
-          params = [userId, budget.category, startDate, endDate];
-        } else {
-          // Общий бюджет - все расходы
-          sql = `SELECT COALESCE(SUM(ABS(amount)), 0) as total
-                 FROM transactions
-                 WHERE user_id = ? AND type = 'expense'
-                 AND date >= ? AND date <= ?`;
-          params = [userId, startDate, endDate];
-        }
-
-        const result = await get(sql, params);
-        // Округляем агрегат SUM (REAL может дать float-дрейф) перед записью.
-        await this.updateSpent(budget.id, userId, money.round(result.total));
+        const { startDate, endDate } = this.getPeriodDates(budget, today);
+        const spent = await this.spentInRange(userId, budget, startDate, endDate, conv);
+        await this.updateSpent(budget.id, userId, spent);
       }
 
       return true;
@@ -290,47 +312,42 @@ class Budget {
     }
   }
 
-  // Получение дат периода для бюджета
-  static getPeriodDates(budget) {
-    const now = new Date();
-    let startDate, endDate;
-
+  // Даты периода, содержащего today ('YYYY-MM-DD' в дне пользователя).
+  // Строковая UTC-арифметика (lib/dates): результат не зависит от TZ процесса.
+  // Неделя — с понедельника по воскресенье.
+  static getPeriodDates(budget, today = null) {
+    const day = today || dates.todayISO();
     switch (budget.period) {
       case 'daily':
-        startDate = now.toISOString().split('T')[0];
-        endDate = startDate;
-        break;
-
-      case 'weekly':
-        const dayOfWeek = now.getDay();
-        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const monday = new Date(now);
-        monday.setDate(now.getDate() + mondayOffset);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        startDate = monday.toISOString().split('T')[0];
-        endDate = sunday.toISOString().split('T')[0];
-        break;
-
+        return { startDate: day, endDate: day };
+      case 'weekly': {
+        const dow = dates.parseISO(day).getUTCDay();
+        const monday = dates.addDaysISO(day, dow === 0 ? -6 : 1 - dow);
+        return { startDate: monday, endDate: dates.addDaysISO(monday, 6) };
+      }
+      case 'yearly':
+        return { startDate: `${day.slice(0, 4)}-01-01`, endDate: `${day.slice(0, 4)}-12-31` };
+      case 'custom':
+        return {
+          startDate: budget.startDate || budget.start_date,
+          endDate: budget.endDate || budget.end_date || day
+        };
       case 'monthly':
       default:
-        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-        endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
-        break;
-
-      case 'yearly':
-        startDate = `${now.getFullYear()}-01-01`;
-        endDate = `${now.getFullYear()}-12-31`;
-        break;
-
-      case 'custom':
-        startDate = budget.startDate;
-        endDate = budget.endDate || now.toISOString().split('T')[0];
-        break;
+        return { startDate: dates.startOfMonthISO(day), endDate: dates.endOfMonthISO(day) };
     }
+  }
 
-    return { startDate, endDate };
+  // Период (daily/weekly/monthly/yearly), начинающийся сразу после периода
+  // со стартом startDate.
+  static nextPeriodStart(period, startDate) {
+    switch (period) {
+      case 'daily': return dates.addDaysISO(startDate, 1);
+      case 'weekly': return dates.addDaysISO(startDate, 7);
+      case 'yearly': return dates.addMonthsISO(startDate, 12, 1);
+      case 'monthly':
+      default: return dates.addMonthsISO(startDate, 1, 1);
+    }
   }
 
   // Удаление (деактивация) бюджета
@@ -366,8 +383,12 @@ class Budget {
   static async getStats(userId) {
     try {
       const budgets = await this.getActiveBudgets(userId);
+      // Итоги по всем бюджетам — в базовой валюте пользователя (каждый бюджет
+      // хранит свою валюту).
+      const conv = await fx.converterForUser(userId);
 
       const stats = {
+        currency: conv.baseCurrency,
         totalBudgets: budgets.length,
         totalBudgetAmount: 0,
         totalSpent: 0,
@@ -377,8 +398,8 @@ class Budget {
       };
 
       for (const budget of budgets) {
-        stats.totalBudgetAmount = money.add(stats.totalBudgetAmount, budget.amount);
-        stats.totalSpent = money.add(stats.totalSpent, budget.spent);
+        stats.totalBudgetAmount = money.add(stats.totalBudgetAmount, await conv.convert(budget.amount, budget.currency));
+        stats.totalSpent = money.add(stats.totalSpent, await conv.convert(budget.spent, budget.currency));
 
         if (budget.isOverBudget) {
           stats.overBudgetCount++;
@@ -392,12 +413,14 @@ class Budget {
           category: budget.category,
           amount: budget.amount,
           spent: budget.spent,
+          currency: budget.currency,
           percentUsed: budget.percentUsed,
           status: budget.isOverBudget ? 'over' : (budget.shouldNotify ? 'warning' : 'ok')
         });
       }
 
       stats.totalRemaining = money.sub(stats.totalBudgetAmount, stats.totalSpent);
+      stats.missingRates = conv.missingRates;
       stats.overallPercentUsed = stats.totalBudgetAmount > 0
         ? Math.round((stats.totalSpent / stats.totalBudgetAmount) * 100)
         : 0;
@@ -408,42 +431,86 @@ class Budget {
     }
   }
 
-  // Envelope / rollover: перенос остатка в carryover следующего периода.
-  // Для бюджетов с rollover=1 и периодом fromPeriod:
-  //   leftover = amount + carryover - spent (= effectiveLimit - spent);
-  //   новый carryover = leftover (может быть отрицательным при перерасходе),
-  //   spent сбрасывается в 0 для нового периода.
-  // Для бюджетов без rollover просто сбрасываем spent (carryover не трогаем,
-  // он остаётся 0). Всё считаем через lib/money и атомарно в transaction().
-  static async rollForward(userId, fromPeriod) {
+  // Envelope / rollover: перенос остатка ЗАВЕРШЁННОГО периода.
+  //
+  // Для rollover-бюджетов периода fromPeriod закрывается ПРЕДЫДУЩИЙ период
+  // (относительно today в дне пользователя): 1-го ноября закрывается октябрь,
+  // а не только что начавшийся ноябрь.
+  //   carryover(next) = amount + carryover - spent(закрытый период),
+  // где spent считается по транзакциям этого периода в валюте бюджета.
+  // budgets.last_rolled_period (миграция 018) хранит старт последнего
+  // закрытого периода: повторный вызов в том же периоде ничего не меняет.
+  // Если пропущено несколько периодов — они закрываются по очереди (не более
+  // 400). Периоды, закончившиеся до start_date бюджета, не закрываются.
+  // spent после переноса = расходы текущего периода.
+  // custom: закрывается сам диапазон start_date..end_date, когда он закончился.
+  // Не-rollover бюджеты не трогаем.
+  static async rollForward(userId, fromPeriod, options = {}) {
     try {
+      const today = options.today || await this.userToday(userId);
+      const rows = await query(
+        `SELECT * FROM budgets
+         WHERE user_id = ? AND is_active = 1 AND rollover = 1
+         AND period = ?`,
+        [userId, fromPeriod]
+      );
+      const conv = fx.createConverter(DEFAULT_CURRENCY);
+
+      // Сначала считаем (чтения + курсы), затем пишем одной транзакцией.
+      const plans = [];
+      for (const row of rows) {
+        const amount = money.round(row.amount || 0);
+        let carry = money.round(row.carryover || 0);
+        const budgetStart = row.start_date ? String(row.start_date).slice(0, 10) : null;
+        let key = null;
+        let currentSpent = 0;
+
+        if (fromPeriod === 'custom') {
+          const end = row.end_date ? String(row.end_date).slice(0, 10) : null;
+          if (!budgetStart || !end || end >= today) continue; // диапазон ещё идёт
+          key = budgetStart;
+          if (row.last_rolled_period === key) continue;
+          const spent = await this.spentInRange(userId, row, budgetStart, end, conv);
+          carry = money.sub(money.add(amount, carry), spent);
+        } else {
+          const current = this.getPeriodDates({ period: fromPeriod }, today);
+          const prevStart = this.getPeriodDates({ period: fromPeriod }, dates.addDaysISO(current.startDate, -1)).startDate;
+          let p = row.last_rolled_period
+            ? this.nextPeriodStart(fromPeriod, String(row.last_rolled_period).slice(0, 10))
+            : prevStart;
+          if (budgetStart) {
+            const firstOwn = this.getPeriodDates({ period: fromPeriod }, budgetStart).startDate;
+            if (p < firstOwn) p = firstOwn;
+          }
+          let closed = 0;
+          while (p <= prevStart && closed < 400) {
+            const { endDate } = this.getPeriodDates({ period: fromPeriod }, p);
+            const spent = await this.spentInRange(userId, row, p, endDate, conv);
+            carry = money.sub(money.add(amount, carry), spent);
+            key = p;
+            closed += 1;
+            p = this.nextPeriodStart(fromPeriod, p);
+          }
+          if (!closed) continue; // уже закрыт или бюджет начался в текущем периоде
+          currentSpent = await this.spentInRange(userId, row, current.startDate, current.endDate, conv);
+        }
+
+        plans.push({ row, carry, key, currentSpent });
+      }
+
       const rolled = [];
-
       await transaction(async () => {
-        // Берём только rollover-бюджеты выбранного периода.
-        const rows = await query(
-          `SELECT * FROM budgets
-           WHERE user_id = ? AND is_active = 1 AND rollover = 1
-           AND period = ?`,
-          [userId, fromPeriod]
-        );
-
-        for (const row of rows) {
-          const amount = money.round(row.amount || 0);
-          const carryover = money.round(row.carryover || 0);
-          const spent = money.round(row.spent || 0);
-
-          // effectiveLimit = amount + carryover; остаток = effectiveLimit - spent.
-          const effectiveLimit = money.add(amount, carryover);
-          const leftover = money.sub(effectiveLimit, spent);
-
-          await run(
-            `UPDATE budgets SET carryover = ?, spent = 0, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ? AND user_id = ?`,
-            [leftover, row.id, userId]
+        for (const { row, carry, key, currentSpent } of plans) {
+          // Условие на last_rolled_period: параллельный вызов, успевший
+          // закрыть период раньше, не даст перенести остаток дважды.
+          const result = await run(
+            `UPDATE budgets SET carryover = ?, spent = ?, last_rolled_period = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND user_id = ? AND COALESCE(last_rolled_period, '') = ?`,
+            [carry, currentSpent, key, row.id, userId, row.last_rolled_period || '']
           );
-
-          rolled.push({ id: row.id, carryover: leftover });
+          if (result.changes > 0) {
+            rolled.push({ id: row.id, carryover: carry, period: key });
+          }
         }
       });
 
