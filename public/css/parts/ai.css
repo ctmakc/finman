@@ -53,7 +53,7 @@
 
 /* The three quick-action buttons read as calm pill chips, not loud buttons. */
 .ai-cfo .ai-actions .btn-secondary {
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   font-weight: 600;
   font-size: 0.84rem;
   padding: 0.5rem 0.95rem;
@@ -78,7 +78,7 @@
   min-width: 9.5rem;
   padding: 0.46rem 0.7rem;
   font-size: 0.84rem;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   background: var(--fm-surface);
   border: 1px solid var(--fm-border);
   font-feature-settings: var(--fm-num);
@@ -389,12 +389,12 @@
 }
 .ai-input-row #ai-input {
   flex: 1 1 auto;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   padding: 0.72rem 1.1rem;
 }
 .ai-input-row #ai-send-btn {
   flex: none;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   padding: 0.6rem 1.4rem;
   font-weight: 600;
 }
@@ -412,10 +412,7 @@
   padding: var(--space-5);
   font-family: var(--fm-font-ui);
   color: var(--fm-ink);
-  background:
-    radial-gradient(120% 90% at 12% 0%, var(--fm-primary-tint) 0%, transparent 55%),
-    radial-gradient(110% 80% at 100% 100%, var(--fm-positive-tint) 0%, transparent 50%),
-    var(--fm-bg);
+  background: var(--fm-bg);
   position: relative;
   isolation: isolate;
 }
@@ -448,7 +445,7 @@
   display: grid;
   place-items: center;
   color: var(--fm-primary-contrast);
-  background: linear-gradient(135deg, var(--fm-primary), var(--fm-primary-soft));
+  background: var(--fm-ink);
   border-radius: var(--radius-md);
   box-shadow: var(--fm-shadow-primary);
 }

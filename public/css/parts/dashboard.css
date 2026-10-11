@@ -19,9 +19,7 @@
   padding: clamp(var(--space-5), 4vw, var(--space-7));
   border: 1px solid var(--fm-border);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--fm-primary-tint) 0%, transparent 58%),
-    linear-gradient(180deg, var(--fm-surface) 0%, var(--fm-surface) 100%);
+  background: transparent;
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -31,7 +29,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: 4px;
-  background: linear-gradient(180deg, var(--fm-primary), var(--fm-primary-soft));
+  background: var(--fm-contour);
 }
 
 .fm-hero-grid {

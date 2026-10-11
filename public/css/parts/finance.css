@@ -240,7 +240,7 @@
 .debts-page .progress-fill::after {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0));
+  background: none;
   pointer-events: none;
 }
 .budgets-list .progress-fill.progress-ok,
@@ -344,7 +344,7 @@
   background: var(--fm-positive);
 }
 .goals-page .card-grid > .card.goal-reached .progress-fill {
-  background: linear-gradient(90deg, var(--fm-positive), var(--fm-positive));
+  background: var(--fm-positive);
 }
 
 /* goal meta row (added additively in goals.js): target date / per-month hint */
