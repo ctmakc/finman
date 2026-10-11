@@ -1,0 +1,4 @@
+"TransferWise ID",Date,Amount,Currency,Description,"Payment Reference","Running Balance","Exchange From","Exchange To","Exchange Rate","Payer Name","Payee Name","Payee Account Number",Merchant,"Card Last Four Digits","Card Holder Full Name",Attachment,Note,"Total fees"
+TRANSFER-123456,01-10-2026,-250.00,CAD,Sent money to Jane Doe,Rent October,1250.00,,,,,Jane Doe,****1234,,,,,,2.15
+CARD-7890,02-10-2026,-18.42,CAD,Card transaction of 18.42 CAD issued by Tim Hortons OTTAWA,,1231.58,,,,,,,Tim Hortons,4321,Max M,,,0.00
+BALANCE-555,03-10-2026,1000.00,CAD,Received money from ACME CORP,Invoice 42,2231.58,,,,ACME CORP,,,,,,,,0.00

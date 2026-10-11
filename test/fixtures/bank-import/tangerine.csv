@@ -1,0 +1,5 @@
+Date,Transaction,Name,Memo,Amount
+10/1/2026,CREDIT,Payroll Deposit,ACME CORP,2450.00
+10/2/2026,DEBIT,Costco Wholesale,Point of Sale - Visa Debit,-231.40
+10/3/2026,DEBIT,Rogers,Bill Payment,-95.00
+10/6/2026,OTHER,Interest Paid,,1.12
