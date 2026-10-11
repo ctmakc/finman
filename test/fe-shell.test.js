@@ -36,26 +36,64 @@ function contrast(a, b) {
 }
 // Extract the --fm-* declarations of the first block whose selector text
 // starts with `selector` (handles nested @media blocks by brace counting).
-function tokensOf(css, selector) {
+// Supports modern single-source tokens via light-dark(#L, #D) and var() resolution.
+function tokensOf(css, selector, mode) {
+  const effectiveMode = mode || (selector.includes('dark') ? 'dark' : 'light');
+  let block;
   const start = css.indexOf(selector);
-  if (start === -1) throw new Error('selector not found: ' + selector);
-  const open = css.indexOf('{', start);
-  let depth = 0;
-  let end = open;
-  for (; end < css.length; end++) {
-    if (css[end] === '{') depth++;
-    else if (css[end] === '}') {
-      depth--;
-      if (depth === 0) break;
+  if (start !== -1) {
+    const open = css.indexOf('{', start);
+    let depth = 0;
+    let end = open;
+    for (; end < css.length; end++) {
+      if (css[end] === '{') depth++;
+      else if (css[end] === '}') {
+        depth--;
+        if (depth === 0) break;
+      }
     }
+    block = css.slice(open + 1, end);
   }
-  const block = css.slice(open + 1, end);
-  const map = {};
-  block.replace(/(--[\w-]+)\s*:\s*([^;]+);/g, (m, k, v) => {
-    map[k] = v.trim();
+
+  // Also read the :root block for light-dark() and alias resolution
+  const rootStart = css.indexOf(':root {');
+  let rootBlock = '';
+  if (rootStart !== -1) {
+    const rootOpen = css.indexOf('{', rootStart);
+    let depth = 0;
+    let end = rootOpen;
+    for (; end < css.length; end++) {
+      if (css[end] === '{') depth++;
+      else if (css[end] === '}') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    rootBlock = css.slice(rootOpen + 1, end);
+  }
+
+  const raw = {};
+  (rootBlock + '\n' + (block || '')).replace(/(--[\w-]+)\s*:\s*([^;]+);/g, (m, k, v) => {
+    raw[k] = v.trim();
     return m;
   });
-  return map;
+
+  const resolved = {};
+  for (const k of Object.keys(raw)) {
+    let val = raw[k];
+    let guard = 0;
+    while (val && val.startsWith('var(') && guard++ < 5) {
+      const ref = val.replace(/^var\((--[\w-]+)\)$/, '$1');
+      val = raw[ref] || val;
+    }
+    const ld = val ? val.match(/light-dark\((#[0-9A-Fa-f]{6}),\s*(#[0-9A-Fa-f]{6})\)/) : null;
+    if (ld) {
+      resolved[k] = effectiveMode === 'dark' ? ld[2] : ld[1];
+    } else {
+      resolved[k] = val;
+    }
+  }
+  return resolved;
 }
 
 // ---- app.js pure helpers -----------------------------------------------------

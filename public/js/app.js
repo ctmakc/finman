@@ -143,7 +143,7 @@ const PAGE_RENDERERS = {
   calendar: () => renderCalendarPage(),
   reports: () => renderReportsPage(),
   forecast: () => renderForecastPage(),
-  'bank-connections': () => renderBankConnectionsPage(),
+  'bank-connections': () => callGlobal('renderBankConnectionsPage'),
   settings: () => renderSettingsPage(),
   ai: () => {
     mountHtml('<div id="ai-cfo-content"></div>');
@@ -1411,73 +1411,6 @@ async function renderTransactionsPage() {
 
   document.querySelectorAll('[data-transaction-action]').forEach((button) => {
     button.addEventListener('click', handleTransactionAction);
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Bank connections
-// ---------------------------------------------------------------------------
-function supportedBankNames() {
-  const raw = appState.supportedBanks;
-  const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.banks) ? raw.banks : []);
-  return list
-    .map((b) => (typeof b === 'string' ? b : (b && (b.name || b.title || b.id))))
-    .filter(Boolean);
-}
-
-async function renderBankConnectionsPage() {
-  const mainContent = document.getElementById('main-content');
-
-  const bankConnections = await fetchBankConnections();
-  const banks = supportedBankNames();
-
-  mainContent.innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">Bank connections</h1>
-      <button id="add-connection-btn" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Connect a bank
-      </button>
-    </div>
-
-    <div class="bank-connections-container">
-      <div class="card bank-info-card">
-        <div class="bank-info-content">
-          <h2><i class="fas fa-info-circle"></i> Bank integration</h2>
-          <p>Connect your bank accounts to sync balances and transactions automatically. Access tokens are stored encrypted.</p>
-          ${banks.length ? `<p>Supported banks: ${banks.map(escapeHtmlShell).join(', ')}.</p>` : ''}
-        </div>
-      </div>
-
-      <div id="bank-connections-list" class="card-grid">
-        ${bankConnections.length > 0 ? renderBankConnectionsList(bankConnections) : `
-          <div class="empty-state">
-            <div class="empty-state-icon">
-              <i class="fas fa-university"></i>
-            </div>
-            <h2>No bank connections</h2>
-            <p>Connect a bank to sync your data automatically</p>
-            <button id="empty-add-connection-btn" class="btn btn-primary">
-              <i class="fas fa-plus"></i> Connect a bank
-            </button>
-          </div>
-        `}
-      </div>
-    </div>
-  `;
-
-  document.getElementById('add-connection-btn').addEventListener('click', () => {
-    showBankConnectionModal();
-  });
-
-  const emptyAddConnectionBtn = document.getElementById('empty-add-connection-btn');
-  if (emptyAddConnectionBtn) {
-    emptyAddConnectionBtn.addEventListener('click', () => {
-      showBankConnectionModal();
-    });
-  }
-
-  document.querySelectorAll('[data-connection-action]').forEach((button) => {
-    button.addEventListener('click', handleConnectionAction);
   });
 }
 
