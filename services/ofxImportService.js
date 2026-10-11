@@ -36,7 +36,8 @@ function decodeEntities(s) {
   return String(s).replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, code) => {
     if (code[0] === '#') {
       const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(n) ? String.fromCodePoint(n) : m;
+      // Out-of-range code points (&#x110000;) made String.fromCodePoint throw.
+      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : m;
     }
     return ENTITIES[code.toLowerCase()] ?? m;
   });
@@ -155,6 +156,9 @@ function parseOfxDate(s) {
   const mo = +m[2];
   const d = +m[3];
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  // Real calendar check: 20240231 is not a date (the commit route would reject it anyway).
+  const check = new Date(Date.UTC(y, mo - 1, d));
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) return null;
   return `${m[1]}-${m[2]}-${m[3]}`;
 }
 
@@ -229,7 +233,7 @@ function parseOfx(text) {
 
     for (const trn of findAll(st, 'STMTTRN')) {
       seq++;
-      const row = { index: seq, raw: {}, error: null, skipped: null };
+      const row = { index: seq, raw: {}, error: null, skipped: null, accountId: account.accountId };
       const trntype = leaf(trn, 'TRNTYPE').toUpperCase();
       const dtposted = leaf(trn, 'DTPOSTED');
       const trnamt = leaf(trn, 'TRNAMT');
@@ -258,7 +262,9 @@ function parseOfx(text) {
         amount,
         type: amount >= 0 ? 'income' : 'expense',
         category: TRNTYPE_CATEGORY[trntype] || categorizeByDescription(description),
-        currency: leaf(trn, 'CURRENCY') ? deepLeaf(child(trn, 'CURRENCY'), 'CURSYM') || currency : currency,
+        // <CURRENCY> (an aggregate) means TRNAMT itself is in CURSYM; <ORIGCURRENCY>
+        // only records the original currency, TRNAMT stays in CURDEF.
+        currency: (child(trn, 'CURRENCY') && leaf(child(trn, 'CURRENCY'), 'CURSYM').toUpperCase()) || currency,
         externalId: fitid,
         accountId: account.accountId,
         trnType: trntype || null
@@ -270,11 +276,36 @@ function parseOfx(text) {
   return { version, accounts, rows };
 }
 
-// options: { existingFingerprints: Map fingerprint->count (or Set), existingExternalIds: Set }
+// options: { existingFingerprints: Map fingerprint->count (or Set), existingExternalIds: Set,
+//            statementAccountId: ACCTID to take from a multi-statement file }
 // markDuplicates treats rows with distinct FITIDs as distinct transactions even
 // when date, amount and name match (two coffees at the same shop on one day).
+//
+// One import goes into one app account, so a file with several statements
+// (chequing + credit card, CAD + USD) is refused unless the caller names the
+// statement's ACCTID; otherwise every row would land in one account.
 function previewOfx(text, options = {}) {
-  const { version, accounts, rows } = parseOfx(text);
+  const parsed = parseOfx(text);
+  const { version } = parsed;
+  let { accounts, rows } = parsed;
+  if (accounts.length > 1) {
+    const wanted = options.statementAccountId != null ? String(options.statementAccountId).trim() : '';
+    const list = accounts.map((a) => `${a.accountId || '?'}${a.accountType ? ` (${a.accountType})` : ''}${a.currency ? ` ${a.currency}` : ''}`).join(', ');
+    if (!wanted) {
+      const err = new Error(`This OFX file holds ${accounts.length} statements: ${list}. One import goes into one account: export a separate file for each account and import them one at a time.`);
+      err.code = 'OFX_MULTIPLE_STATEMENTS';
+      err.statements = accounts.map((a) => ({ accountId: a.accountId, accountType: a.accountType, currency: a.currency }));
+      throw err;
+    }
+    const chosen = accounts.filter((a) => a.accountId === wanted);
+    if (chosen.length !== 1) {
+      const err = new Error(`Statement "${wanted}" is not in this file. It holds: ${list}.`);
+      err.code = 'OFX_MULTIPLE_STATEMENTS';
+      throw err;
+    }
+    accounts = chosen;
+    rows = rows.filter((r) => r.accountId === wanted);
+  }
   markDuplicates(rows, options.existingFingerprints);
   // FITID is the bank's own stable id: a match is a duplicate even if the text changed.
   if (options.existingExternalIds && options.existingExternalIds.size) {

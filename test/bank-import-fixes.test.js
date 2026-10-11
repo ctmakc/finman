@@ -292,6 +292,18 @@ describe('HTTP: bank sync and commit with identical transactions', () => {
     expect(await countTx(ctx, acc)).toBe(2);
   });
 
+  test('/import/preview refuses a multi-statement OFX with 400 and the statement list', async () => {
+    const t = (id, acct, cur) => `<STMTTRNRS><STMTRS><CURDEF>${cur}<BANKACCTFROM><ACCTID>${acct}</BANKACCTFROM><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20240110<TRNAMT>-1.00<FITID>${id}<NAME>A</STMTTRN></BANKTRANLIST></STMTRS></STMTTRNRS>`;
+    const body = `OFXHEADER:100\nDATA:OFXSGML\n\n<OFX><BANKMSGSRSV1>${t('a', '111', 'CAD')}${t('b', '222', 'USD')}</BANKMSGSRSV1></OFX>`;
+    const res = await ctx.request.post('/api/bank-api/import/preview').set(auth).attach('file', Buffer.from(body), 'two.ofx');
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('OFX_MULTIPLE_STATEMENTS');
+    expect(res.body.statements).toHaveLength(2);
+    const one = await ctx.request.post('/api/bank-api/import/preview').set(auth).field('ofxAccountId', '222').attach('file', Buffer.from(body), 'two.ofx');
+    expect(one.status).toBe(200);
+    expect(one.body.rows.map((r) => r.currency)).toEqual(['USD']);
+  });
+
   test('syncScheduler.runOnce inserts both identical operations and is idempotent', async () => {
     const scheduler = require(path.join(PROJECT_ROOT, 'services', 'syncScheduler.js'));
     const { userId } = ctx;
@@ -304,5 +316,60 @@ describe('HTTP: bank sync and commit with identical transactions', () => {
     expect(second.inserted).toBe(0);
     expect(second.skipped).toBe(second.fetched);
     expect(await countTx(ctx, acc)).toBe(2);
+  });
+});
+
+describe('OFX: multi-statement files, calendar dates, per-transaction currency, entities', () => {
+  const ofx = require(path.join(PROJECT_ROOT, 'services', 'ofxImportService.js'));
+  const tr = (id, dt, amt, name, more = '') => `<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>${dt}<TRNAMT>${amt}<FITID>${id}<NAME>${name}${more}</STMTTRN>`;
+  const stmt = (acct, cur, trns) => `<STMTTRNRS><STMTRS><CURDEF>${cur}<BANKACCTFROM><BANKID>001<ACCTID>${acct}<ACCTTYPE>CHECKING</BANKACCTFROM><BANKTRANLIST>${trns}</BANKTRANLIST></STMTRS></STMTTRNRS>`;
+  const file = (body) => `OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\n\n<OFX><BANKMSGSRSV1>${body}</BANKMSGSRSV1></OFX>`;
+  const two = file(stmt('111', 'CAD', tr('G1', '20240110', '-1.00', 'A')) + stmt('222', 'USD', tr('G2', '20240110', '-9.00', 'B')));
+
+  test('a file with two statements is refused with the account list', () => {
+    let err;
+    try {
+      ofx.previewOfx(two);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    expect(err.code).toBe('OFX_MULTIPLE_STATEMENTS');
+    expect(err.message).toMatch(/2 statements.*111.*222/);
+    expect(err.statements.map((s) => s.accountId)).toEqual(['111', '222']);
+  });
+
+  test('naming the statement imports only its rows', () => {
+    const p = ofx.previewOfx(two, { statementAccountId: '222' });
+    expect(p.accounts).toHaveLength(1);
+    expect(p.rows.map((r) => [r.externalId, r.amount, r.currency])).toEqual([['G2', -9, 'USD']]);
+    expect(() => ofx.previewOfx(two, { statementAccountId: '999' })).toThrow(/not in this file/);
+  });
+
+  test('DTPOSTED 20240231 is an error row, not a preview date', () => {
+    expect(ofx.parseOfxDate('20240231')).toBeNull();
+    expect(ofx.parseOfxDate('20240229')).toBe('2024-02-29');
+    const p = ofx.previewOfx(file(stmt('1', 'CAD', tr('B1', '20240231', '-1.00', 'X'))));
+    expect(p.rows[0].error).toMatch(/Unrecognised date/);
+    expect(p.stats.valid).toBe(0);
+  });
+
+  test('<CURRENCY><CURSYM> on a transaction sets its currency; ORIGCURRENCY does not', () => {
+    const p = ofx.previewOfx(
+      file(
+        stmt(
+          '1',
+          'CAD',
+          tr('C1', '20240110', '-10.00', 'AMAZON US', '<CURRENCY><CURRATE>1.35<CURSYM>USD</CURRENCY>') +
+            tr('C2', '20240111', '-13.50', 'AMAZON US', '<ORIGCURRENCY><CURRATE>1.35<CURSYM>USD</ORIGCURRENCY>')
+        )
+      )
+    );
+    expect(p.rows.map((r) => r.currency)).toEqual(['USD', 'CAD']);
+  });
+
+  test('an out-of-range numeric entity is kept as text instead of throwing', () => {
+    const p = ofx.previewOfx(file(stmt('1', 'CAD', tr('F1', '20240110', '-1.00', 'A &#x110000; B &#65;'))));
+    expect(p.rows[0].description).toBe('A &#x110000; B A');
   });
 });

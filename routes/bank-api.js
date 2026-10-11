@@ -356,7 +356,8 @@ function parseBoolean(v) {
   return undefined;
 }
 
-// multipart/form-data: file + optional accountId, presetId, hasHeader, delimiter, dateOrder, mapping (JSON)
+// multipart/form-data: file + optional accountId, presetId, hasHeader, delimiter, dateOrder, mapping (JSON),
+// ofxAccountId (ACCTID of the statement to take from a multi-statement OFX file)
 router.post('/import/preview', authenticate, (req, res) => {
   upload.single('file')(req, res, async (uploadError) => {
     if (uploadError) return fail(res, 400, uploadError.message || 'Upload failed');
@@ -374,7 +375,7 @@ router.post('/import/preview', authenticate, (req, res) => {
       const ext = path.extname(req.file.originalname || '').toLowerCase();
       let preview;
       if (ofxImportService.isOfx(text) || ['.ofx', '.qfx', '.qbo'].includes(ext)) {
-        preview = ofxImportService.previewOfx(text, { existingFingerprints: existing });
+        preview = ofxImportService.previewOfx(text, { existingFingerprints: existing, statementAccountId: body.ofxAccountId || undefined });
       } else {
         let mapping;
         if (body.mapping) {
@@ -409,6 +410,9 @@ router.post('/import/preview', authenticate, (req, res) => {
         ...preview
       });
     } catch (error) {
+      if (error.code === 'OFX_MULTIPLE_STATEMENTS') {
+        return res.status(400).json({ error: true, code: error.code, message: error.message, statements: error.statements || null });
+      }
       fail(res, 400, error.message || 'Could not parse this file');
     }
   });
