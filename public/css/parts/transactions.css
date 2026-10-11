@@ -481,7 +481,7 @@
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--fm-primary), var(--fm-primary-soft));
+  background: var(--fm-ink);
   opacity: 0.9;
 }
 

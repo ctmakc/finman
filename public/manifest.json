@@ -4,8 +4,8 @@
   "description": "Personal finance manager with an AI CFO",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#5D5CDE",
-  "theme_color": "#5D5CDE",
+  "background_color": "#C6E4E6",
+  "theme_color": "#0B2A2E",
   "orientation": "portrait-primary",
   "icons": [
     {
