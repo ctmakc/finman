@@ -18,6 +18,7 @@
 
 const { query, get } = require('../db/database');
 const money = require('../lib/money');
+const { isCashflow } = require('../lib/txFilter');
 const logger = require('../lib/logger');
 const Notification = require('../models/notification');
 const emailService = require('./emailService');
@@ -58,11 +59,12 @@ async function buildDigest(userId, { now } = {}) {
   const categoryTotals = {}; // category -> сумма расходов (положительная)
 
   for (const row of txRows) {
+    // Transfers and opening balances are not cash flow (lib/txFilter).
+    if (!isCashflow(row)) continue;
     const amt = Math.abs(Number(row.amount) || 0);
     if (row.type === 'income') {
       income = money.add(income, amt);
     } else {
-      // всё, что не income, считаем расходом (expense/transfer-out и т.п.)
       expense = money.add(expense, amt);
       const cat = row.category || 'Без категории';
       categoryTotals[cat] = money.add(categoryTotals[cat] || 0, amt);

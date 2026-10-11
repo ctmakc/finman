@@ -14,6 +14,7 @@ const { query, get } = require('../db/database');
 const money = require('../lib/money');
 const { AppError } = require('../middleware/error');
 const logger = require('../lib/logger');
+const { isOpening } = require('../lib/txFilter');
 
 // ---- настройки по умолчанию (можно переопределить через opts) ----
 const DEFAULTS = {
@@ -71,6 +72,7 @@ function detectAmountOutliers(transactions, cfg) {
   // Группируем по категории (null -> '__uncategorized__').
   const byCategory = new Map();
   for (const t of transactions) {
+    if (isOpening(t)) continue; // opening balances are never "unusual spend"
     if (cfg.expenseOnly && t.type !== 'expense') continue;
     const key = t.category || '__uncategorized__';
     if (!byCategory.has(key)) byCategory.set(key, []);

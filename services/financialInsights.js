@@ -18,6 +18,10 @@
 const { query, get, run } = require('../db/database');
 const provider = require('../lib/ai/provider');
 const logger = require('../lib/logger');
+const { cashflowOnly, isCashflow } = require('../lib/txFilter');
+
+// Cash flow only (no transfers / opening balances).
+const CF = cashflowOnly();
 
 const ANOMALY_FACTOR = 2.5; // a tx this far above its category norm is flagged
 const ANOMALY_MIN_PRIOR = 2; // need at least this many priors to have a norm
@@ -89,6 +93,7 @@ async function buildDigest(userOrId, opts = {}) {
   const catLast = {};
 
   for (const r of rows) {
+    if (!isCashflow(r)) continue; // transfers / opening balances are not cash flow
     const isThis = inMonth(r.date, thisStart, thisEnd);
     const isLast = inMonth(r.date, lastStart, thisStart);
     if (r.type === 'income') {
@@ -454,18 +459,18 @@ async function weeklyBrief(userOrId, opts = {}) {
     query(
       `SELECT amount, description, date, type, COALESCE(category, 'Uncategorized') AS category
          FROM transactions
-        WHERE user_id = ? AND date >= ? AND date <= ? AND type IN ('income', 'expense')
+        WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
         ORDER BY date DESC, id DESC`,
-      [userId, since, until]
+      [userId, since, until, ...CF.params]
     ),
     query(
       `SELECT date,
               SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) AS spent,
               SUM(CASE WHEN type = 'income' THEN ABS(amount) ELSE 0 END) AS earned
          FROM transactions
-        WHERE user_id = ? AND date >= ? AND date <= ? AND type IN ('income', 'expense')
+        WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
         GROUP BY date ORDER BY date`,
-      [userId, since, until]
+      [userId, since, until, ...CF.params]
     ),
   ]);
 

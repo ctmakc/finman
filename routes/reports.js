@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const { cashflowOnly, isCashflow } = require('../lib/txFilter');
+
+// Cash flow only: no transfers, no opening balances (lib/txFilter).
+const CF = cashflowOnly();
 const reportService = require('../services/reportService');
 
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -177,11 +181,12 @@ async function generateMonthlyReport(userId, start, end) {
     [userId, start, end]
   );
 
-  const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const cashflow = transactions.filter(isCashflow);
+  const income = cashflow.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expenses = cashflow.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   const byCategory = {};
-  transactions.filter(t => t.type === 'expense').forEach(t => {
+  cashflow.filter(t => t.type === 'expense').forEach(t => {
     byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
   });
 
@@ -190,10 +195,10 @@ async function generateMonthlyReport(userId, start, end) {
   return {
     period: { start, end },
     summary: { income, expenses, savings: income - expenses, savingsRate: income > 0 ? ((income - expenses) / income * 100).toFixed(1) : 0 },
-    transactionCount: transactions.length,
+    transactionCount: cashflow.length,
     expensesByCategory: byCategory,
     accountBalances: accounts,
-    topExpenses: transactions.filter(t => t.type === 'expense').sort((a, b) => b.amount - a.amount).slice(0, 10)
+    topExpenses: cashflow.filter(t => t.type === 'expense').sort((a, b) => b.amount - a.amount).slice(0, 10)
   };
 }
 
@@ -207,12 +212,12 @@ async function generateYearlyReport(userId, year) {
     const monthEnd = new Date(year, m, 0).toISOString().split('T')[0];
 
     const income = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?`,
-      [userId, monthStart, monthEnd]
+      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?${CF.sql}`,
+      [userId, monthStart, monthEnd, ...CF.params]
     );
     const expenses = await get(
-      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
-      [userId, monthStart, monthEnd]
+      `SELECT SUM(amount) as total FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}`,
+      [userId, monthStart, monthEnd, ...CF.params]
     );
 
     monthlyData.push({
@@ -236,9 +241,9 @@ async function generateYearlyReport(userId, year) {
 async function generateCategoryReport(userId, start, end) {
   const expenses = await query(
     `SELECT category, SUM(amount) as total, COUNT(*) as count
-     FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?
+     FROM transactions WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?${CF.sql}
      GROUP BY category ORDER BY total DESC`,
-    [userId, start, end]
+    [userId, start, end, ...CF.params]
   );
 
   const total = expenses.reduce((s, e) => s + e.total, 0);
@@ -283,8 +288,8 @@ async function generateBudgetReport(userId, start, end) {
   const budgetStatus = await Promise.all(budgets.map(async b => {
     const spent = await get(
       `SELECT SUM(amount) as total FROM transactions
-       WHERE user_id = ? AND type = 'expense' AND category = ? AND date >= ? AND date <= ?`,
-      [userId, b.category, start, end]
+       WHERE user_id = ? AND type = 'expense' AND category = ? AND date >= ? AND date <= ?${CF.sql}`,
+      [userId, b.category, start, end, ...CF.params]
     );
 
     return {
@@ -345,8 +350,8 @@ async function generateInvestmentReport(userId) {
 
 async function generateTaxReport(userId, start, end) {
   const income = await query(
-    `SELECT * FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ? ORDER BY date`,
-    [userId, start, end]
+    `SELECT * FROM transactions WHERE user_id = ? AND type = 'income' AND date >= ? AND date <= ?${CF.sql} ORDER BY date`,
+    [userId, start, end, ...CF.params]
   );
 
   const totalIncome = income.reduce((s, t) => s + t.amount, 0);

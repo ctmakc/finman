@@ -1,5 +1,6 @@
 const { query, get, run, transaction } = require('../db/database');
 const money = require('../lib/money');
+const { OPENING_TYPE, OPENING_CATEGORY, OPENING_DESCRIPTION } = require('../lib/txFilter');
 
 class Account {
   // Создание счета
@@ -26,12 +27,12 @@ class Account {
     }
   }
 
-  // Создание счёта пользователем с начальным балансом.
-  // Баланс записывается ОДИН раз (в accounts.balance), а в леджер ложится
-  // одна строка type='opening' на ту же сумму — без повторного инкремента
-  // баланса. Строка нужна, чтобы SUM(amount) по счёту сходился с балансом
-  // (reconcile, Beancount-экспорт), и исключена из доходов/расходов во всей
-  // аналитике, которая фильтрует type IN ('income','expense'). Атомарно.
+  // Create an account with an opening balance.
+  // The balance is stored ONCE (accounts.balance); the ledger gets a single
+  // row type='opening' (lib/txFilter OPENING_TYPE) for the same amount without
+  // a second balance increment. The row keeps SUM(amount) per account equal to
+  // the balance (reconcile, Beancount export) and is excluded from income/
+  // expense by every aggregate that filters type IN ('income','expense'). Atomic.
   static async createWithOpeningBalance(accountData) {
     const balance = money.round(accountData.balance || 0);
     return transaction(async () => {
@@ -53,14 +54,15 @@ class Account {
         await run(
           `INSERT INTO transactions
            (account_id, user_id, date, description, category, amount, type)
-           VALUES (?, ?, ?, ?, ?, ?, 'opening')`,
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             result.id,
             accountData.userId,
             accountData.openingDate || new Date().toISOString().split('T')[0],
-            'Начальный баланс',
-            'Начальный баланс',
-            balance
+            OPENING_DESCRIPTION,
+            OPENING_CATEGORY,
+            balance,
+            OPENING_TYPE
           ]
         );
       }

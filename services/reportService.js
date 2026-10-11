@@ -16,6 +16,7 @@
 
 const { query, get, run } = require('../db/database');
 const money = require('../lib/money');
+const { isCashflow } = require('../lib/txFilter');
 const { AppError } = require('../middleware/error');
 
 const SUPPORTED_TYPES = ['monthly', 'annual'];
@@ -68,8 +69,10 @@ async function buildReportData(userId, opts = {}) {
     [userId, start, end]
   );
 
-  const incomeRows = transactions.filter((t) => t.type === 'income');
-  const expenseRows = transactions.filter((t) => t.type === 'expense');
+  // Only cash flow: transfers and opening balances are excluded (lib/txFilter).
+  const cashflow = transactions.filter(isCashflow);
+  const incomeRows = cashflow.filter((t) => t.type === 'income');
+  const expenseRows = cashflow.filter((t) => t.type === 'expense');
 
   const income = money.sum(incomeRows.map((t) => t.amount));
   const expenses = money.sum(expenseRows.map((t) => t.amount));
