@@ -351,9 +351,12 @@ function renderPaymentCard(payment, isOverdue = false) {
 function showAddRecurringModal(payment = null) {
   const isEdit = !!payment;
   const accounts = UI.accountsArray();
+  // Pre-select the saved weekday (0 = Sunday is a real value); Monday for new ones.
+  const savedDow = payment ? parseIntOrNull(payment.day_of_week) : null;
+  const dayOfWeekSelected = savedDow != null && savedDow >= 0 && savedDow <= 6 ? savedDow : 1;
 
   const body = `
-        <form id="recurring-form" data-submit="recurring:save" data-id="${payment?.id || ''}">
+        <form id="recurring-form" data-submit="recurring:save" data-id="${UI.esc(payment?.id || '')}">
           <div class="form-row">
             <div class="form-group">
               <label>${t('common.name')} *</label>
@@ -404,13 +407,7 @@ function showAddRecurringModal(payment = null) {
             <div class="form-group" id="day-of-week-group" style="display:none;">
               <label>${t('recurring.field.dayOfWeek')}</label>
               <select id="rp-day-of-week">
-                <option value="0">${t('recurring.day.0')}</option>
-                <option value="1" ${payment?.day_of_week === 1 ? 'selected' : ''}>${t('recurring.day.1')}</option>
-                <option value="2">${t('recurring.day.2')}</option>
-                <option value="3">${t('recurring.day.3')}</option>
-                <option value="4">${t('recurring.day.4')}</option>
-                <option value="5">${t('recurring.day.5')}</option>
-                <option value="6">${t('recurring.day.6')}</option>
+                ${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${dayOfWeekSelected === d ? 'selected' : ''}>${t('recurring.day.' + d)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group" id="day-of-month-group">
@@ -482,13 +479,17 @@ async function saveRecurring(id) {
     type: document.getElementById('rp-type').value,
     category: document.getElementById('rp-category').value.trim(),
     frequency: document.getElementById('rp-frequency').value,
-    dayOfMonth: parseInt(document.getElementById('rp-day-of-month').value) || null,
-    dayOfWeek: parseInt(document.getElementById('rp-day-of-week').value) || null,
+    dayOfMonth: parseIntOrNull(document.getElementById('rp-day-of-month').value),
+    // Sunday is 0: `parseInt(...) || null` used to turn it into null.
+    dayOfWeek: parseIntOrNull(document.getElementById('rp-day-of-week').value),
     startDate: document.getElementById('rp-start-date').value,
     endDate: document.getElementById('rp-end-date').value || null,
     autoCreate: document.getElementById('rp-auto-create').checked,
-    notifyBefore: parseInt(document.getElementById('rp-notify-before').value) || 3
+    notifyBefore: parseIntOrNull(document.getElementById('rp-notify-before').value) ?? 3
   };
+  // Only the field that matches the frequency is meaningful.
+  if (!['weekly', 'biweekly'].includes(data.frequency)) data.dayOfWeek = null;
+  if (!['monthly', 'quarterly', 'yearly'].includes(data.frequency)) data.dayOfMonth = null;
 
   if (!data.name || !data.amount || !data.startDate) {
     showNotification(t('recurring.fillRequired'), 'error');
@@ -581,6 +582,12 @@ function formatDateShort(dateStr) {
 // HTML-экранирование и форматирование денег — общие (lib/ui.js). Раньше здесь
 // жили глобальные formatCurrency('UAH')/escapeHtml/closeModal, которые
 // перекрывали одноимённые функции app.js для всех модулей.
+// '' -> null, '0' -> 0 (Sunday), '15' -> 15.
+function parseIntOrNull(value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 function escapeHtmlRecurring(text) {
   return UI.esc(text);
 }
