@@ -270,7 +270,9 @@ function parseOfx(text) {
   return { version, accounts, rows };
 }
 
-// options: { existingFingerprints:Set, existingExternalIds:Set }
+// options: { existingFingerprints: Map fingerprint->count (or Set), existingExternalIds: Set }
+// markDuplicates treats rows with distinct FITIDs as distinct transactions even
+// when date, amount and name match (two coffees at the same shop on one day).
 function previewOfx(text, options = {}) {
   const { version, accounts, rows } = parseOfx(text);
   markDuplicates(rows, options.existingFingerprints);
@@ -278,13 +280,6 @@ function previewOfx(text, options = {}) {
   if (options.existingExternalIds && options.existingExternalIds.size) {
     for (const r of rows) {
       if (!r.duplicate && r.externalId && options.existingExternalIds.has(r.externalId)) r.duplicate = 'existing';
-    }
-  }
-  const seenIds = new Set();
-  for (const r of rows) {
-    if (r.externalId) {
-      if (!r.duplicate && seenIds.has(r.externalId)) r.duplicate = 'file';
-      seenIds.add(r.externalId);
     }
   }
   return {

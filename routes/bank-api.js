@@ -10,7 +10,7 @@
 //   POST /connect/:bankId/direct     store a personal token (verified against the bank first)
 //   POST /disconnect/:connectionId
 //   POST /sync-accounts/:connectionId
-//   POST /sync-transactions/:accountId   (dedupes by date+amount+description)
+//   POST /sync-transactions/:accountId   (count-based dedupe by date+amount+description)
 //   GET  /import/presets             CSV presets with their `verified` flag
 //   POST /import/preview             multipart file -> parsed rows + preset + duplicates
 //   POST /import/commit              JSON rows -> inserted inside db.transaction(), balance updated once
@@ -55,15 +55,26 @@ function bankSummary(bankId) {
   return bankApiConfig.listBanks().find((b) => b.id === bankId) || null;
 }
 
-// Fingerprints of what the account already holds (for duplicate detection).
+// Fingerprints of what the account already holds, as a count Map
+// (fingerprint -> stored copies). Dedupe consumes one stored copy per incoming
+// row, so two identical real transactions (same day, amount, merchant) both
+// import, and a re-import of the same statement still skips both.
+// The transactions table has no column for a bank id (FITID / Monobank op id),
+// so identity across imports can only be the (date, amount, description) count.
 async function loadExistingFingerprints(accountId, userId) {
   const rows = await query(
     `SELECT date, amount, description FROM transactions WHERE account_id = ? AND user_id = ?`,
     [accountId, userId]
   );
-  const set = new Set();
-  for (const r of rows) set.add(csvImportService.fingerprintOf(r.date, r.amount, r.description));
-  return set;
+  return csvImportService.fingerprintCounts(rows.map((r) => csvImportService.fingerprintOf(r.date, r.amount, r.description)));
+}
+
+// Take one stored copy of `fp` if any is left; true = this row is already stored.
+function consumeExisting(counts, fp) {
+  const left = counts.get(fp) || 0;
+  if (left <= 0) return false;
+  counts.set(fp, left - 1);
+  return true;
 }
 
 // ==================== CATALOGUE ====================
@@ -293,15 +304,23 @@ router.post('/sync-transactions/:accountId', authenticate, async (req, res) => {
 
     let inserted = 0;
     let skipped = 0;
+    const seenIds = new Set();
     await transaction(async () => {
       for (const tr of bankTx) {
+        // The same bank operation twice in one response (overlapping pages) is one row.
+        if (tr.id != null) {
+          if (seenIds.has(tr.id)) {
+            skipped++;
+            continue;
+          }
+          seenIds.add(tr.id);
+        }
         const amount = money.round(tr.amount);
         const fp = csvImportService.fingerprintOf(tr.date, amount, tr.description);
-        if (existing.has(fp)) {
+        if (consumeExisting(existing, fp)) {
           skipped++;
           continue;
         }
-        existing.add(fp);
         await run(
           `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -446,11 +465,10 @@ router.post('/import/commit', authenticate, async (req, res) => {
     let delta = 0;
     await transaction(async () => {
       for (const tx of prepared) {
-        if (skipDuplicates && existing.has(tx.fingerprint)) {
+        if (skipDuplicates && consumeExisting(existing, tx.fingerprint)) {
           skipped++;
           continue;
         }
-        existing.add(tx.fingerprint);
         await run(
           `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,

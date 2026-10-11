@@ -836,15 +836,49 @@ function normalizeRow(cells, idx, options, rowIndex) {
   return out;
 }
 
-// Mark in-file and existing duplicates. existing = Set of fingerprints already in the DB.
+// Multiset of fingerprints: Map fingerprint -> how many stored rows carry it.
+function fingerprintCounts(fingerprints) {
+  const counts = new Map();
+  for (const fp of fingerprints || []) counts.set(fp, (counts.get(fp) || 0) + 1);
+  return counts;
+}
+
+// Normalise `existing` (a count Map, a Set, an array, or nothing) to a fresh
+// Map we can consume without touching the caller's object.
+function toCounts(existing) {
+  if (!existing) return new Map();
+  if (existing instanceof Map) return new Map(existing);
+  return fingerprintCounts(existing);
+}
+
+// Mark in-file and existing duplicates.
+//
+// existing = what the account already holds, ideally a count Map from
+// fingerprintCounts(): two identical coffees on one day are two rows, so each
+// stored copy matches ONE incoming row ("multiset" dedupe). A plain Set counts
+// every fingerprint once.
+//
+// In-file: a row with a bank id (OFX FITID, Wise ID) is a file duplicate only
+// when the same id repeats; identical rows with different ids are distinct
+// transactions. Rows without an id fall back to the fingerprint.
 function markDuplicates(rows, existing) {
-  const seen = new Set();
+  const remaining = toCounts(existing);
+  const seenFp = new Set();
+  const seenIds = new Set();
   for (const r of rows) {
     r.duplicate = null;
     if (!r.fingerprint) continue;
-    if (existing && existing.has(r.fingerprint)) r.duplicate = 'existing';
-    else if (seen.has(r.fingerprint)) r.duplicate = 'file';
-    seen.add(r.fingerprint);
+    const left = remaining.get(r.fingerprint) || 0;
+    if (left > 0) {
+      r.duplicate = 'existing';
+      remaining.set(r.fingerprint, left - 1);
+    } else if (r.externalId) {
+      if (seenIds.has(r.externalId)) r.duplicate = 'file';
+    } else if (seenFp.has(r.fingerprint)) {
+      r.duplicate = 'file';
+    }
+    seenFp.add(r.fingerprint);
+    if (r.externalId) seenIds.add(r.externalId);
   }
   return rows;
 }
@@ -1000,6 +1034,7 @@ module.exports = {
   // normalisation
   normalizeRow,
   fingerprintOf,
+  fingerprintCounts,
   markDuplicates,
   summarize,
   // entry points

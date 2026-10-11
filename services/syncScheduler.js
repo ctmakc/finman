@@ -16,10 +16,12 @@
 //                         fetched, inserted, skipped, errors }.
 //
 // ДЕДУПЛИКАЦИЯ: в таблице transactions нет колонки под bank tx id (схема — общая,
-// её менять нельзя), поэтому уникальность транзакции определяется по комбинации
-// account_id + date + amount + description. Перед вставкой грузим уже имеющиеся
-// «отпечатки» транзакций счёта и пропускаем совпадения. Это безопасно при
-// повторных прогонах и не ломает ручной импорт.
+// её менять нельзя), поэтому транзакция опознаётся по date + amount +
+// description (тот же fingerprintOf, что у импорта файлов). Дедупликация
+// СЧЁТНАЯ: каждая уже сохранённая копия гасит ровно одну входящую строку, так
+// что две одинаковые реальные покупки (тот же день, сумма, магазин) обе
+// попадут в БД, а повторный прогон не создаст дублей. Одна и та же операция
+// банка (одинаковый id) внутри одного ответа берётся один раз.
 
 const cron = require('node-cron');
 
@@ -29,6 +31,7 @@ const bankApiService = require('../services/bankApiService');
 const bankApiConfig = require('../config/bank-api-config');
 const { query, get, run } = require('../db/database');
 const { round } = require('../lib/money');
+const { fingerprintOf, fingerprintCounts } = require('./csvImportService');
 const logger = require('../lib/logger');
 
 // Расписание cron: по умолчанию каждый час. Переопределяется env SYNC_CRON.
@@ -48,30 +51,14 @@ function bankNameFor(bankId) {
   return (cfg && cfg.name) || bankId;
 }
 
-// --- «Отпечаток» транзакции для дедупликации --------------------------------
-// Сумма округляется через money.round, чтобы устранить float-дрейф между тем,
-// что вернул банк, и тем, что хранится в SQLite.
-function fingerprint(accountId, date, amount, description) {
-  return [
-    String(accountId),
-    String(date || ''),
-    String(round(Number(amount) || 0)),
-    String(description || ''),
-  ].join('|');
-}
-
-// --- Загрузка существующих отпечатков транзакций счёта ----------------------
+// --- Отпечатки уже сохранённых транзакций счёта: Map fingerprint -> копий ----
 async function loadExistingFingerprints(accountId, userId) {
   const rows = await query(
     `SELECT date, amount, description FROM transactions
      WHERE account_id = ? AND user_id = ?`,
     [accountId, userId]
   );
-  const set = new Set();
-  for (const r of rows) {
-    set.add(fingerprint(accountId, r.date, r.amount, r.description));
-  }
-  return set;
+  return fingerprintCounts(rows.map((r) => fingerprintOf(r.date, r.amount, r.description)));
 }
 
 // --- Вставка одной транзакции (без обновления баланса) ----------------------
@@ -117,13 +104,22 @@ async function syncAccount(connection, account, userId) {
 
   if (bankTransactions.length === 0) return result;
 
-  // Грузим отпечатки один раз и дополняем их по мере вставки, чтобы внутри
-  // одного прогона не задвоить идентичные записи из самого банковского ответа.
-  const seen = await loadExistingFingerprints(account.id, userId);
+  // Счётная дедупликация: каждая сохранённая копия гасит одну входящую строку.
+  const remaining = await loadExistingFingerprints(account.id, userId);
+  const seenIds = new Set();
 
   for (const tx of bankTransactions) {
-    const fp = fingerprint(account.id, tx.date, tx.amount, tx.description);
-    if (seen.has(fp)) {
+    if (tx.id != null) {
+      if (seenIds.has(tx.id)) {
+        result.skipped += 1;
+        continue;
+      }
+      seenIds.add(tx.id);
+    }
+    const fp = fingerprintOf(tx.date, round(Number(tx.amount) || 0), tx.description);
+    const left = remaining.get(fp) || 0;
+    if (left > 0) {
+      remaining.set(fp, left - 1);
       result.skipped += 1;
       continue;
     }
@@ -136,7 +132,6 @@ async function syncAccount(connection, account, userId) {
       amount: tx.amount,
       type: tx.type,
     });
-    seen.add(fp);
     result.inserted += 1;
   }
 

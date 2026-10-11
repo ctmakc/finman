@@ -133,3 +133,129 @@ describe('Monobank API: balance, dates, range, currency', () => {
     expect(new Date(svc.rangeBound('2026-03-29', 'end') * 1000).toISOString()).toBe('2026-03-29T20:59:59.000Z');
   });
 });
+
+describe('count-based dedupe keeps legit identical transactions', () => {
+  const ofx = require(path.join(PROJECT_ROOT, 'services', 'ofxImportService.js'));
+  const sgml = (trns) => `OFXHEADER:100\nDATA:OFXSGML\n\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>CAD\n<BANKACCTFROM><BANKID>001<ACCTID>111<ACCTTYPE>CHECKING</BANKACCTFROM>\n<BANKTRANLIST><DTSTART>20240101<DTEND>20240131\n${trns}\n</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>`;
+  const tr = (id, dt, amt, name) => `<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>${dt}<TRNAMT>${amt}<FITID>${id}<NAME>${name}</STMTTRN>`;
+  const twoCoffees = sgml(tr('A1', '20240131120000.000[-5:EST]', '-4.85', 'TIM HORTONS') + tr('A2', '20240131', '-4.85', 'TIM HORTONS'));
+
+  test('OFX: same day/amount/name with distinct FITIDs are two transactions', () => {
+    const p = ofx.previewOfx(twoCoffees);
+    expect(p.rows.map((r) => r.duplicate)).toEqual([null, null]);
+    expect(p.stats.valid).toBe(2);
+  });
+
+  test('one stored copy matches one incoming row, not all of them', () => {
+    const p = ofx.previewOfx(twoCoffees);
+    const fp = p.rows[0].fingerprint;
+    const one = ofx.previewOfx(twoCoffees, { existingFingerprints: csv.fingerprintCounts([fp]) });
+    expect(one.rows.map((r) => r.duplicate)).toEqual(['existing', null]);
+    const two = ofx.previewOfx(twoCoffees, { existingFingerprints: csv.fingerprintCounts([fp, fp]) });
+    expect(two.rows.map((r) => r.duplicate)).toEqual(['existing', 'existing']);
+  });
+
+  test('CSV without ids still flags an identical in-file row', () => {
+    const rows = [{ fingerprint: 'x' }, { fingerprint: 'x' }, { fingerprint: 'x', externalId: 'b' }];
+    expect(csv.markDuplicates(rows, csv.fingerprintCounts(['x'])).map((r) => r.duplicate)).toEqual(['existing', 'file', null]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HTTP + scheduler
+// ---------------------------------------------------------------------------
+const { makeApp } = require('./helpers/app');
+
+function dbRun(ctx, sql, params) {
+  return new Promise((resolve, reject) =>
+    ctx.db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve(this.lastID);
+    })
+  );
+}
+function dbGet(ctx, sql, params) {
+  return new Promise((resolve, reject) => ctx.db.get(sql, params, (err, row) => (err ? reject(err) : resolve(row))));
+}
+function seedAccount(ctx, overrides = {}) {
+  const a = { name: 'Card', number: `n-${Math.random().toString(36).slice(2)}`, bank: 'Monobank', currency: 'UAH', balance: 0, ...overrides };
+  return dbRun(
+    ctx,
+    `INSERT INTO accounts (user_id, name, account_number, bank_name, currency, balance, account_type) VALUES (?, ?, ?, ?, ?, ?, 'checking')`,
+    [ctx.userId, a.name, a.number, a.bank, a.currency, a.balance]
+  );
+}
+const countTx = async (ctx, accountId) => (await dbGet(ctx, `SELECT COUNT(*) AS c FROM transactions WHERE account_id = ?`, [accountId])).c;
+
+describe('HTTP: bank sync and commit with identical transactions', () => {
+  let ctx;
+  let auth;
+  let bankApiService;
+  let original;
+  const twoCoffees = [
+    { id: 'op1', date: '2026-10-08', description: 'Aroma Kava', category: 'Food & Dining', amount: -65, type: 'expense' },
+    { id: 'op2', date: '2026-10-08', description: 'Aroma Kava', category: 'Food & Dining', amount: -65, type: 'expense' }
+  ];
+
+  beforeAll(async () => {
+    ctx = await makeApp();
+    auth = { Authorization: `Bearer ${ctx.token}` };
+    bankApiService = require(path.join(PROJECT_ROOT, 'services', 'bankApiService.js'));
+    original = bankApiService.getTransactions;
+    bankApiService.getTransactions = jest.fn(async () => twoCoffees.slice());
+    await ctx.request.post('/api/bank-api/connect/monobank/direct').set(auth).send({ apiKey: 'tok', skipVerify: true });
+  });
+  afterAll(async () => {
+    if (bankApiService) bankApiService.getTransactions = original;
+    if (ctx) await ctx.close();
+  });
+
+  test('/sync-transactions inserts both identical operations once, and a re-sync skips both', async () => {
+    const acc = await seedAccount(ctx);
+    const first = await ctx.request.post(`/api/bank-api/sync-transactions/${acc}`).set(auth).send({});
+    expect(first.body).toMatchObject({ inserted: 2, skipped: 0 });
+    const second = await ctx.request.post(`/api/bank-api/sync-transactions/${acc}`).set(auth).send({});
+    expect(second.body).toMatchObject({ inserted: 0, skipped: 2 });
+    expect(await countTx(ctx, acc)).toBe(2);
+    // the same op id twice in one response is one row
+    bankApiService.getTransactions.mockImplementationOnce(async () => [...twoCoffees, { ...twoCoffees[0] }, { ...twoCoffees[0], id: 'op3' }]);
+    const third = await ctx.request.post(`/api/bank-api/sync-transactions/${acc}`).set(auth).send({});
+    expect(third.body).toMatchObject({ inserted: 1, skipped: 3 });
+  });
+
+  test('/sync-transactions rejects an invalid date range with 400', async () => {
+    const acc = await seedAccount(ctx);
+    const bad = await ctx.request.post(`/api/bank-api/sync-transactions/${acc}`).set(auth).send({ startDate: 'garbage' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.message).toMatch(/Invalid start date/);
+    const bad2 = await ctx.request.post(`/api/bank-api/sync-transactions/${acc}`).set(auth).send({ endDate: '2026-02-30' });
+    expect(bad2.status).toBe(400);
+  });
+
+  test('/import/commit inserts two identical rows; a re-commit skips both', async () => {
+    const acc = await seedAccount(ctx, { bank: 'RBC Royal Bank', currency: 'CAD' });
+    const rows = [
+      { date: '2026-10-07', description: 'Coffee', amount: -4.5, category: 'Food & Dining' },
+      { date: '2026-10-07', description: 'Coffee', amount: -4.5, category: 'Food & Dining' }
+    ];
+    const first = await ctx.request.post('/api/bank-api/import/commit').set(auth).send({ accountId: acc, rows });
+    expect(first.body).toMatchObject({ inserted: 2, skipped: 0, balanceDelta: -9 });
+    const again = await ctx.request.post('/api/bank-api/import/commit').set(auth).send({ accountId: acc, rows });
+    expect(again.body).toMatchObject({ inserted: 0, skipped: 2 });
+    expect(await countTx(ctx, acc)).toBe(2);
+  });
+
+  test('syncScheduler.runOnce inserts both identical operations and is idempotent', async () => {
+    const scheduler = require(path.join(PROJECT_ROOT, 'services', 'syncScheduler.js'));
+    const { userId } = ctx;
+    // Earlier tests left other Monobank accounts; only the fresh one is new.
+    const acc = await seedAccount(ctx);
+    const first = await scheduler.runOnce(userId);
+    expect(first.errors).toEqual([]);
+    expect(await countTx(ctx, acc)).toBe(2);
+    const second = await scheduler.runOnce(userId);
+    expect(second.inserted).toBe(0);
+    expect(second.skipped).toBe(second.fetched);
+    expect(await countTx(ctx, acc)).toBe(2);
+  });
+});
