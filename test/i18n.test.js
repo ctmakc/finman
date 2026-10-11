@@ -78,13 +78,13 @@ describe('i18n.t()', () => {
     expect(i18n.t('missing.{name}', { name: 'X' })).toBe('missing.X');
   });
 
-  test('falls back to default language (uk) when active language lacks a key', () => {
-    // Inject a key that only exists in the default (uk) dict.
-    i18n.registerLocales({ uk: Object.assign({}, ukDict, { 'only.in.uk': 'лише-укр' }) });
-    i18n.setLanguage('en', { translate: false });
-    expect(i18n.t('only.in.uk')).toBe('лише-укр');
+  test('falls back to default language (en) when active language lacks a key', () => {
+    // Inject a key that only exists in the default (en) dict.
+    i18n.registerLocales({ en: Object.assign({}, enDict, { 'only.in.en': 'english-only' }) });
+    i18n.setLanguage('uk', { translate: false });
+    expect(i18n.t('only.in.en')).toBe('english-only');
     // restore clean dict for any later tests
-    i18n.registerLocales({ uk: ukDict });
+    i18n.registerLocales({ en: enDict });
   });
 
   test('handles null/empty keys gracefully', () => {
@@ -106,8 +106,8 @@ describe('i18n language management', () => {
     expect(langs).toEqual(expect.arrayContaining(['uk', 'en', 'ru']));
   });
 
-  test('default language is uk', () => {
-    expect(i18n.DEFAULT_LANG).toBe('uk');
+  test('default language is en', () => {
+    expect(i18n.DEFAULT_LANG).toBe('en');
   });
 
   test('onChange subscribers fire on language switch and can unsubscribe', () => {

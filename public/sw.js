@@ -13,17 +13,34 @@
 //     { type:'replay-queue' } — реальная отправка очереди живёт в странице
 //     (там есть localStorage-токен и доступ к IndexedDB-очереди).
 //
-// Версия кэша поднята до v2; activate чистит все НЕ-текущие кэши (старый
+// Версия кэша поднята до v3 (fe-shell: self-hosted vendor + locales); activate чистит все НЕ-текущие кэши (старый
 // finman-v1 будет удалён автоматически — существующее поведение не ломается).
 
-const CACHE_VERSION = 'finman-v2';
+const CACHE_VERSION = 'finman-v3';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 const API_CACHE = CACHE_VERSION + '-api';
 
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/manifest.json',
+  '/icons/icon.svg',
   '/css/style.css',
+  '/css/parts/dashboard.css',
+  '/css/parts/transactions.css',
+  '/css/parts/finance.css',
+  '/css/parts/ai.css',
+  '/vendor/chart.min.js',
+  '/vendor/fa.min.css',
+  '/vendor/webfonts/fa-solid-900.woff2',
+  '/vendor/webfonts/fa-regular-400.woff2',
+  '/vendor/webfonts/fa-brands-400.woff2',
+  '/js/locales/en.js',
+  '/js/locales/uk.js',
+  '/js/locales/ru.js',
+  '/js/i18n.js',
+  '/js/theme.js',
+  '/js/lib/a11y.js',
   '/js/app.js',
   '/js/auth.js',
   '/js/accounts.js',
@@ -46,8 +63,15 @@ const STATIC_ASSETS = [
   '/js/dashboard.js',
   '/js/bank-api.js',
   '/js/charts.js',
+  '/js/ai.js',
+  '/js/widgets.js',
+  '/js/onboarding.js',
   '/js/offline.js',
-  '/manifest.json'
+  '/js/data-export.js',
+  '/js/rules.js',
+  '/js/reconcile.js',
+  '/js/api-tokens.js',
+  '/js/billing.js',
 ];
 
 // Install — precache app shell. Используем addAll по одному с защитой, чтобы
@@ -116,7 +140,7 @@ async function apiNetworkFirst(request) {
         error: true,
         offline: true,
         queued: isTxCreate,
-        message: 'Нет подключения к сети. Изменение сохранено локально и будет синхронизировано.'
+        message: 'You are offline. The change was saved on this device and will sync when you reconnect.'
       }),
       {
         status: 503,
@@ -135,7 +159,7 @@ async function navigationNetworkFirst(request) {
     if (cached) return cached;
     const shell = await caches.match('/index.html');
     if (shell) return shell;
-    return new Response('Офлайн', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   }
 }
 
@@ -238,8 +262,8 @@ self.addEventListener('push', event => {
   const data = (event.data && event.data.json && event.data.json()) || {};
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'ФинМенеджер', {
-      body: data.body || 'Новое уведомление',
+    self.registration.showNotification(data.title || 'Finman', {
+      body: data.body || 'New notification',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-72.png',
       data: data.url || '/'
