@@ -68,7 +68,8 @@ async function fetchTransactions(filters = {}) {
   async function fetchCategories() {
     try {
       // Простая реализация - извлечение категорий из существующих транзакций
-      const transactions = await fetchTransactions({ limit: 1000 });
+      // The API clamps limit to 500.
+      const transactions = await fetchTransactions({ limit: TX_PAGE_LIMIT });
       
       // Извлечение уникальных категорий
       const categories = [...new Set(transactions.map(t => t.category))].filter(Boolean);
@@ -80,89 +81,147 @@ async function fetchTransactions(filters = {}) {
     }
   }
   
-  // Получение статистики транзакций
-  async function fetchTransactionStats() {
+  // Server-side page size cap for GET /api/transactions (routes/transactions.js).
+  const TX_PAGE_LIMIT = 500;
+
+  // Every page of a filtered query (the API returns at most 500 rows per page).
+  async function fetchAllTransactions(filters = {}, maxPages = 40) {
+    let all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const batch = await fetchTransactions({ ...filters, page, limit: TX_PAGE_LIMIT });
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      all = all.concat(batch);
+      if (batch.length < TX_PAGE_LIMIT) break;
+    }
+    return all;
+  }
+
+  // Total balance converted into the base currency by the server
+  // (GET /api/analytics/overview -> totalBalance + baseCurrency); null if unavailable.
+  async function fetchConvertedBalance() {
     try {
-      // Получение текущей даты
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
-      // Получение транзакций за текущий месяц
-      const monthlyTransactions = await fetchTransactions({
-        startDate: firstDayOfMonth.toISOString().split('T')[0],
-        limit: 1000
-      });
-      
-      // Получение всех счетов для расчета общего баланса
-      const accounts = await fetchAccounts();
-      
-      // Расчет статистики
-      const stats = {
-        monthlyIncome: 0,
-        monthlyExpense: 0,
-        totalBalance: accounts.reduce((sum, acc) => sum + acc.balance, 0),
-        transactionsByCategory: {},
-        transactionsByMonth: {}
-      };
-      
-      // Расчет доходов и расходов за месяц
-      monthlyTransactions.forEach(transaction => {
-        if (transaction.type === 'income') {
-          stats.monthlyIncome += transaction.amount;
-        } else if (transaction.type === 'expense') {
-          stats.monthlyExpense += Math.abs(transaction.amount);
-        }
-        
-        // Группировка по категориям
-        const category = transaction.category || t('transactions.uncategorized');
-        if (!stats.transactionsByCategory[category]) {
-          stats.transactionsByCategory[category] = {
-            income: 0,
-            expense: 0
-          };
-        }
-        
-        if (transaction.type === 'income') {
-          stats.transactionsByCategory[category].income += transaction.amount;
-        } else {
-          stats.transactionsByCategory[category].expense += Math.abs(transaction.amount);
-        }
-        
-        // Группировка по месяцам
-        const date = new Date(transaction.date);
-        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        
-        if (!stats.transactionsByMonth[monthKey]) {
-          stats.transactionsByMonth[monthKey] = {
-            income: 0,
-            expense: 0
-          };
-        }
-        
-        if (transaction.type === 'income') {
-          stats.transactionsByMonth[monthKey].income += transaction.amount;
-        } else {
-          stats.transactionsByMonth[monthKey].expense += Math.abs(transaction.amount);
-        }
-      });
-      
-      return stats;
-    } catch (error) {
-      console.error('Ошибка получения статистики:', error);
+      const response = await fetchWithAuth('/api/analytics/overview');
+      if (!response.ok) return null;
+      const data = await response.json();
+      const total = Number(data && data.totalBalance);
+      if (!Number.isFinite(total)) return null;
       return {
-        monthlyIncome: 0,
-        monthlyExpense: 0,
-        totalBalance: 0,
-        transactionsByCategory: {},
-        transactionsByMonth: {}
+        total,
+        currency: data.baseCurrency ? String(data.baseCurrency).toUpperCase() : null,
+        missingRates: Array.isArray(data.missingRates) ? data.missingRates : []
       };
+    } catch (error) {
+      return null;
     }
   }
-  
-  // Создание новой транзакции
-  async function createTransaction(transactionData) {
+
+  // Pure aggregation (unit-tested): only real cash flow (income/expense) counts
+  // — opening balances and transfers are not income or spending — and amounts
+  // are grouped per currency, never added across currencies.
+  function computeTransactionStats(transactions, accounts, baseCurrency) {
+    const base = String(baseCurrency || 'CAD').toUpperCase();
+    const curOf = (tx) => String(transactionCurrency(tx, accounts) || base).toUpperCase();
+    const add = (map, key, v) => { map[key] = Math.round(((map[key] || 0) + v) * 100) / 100; };
+
+    const incomeByCurrency = {};
+    const expenseByCurrency = {};
+    const flow = (transactions || []).filter(tx => tx && (tx.type === 'income' || tx.type === 'expense'));
+    flow.forEach(tx => {
+      const amount = Math.abs(Number(tx.amount) || 0);
+      add(tx.type === 'income' ? incomeByCurrency : expenseByCurrency, curOf(tx), amount);
+    });
+
+    const balanceByCurrency = {};
+    (accounts || []).forEach(acc => {
+      add(balanceByCurrency, String(acc.currency || base).toUpperCase(), Number(acc.balance) || 0);
+    });
+
+    const flowCurrencies = [...new Set([...Object.keys(incomeByCurrency), ...Object.keys(expenseByCurrency)])];
+    // Charts show one currency: the base one when present, else the first seen.
+    const currency = flowCurrencies.length === 0 || flowCurrencies.includes(base) ? base : flowCurrencies[0];
+
+    const transactionsByCategory = {};
+    const transactionsByMonth = {};
+    flow.filter(tx => curOf(tx) === currency).forEach(tx => {
+      const amount = Math.abs(Number(tx.amount) || 0);
+      const key = tx.type === 'income' ? 'income' : 'expense';
+      const category = tx.category || t('transactions.uncategorized');
+      if (!transactionsByCategory[category]) transactionsByCategory[category] = { income: 0, expense: 0 };
+      transactionsByCategory[category][key] += amount;
+      const monthKey = String(tx.date || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(monthKey)) {
+        if (!transactionsByMonth[monthKey]) transactionsByMonth[monthKey] = { income: 0, expense: 0 };
+        transactionsByMonth[monthKey][key] += amount;
+      }
+    });
+
+    return {
+      currency,
+      mixedCurrencies: flowCurrencies.length > 1,
+      incomeByCurrency,
+      expenseByCurrency,
+      monthlyIncome: incomeByCurrency[currency] || 0,
+      monthlyExpense: expenseByCurrency[currency] || 0,
+      balanceByCurrency,
+      totalBalance: null,
+      balanceCurrency: null,
+      transactionsByCategory,
+      transactionsByMonth
+    };
+  }
+
+  // Dashboard statistics for the current (local) month.
+  async function fetchTransactionStats() {
+    const base = (typeof appState !== 'undefined' && appState.baseCurrency) || 'CAD';
     try {
-      const response = await fetchWithAuth('/api/transactions', {
+      const { start } = UI.monthRange(new Date());
+      const [monthlyTransactions, accounts, converted] = await Promise.all([
+        fetchAllTransactions({ startDate: start }),
+        fetchAccounts(),
+        fetchConvertedBalance()
+      ]);
+      const stats = computeTransactionStats(monthlyTransactions, accounts, base);
+      if (converted) {
+        stats.totalBalance = converted.total;
+        stats.balanceCurrency = converted.currency || base;
+        stats.missingRates = converted.missingRates;
+      } else {
+        const codes = Object.keys(stats.balanceByCurrency);
+        if (codes.length <= 1) {
+          stats.totalBalance = codes.length ? stats.balanceByCurrency[codes[0]] : 0;
+          stats.balanceCurrency = codes[0] || base;
+        }
+      }
+      return stats;
+    } catch (error) {
+      console.error('Could not load statistics:', error);
+      return computeTransactionStats([], [], base);
+    }
+  }
+
+  // Создание новой транзакции
+  // Offline: put the transaction into the IndexedDB queue (offline.js). Returns
+  // a placeholder row on success, null when there is no queue to put it in.
+  async function queueTransactionOffline(transactionData) {
+    if (typeof window === 'undefined' || typeof window.queueOfflineTransaction !== 'function') {
+      showNotification(t('transactions.offlineNotSaved'), 'error');
+      return null;
+    }
+    try {
+      const item = await window.queueOfflineTransaction(transactionData);
+      showNotification(t('transactions.offlineQueued'), 'warning');
+      return { queued: true, clientTxId: item && item.clientId };
+    } catch (error) {
+      console.error('Could not queue the transaction offline:', error);
+      showNotification(t('transactions.offlineNotSaved'), 'error');
+      return null;
+    }
+  }
+
+  async function createTransaction(transactionData) {
+    let response;
+    try {
+      response = await fetchWithAuth('/api/transactions', {
         method: 'POST',
         body: JSON.stringify(transactionData)
       });
@@ -576,9 +635,10 @@ async function fetchTransactions(filters = {}) {
   
   // Currency of a transaction row: the API row carries none, so take it from
   // the account (appState.accounts) and fall back to the base currency.
-  function transactionCurrency(transaction) {
+  function transactionCurrency(transaction, accountList) {
     if (transaction && transaction.currency) return transaction.currency;
-    const accounts = (typeof appState !== 'undefined' && Array.isArray(appState.accounts)) ? appState.accounts : [];
+    const accounts = Array.isArray(accountList) ? accountList
+      : ((typeof appState !== 'undefined' && Array.isArray(appState.accounts)) ? appState.accounts : []);
     const acc = accounts.find(a => String(a.id) === String(transaction && transaction.account_id));
     return acc && acc.currency ? acc.currency : undefined;
   }

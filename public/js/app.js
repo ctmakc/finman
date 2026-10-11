@@ -685,6 +685,9 @@ async function loadBaseCurrencySettings() {
     const settings = data && data.settings ? data.settings : data;
     if (settings && typeof settings.base_currency === 'string' && settings.base_currency) {
       appState.baseCurrency = settings.base_currency.toUpperCase();
+      if (typeof UI !== 'undefined' && UI && typeof UI.setBaseCurrency === 'function') {
+        UI.setBaseCurrency(appState.baseCurrency);
+      }
     }
     appState.currencySettings = settings || null;
     return settings;
@@ -1014,17 +1017,33 @@ async function renderDashboard() {
     : '<p>You have no transactions yet. <a href="#" class="add-transaction-link">Add a transaction</a></p>';
 
   // ---- Signature hero ----
-  const totalBalance = statsData.totalBalance || 0;
-  const monthIn = statsData.monthlyIncome || 0;
-  const monthOut = statsData.monthlyExpense || 0;
+  // Balance: the server's figure converted into the base currency; without it,
+  // one line per account currency (never a cross-currency sum).
+  const hasTotal = statsData.totalBalance != null && Number.isFinite(Number(statsData.totalBalance));
+  const balanceCurrency = statsData.balanceCurrency || appState.baseCurrency;
+  const totalBalance = hasTotal ? Number(statsData.totalBalance) : 0;
+  const balanceText = hasTotal
+    ? fmFormatCurrency(totalBalance, balanceCurrency)
+    : formatTotals(statsData.balanceByCurrency, balanceCurrency);
+  // Cash flow per currency (opening balances and transfers excluded).
+  const flowCurrency = statsData.currency || appState.baseCurrency;
+  const monthIn = Number(statsData.monthlyIncome) || 0;
+  const monthOut = Number(statsData.monthlyExpense) || 0;
   const netFlow = monthIn - monthOut;
   const flowUp = netFlow >= 0;
+  const incomeText = statsData.incomeByCurrency
+    ? formatTotals(statsData.incomeByCurrency, flowCurrency) : fmFormatCurrency(monthIn, flowCurrency);
+  const expenseText = statsData.expenseByCurrency
+    ? formatTotals(statsData.expenseByCurrency, flowCurrency) : fmFormatCurrency(monthOut, flowCurrency);
+  const netText = statsData.mixedCurrencies
+    ? formatTotals(netByCurrency(statsData.incomeByCurrency, statsData.expenseByCurrency), flowCurrency)
+    : fmFormatCurrency(Math.abs(netFlow), flowCurrency);
   const aiInsight = (typeof getDashboardInsight === 'function')
     ? getDashboardInsight(statsData)
     : (flowUp
         ? 'You are spending less than you earn this month, so your balance is growing.'
         : 'Spending exceeded income this month. Check the categories to get back on track.');
-  const symbol = currencySymbol(appState.baseCurrency);
+  const symbol = currencySymbol(balanceCurrency);
 
   const heroHtml = `
     <section class="fm-hero" aria-label="Your finances">
@@ -1032,22 +1051,22 @@ async function renderDashboard() {
         <div class="fm-hero-main">
           <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
           <h1 class="fm-hero-title">Total balance</h1>
-          <div class="fm-hero-figure" id="hero-networth"
+          ${hasTotal ? `<div class="fm-hero-figure" id="hero-networth"
                data-countup="${totalBalance}" data-currency="${escapeHtmlShell(symbol)}">
             <span class="fm-hero-currency">${escapeHtmlShell(symbol)}</span><span class="fm-hero-amount">${formatPlainNumber(totalBalance)}</span>
-          </div>
+          </div>` : `<div class="fm-hero-figure"><span class="fm-hero-amount">${escapeHtmlShell(balanceText)}</span></div>`}
           <span class="fm-hero-delta ${flowUp ? 'up' : 'down'}">
             <i class="fas fa-arrow-${flowUp ? 'up' : 'down'}"></i>
-            ${fmFormatCurrency(Math.abs(netFlow))} this month
+            ${escapeHtmlShell(netText)} this month
           </span>
           <div class="fm-hero-cashflow">
             <div class="fm-cashflow-item">
               <span class="fm-cashflow-label">Income</span>
-              <span class="fm-cashflow-value in">${fmFormatCurrency(monthIn)}</span>
+              <span class="fm-cashflow-value in">${escapeHtmlShell(incomeText)}</span>
             </div>
             <div class="fm-cashflow-item">
               <span class="fm-cashflow-label">Expenses</span>
-              <span class="fm-cashflow-value out">${fmFormatCurrency(monthOut)}</span>
+              <span class="fm-cashflow-value out">${escapeHtmlShell(expenseText)}</span>
             </div>
           </div>
         </div>
@@ -1072,7 +1091,7 @@ async function renderDashboard() {
         </div>
         <div class="summary-data">
           <h3>Income this month</h3>
-          <div class="summary-amount">${fmFormatCurrency(monthIn)}</div>
+          <div class="summary-amount">${escapeHtmlShell(incomeText)}</div>
         </div>
       </div>
 
@@ -1082,7 +1101,7 @@ async function renderDashboard() {
         </div>
         <div class="summary-data">
           <h3>Expenses this month</h3>
-          <div class="summary-amount">${fmFormatCurrency(monthOut)}</div>
+          <div class="summary-amount">${escapeHtmlShell(expenseText)}</div>
         </div>
       </div>
 
@@ -1092,7 +1111,7 @@ async function renderDashboard() {
         </div>
         <div class="summary-data">
           <h3>Total balance</h3>
-          <div class="summary-amount">${fmFormatCurrency(totalBalance)}</div>
+          <div class="summary-amount">${escapeHtmlShell(balanceText)}</div>
         </div>
       </div>
     </div>
@@ -1697,8 +1716,24 @@ function formatCurrency(amount, currency) {
   return fmFormatCurrency(amount, currency);
 }
 
+// { CAD: 10, EUR: 5 } -> "$10.00 · €5.00" (zero lines dropped; one line minimum).
+function formatTotals(totals, fallbackCurrency) {
+  const map = totals || {};
+  const codes = Object.keys(map).filter((c) => Number(map[c]) !== 0);
+  if (!codes.length) return fmFormatCurrency(0, fallbackCurrency);
+  return codes.map((c) => fmFormatCurrency(map[c], c)).join(' · ');
+}
+
+function netByCurrency(income, expense) {
+  const out = {};
+  Object.keys(income || {}).forEach((c) => { out[c] = (out[c] || 0) + Number(income[c] || 0); });
+  Object.keys(expense || {}).forEach((c) => { out[c] = (out[c] || 0) - Number(expense[c] || 0); });
+  return out;
+}
+
 function currencySymbol(code) {
   const c = String(code || appState.baseCurrency || 'CAD').toUpperCase();
+  if (!isCurrencyCode(c)) return fallbackCurrencyLabel(c);
   try {
     const parts = new Intl.NumberFormat(numberLocale(), { style: 'currency', currency: c }).formatToParts(0);
     const part = parts.find((p) => p.type === 'currency');
@@ -1932,6 +1967,10 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     appState,
     formatCurrency: fmFormatCurrency,
+    formatDate,
+    formatTotals,
+    netByCurrency,
+    isCurrencyCode,
     currencySymbol,
     numberLocale,
     formatPlainNumber,

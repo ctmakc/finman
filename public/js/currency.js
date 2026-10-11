@@ -509,16 +509,18 @@ async function renderCurrencySettingsTab() {
     const displayCurrencies = Array.from(displayCheckboxes).map(cb => cb.value);
 
     try {
+      // models/currency.js updateUserSettings reads camelCase keys.
       const result = await updateCurrencySettings({
-        base_currency: baseCurrency,
-        display_currencies: displayCurrencies,
-        auto_convert: autoConvert
+        baseCurrency,
+        displayCurrencies,
+        autoConvert
       });
 
       currencyState.settings = result.settings;
       showNotification(t('currency.settings.saved'), 'success');
       if (typeof appState !== 'undefined' && result && result.settings && result.settings.base_currency) {
         appState.baseCurrency = String(result.settings.base_currency).toUpperCase();
+        if (typeof UI !== 'undefined' && UI.setBaseCurrency) UI.setBaseCurrency(appState.baseCurrency);
       }
     } catch (error) {
       showNotification(t('currency.settings.saveError'), 'error');
