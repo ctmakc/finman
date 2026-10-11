@@ -54,22 +54,31 @@ async function googleVerify(accessToken, refreshToken, profile, done) {
     const googleId = profile && profile.id;
     if (!googleId) return done(null, false, { message: 'Google profile has no id' });
     const email = ((profile.emails && profile.emails[0] && profile.emails[0].value) || '').toLowerCase();
+    // Google marks the address verified in emails[0].verified (passport-google-oauth20)
+    // or in the raw userinfo email_verified. An unverified address is never
+    // trusted for account creation or matching.
+    const emailVerified = Boolean(
+      (profile.emails && profile.emails[0] && profile.emails[0].verified === true) ||
+      (profile._json && (profile._json.email_verified === true || profile._json.email_verified === 'true'))
+    );
     const avatarUrl = profile.photos && profile.photos[0] && profile.photos[0].value;
     const fullName = profile.displayName || '';
 
     let user = await User.findByGoogleId(googleId);
     if (user) return done(null, user);
 
-    if (email) {
-      const existing = await User.findByEmail(email);
-      if (existing) {
-        await User.linkGoogle(existing.id, googleId, avatarUrl);
-        // Отдаём свежую строку (с google_id/avatar_url), а не снимок до привязки.
-        return done(null, (await User.findById(existing.id)) || existing);
-      }
+    if (!email || !emailVerified) {
+      return done(null, false, { message: 'Google account has no verified email' });
     }
 
-    if (!email) return done(null, false, { message: 'Google account has no usable email' });
+    // A password account with the same email is NOT linked automatically:
+    // local emails are never verified, so anyone could pre-register the
+    // victim's address and receive their Google sign-in. The user signs in
+    // with the password instead (callback reports auth_error=email_exists).
+    const existing = await User.findByEmail(email);
+    if (existing) {
+      return done(null, false, { message: 'email_exists' });
+    }
 
     const created = await User.createFromGoogle({ googleId, email, fullName, avatarUrl });
     const fresh = await User.findById(created.id);
@@ -97,6 +106,9 @@ function registerGoogleStrategy() {
     clientSecret: config.google.clientSecret,
     callbackURL: config.google.callbackUrl,
     scope: ['profile', 'email'],
+    // OAuth state in the session: a callback carrying someone else's code
+    // (login CSRF) is rejected.
+    state: true,
   }, googleVerify));
   console.log('Passport: Google OAuth strategy enabled');
   return true;

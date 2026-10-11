@@ -31,7 +31,7 @@ function profile(over = {}) {
   return Object.assign({
     id: 'g-1001',
     displayName: 'Google Person',
-    emails: [{ value: 'Google.Person@example.com' }],
+    emails: [{ value: 'Google.Person@example.com', verified: true }],
     photos: [{ value: 'https://lh3.googleusercontent.com/a/photo.jpg' }],
   }, over);
 }
@@ -179,25 +179,39 @@ describe('Google sign-in: enabled with credentials', () => {
     expect(all[0].n).toBe(1);
   });
 
-  test('verify: email matches a password account -> links google_id, no duplicate, no notification', async () => {
-    const { err, user } = await runVerify(authService.googleVerify, profile({
+  // Local emails are never verified: whoever registered victim@ with a
+  // password first would receive the victim's Google sign-in. No auto-link.
+  test('verify: email matches a password account -> refused (email_exists), nothing linked or created', async () => {
+    const before = (await require('../db/database').query('SELECT COUNT(*) AS n FROM users'))[0].n;
+    const { err, user, info } = await runVerify(authService.googleVerify, profile({
       id: 'g-2002',
-      emails: [{ value: 'TEST@example.com' }],
+      emails: [{ value: 'TEST@example.com', verified: true }],
       photos: [{ value: 'https://lh3.googleusercontent.com/a/seed.jpg' }],
     }));
     expect(err).toBeFalsy();
-    expect(user.id).toBe(ctx.userId);
-    const linked = await User.findById(ctx.userId);
-    expect(linked.google_id).toBe('g-2002');
-    expect(linked.avatar_url).toBe('https://lh3.googleusercontent.com/a/seed.jpg');
-    // Пароль продолжает работать после привязки.
-    const row = await User.findByUsername('testuser');
-    expect(await User.verifyPassword(row, 'password123')).toBe(true);
+    expect(user).toBe(false);
+    expect(info.message).toBe('email_exists');
+    const row = await User.findById(ctx.userId);
+    expect(row.google_id).toBeFalsy();
+    const after = (await require('../db/database').query('SELECT COUNT(*) AS n FROM users'))[0].n;
+    expect(after).toBe(before);
     await signupNotify.flush();
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
-  test('verify: password account registered with a MIXED-case email is linked, not duplicated', async () => {
+  test('verify: unverified Google email -> rejected, nothing created', async () => {
+    const before = (await require('../db/database').query('SELECT COUNT(*) AS n FROM users'))[0].n;
+    const { user, info } = await runVerify(authService.googleVerify, profile({
+      id: 'g-6006',
+      emails: [{ value: 'unverified@example.com', verified: false }],
+    }));
+    expect(user).toBe(false);
+    expect(info.message).toMatch(/verified email/);
+    const after = (await require('../db/database').query('SELECT COUNT(*) AS n FROM users'))[0].n;
+    expect(after).toBe(before);
+  });
+
+  test('verify: password account registered with a MIXED-case email is matched (refused), not duplicated', async () => {
     const db = require('../db/database');
     const bcrypt = require('bcrypt');
     const hash = await bcrypt.hash('pw-mixed', 4);
@@ -205,13 +219,13 @@ describe('Google sign-in: enabled with credentials', () => {
     const before = (await db.query('SELECT COUNT(*) AS n FROM users'))[0].n;
 
     // Google всегда отдаёт email в нижнем регистре.
-    const { err, user } = await runVerify(authService.googleVerify, profile({
+    const { err, user, info } = await runVerify(authService.googleVerify, profile({
       id: 'g-5005',
-      emails: [{ value: 'mixed.case@example.com' }],
+      emails: [{ value: 'mixed.case@example.com', verified: true }],
     }));
     expect(err).toBeFalsy();
-    expect(user.username).toBe('mixedcase');
-    expect(user.google_id).toBe('g-5005');
+    expect(user).toBe(false);
+    expect(info.message).toBe('email_exists');
     const after = (await db.query('SELECT COUNT(*) AS n FROM users'))[0].n;
     expect(after).toBe(before); // привязка, не второй аккаунт
     await signupNotify.flush();
@@ -232,7 +246,7 @@ describe('Google sign-in: enabled with credentials', () => {
   test('verify: username clash gets a suffix instead of failing', async () => {
     const { err, user } = await runVerify(authService.googleVerify, profile({
       id: 'g-4004',
-      emails: [{ value: 'testuser@other.example' }], // base "testuser" already exists
+      emails: [{ value: 'testuser@other.example', verified: true }], // base "testuser" already exists
     }));
     expect(err).toBeFalsy();
     expect(user.username).toMatch(/^testuser-[0-9a-f]{4}$/);
@@ -272,6 +286,13 @@ describe('Google sign-in: enabled with credentials', () => {
       const r = await ctx.request.get('/api/auth/google/callback?error=access_denied');
       expect(r.status).toBe(302);
       expect(r.headers.location).toBe('http://localhost:3000/?auth_error=google_denied');
+    });
+
+    test('existing password account -> 302 successRedirect?auth_error=email_exists', async () => {
+      strategy.authenticate = function () { this.fail({ message: 'email_exists' }); };
+      const r = await ctx.request.get('/api/auth/google/callback?code=fake');
+      expect(r.status).toBe(302);
+      expect(r.headers.location).toBe('http://localhost:3000/?auth_error=email_exists');
     });
 
     test('strategy error -> 302 successRedirect?auth_error=google_failed', async () => {

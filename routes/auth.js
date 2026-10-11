@@ -29,11 +29,14 @@ router.get('/google/callback', (req, res, next) => {
   if (!googleEnabled()) {
     return res.status(503).json({ error: true, message: 'Google sign-in is not configured' });
   }
-  passport.authenticate('google', { session: false }, (err, user) => {
+  passport.authenticate('google', { session: false }, (err, user, info) => {
     const fail = (reason) =>
       res.redirect(config.google.successRedirect + '?auth_error=' + encodeURIComponent(reason));
     if (err) { console.error('Google callback error:', err); return fail('google_failed'); }
-    if (!user) return fail('google_denied');
+    if (!user) {
+      const reason = info && info.message === 'email_exists' ? 'email_exists' : 'google_denied';
+      return fail(reason);
+    }
     try {
       // Тот же payload, что и у входа по паролю: { id }.
       const token = jwt.sign({ id: user.id }, config.jwtSecret, {
@@ -206,8 +209,14 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
   try {
     const { email, fullName, password, currentPassword } = req.body;
     
-    // Если меняется пароль, проверить текущий пароль
-    if (password) {
+    // Пароль и email меняются только с текущим паролем: иначе украденный JWT
+    // (24 ч) превращается в постоянный доступ (смена email -> сброс/вход Google).
+    const currentEmail = String(req.user.email || '').toLowerCase();
+    const emailChanging = email !== undefined && String(email).toLowerCase() !== currentEmail;
+    if (password !== undefined && password !== null && String(password).length < 6) {
+      return res.status(400).json({ error: true, message: 'Password must be at least 6 characters' });
+    }
+    if (password || emailChanging) {
       if (!currentPassword) {
         return res.status(400).json({ 
           error: true, 
@@ -215,11 +224,14 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
         });
       }
       
-      const user = await User.findById(req.user.id);
-      const isPasswordValid = await User.verifyPassword(user, currentPassword);
+      // findById не отдаёт хеш пароля (bcrypt.compare(undefined) -> 500):
+      // берём полную строку.
+      const user = await User.findByUsername(req.user.username);
+      const isPasswordValid = Boolean(user) && await User.verifyPassword(user, String(currentPassword));
       
       if (!isPasswordValid) {
-        return res.status(401).json({ 
+        // 400, не 401: клиент считает любой 401 истёкшей сессией и разлогинивает.
+        return res.status(400).json({ 
           error: true, 
           message: 'Current password is incorrect' 
         });

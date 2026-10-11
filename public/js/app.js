@@ -720,6 +720,11 @@ function consumeOAuthFragment() {
   if (err) {
     history.replaceState(null, '', window.location.pathname);
     console.warn('Google sign-in failed:', err);
+    const msg = err === 'email_exists'
+      ? 'An account with this email already exists. Sign in with your password.'
+      : 'Google sign-in failed. Try again or use your password.';
+    // Login page renders after this call; show the message once it exists.
+    setTimeout(() => { try { showNotification(msg, 'error'); } catch (_) {} }, 0);
   }
   return false;
 }

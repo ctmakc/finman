@@ -137,7 +137,9 @@ app.use(session({
   cookie: {
     secure: config.environment === 'production',
     httpOnly: true,
-    sameSite: 'strict',
+    // lax, not strict: the only session user is the Google OAuth handshake,
+    // and its state must survive the top-level redirect back from Google.
+    sameSite: 'lax',
     path: '/',
     domain: config.cookieDomain,
     expires: false,
