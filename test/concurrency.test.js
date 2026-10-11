@@ -44,6 +44,31 @@ describe('Concurrency — balance integrity under parallel writes', () => {
     expect(acc.balance).toBe(211.1);
   });
 
+  test('a write outside transaction() survives a concurrent ROLLBACK', async () => {
+    // Раньше run() вне transaction() на общем соединении попадал внутрь
+    // открытой чужой транзакции и откатывался вместе с ней.
+    const db = require('../db/database');
+    let release, started;
+    const gate = new Promise((r) => { release = r; });
+    const opened = new Promise((r) => { started = r; });
+    const failing = db.transaction(async () => {
+      await db.run('UPDATE accounts SET name = ? WHERE id = ?', ['inside-tx', accountId]);
+      started();
+      await gate;
+      throw new Error('boom');
+    });
+    await opened;
+    // Пока транзакция открыта — независимая запись другого «запроса».
+    const outside = db.run('UPDATE accounts SET bank_name = ? WHERE id = ?', ['kept', accountId]);
+    await new Promise((r) => setTimeout(r, 50));
+    release();
+    await expect(failing).rejects.toThrow('boom');
+    await outside;
+    const acc = await get('SELECT name, bank_name FROM accounts WHERE id = ?', [accountId]);
+    expect(acc.name).toBe('Concurrency');
+    expect(acc.bank_name).toBe('kept');
+  });
+
   test('concurrent creates + deletes net out exactly', async () => {
     // создаём 10 по +7, параллельно. Затем удаляем половину, параллельно.
     const created = await Promise.all(Array.from({ length: 10 }, () => mkTx(7, 'income')));

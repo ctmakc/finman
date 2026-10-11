@@ -15,6 +15,11 @@ if (!fs.existsSync(dbDir)){
 // Создание подключения к базе данных
 const db = new sqlite3.Database(dbPath);
 
+// Очередь записи (см. run/transaction ниже) и маркер «мы внутри transaction()».
+const { AsyncLocalStorage } = require('async_hooks');
+const _txContext = new AsyncLocalStorage();
+let _txQueue = Promise.resolve();
+
 // Прочность под конкуренцией:
 //  - WAL: читатели не блокируют писателя (меньше SQLITE_BUSY);
 //  - busy_timeout: ждать освобождения вместо мгновенной ошибки;
@@ -985,8 +990,20 @@ function get(sql, params = []) {
   });
 }
 
-// Вспомогательная функция для выполнения INSERT/UPDATE/DELETE
+// Вспомогательная функция для выполнения INSERT/UPDATE/DELETE.
+// Все писатели делят ОДНО соединение. Запись вне transaction(), выполненная,
+// пока другая транзакция открыта, попадала внутрь её BEGIN..COMMIT и
+// пропадала при её ROLLBACK (запрос уже ответил «успех»). Поэтому запись вне
+// транзакции встаёт в ту же очередь, что и transaction(); внутри work()
+// (контекст AsyncLocalStorage) запись идёт напрямую.
 function run(sql, params = []) {
+  if (_txContext.getStore()) return rawRun(sql, params);
+  const result = _txQueue.then(() => rawRun(sql, params));
+  _txQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+function rawRun(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.run(sql, params, function(err) {
       if (err) {
@@ -1019,19 +1036,18 @@ function closeDatabase() {
 // (SQLite: "cannot start a transaction within a transaction") и корраптят
 // баланс. transaction(work) гарантирует: одновременно открыта максимум одна
 // транзакция; work() выполняется между BEGIN и COMMIT, при ошибке — ROLLBACK.
-let _txQueue = Promise.resolve();
 function transaction(work) {
-  const result = _txQueue.then(async () => {
-    await run('BEGIN');
+  const result = _txQueue.then(() => _txContext.run(true, async () => {
+    await rawRun('BEGIN');
     try {
       const r = await work();
-      await run('COMMIT');
+      await rawRun('COMMIT');
       return r;
     } catch (err) {
-      try { await run('ROLLBACK'); } catch (_) { /* уже откатилось */ }
+      try { await rawRun('ROLLBACK'); } catch (_) { /* уже откатилось */ }
       throw err;
     }
-  });
+  }));
   // Очередь продолжается независимо от успеха/ошибки текущей транзакции.
   _txQueue = result.then(() => undefined, () => undefined);
   return result;
