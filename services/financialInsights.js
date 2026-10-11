@@ -25,6 +25,7 @@ const { query, get, run } = require('../db/database');
 const provider = require('../lib/ai/provider');
 const logger = require('../lib/logger');
 const { cashflowOnly, isCashflow } = require('../lib/txFilter');
+const { converterForUser } = require('../lib/fx');
 
 // Cash flow only (no transfers / opening balances).
 const CF = cashflowOnly();
@@ -62,6 +63,17 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 // Accept either a user object ({ id }) or a bare id.
+// Rows carry their account currency; amounts come back in the base currency.
+async function toBaseCurrency(userId, rows) {
+  const fx = await converterForUser(userId);
+  const out = [];
+  for (const r of rows) {
+    const { currency, ...rest } = r;
+    out.push({ ...rest, amount: await fx.convert(r.amount, currency) });
+  }
+  return out;
+}
+
 function toUserId(userOrId) {
   if (userOrId && typeof userOrId === 'object') return userOrId.id;
   return userOrId;
@@ -83,12 +95,15 @@ async function buildDigest(userOrId, opts = {}) {
   const windowStart = isoDate(new Date(now.getTime() - 90 * 864e5));
   const since = windowStart < lastStart ? windowStart : lastStart;
 
-  const rows = await query(
-    `SELECT date, COALESCE(category, 'Uncategorized') AS category, amount, type
-       FROM transactions
-      WHERE user_id = ? AND date >= ? AND date < ?`,
+  const rawRows = await query(
+    `SELECT t.date, COALESCE(t.category, 'Uncategorized') AS category, t.amount, t.type, a.currency
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.date >= ? AND t.date < ?`,
     [userId, since, thisEnd]
   );
+  // Each row in its account's currency -> the user's base currency.
+  const rows = await toBaseCurrency(userId, rawRows);
 
   const inMonth = (dt, s, e) => dt >= s && dt < e;
   let incomeThis = 0;
@@ -512,24 +527,24 @@ async function weeklyBrief(userOrId, opts = {}) {
   const since = isoDate(new Date(now.getTime() - 6 * 864e5));
   const until = isoDate(now);
 
-  const [transactions, dailyTotals] = await Promise.all([
-    query(
-      `SELECT amount, description, date, type, COALESCE(category, 'Uncategorized') AS category
-         FROM transactions
-        WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
-        ORDER BY date DESC, id DESC`,
-      [userId, since, until, ...CF.params]
-    ),
-    query(
-      `SELECT date,
-              SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END) AS spent,
-              SUM(CASE WHEN type = 'income' THEN ABS(amount) ELSE 0 END) AS earned
-         FROM transactions
-        WHERE user_id = ? AND date >= ? AND date <= ?${CF.sql}
-        GROUP BY date ORDER BY date`,
-      [userId, since, until, ...CF.params]
-    ),
-  ]);
+  const CFT = cashflowOnly('t');
+  const transactions = await toBaseCurrency(userId, await query(
+    `SELECT t.amount, t.description, t.date, t.type, COALESCE(t.category, 'Uncategorized') AS category, a.currency
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.date >= ? AND t.date <= ?${CFT.sql}
+      ORDER BY t.date DESC, t.id DESC`,
+    [userId, since, until, ...CFT.params]
+  ));
+  // Daily totals from the converted rows (SQL SUM would mix currencies).
+  const byDay = new Map();
+  for (const t of transactions) {
+    const d = byDay.get(t.date) || { date: t.date, spent: 0, earned: 0 };
+    if (t.type === 'expense') d.spent = round2(d.spent + Math.abs(t.amount));
+    else if (t.type === 'income') d.earned = round2(d.earned + Math.abs(t.amount));
+    byDay.set(t.date, d);
+  }
+  const dailyTotals = Array.from(byDay.values()).sort((x, y) => (x.date < y.date ? -1 : 1));
 
   const totalSpent = round2(
     transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)

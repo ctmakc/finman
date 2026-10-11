@@ -49,6 +49,12 @@ async function seedAccount(db, userId) {
     `INSERT INTO accounts (user_id, name, currency, balance, account_type, is_active) VALUES (?, ?, 'UAH', 5000, 'card', 1)`,
     [userId, 'Main Card']
   );
+  // Digest totals are in the user's base currency; the fixture is all UAH.
+  await dbRun(
+    db,
+    `INSERT OR REPLACE INTO user_currency_settings (user_id, base_currency, display_currencies) VALUES (?, 'UAH', '["UAH"]')`,
+    [userId]
+  );
   return acc.id;
 }
 

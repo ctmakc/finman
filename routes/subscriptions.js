@@ -6,6 +6,8 @@ const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const subscriptionDetector = require('../services/subscriptionDetector');
 const Subscription = require('../models/subscription');
 const dates = require('../lib/dates');
+const money = require('../lib/money');
+const { converterForUser } = require('../lib/fx');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -59,13 +61,16 @@ router.get('/stats', async (req, res) => {
       [req.user.id]
     );
 
+    // Each subscription in its own currency -> totals in the base currency.
+    const fx = await converterForUser(req.user.id);
     let monthlyTotal = 0;
     let yearlyTotal = 0;
-
-    active.forEach(s => {
-      monthlyTotal += calculateMonthlyAmount(s.amount, s.billing_cycle);
-      yearlyTotal += calculateYearlyAmount(s.amount, s.billing_cycle);
-    });
+    for (const s of active) {
+      const yearly = calculateYearlyAmount(Number(s.amount) || 0, s.billing_cycle);
+      const converted = await fx.convert(yearly, s.currency);
+      yearlyTotal = money.add(yearlyTotal, converted);
+    }
+    monthlyTotal = money.round(yearlyTotal / 12);
 
     const upcoming = active.filter(s => {
       if (!s.next_billing_date) return false;
@@ -77,6 +82,8 @@ router.get('/stats', async (req, res) => {
       activeCount: active.length,
       monthlyTotal,
       yearlyTotal,
+      currency: fx.baseCurrency,
+      missingRates: fx.missingRates,
       upcomingCount: upcoming.length,
       upcoming
     });
