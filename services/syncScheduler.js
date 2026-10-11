@@ -165,14 +165,12 @@ async function syncUser(userId, summary) {
     summary.connections += 1;
     const bankName = bankNameFor(connection.bank_id);
 
-    // Счета, относящиеся к этому подключению. Сопоставляем по bank_name
-    // (так же, как существующий маршрут sync-transactions). Если совпадений
-    // нет — берём все счета пользователя как fallback (на случай, когда
-    // bank_name не был проставлен).
-    let targetAccounts = accounts.filter((a) => a.bank_name === bankName);
-    if (targetAccounts.length === 0) {
-      targetAccounts = accounts.filter((a) => a.account_number);
-    }
+    // Счета этого подключения: сохранённые в нём accountIds (их пишет
+    // sync-accounts) или совпадение bank_name — как в маршруте
+    // sync-transactions. Fallback «все счета пользователя» убран: он слал
+    // номера счетов RBC/TD и т.п. в эндпоинт Monobank.
+    const linkedIds = new Set((connection.accountIds || []).map(String));
+    const targetAccounts = accounts.filter((a) => a.bank_name === bankName || linkedIds.has(String(a.id)));
 
     for (const account of targetAccounts) {
       if (!account.account_number) continue;

@@ -342,6 +342,22 @@ describe('HTTP: bank sync and commit with identical transactions', () => {
     expect(second.skipped).toBe(second.fetched);
     expect(await countTx(ctx, acc)).toBe(2);
   });
+
+  test('syncScheduler never sends accounts of another bank to the Monobank endpoint', async () => {
+    const scheduler = require(path.join(PROJECT_ROOT, 'services', 'syncScheduler.js'));
+    // A user with a Monobank connection and only an RBC account.
+    const userId = await dbRun(ctx, `INSERT INTO users (username, email, password, full_name) VALUES ('rbc', 'rbc@example.com', 'x', 'R')`, []);
+    await dbRun(ctx, `INSERT INTO bank_connections (user_id, bank_id, access_token, is_active) VALUES (?, 'monobank', 'tok', 1)`, [userId]);
+    await dbRun(
+      ctx,
+      `INSERT INTO accounts (user_id, name, account_number, bank_name, currency, balance, account_type) VALUES (?, 'Chequing', '00123-4567', 'RBC Royal Bank', 'CAD', 0, 'checking')`,
+      [userId]
+    );
+    bankApiService.getTransactions.mockClear();
+    const summary = await scheduler.runOnce(userId);
+    expect(bankApiService.getTransactions).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ accounts: 0, inserted: 0 });
+  });
 });
 
 describe('OFX: multi-statement files, calendar dates, per-transaction currency, entities', () => {
