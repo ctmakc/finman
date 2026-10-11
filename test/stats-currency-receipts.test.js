@@ -136,6 +136,12 @@ describe('networth: CAD конвертируется без «Нет курса�
   beforeAll(async () => {
     ctx = await makeApp();
     db = require('../db/database');
+    // This user keeps UAH as base currency (product default is CAD).
+    await db.run(
+      `INSERT INTO user_currency_settings (user_id, base_currency, display_currencies)
+       VALUES (?, 'UAH', '["UAH","USD","EUR"]')`,
+      [ctx.userId]
+    );
     await db.run(
       `INSERT INTO accounts (user_id, name, currency, balance, is_active) VALUES (?, 'CAD acc', 'CAD', 1000, 1)`,
       [ctx.userId]

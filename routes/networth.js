@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const networthService = require('../services/networthService');
 const { ok } = require('../lib/respond');
 const { AppError } = require('../middleware/error');
@@ -110,7 +111,7 @@ router.post('/assets', async (req, res, next) => {
         name,
         type || 'other',
         value,
-        currency || 'UAH',
+        currency || DEFAULT_CURRENCY,
         purchase_date,
         purchase_price,
         description,

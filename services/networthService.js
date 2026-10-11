@@ -5,7 +5,7 @@
 // into the user's base currency via the Currency model / currency_rates table.
 //
 // Rules:
-//   - Base currency comes from user_currency_settings (Currency.getUserSettings), default 'UAH'.
+//   - Base currency comes from user_currency_settings (Currency.getUserSettings), default config.defaultCurrency (CAD).
 //   - Each component is converted with Currency.getRate(from, base). If a rate is MISSING
 //     (getRate -> null), we fall back to a 1:1 conversion and FLAG that currency in
 //     `missingRates` so the caller/UI can warn the user that the total is approximate.
@@ -24,7 +24,7 @@ const Currency = require('../models/currency');
 const currencyService = require('./currencyService');
 const money = require('../lib/money');
 
-const DEFAULT_BASE = 'UAH';
+const DEFAULT_BASE = require('../config/config').defaultCurrency;
 
 // Liability debt types (mirrors the existing route's filter so we never break it).
 const LIABILITY_DEBT_TYPES = ['i_owe', 'credit', 'mortgage', 'loan'];
@@ -79,6 +79,26 @@ async function convertAmount(amount, fromCurrency, baseCurrency, date, missingRa
   }
 
   return money.mul(value, rate);
+}
+
+// Sum of all active account balances in the user's base currency.
+// Used by the dashboard (analytics overview), the balance / net-worth widgets
+// and the forecast so a CAD user with a USD account never sees a naive sum.
+// Missing rates fall back to 1:1 and are reported in missingRates (no 422).
+async function sumAccountsInBase(userId, options = {}) {
+  const baseCurrency = await resolveBaseCurrency(userId, options.baseCurrency);
+  const missingRates = new Set();
+  const rows = await query(
+    `SELECT balance AS amount, currency FROM accounts WHERE user_id = ? AND is_active = 1`,
+    [userId]
+  );
+  const total = await convertRows(rows, baseCurrency, options.date || null, missingRates);
+  return {
+    total,
+    baseCurrency,
+    missingRates: Array.from(missingRates),
+    hasMissingRates: missingRates.size > 0,
+  };
 }
 
 // Sum a list of { amount, currency } rows into the base currency.
@@ -278,6 +298,7 @@ async function getTrend(userId, options = {}) {
 
 module.exports = {
   computeNetWorth,
+  sumAccountsInBase,
   takeSnapshot,
   getTrend,
   resolveBaseCurrency,

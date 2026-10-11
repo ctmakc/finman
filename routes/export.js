@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, run, transaction } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const Account = require('../models/account');
 const Transaction = require('../models/transaction');
 const backupService = require('../services/backupService');
@@ -86,7 +87,7 @@ router.get('/transactions/csv', async (req, res) => {
     const headers = ['Дата', 'Описание', 'Категория', 'Сумма', 'Тип', 'Счёт', 'Валюта'];
     const rows = transactions.map(t => [
       t.date, '"' + (t.description || '').replace(/"/g, '""') + '"', t.category || '',
-      t.amount, t.type === 'income' ? 'Доход' : 'Расход', t.account_name || '', t.currency || 'UAH'
+      t.amount, t.type === 'income' ? 'Доход' : 'Расход', t.account_name || '', t.currency || DEFAULT_CURRENCY
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -99,7 +100,7 @@ router.get('/accounts/csv', async (req, res) => {
   try {
     const accounts = await query('SELECT name, account_number, bank_name, balance, currency, account_type, created_at FROM accounts WHERE user_id = ? AND is_active = 1', [req.user.id]);
     const headers = ['Название', 'Номер', 'Банк', 'Баланс', 'Валюта', 'Тип', 'Создан'];
-    const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || 'UAH', a.account_type || '', a.created_at]);
+    const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || DEFAULT_CURRENCY, a.account_type || '', a.created_at]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=accounts_' + new Date().toISOString().split('T')[0] + '.csv');

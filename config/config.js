@@ -96,6 +96,11 @@ module.exports = {
   dbPath: process.env.DATABASE_PATH || './data/finance.db',
   environment: process.env.NODE_ENV || 'development',
 
+  // Product default currency (Canada-first). New users, accounts, budgets, goals,
+  // debts etc. fall back to this when no currency is given. Existing rows keep
+  // whatever they were created with.
+  defaultCurrency: String(process.env.DEFAULT_CURRENCY || 'CAD').toUpperCase(),
+
   // Session cookie (express-session). Имя и домен совпадают с продом
   // (app.finman.money): COOKIE_DOMAIN пустой -> cookie только для хоста.
   sessionCookieName: 'finman.sid',

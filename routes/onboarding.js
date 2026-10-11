@@ -16,6 +16,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, get, run } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const { ok } = require('../lib/respond');
 const { AppError } = require('../middleware/error');
 
@@ -172,7 +173,7 @@ router.post('/quickstart', async (req, res, next) => {
     const { currency, accountName } = req.body || {};
     const accCurrency = typeof currency === 'string' && currency.trim()
       ? currency.trim().toUpperCase()
-      : 'UAH';
+      : DEFAULT_CURRENCY;
     const accName = typeof accountName === 'string' && accountName.trim()
       ? accountName.trim()
       : 'Основной счёт';

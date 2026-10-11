@@ -1,4 +1,5 @@
 const { query, get, run, transaction } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const money = require('../lib/money');
 
 class Budget {
@@ -17,7 +18,7 @@ class Budget {
           budgetData.period || 'monthly',
           budgetData.startDate,
           budgetData.endDate || null,
-          budgetData.currency || 'UAH',
+          budgetData.currency || DEFAULT_CURRENCY,
           budgetData.notifyAtPercent || 80,
           budgetData.rollover ? 1 : 0,
           money.round(budgetData.carryover || 0)

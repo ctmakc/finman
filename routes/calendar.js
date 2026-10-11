@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const { todayISO, userTz, addDaysISO, startOfMonthISO, endOfMonthISO } = require('../lib/dates');
 
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -120,7 +121,7 @@ router.post('/events', async (req, res) => {
     const result = await run(
       `INSERT INTO calendar_events (user_id, title, description, event_type, amount, currency, event_date, end_date, is_recurring, recurrence_rule, reminder_enabled, reminder_days, color)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, title, description, event_type, amount, currency || 'UAH', event_date, end_date, is_recurring ? 1 : 0, recurrence_rule, reminder_enabled !== false ? 1 : 0, reminder_days || 1, color || '#5D5CDE']
+      [req.user.id, title, description, event_type, amount, currency || DEFAULT_CURRENCY, event_date, end_date, is_recurring ? 1 : 0, recurrence_rule, reminder_enabled !== false ? 1 : 0, reminder_days || 1, color || '#5D5CDE']
     );
 
     res.status(201).json({ id: result.id, message: 'Событие создано' });

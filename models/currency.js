@@ -1,4 +1,5 @@
 const { query, get, run } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 
 // Список поддерживаемых валют
 const SUPPORTED_CURRENCIES = [
@@ -220,11 +221,13 @@ class Currency {
     );
 
     if (!settings) {
-      // Создаем настройки по умолчанию
+      // Default settings for a new user: base = product default (CAD),
+      // display list = base + USD/EUR (deduplicated).
+      const display = [...new Set([DEFAULT_CURRENCY, 'USD', 'EUR'])];
       await run(
         `INSERT INTO user_currency_settings (user_id, base_currency, display_currencies)
-         VALUES (?, 'UAH', '["UAH","USD","EUR"]')`,
-        [userId]
+         VALUES (?, ?, ?)`,
+        [userId, DEFAULT_CURRENCY, JSON.stringify(display)]
       );
       settings = await get(
         `SELECT * FROM user_currency_settings WHERE user_id = ?`,
@@ -234,7 +237,7 @@ class Currency {
 
     return {
       ...settings,
-      display_currencies: JSON.parse(settings.display_currencies || '["UAH","USD","EUR"]')
+      display_currencies: JSON.parse(settings.display_currencies || JSON.stringify([...new Set([DEFAULT_CURRENCY, 'USD', 'EUR'])]))
     };
   }
 
@@ -272,7 +275,7 @@ class Currency {
   }
 
   // Рассчитать общий баланс в базовой валюте
-  static async calculateTotalBalance(userId, accounts, baseCurrency = 'UAH') {
+  static async calculateTotalBalance(userId, accounts, baseCurrency = DEFAULT_CURRENCY) {
     let total = 0;
 
     for (const account of accounts) {

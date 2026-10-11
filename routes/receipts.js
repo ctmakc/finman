@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const { query, get, run } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const ocrService = require('../services/ocrService');
 
 // Foundation-инфраструктура (feature-detect: если чего-то нет — деградируем мягко).
@@ -126,7 +127,7 @@ async function processAndStore(receiptId, imageData) {
     [
       ocr.merchant,
       ocr.total_amount,
-      ocr.currency || 'UAH',
+      ocr.currency || DEFAULT_CURRENCY,
       ocr.receipt_date,
       ocr.category,
       JSON.stringify(ocr.items || []),
@@ -147,7 +148,7 @@ router.post('/manual', async (req, res) => {
     const result = await run(
       `INSERT INTO receipts (user_id, merchant, total_amount, currency, receipt_date, category, items, ocr_status, is_processed, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', 1, ?)`,
-      [req.user.id, merchant, total_amount, currency || 'UAH', receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
+      [req.user.id, merchant, total_amount, currency || DEFAULT_CURRENCY, receipt_date || new Date().toISOString().split('T')[0], category, JSON.stringify(items || []), notes]
     );
 
     res.status(201).json({ id: result.id, message: 'Чек добавлен' });

@@ -25,9 +25,14 @@ describe('networth-fx: currency-aware net worth', () => {
     ctx = await makeApp();
     db = getDb();
 
-    // Базовая валюта пользователя — UAH (дефолт user_currency_settings).
-    // Курсы: 1 USD = 40 UAH, 1 EUR = 44 UAH. GBP — НАМЕРЕННО без курса.
+    // Base currency of this user is pinned to UAH (the product default is CAD).
+    // Rates: 1 USD = 40 UAH, 1 EUR = 44 UAH. GBP — deliberately without a rate.
     const today = new Date().toISOString().split('T')[0];
+    await db.run(
+      `INSERT INTO user_currency_settings (user_id, base_currency, display_currencies)
+       VALUES (?, 'UAH', '["UAH","USD","EUR"]')`,
+      [ctx.userId]
+    );
     await db.run(
       `INSERT INTO currency_rates (from_currency, to_currency, rate, source, date)
        VALUES (?, ?, ?, 'test', ?)`,

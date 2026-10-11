@@ -21,7 +21,7 @@
 const { query } = require('../db/database');
 const money = require('../lib/money');
 
-const DEFAULT_CURRENCY = 'UAH';
+const DEFAULT_CURRENCY = require('../config/config').defaultCurrency;
 
 // ----- Beancount name/string helpers -------------------------------------
 

@@ -5,6 +5,7 @@ const { query, get, run } = require('../db/database');
 const money = require('../lib/money');
 const dates = require('../lib/dates');
 const { cashflowOnly } = require('../lib/txFilter');
+const networthService = require('../services/networthService');
 
 // Фильтр денежного потока (без переводов и начального баланса): иначе
 // стартовый баланс счёта выглядит как доход и прогноз даёт «+116.8 % за 30 дней».
@@ -32,11 +33,8 @@ router.get('/balance', async (req, res) => {
     const userId = req.user.id;
     const todayStr = dates.todayISO(dates.userTz(req.user));
 
-    // Текущий баланс
-    const currentBalance = await get(
-      'SELECT SUM(balance) as total FROM accounts WHERE user_id = ?',
-      [userId]
-    );
+    // Current balance across accounts in the user's base currency.
+    const currentBalance = await networthService.sumAccountsInBase(userId);
 
     // Период истории для обучения модели (по умолчанию 90 дней).
     const HISTORY_DAYS = 90;

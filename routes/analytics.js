@@ -6,6 +6,7 @@ const passport = require('passport');
 const { query, get } = require('../db/database');
 const dates = require('../lib/dates');
 const { cashflowOnly } = require('../lib/txFilter');
+const networthService = require('../services/networthService');
 
 // Фильтр денежного потока: только income/expense, без переводов и строк
 // «Начальный баланс» (иначе +658 % к прошлому месяцу и категория-призрак).
@@ -49,11 +50,9 @@ router.get('/overview', async (req, res) => {
       WHERE user_id = ? AND date BETWEEN ? AND ?${CF.sql}
     `, [userId, start, end, ...CF.params]);
 
-    // Баланс по счетам
-    const balance = await get(`
-      SELECT COALESCE(SUM(balance), 0) as total_balance
-      FROM accounts WHERE user_id = ? AND is_active = 1
-    `, [userId]);
+    // Total balance across accounts, converted into the user's base currency
+    // (FX via networthService; missing rates fall back 1:1 and are flagged).
+    const balance = await networthService.sumAccountsInBase(userId);
 
     // Количество активных целей и их прогресс
     const goals = await get(`
@@ -77,7 +76,9 @@ router.get('/overview', async (req, res) => {
       expense: totals.total_expense,
       netIncome: totals.total_income - totals.total_expense,
       transactionCount: totals.transaction_count,
-      totalBalance: balance.total_balance,
+      totalBalance: balance.total,
+      baseCurrency: balance.baseCurrency,
+      missingRates: balance.missingRates,
       savingsGoals: {
         count: goals.count,
         saved: goals.saved,

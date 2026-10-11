@@ -164,7 +164,7 @@ describe('ledger-export: Beancount service', () => {
     expect(accountComponent('еда & кофе', 'X')).toMatch(/^[A-Z0-9]/);
     expect(accountComponent('', 'Fallback')).toBe('Fallback');
     expect(normalizeCurrency('uah')).toBe('UAH');
-    expect(normalizeCurrency('!!!')).toBe('UAH');
+    expect(normalizeCurrency('!!!')).toBe('CAD'); // product default currency
     expect(normalizeDate('2026-03-02T10:00:00Z')).toBe('2026-03-02');
     expect(bcString('a "b" \\c')).toBe('a \\"b\\" \\\\c');
   });

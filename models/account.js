@@ -1,5 +1,6 @@
 const { query, get, run, transaction } = require('../db/database');
 const money = require('../lib/money');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const { OPENING_TYPE, OPENING_CATEGORY, OPENING_DESCRIPTION } = require('../lib/txFilter');
 
 class Account {
@@ -15,7 +16,7 @@ class Account {
           accountData.name,
           accountData.accountNumber || '',
           accountData.bankName || '',
-          accountData.currency || 'UAH',
+          accountData.currency || DEFAULT_CURRENCY,
           accountData.balance || 0,
           accountData.accountType || 'checking'
         ]
@@ -45,7 +46,7 @@ class Account {
           accountData.name,
           accountData.accountNumber || '',
           accountData.bankName || '',
-          accountData.currency || 'UAH',
+          accountData.currency || DEFAULT_CURRENCY,
           balance,
           accountData.accountType || 'checking'
         ]

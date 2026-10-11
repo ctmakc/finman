@@ -16,6 +16,7 @@ const { query, get, run } = require('../db/database');
 const { ok } = require('../lib/respond');
 const dates = require('../lib/dates');
 const { cashflowOnly } = require('../lib/txFilter');
+const networthService = require('../services/networthService');
 const { AppError } = require('../middleware/error');
 
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -363,27 +364,29 @@ function periodStart(period, tz) {
 // Единый фильтр денежного потока: без переводов и начального баланса.
 const CF = cashflowOnly();
 
+// Balance and net worth are reported in the user's base currency
+// (networthService converts each account/asset/debt via the FX service;
+// a missing rate falls back to 1:1 and is listed in missingRates).
 async function getBalanceData(userId) {
-  const result = await get('SELECT SUM(balance) as total FROM accounts WHERE user_id = ?', [userId]);
-  return { total: (result && result.total) || 0 };
+  const sum = await networthService.sumAccountsInBase(userId);
+  return {
+    total: sum.total,
+    currency: sum.baseCurrency,
+    baseCurrency: sum.baseCurrency,
+    missingRates: sum.missingRates,
+  };
 }
 
 async function getNetWorthData(userId) {
-  const accounts = await get('SELECT SUM(balance) as total FROM accounts WHERE user_id = ?', [userId]);
-  const debts = await get(
-    `SELECT SUM(amount - paid_amount) as total FROM debts WHERE user_id = ? AND is_active = 1 AND type IN ('i_owe', 'credit', 'loan')`,
-    [userId]
-  );
-  const assets = await get(
-    'SELECT SUM(value) as total FROM manual_assets WHERE user_id = ? AND is_active = 1',
-    [userId]
-  );
-
-  const accountsTotal = (accounts && accounts.total) || 0;
-  const assetsTotal = (assets && assets.total) || 0;
-  const liabilities = (debts && debts.total) || 0;
-  const netWorth = accountsTotal + assetsTotal - liabilities;
-  return { netWorth, assets: accountsTotal + assetsTotal, liabilities };
+  const nw = await networthService.computeNetWorth(userId);
+  return {
+    netWorth: nw.netWorth,
+    assets: nw.totalAssets,
+    liabilities: nw.totalLiabilities,
+    currency: nw.baseCurrency,
+    baseCurrency: nw.baseCurrency,
+    missingRates: nw.missingRates,
+  };
 }
 
 async function getCashflowData(userId, period, tz) {

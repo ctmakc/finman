@@ -1,6 +1,7 @@
 // ==================== МОДЕЛЬ ЦЕЛЕЙ НАКОПЛЕНИЯ ====================
 
 const { query, get, run } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const money = require('../lib/money');
 const dates = require('../lib/dates');
 
@@ -90,7 +91,7 @@ const SavingsGoal = {
       `INSERT INTO savings_goals (user_id, name, description, target_amount, currency, target_date, category, icon, color)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.user_id, data.name, data.description, data.target_amount,
-       data.currency || 'UAH', data.target_date, data.category,
+       data.currency || DEFAULT_CURRENCY, data.target_date, data.category,
        data.icon || 'piggy-bank', data.color || '#5D5CDE']
     );
     return this.findById(result.id);

@@ -5,6 +5,7 @@
 'use strict';
 
 const { query } = require('../db/database');
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const money = require('../lib/money');
 
 // Нормализация описания: убираем числа (даты/номера), оставляем буквы.
@@ -41,10 +42,11 @@ async function detectRecurring(userId, { now, lookbackDays = 120 } = {}) {
     .slice(0, 10);
 
   const txs = await query(
-    `SELECT date, description, ABS(amount) AS amount, category
-       FROM transactions
-      WHERE user_id = ? AND type = 'expense' AND description IS NOT NULL AND date >= ?
-      ORDER BY date ASC`,
+    `SELECT t.date, t.description, ABS(t.amount) AS amount, t.category, a.currency
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.type = 'expense' AND t.description IS NOT NULL AND t.date >= ?
+      ORDER BY t.date ASC`,
     [userId, cutoff]
   );
 
@@ -89,7 +91,7 @@ async function detectRecurring(userId, { now, lookbackDays = 120 } = {}) {
       description: items[items.length - 1].description,
       normalizedKey: key,
       amount,
-      currency: 'UAH',
+      currency: items[items.length - 1].currency || DEFAULT_CURRENCY,
       billingCycle: freq.cycle,
       category: items[items.length - 1].category || null,
       occurrences: items.length,

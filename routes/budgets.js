@@ -3,6 +3,7 @@ const passport = require('passport');
 const Budget = require('../models/budget');
 
 const router = express.Router();
+const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 
 // Middleware для проверки аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
@@ -118,7 +119,7 @@ router.post('/', authenticate, async (req, res) => {
       period: period || 'monthly',
       startDate: budgetStartDate,
       endDate: endDate || null,
-      currency: currency || 'UAH',
+      currency: currency || DEFAULT_CURRENCY,
       notifyAtPercent: notifyAtPercent || 80,
       rollover: rollover ? true : false,
       carryover: carryover !== undefined ? parseFloat(carryover) : 0
