@@ -159,12 +159,13 @@ async function togglePayment(id) {
 
 async function renderRecurringPage() {
   const mainContent = document.getElementById('main-content');
+  await UI.loadBaseCurrency();
 
   mainContent.innerHTML = `
     <div class="recurring-page">
       <header class="page-header">
         <h1 class="page-title"><i class="fas fa-sync-alt"></i> Регулярные платежи</h1>
-        <button class="btn btn-primary" onclick="showAddRecurringModal()">
+        <button type="button" class="btn btn-primary" data-action="recurring:add">
           <i class="fas fa-plus"></i> Добавить платеж
         </button>
       </header>
@@ -188,7 +189,7 @@ async function renderRecurringPage() {
           <h2><i class="fas fa-list"></i> Все платежи</h2>
           <div class="filter-row">
             <label>
-              <input type="checkbox" id="show-inactive" onchange="loadRecurringPayments()">
+              <input type="checkbox" id="show-inactive" data-change="recurring:reload">
               Показать неактивные
             </label>
           </div>
@@ -202,9 +203,20 @@ async function renderRecurringPage() {
   await loadRecurringPayments();
 }
 
-async function loadRecurringStats() {
+// Месячные суммы считаем по списку платежей в валюте СЧЁТА каждого платежа
+// (API складывает все валюты в одно число). Счётчики берём из API.
+function monthlyTotalsByCurrency(payments, type) {
+  const active = (payments || []).filter(p => p.is_active && p.type === type);
+  return UI.sumByCurrency(active, p => Math.abs(Number(p.amount) || 0) * UI.monthlyFactor(p.frequency), p => p.account_currency);
+}
+
+async function loadRecurringStats(payments) {
   const stats = await fetchRecurringStats();
   const container = document.getElementById('recurring-stats');
+  if (!container) return;
+  const list = payments || await fetchRecurringPayments(false);
+  const expenses = monthlyTotalsByCurrency(list, 'expense');
+  const income = monthlyTotalsByCurrency(list, 'income');
 
   container.innerHTML = `
     <div class="stats-grid">
@@ -218,14 +230,14 @@ async function loadRecurringStats() {
       <div class="stat-card expense">
         <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
         <div class="stat-data">
-          <div class="stat-value">${formatCurrency(stats.monthlyExpenses)}</div>
+          <div class="stat-value">${UI.moneyList(expenses)}</div>
           <div class="stat-label">Расходы/мес</div>
         </div>
       </div>
       <div class="stat-card income">
         <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
         <div class="stat-data">
-          <div class="stat-value">${formatCurrency(stats.monthlyIncome)}</div>
+          <div class="stat-value">${UI.moneyList(income)}</div>
           <div class="stat-label">Доходы/мес</div>
         </div>
       </div>
@@ -289,12 +301,12 @@ function renderPaymentCard(payment, isOverdue = false) {
           <i class="fas fa-${payment.type === 'income' ? 'arrow-down' : 'arrow-up'}"></i>
         </div>
         <div class="payment-info">
-          <h4>${escapeHtml(payment.name)}</h4>
-          <span class="payment-account">${escapeHtml(payment.account_name)}</span>
-          ${payment.category ? `<span class="payment-category">${escapeHtml(payment.category)}</span>` : ''}
+          <h4>${escapeHtmlRecurring(payment.name)}</h4>
+          <span class="payment-account">${escapeHtmlRecurring(payment.account_name)}</span>
+          ${payment.category ? `<span class="payment-category">${escapeHtmlRecurring(payment.category)}</span>` : ''}
         </div>
         <div class="payment-amount ${payment.type}">
-          ${payment.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(payment.amount), payment.account_currency)}
+          ${payment.type === 'expense' ? '-' : '+'}${UI.esc(UI.money(Math.abs(payment.amount), payment.account_currency))}
         </div>
       </div>
 
@@ -309,21 +321,21 @@ function renderPaymentCard(payment, isOverdue = false) {
 
       <div class="payment-actions">
         ${payment.is_active ? `
-          <button class="btn btn-sm btn-success" onclick="payRecurring(${payment.id})" title="Оплатить">
+          <button type="button" class="btn btn-sm btn-success" data-action="recurring:pay" data-id="${payment.id}" title="Оплатить" aria-label="Оплатить">
             <i class="fas fa-check"></i>
           </button>
-          <button class="btn btn-sm btn-warning" onclick="skipRecurring(${payment.id})" title="Пропустить">
+          <button type="button" class="btn btn-sm btn-warning" data-action="recurring:skip" data-id="${payment.id}" title="Пропустить" aria-label="Пропустить">
             <i class="fas fa-forward"></i>
           </button>
         ` : ''}
-        <button class="btn btn-sm btn-outline" onclick="editRecurring(${payment.id})" title="Редактировать">
+        <button type="button" class="btn btn-sm btn-outline" data-action="recurring:edit" data-id="${payment.id}" title="Редактировать" aria-label="Редактировать">
           <i class="fas fa-edit"></i>
         </button>
-        <button class="btn btn-sm ${payment.is_active ? 'btn-secondary' : 'btn-primary'}"
-                onclick="toggleRecurring(${payment.id})" title="${payment.is_active ? 'Приостановить' : 'Возобновить'}">
+        <button type="button" class="btn btn-sm ${payment.is_active ? 'btn-secondary' : 'btn-primary'}"
+                data-action="recurring:toggle" data-id="${payment.id}" title="${payment.is_active ? 'Приостановить' : 'Возобновить'}" aria-label="${payment.is_active ? 'Приостановить' : 'Возобновить'}">
           <i class="fas fa-${payment.is_active ? 'pause' : 'play'}"></i>
         </button>
-        <button class="btn btn-sm btn-danger" onclick="deleteRecurring(${payment.id})" title="Удалить">
+        <button type="button" class="btn btn-sm btn-danger" data-action="recurring:delete" data-id="${payment.id}" title="Удалить" aria-label="Удалить">
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -333,30 +345,21 @@ function renderPaymentCard(payment, isOverdue = false) {
 
 function showAddRecurringModal(payment = null) {
   const isEdit = !!payment;
-  const accounts = appState.accounts?.all || appState.accounts || [];
+  const accounts = UI.accountsArray();
 
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'recurring-modal';
-  modal.innerHTML = `
-    <div class="modal modal-large">
-      <div class="modal-header">
-        <h3>${isEdit ? 'Редактировать платеж' : 'Новый регулярный платеж'}</h3>
-        <button class="btn-close" onclick="closeModal('recurring-modal')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <form id="recurring-form">
+  const body = `
+        <form id="recurring-form" data-submit="recurring:save" data-id="${payment?.id || ''}">
           <div class="form-row">
             <div class="form-group">
               <label>Название *</label>
-              <input type="text" id="rp-name" value="${payment?.name || ''}" required placeholder="Например: Netflix">
+              <input type="text" id="rp-name" value="${UI.esc(payment?.name || '')}" required placeholder="Например: Netflix">
             </div>
             <div class="form-group">
               <label>Счет *</label>
               <select id="rp-account" required>
                 ${accounts.map(a => `
                   <option value="${a.id}" ${payment?.account_id === a.id ? 'selected' : ''}>
-                    ${escapeHtml(a.name)}
+                    ${escapeHtmlRecurring(a.name)}
                   </option>
                 `).join('')}
               </select>
@@ -377,14 +380,14 @@ function showAddRecurringModal(payment = null) {
             </div>
             <div class="form-group">
               <label>Категория</label>
-              <input type="text" id="rp-category" value="${payment?.category || ''}" placeholder="Подписки">
+              <input type="text" id="rp-category" value="${UI.esc(payment?.category || '')}" placeholder="Подписки">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>Частота *</label>
-              <select id="rp-frequency" onchange="updateFrequencyOptions()">
+              <select id="rp-frequency" data-change="recurring:frequency">
                 <option value="daily" ${payment?.frequency === 'daily' ? 'selected' : ''}>Ежедневно</option>
                 <option value="weekly" ${payment?.frequency === 'weekly' ? 'selected' : ''}>Еженедельно</option>
                 <option value="biweekly" ${payment?.frequency === 'biweekly' ? 'selected' : ''}>Раз в 2 недели</option>
@@ -437,19 +440,14 @@ function showAddRecurringModal(payment = null) {
 
           <div class="form-group">
             <label>Описание</label>
-            <textarea id="rp-description" rows="2">${payment?.description || ''}</textarea>
+            <textarea id="rp-description" rows="2">${UI.esc(payment?.description || '')}</textarea>
           </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('recurring-modal')">Отмена</button>
-        <button class="btn btn-primary" onclick="saveRecurring(${payment?.id || 'null'})">
-          ${isEdit ? 'Сохранить' : 'Создать'}
-        </button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button>
+            <button type="submit" class="btn btn-primary">${isEdit ? 'Сохранить' : 'Создать'}</button>
+          </div>
+        </form>`;
+  UI.modal({ id: 'recurring-modal', size: 'lg', title: isEdit ? 'Редактировать платеж' : 'Новый регулярный платеж', body });
   updateFrequencyOptions();
 }
 
@@ -500,7 +498,7 @@ async function saveRecurring(id) {
   }
 
   if (result) {
-    closeModal('recurring-modal');
+    UI.closeModal('recurring-modal');
     await loadRecurringStats();
     await loadRecurringPayments();
   }
@@ -557,26 +555,37 @@ function getFrequencyLabel(frequency) {
   return labels[frequency] || frequency;
 }
 
+// «1 дек.» для текущего года, «1 дек. 2025» — для любого другого: иначе
+// просроченный с прошлого года платёж выглядит как будущий.
 function formatDateShort(dateStr) {
   const date = new Date(dateStr);
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  if (Number.isNaN(date.getTime())) return UI.esc(dateStr || '');
+  const opts = { day: 'numeric', month: 'short' };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return date.toLocaleDateString('ru-RU', opts);
 }
 
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+// HTML-экранирование и форматирование денег — общие (lib/ui.js). Раньше здесь
+// жили глобальные formatCurrency('UAH')/escapeHtml/closeModal, которые
+// перекрывали одноимённые функции app.js для всех модулей.
+function escapeHtmlRecurring(text) {
+  return UI.esc(text);
 }
 
-function formatCurrency(amount, currency = 'UAH') {
-  return new Intl.NumberFormat('uk-UA', {
-    style: 'currency',
-    currency: currency
-  }).format(amount);
-}
-
-function closeModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) modal.remove();
-}
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
+  UI.actions({
+    'recurring:add': () => showAddRecurringModal(),
+    'recurring:reload': () => loadRecurringPayments(),
+    'recurring:frequency': () => updateFrequencyOptions(),
+    'recurring:save': (form) => saveRecurring(form.dataset.id ? Number(form.dataset.id) : null),
+    'recurring:pay': (el) => payRecurring(Number(el.dataset.id)),
+    'recurring:skip': (el) => skipRecurring(Number(el.dataset.id)),
+    'recurring:edit': (el) => editRecurring(Number(el.dataset.id)),
+    'recurring:toggle': (el) => toggleRecurring(Number(el.dataset.id)),
+    'recurring:delete': (el) => deleteRecurring(Number(el.dataset.id)),
+  });
+})();

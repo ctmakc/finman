@@ -46,5 +46,5 @@ ios/App/Pods/
 *.xcworkspace
 *.ipa
 
-# UI screenshot sweeps (fe-shell)
+# Local UI screenshot sweeps (fe-shell / fe-logic verification)
 .shots/

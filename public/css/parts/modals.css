@@ -1,0 +1,76 @@
+/* ==========================================================================
+   MODALS — shared hidden / is-open convention (public/js/lib/ui.js)
+   Host: .modal-backdrop[hidden] > .modal. UI.openModal() removes `hidden`
+   and adds `.is-open`; UI.closeModal() reverses it. Dialogs rendered inline
+   by the page (subscriptions, networth, reports, calendar, receipts) start
+   hidden, so nothing shows at the bottom of the page any more.
+   Imported from style.css: @import url("/css/parts/modals.css");
+   ========================================================================== */
+
+/* [hidden] must win over `.modal-backdrop { display: flex }` from style.css */
+.modal-backdrop[hidden],
+.modal[hidden] {
+  display: none;
+}
+
+.modal-backdrop.is-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 1rem);
+}
+
+/* Prevent the page from scrolling behind an open dialog */
+body.fm-modal-open {
+  overflow: hidden;
+}
+
+.modal-backdrop.is-open > .modal {
+  outline: none;
+  width: min(100%, 520px);
+  max-height: min(90vh, 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-backdrop.is-open > .modal.modal-lg {
+  width: min(100%, 820px);
+}
+
+.modal-backdrop.is-open > .modal > .modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+/* Form footers rendered inside .modal-body share the footer look */
+.modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2, 0.5rem);
+  margin-top: var(--space-4, 1rem);
+  padding-top: var(--space-4, 1rem);
+  border-top: 1px solid var(--fm-border, var(--border-color));
+}
+
+.modal-close:focus-visible {
+  outline: 2px solid var(--fm-primary, var(--primary-color));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+@media (max-width: 480px) {
+  .modal-backdrop.is-open {
+    padding: var(--space-2, 0.5rem);
+    align-items: flex-end;
+  }
+  .modal-backdrop.is-open > .modal {
+    max-height: 94vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop.is-open,
+  .modal-backdrop.is-open > .modal {
+    animation: none;
+  }
+}

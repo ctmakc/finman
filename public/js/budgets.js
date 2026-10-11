@@ -158,7 +158,7 @@ async function renderBudgetsPage() {
       </div>
     </div>
 
-    ${stats ? renderBudgetStats(stats) : ''}
+    ${stats ? renderBudgetStats(stats, budgets) : ''}
 
     <div class="budgets-list">
       ${budgets.length > 0 ? renderBudgetCards(budgets) : renderEmptyBudgets()}
@@ -189,8 +189,13 @@ async function renderBudgetsPage() {
   });
 }
 
-// Рендер статистики
-function renderBudgetStats(stats) {
+// Рендер статистики. Итоги считаем по списку бюджетов ПО ВАЛЮТАМ (API
+// складывает CAD и UAH в одно число); счётчики и процент берём из API.
+function renderBudgetStats(stats, budgets) {
+  const list = Array.isArray(budgets) ? budgets : [];
+  const totalAmount = UI.sumByCurrency(list, 'amount', 'currency');
+  const totalSpent = UI.sumByCurrency(list, 'spent', 'currency');
+  const totalRemaining = UI.sumByCurrency(list, b => Number(b.amount) - Number(b.spent || 0), 'currency');
   const overallStatus = stats.overallPercentUsed >= 100 ? 'over' :
                         stats.overallPercentUsed >= 80 ? 'warning' : 'ok';
 
@@ -199,7 +204,7 @@ function renderBudgetStats(stats) {
       <div class="stat-card">
         <div class="stat-icon"><i class="fas fa-wallet"></i></div>
         <div class="stat-info">
-          <div class="stat-value">${formatCurrency(stats.totalBudgetAmount)}</div>
+          <div class="stat-value">${UI.moneyList(totalAmount)}</div>
           <div class="stat-label">Общий бюджет</div>
         </div>
       </div>
@@ -207,7 +212,7 @@ function renderBudgetStats(stats) {
       <div class="stat-card">
         <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
         <div class="stat-info">
-          <div class="stat-value">${formatCurrency(stats.totalSpent)}</div>
+          <div class="stat-value">${UI.moneyList(totalSpent)}</div>
           <div class="stat-label">Потрачено</div>
         </div>
       </div>
@@ -215,7 +220,7 @@ function renderBudgetStats(stats) {
       <div class="stat-card">
         <div class="stat-icon"><i class="fas fa-piggy-bank"></i></div>
         <div class="stat-info">
-          <div class="stat-value">${formatCurrency(stats.totalRemaining)}</div>
+          <div class="stat-value">${UI.moneyList(totalRemaining)}</div>
           <div class="stat-label">Осталось</div>
         </div>
       </div>
@@ -276,16 +281,16 @@ function renderBudgetCards(budgets) {
             <div class="progress-fill progress-${statusClass}" style="width: ${progressWidth}%"></div>
           </div>
           <div class="progress-labels">
-            <span class="spent">${formatCurrency(budget.spent)}</span>
+            <span class="spent">${UI.money(budget.spent, budget.currency)}</span>
             <span class="budget-pct">${pctLabel}%</span>
-            <span class="total">из ${formatCurrency(budget.amount)}</span>
+            <span class="total">из ${UI.money(budget.amount, budget.currency)}</span>
           </div>
         </div>
 
         <div class="budget-footer">
           <span class="budget-remaining ${budget.remaining < 0 ? 'negative' : ''}">
             ${budget.remaining >= 0 ? 'Осталось: ' : 'Превышено на: '}
-            ${formatCurrency(Math.abs(budget.remaining))}
+            ${UI.money(Math.abs(budget.remaining), budget.currency)}
           </span>
           <span class="budget-period">${getPeriodLabel(budget.period)}</span>
         </div>
@@ -297,11 +302,11 @@ function renderBudgetCards(budgets) {
             </span>
             ${budget.carryover !== 0 ? `
               <span class="budget-carryover ${budget.carryover < 0 ? 'negative' : ''}">
-                Перенос: ${budget.carryover >= 0 ? '+' : '−'}${formatCurrency(Math.abs(budget.carryover))}
+                Перенос: ${budget.carryover >= 0 ? '+' : '−'}${UI.money(Math.abs(budget.carryover), budget.currency)}
               </span>
             ` : ''}
             <span class="budget-effective-limit">
-              Лимит: ${formatCurrency(budget.effectiveLimit)}
+              Лимит: ${UI.money(budget.effectiveLimit, budget.currency)}
             </span>
           </div>
         ` : ''}
@@ -312,16 +317,12 @@ function renderBudgetCards(budgets) {
 
 // Рендер пустого состояния
 function renderEmptyBudgets() {
-  return `
-    <div class="empty-state">
-      <i class="fas fa-piggy-bank"></i>
-      <h3>Нет бюджетов</h3>
-      <p>Создайте первый бюджет, чтобы контролировать свои расходы</p>
-      <button class="btn btn-primary" onclick="showCreateBudgetModal()">
-        <i class="fas fa-plus"></i> Создать бюджет
-      </button>
-    </div>
-  `;
+  return UI.emptyState({
+    icon: 'fa-piggy-bank',
+    title: 'Нет бюджетов',
+    text: 'Создайте первый бюджет, чтобы контролировать свои расходы',
+    action: { label: 'Создать бюджет', action: 'budgets:create', icon: 'fa-plus' }
+  });
 }
 
 // Получение метки периода
@@ -369,10 +370,7 @@ function showCreateBudgetModal() {
             <div class="form-group">
               <label for="${modalId}-currency" class="form-label">Валюта</label>
               <select id="${modalId}-currency" class="form-control">
-                <option value="UAH">UAH</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="CAD">CAD</option>
+                ${UI.currencyOptions()}
               </select>
             </div>
           </div>
@@ -487,10 +485,7 @@ async function showEditBudgetModal(id) {
             <div class="form-group">
               <label for="${modalId}-currency" class="form-label">Валюта</label>
               <select id="${modalId}-currency" class="form-control">
-                <option value="UAH" ${budget.currency === 'UAH' ? 'selected' : ''}>UAH</option>
-                <option value="USD" ${budget.currency === 'USD' ? 'selected' : ''}>USD</option>
-                <option value="EUR" ${budget.currency === 'EUR' ? 'selected' : ''}>EUR</option>
-                <option value="CAD" ${budget.currency === 'CAD' ? 'selected' : ''}>CAD</option>
+                ${UI.currencyOptions(budget.currency)}
               </select>
             </div>
           </div>
@@ -516,7 +511,7 @@ async function showEditBudgetModal(id) {
               Переносить остаток (конвертный бюджет)
             </label>
             ${budget.rollover && budget.carryover !== 0 ? `
-              <small class="form-hint">Текущий перенос: ${formatCurrency(budget.carryover)}</small>
+              <small class="form-hint">Текущий перенос: ${UI.money(budget.carryover, budget.currency)}</small>
             ` : ''}
           </div>
 
@@ -589,7 +584,7 @@ async function renderBudgetWidget() {
         <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Бюджеты</h3>
         <div class="widget-empty">
           <p>Нет активных бюджетов</p>
-          <button class="btn btn-sm btn-primary" onclick="navigateTo('budgets')">Создать бюджет</button>
+          <button type="button" class="btn btn-sm btn-primary" data-action="ui:navigate" data-page="budgets">Создать бюджет</button>
         </div>
       </div>
     `;
@@ -611,7 +606,7 @@ async function renderBudgetWidget() {
     <div class="widget budget-widget">
       <div class="widget-header">
         <h3 class="widget-title"><i class="fas fa-piggy-bank"></i> Бюджеты</h3>
-        <a href="#" onclick="navigateTo('budgets'); return false;" class="widget-link">Все</a>
+        <a href="#" data-action="ui:navigate" data-page="budgets" class="widget-link">Все</a>
       </div>
       <div class="widget-content">
         ${budgetsHtml}
@@ -624,3 +619,13 @@ async function renderBudgetWidget() {
     </div>
   `;
 }
+
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
+  UI.actions({
+    'budgets:create': () => showCreateBudgetModal(),
+  });
+})();

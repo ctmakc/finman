@@ -10,7 +10,13 @@ const ForecastModule = {
     return { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
   },
 
+  // /api/forecast sums balances of ALL accounts without converting currencies,
+  // so figures carry a currency only when every account shares one.
+  currencies: [],
+
   async init() {
+    await UI.loadBaseCurrency();
+    this.currencies = await UI.loadAccountCurrencies();
     await Promise.all([this.loadForecast(), this.loadTrends(), this.loadAnomalies()]);
   },
 
@@ -54,6 +60,8 @@ const ForecastModule = {
   },
 
   renderForecast() {
+    const note = document.getElementById('forecast-currency-note');
+    if (note) note.innerHTML = UI.mixedCurrencyNote(this.currencies);
     const container = document.getElementById('forecast-summary');
     if (!container || !this.forecast) return;
 
@@ -66,18 +74,18 @@ const ForecastModule = {
       confidenceHtml = `
         <div class="detail-item">
           <span class="label">Коридор прогноза (±)</span>
-          <span class="value">${this.fmt(s.confidence.endBand)} ₴</span>
-          <small>${this.fmt(s.confidence.projectedLower)} … ${this.fmt(s.confidence.projectedUpper)} ₴</small>
+          <span class="value">${this.fmt(s.confidence.endBand)}</span>
+          <small>${this.fmt(s.confidence.projectedLower)} … ${this.fmt(s.confidence.projectedUpper)}</small>
         </div>
         <div class="detail-item ${s.worstCasePoint < 0 ? 'warning' : ''}">
           <span class="label">Худший сценарий</span>
-          <span class="value ${s.worstCasePoint < 0 ? 'negative' : ''}">${this.fmt(s.worstCasePoint)} ₴</span>
+          <span class="value ${s.worstCasePoint < 0 ? 'negative' : ''}">${this.fmt(s.worstCasePoint)}</span>
           <small>${s.worstCaseDate || ''}</small>
         </div>
         <div class="detail-item">
           <span class="label">Модель</span>
           <span class="value">${s.model === 'seasonal_trend' ? 'сезонность+тренд' : 'средняя'}</span>
-          <small>тренд/день: ${this.fmt(s.trendPerDay || 0)} ₴</small>
+          <small>тренд/день: ${this.fmt(s.trendPerDay || 0)}</small>
         </div>`;
     }
 
@@ -85,31 +93,31 @@ const ForecastModule = {
       <div class="forecast-main">
         <div class="forecast-current">
           <span class="label">Текущий баланс</span>
-          <span class="value">${this.fmt(s.currentBalance)} ₴</span>
+          <span class="value">${this.fmt(s.currentBalance)}</span>
         </div>
         <div class="forecast-arrow ${isPositive ? 'up' : 'down'}">${isPositive ? '↗' : '↘'}</div>
         <div class="forecast-projected">
           <span class="label">Прогноз</span>
-          <span class="value ${isPositive ? 'positive' : 'negative'}">${this.fmt(s.projectedBalance)} ₴</span>
+          <span class="value ${isPositive ? 'positive' : 'negative'}">${this.fmt(s.projectedBalance)}</span>
         </div>
       </div>
       <div class="forecast-details">
         <div class="detail-item">
           <span class="label">Изменение</span>
-          <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${this.fmt(s.change)} ₴ (${s.changePercent}%)</span>
+          <span class="value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${this.fmt(s.change)} (${s.changePercent}%)</span>
         </div>
         <div class="detail-item warning">
           <span class="label">Минимум баланса</span>
-          <span class="value">${this.fmt(s.lowestPoint)} ₴</span>
+          <span class="value">${this.fmt(s.lowestPoint)}</span>
           <small>${s.lowestDate || ''}</small>
         </div>
         <div class="detail-item">
           <span class="label">Ср. расход/день</span>
-          <span class="value negative">${this.fmt(s.avgDailyExpense)} ₴</span>
+          <span class="value negative">${this.fmt(s.avgDailyExpense)}</span>
         </div>
         <div class="detail-item">
           <span class="label">Ср. доход/день</span>
-          <span class="value positive">${this.fmt(s.avgDailyIncome)} ₴</span>
+          <span class="value positive">${this.fmt(s.avgDailyIncome)}</span>
         </div>
         ${confidenceHtml}
       </div>
@@ -217,7 +225,7 @@ const ForecastModule = {
         </div>
         <div class="anomaly-reason">${this.escape(a.reason)}</div>
         <div class="anomaly-meta">
-          ${a.amount != null ? `<span>${this.fmt(a.amount)} ₴</span>` : ''}
+          ${a.amount != null ? `<span>${this.fmt(a.amount)}</span>` : ''}
           ${a.date ? `<small>${a.date}</small>` : ''}
         </div>
       </div>
@@ -235,15 +243,15 @@ const ForecastModule = {
       <div class="trends-grid">
         <div class="trend-card">
           <div class="trend-header"><span>📈 Доходы</span><span class="${t.income.direction === 'up' ? 'positive' : 'negative'}">${t.income.direction === 'up' ? '↑' : '↓'} ${t.income.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong>${this.fmt(p.nextMonthIncome)} ₴</strong></div>
+          <div class="trend-prediction">Прогноз: <strong>${this.fmt(p.nextMonthIncome)}</strong></div>
         </div>
         <div class="trend-card">
           <div class="trend-header"><span>📉 Расходы</span><span class="${t.expense.direction === 'down' ? 'positive' : 'negative'}">${t.expense.direction === 'up' ? '↑' : '↓'} ${t.expense.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong>${this.fmt(p.nextMonthExpense)} ₴</strong></div>
+          <div class="trend-prediction">Прогноз: <strong>${this.fmt(p.nextMonthExpense)}</strong></div>
         </div>
         <div class="trend-card">
           <div class="trend-header"><span>💰 Сбережения</span><span class="${t.savings.direction === 'up' ? 'positive' : 'negative'}">${t.savings.direction === 'up' ? '↑' : '↓'} ${t.savings.percent}%</span></div>
-          <div class="trend-prediction">Прогноз: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${this.fmt(p.nextMonthSavings)} ₴</strong></div>
+          <div class="trend-prediction">Прогноз: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${this.fmt(p.nextMonthSavings)}</strong></div>
         </div>
       </div>
     `;
@@ -282,8 +290,7 @@ const ForecastModule = {
   // ---- helpers ----
   fmt(n) {
     const num = Number(n);
-    if (!Number.isFinite(num)) return '0';
-    return num.toLocaleString();
+    return UI.esc(UI.aggregateMoney(Number.isFinite(num) ? num : 0, this.currencies));
   },
 
   escape(str) {
@@ -305,12 +312,13 @@ const ForecastModule = {
         <div class="page-header">
           <h1>🔮 Прогнозирование</h1>
           <div class="period-buttons">
-            <button class="btn period-btn" onclick="ForecastModule.changePeriod(7)">7 дней</button>
-            <button class="btn period-btn active" onclick="ForecastModule.changePeriod(30)">30 дней</button>
-            <button class="btn period-btn" onclick="ForecastModule.changePeriod(90)">90 дней</button>
+            <button class="btn period-btn" type="button" data-action="forecast:period" data-days="7">7 дней</button>
+            <button class="btn period-btn active" type="button" data-action="forecast:period" data-days="30">30 дней</button>
+            <button class="btn period-btn" type="button" data-action="forecast:period" data-days="90">90 дней</button>
           </div>
         </div>
 
+        <div id="forecast-currency-note"></div>
         <div class="card" id="forecast-summary"></div>
 
         <div class="card">
@@ -332,3 +340,13 @@ const ForecastModule = {
     `;
   }
 };
+
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
+  UI.actions({
+    'forecast:period': (el) => ForecastModule.changePeriod(Number(el.dataset.days)),
+  });
+})();

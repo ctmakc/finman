@@ -1,10 +1,28 @@
 // Calendar Module
+// Event amounts are shown in the event's own currency when the API provides
+// one; otherwise as a plain number (no invented symbol). Modals use the
+// shared hidden / is-open convention (lib/ui.js).
 const CalendarModule = {
   events: [],
   currentDate: new Date(),
   view: 'month',
+  typeIcons: { payment: '💳', income: '💰', reminder: '🔔', goal: '🎯', debt: '📋', subscription: '📦', recurring: '🔄' },
+
+  headers() {
+    return { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+  },
+
+  amount(e) {
+    if (e == null || e.amount == null || e.amount === '') return '';
+    return UI.esc(e.currency ? UI.money(e.amount, e.currency) : UI.fmtNumber(e.amount));
+  },
+
+  safeColor(c) {
+    return /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '#5D5CDE';
+  },
 
   async init() {
+    await UI.loadBaseCurrency();
     await this.loadEvents();
   },
 
@@ -15,14 +33,16 @@ const CalendarModule = {
     const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
 
     try {
-      const response = await fetch(`/api/calendar/events?start=${start}&end=${end}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      this.events = await response.json();
-      this.render();
+      const response = await fetch(`/api/calendar/events?start=${start}&end=${end}`, { headers: this.headers() });
+      const data = await response.json();
+      // Ошибка API не должна оставлять сетку пустой: рисуем месяц без событий.
+      this.events = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
+      if (!Array.isArray(data) && !(data && Array.isArray(data.data))) console.error('calendar events:', data);
     } catch (error) {
       console.error('Error loading events:', error);
+      this.events = [];
     }
+    this.render();
   },
 
   render() {
@@ -51,9 +71,9 @@ const CalendarModule = {
       const dayEvents = this.events.filter(e => e.event_date === dateStr);
       const isToday = dateStr === today;
 
-      html += `<div class="calendar-day ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-events' : ''}" onclick="CalendarModule.showDayEvents('${dateStr}')">
+      html += `<div class="calendar-day ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-events' : ''}" data-action="cal:day" data-date="${dateStr}" role="button" tabindex="0" aria-label="${dateStr}${dayEvents.length ? ', событий: ' + dayEvents.length : ''}">
         <span class="day-number">${day}</span>
-        ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${e.color || '#5D5CDE'}" title="${e.title}"></div>`).join('')}
+        ${dayEvents.slice(0, 3).map(e => `<div class="event-dot" style="background:${this.safeColor(e.color)}" title="${UI.esc(e.title)}"></div>`).join('')}
         ${dayEvents.length > 3 ? `<small>+${dayEvents.length - 3}</small>` : ''}
       </div>`;
     }
@@ -69,23 +89,20 @@ const CalendarModule = {
     if (!container) return;
 
     try {
-      const response = await fetch('/api/calendar/upcoming', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      const upcoming = await response.json();
+      const response = await fetch('/api/calendar/upcoming', { headers: this.headers() });
+      const data = await response.json();
+      const upcoming = Array.isArray(data) ? data : [];
 
       if (upcoming.length === 0) {
         container.innerHTML = '<p class="text-secondary">Нет предстоящих событий</p>';
         return;
       }
 
-      const typeIcons = { payment: '💳', income: '💰', reminder: '🔔', goal: '🎯', debt: '📋', subscription: '📦', recurring: '🔄' };
-
       container.innerHTML = upcoming.map(e => `
-        <div class="upcoming-item" style="border-left: 3px solid ${e.color || '#5D5CDE'}">
-          <span class="event-icon">${typeIcons[e.event_type] || '📅'}</span>
-          <div class="event-info"><strong>${e.title}</strong><small>${e.event_date}</small></div>
-          ${e.amount ? `<span class="event-amount">${e.amount.toLocaleString()} ₴</span>` : ''}
+        <div class="upcoming-item" style="border-left: 3px solid ${this.safeColor(e.color)}">
+          <span class="event-icon">${this.typeIcons[e.event_type] || '📅'}</span>
+          <div class="event-info"><strong>${UI.esc(e.title)}</strong><small>${UI.esc(e.event_date)}</small></div>
+          ${e.amount ? `<span class="event-amount">${this.amount(e)}</span>` : ''}
         </div>
       `).join('');
     } catch (error) {
@@ -110,34 +127,37 @@ const CalendarModule = {
 
   showDayEvents(dateStr) {
     const dayEvents = this.events.filter(e => e.event_date === dateStr);
-    const typeIcons = { payment: '💳', income: '💰', reminder: '🔔', goal: '🎯', debt: '📋', subscription: '📦', recurring: '🔄' };
 
     document.getElementById('day-events-date').textContent = dateStr;
-    document.getElementById('day-events-list').innerHTML = dayEvents.length === 0 
-      ? '<p>Нет событий</p>'
+    document.getElementById('day-events-list').innerHTML = dayEvents.length === 0
+      ? `<p class="text-secondary">Нет событий</p><button type="button" class="btn btn-sm btn-primary" data-action="cal:add" data-date="${dateStr}">+ Событие на этот день</button>`
       : dayEvents.map(e => `
         <div class="day-event-item">
-          <span>${typeIcons[e.event_type] || '📅'}</span>
-          <div><strong>${e.title}</strong>${e.amount ? ` - ${e.amount.toLocaleString()} ₴` : ''}<br><small>${e.description || e.event_type}</small></div>
-          ${e.source ? '' : `<button class="btn btn-sm btn-icon" onclick="CalendarModule.completeEvent(${e.id})">✓</button>`}
+          <span>${this.typeIcons[e.event_type] || '📅'}</span>
+          <div><strong>${UI.esc(e.title)}</strong>${e.amount ? ` - ${this.amount(e)}` : ''}<br><small>${UI.esc(e.description || e.event_type)}</small></div>
+          ${e.source ? '' : `<button type="button" class="btn btn-sm btn-icon" data-action="cal:complete" data-id="${e.id}" aria-label="Отметить выполненным" title="Выполнено">✓</button>`}
         </div>
       `).join('');
 
-    document.getElementById('day-modal').classList.add('active');
+    UI.openModal('day-modal');
   },
 
   showAddModal(dateStr) {
     document.getElementById('event-form').reset();
     document.getElementById('event-date').value = dateStr || new Date().toISOString().split('T')[0];
-    document.getElementById('event-modal').classList.add('active');
+    const cur = document.getElementById('event-currency');
+    if (cur) cur.innerHTML = UI.currencyOptions();
+    UI.openModal('event-modal');
   },
 
   async saveEvent() {
+    const amountRaw = document.getElementById('event-amount').value;
     const data = {
       title: document.getElementById('event-title').value,
       event_type: document.getElementById('event-type').value,
       event_date: document.getElementById('event-date').value,
-      amount: document.getElementById('event-amount').value ? parseFloat(document.getElementById('event-amount').value) : null,
+      amount: amountRaw ? parseFloat(amountRaw) : null,
+      currency: document.getElementById('event-currency').value,
       description: document.getElementById('event-description').value,
       color: document.getElementById('event-color').value
     };
@@ -145,10 +165,10 @@ const CalendarModule = {
     try {
       await fetch('/api/calendar/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Content-Type': 'application/json', ...this.headers() },
         body: JSON.stringify(data)
       });
-      document.getElementById('event-modal').classList.remove('active');
+      UI.closeModal('event-modal');
       await this.loadEvents();
     } catch (error) {
       alert('Ошибка');
@@ -157,12 +177,9 @@ const CalendarModule = {
 
   async completeEvent(id) {
     try {
-      await fetch(`/api/calendar/events/${id}/complete`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
+      await fetch(`/api/calendar/events/${Number(id)}/complete`, { method: 'POST', headers: this.headers() });
       await this.loadEvents();
-      document.getElementById('day-modal').classList.remove('active');
+      UI.closeModal('day-modal');
     } catch (error) {
       alert('Ошибка');
     }
@@ -172,43 +189,62 @@ const CalendarModule = {
     return `
       <div class="calendar-page">
         <div class="page-header"><h1>📅 Финансовый календарь</h1>
-          <button class="btn btn-primary" onclick="CalendarModule.showAddModal()">+ Событие</button>
+          <button type="button" class="btn btn-primary" data-action="cal:add">+ Событие</button>
         </div>
         <div class="calendar-container card">
           <div class="calendar-nav">
-            <button class="btn btn-icon" onclick="CalendarModule.prevMonth()">◀</button>
+            <button type="button" class="btn btn-icon" data-action="cal:prev" aria-label="Предыдущий месяц">◀</button>
             <h2 id="calendar-title"></h2>
-            <button class="btn btn-icon" onclick="CalendarModule.nextMonth()">▶</button>
-            <button class="btn btn-sm" onclick="CalendarModule.goToday()">Сегодня</button>
+            <button type="button" class="btn btn-icon" data-action="cal:next" aria-label="Следующий месяц">▶</button>
+            <button type="button" class="btn btn-sm" data-action="cal:today">Сегодня</button>
           </div>
           <div id="calendar-grid"></div>
         </div>
         <div class="card"><h3>🔔 Предстоящие события</h3><div id="upcoming-events"></div></div>
       </div>
-      <div class="modal" id="day-modal">
-        <div class="modal-content">
-          <div class="modal-header"><h2>События <span id="day-events-date"></span></h2><button class="modal-close" onclick="document.getElementById('day-modal').classList.remove('active')">&times;</button></div>
-          <div id="day-events-list"></div>
+      <div class="modal-backdrop" id="day-modal" hidden>
+        <div class="modal">
+          <div class="modal-header"><h2 class="modal-title">События <span id="day-events-date"></span></h2><button type="button" class="modal-close" data-action="ui:close" aria-label="Закрыть">&times;</button></div>
+          <div class="modal-body" id="day-events-list"></div>
         </div>
       </div>
-      <div class="modal" id="event-modal">
-        <div class="modal-content">
-          <div class="modal-header"><h2>Новое событие</h2><button class="modal-close" onclick="document.getElementById('event-modal').classList.remove('active')">&times;</button></div>
-          <form id="event-form" onsubmit="event.preventDefault(); CalendarModule.saveEvent()">
-            <div class="form-group"><label>Название</label><input type="text" id="event-title" class="form-control" required></div>
-            <div class="form-row">
-              <div class="form-group"><label>Тип</label><select id="event-type" class="form-control"><option value="payment">Платёж</option><option value="income">Доход</option><option value="reminder">Напоминание</option><option value="other">Другое</option></select></div>
-              <div class="form-group"><label>Дата</label><input type="date" id="event-date" class="form-control" required></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Сумма</label><input type="number" id="event-amount" class="form-control" step="0.01"></div>
-              <div class="form-group"><label>Цвет</label><input type="color" id="event-color" class="form-control" value="#5D5CDE"></div>
-            </div>
-            <div class="form-group"><label>Описание</label><textarea id="event-description" class="form-control"></textarea></div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="document.getElementById('event-modal').classList.remove('active')">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
-          </form>
+      <div class="modal-backdrop" id="event-modal" hidden>
+        <div class="modal">
+          <div class="modal-header"><h2 class="modal-title">Новое событие</h2><button type="button" class="modal-close" data-action="ui:close" aria-label="Закрыть">&times;</button></div>
+          <div class="modal-body">
+            <form id="event-form" data-submit="cal:save">
+              <div class="form-group"><label for="event-title">Название</label><input type="text" id="event-title" class="form-control" required></div>
+              <div class="form-row">
+                <div class="form-group"><label for="event-type">Тип</label><select id="event-type" class="form-control"><option value="payment">Платёж</option><option value="income">Доход</option><option value="reminder">Напоминание</option><option value="other">Другое</option></select></div>
+                <div class="form-group"><label for="event-date">Дата</label><input type="date" id="event-date" class="form-control" required></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label for="event-amount">Сумма</label><input type="number" id="event-amount" class="form-control" step="0.01"></div>
+                <div class="form-group"><label for="event-currency">Валюта</label><select id="event-currency" class="form-control">${UI.currencyOptions()}</select></div>
+                <div class="form-group"><label for="event-color">Цвет</label><input type="color" id="event-color" class="form-control" value="#5D5CDE"></div>
+              </div>
+              <div class="form-group"><label for="event-description">Описание</label><textarea id="event-description" class="form-control"></textarea></div>
+              <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="ui:close">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+            </form>
+          </div>
         </div>
       </div>
     `;
   }
 };
+
+// Регистрация делегированных обработчиков. lib/ui.js подключён в index.html
+// после app.js; если он окажется ниже этого модуля — регистрируемся на DOMContentLoaded.
+(function registerActions() {
+  if (typeof window === 'undefined') return;
+  if (!window.UI) { document.addEventListener('DOMContentLoaded', registerActions, { once: true }); return; }
+  UI.actions({
+    'cal:day': (el) => CalendarModule.showDayEvents(el.dataset.date),
+    'cal:add': (el) => { UI.closeModal('day-modal'); CalendarModule.showAddModal(el.dataset.date); },
+    'cal:save': () => CalendarModule.saveEvent(),
+    'cal:complete': (el) => CalendarModule.completeEvent(el.dataset.id),
+    'cal:prev': () => CalendarModule.prevMonth(),
+    'cal:next': () => CalendarModule.nextMonth(),
+    'cal:today': () => CalendarModule.goToday(),
+  });
+})();
