@@ -42,6 +42,9 @@ const appState = {
     page: 1
   }
 };
+// A top-level const is not a window property: expose it for lib/ui.js
+// (UI.baseCurrency / UI.accountsArray read root.appState).
+if (typeof window !== 'undefined') window.appState = appState;
 
 // ---------------------------------------------------------------------------
 // Navigation information architecture
