@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#5D5CDE">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#EDF7F6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B2A2E" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Finman">
@@ -15,8 +17,10 @@
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-  <!-- Vendor assets are self-hosted (CSP 'self', works offline). Typography uses the
-       system stack via --fm-font-ui / --fm-font-num until the self-hosted type wave. -->
+  <!-- Vendor assets are self-hosted (CSP 'self', works offline). Type is CHART DATUM:
+       Familjen Grotesk (UI), Azeret Mono (every numeral), Newsreader (long-form AI text). -->
+  <link rel="preload" href="/vendor/fonts/familjen-grotesk-latin-r.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/vendor/fonts/azeret-mono-latin-r.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/vendor/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/vendor/fa.min.css">
   <link rel="stylesheet" href="/css/style.css">
