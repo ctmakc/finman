@@ -118,4 +118,28 @@ describe('review: cross-user access', () => {
       config.adminEmails.length = 0;
     }
   });
+
+  test('split: members of another group cannot be used in expenses or settlements', async () => {
+    const gA = (await dbRun(ctx.db, `INSERT INTO split_groups (user_id,name) VALUES (?,?)`, [alice.id, 'Trip'])).id;
+    const mA1 = (await dbRun(ctx.db, `INSERT INTO split_members (group_id,name) VALUES (?,?)`, [gA, 'Alice'])).id;
+    const mA2 = (await dbRun(ctx.db, `INSERT INTO split_members (group_id,name) VALUES (?,?)`, [gA, 'Ann'])).id;
+    const gB = (await dbRun(ctx.db, `INSERT INTO split_groups (user_id,name) VALUES (?,?)`, [bob.id, 'Bob group'])).id;
+    const mB = (await dbRun(ctx.db, `INSERT INTO split_members (group_id,name) VALUES (?,?)`, [gB, 'Bob secret name'])).id;
+
+    const bad = await request.post(`/api/split/groups/${gA}/expenses`).set(auth(alice.token))
+      .send({ paid_by: mB, description: 'x', amount: 10 });
+    expect(bad.status).toBe(400);
+    const badShare = await request.post(`/api/split/groups/${gA}/expenses`).set(auth(alice.token))
+      .send({ paid_by: mA1, description: 'x', amount: 10, split_type: 'custom', shares: [{ member_id: mB, amount: 10 }] });
+    expect(badShare.status).toBe(400);
+    const sumOff = await request.post(`/api/split/groups/${gA}/expenses`).set(auth(alice.token))
+      .send({ paid_by: mA1, description: 'x', amount: 10, split_type: 'custom', shares: [{ member_id: mA2, amount: 3 }] });
+    expect(sumOff.status).toBe(400);
+    const ok = await request.post(`/api/split/groups/${gA}/expenses`).set(auth(alice.token))
+      .send({ paid_by: String(mA1), description: 'Dinner', amount: 10 });
+    expect(ok.status).toBe(201);
+    const settle = await request.post(`/api/split/groups/${gA}/settlements`).set(auth(alice.token))
+      .send({ from_member: mA2, to_member: mB, amount: 5 });
+    expect(settle.status).toBe(400);
+  });
 });

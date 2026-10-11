@@ -123,7 +123,7 @@ const Split = {
         await run(
           `INSERT INTO split_shares (expense_id, member_id, amount, is_paid)
            VALUES (?, ?, ?, ?)`,
-          [result.id, member.id, shares[idx], member.id === data.paid_by ? 1 : 0]
+          [result.id, member.id, shares[idx], String(member.id) === String(data.paid_by) ? 1 : 0]
         );
       }
     } else if (splitType === 'custom' && data.shares) {
@@ -133,7 +133,7 @@ const Split = {
           `INSERT INTO split_shares (expense_id, member_id, amount, is_paid)
            VALUES (?, ?, ?, ?)`,
           [result.id, share.member_id, money.round(share.amount),
-           share.member_id === data.paid_by ? 1 : 0]
+           String(share.member_id) === String(data.paid_by) ? 1 : 0]
         );
       }
     }

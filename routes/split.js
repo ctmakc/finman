@@ -5,6 +5,8 @@ const router = express.Router();
 const passport = require('passport');
 const Split = require('../models/split');
 const { get } = require('../db/database');
+const money = require('../lib/money');
+const dates = require('../lib/dates');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -187,6 +189,15 @@ router.get('/groups/:id/expenses', ownGroup, async (req, res) => {
   }
 });
 
+// Все id участников из тела запроса должны принадлежать этой группе:
+// иначе в расход/взаиморасчёт попадали участники чужих групп (и их имена
+// потом возвращались в списке расходов).
+async function membersOfGroup(groupId, ids) {
+  const members = await Split.getMembers(groupId);
+  const own = new Set(members.map((m) => String(m.id)));
+  return ids.every((id) => own.has(String(id)));
+}
+
 // Добавить расход
 router.post('/groups/:id/expenses', ownGroup, async (req, res) => {
   try {
@@ -195,10 +206,25 @@ router.post('/groups/:id/expenses', ownGroup, async (req, res) => {
     if (!paid_by || !description || !amount) {
       return res.status(400).json({ message: 'Please fill in the required fields' });
     }
+    if (!(Number(amount) > 0)) {
+      return res.status(400).json({ message: 'Amount must be positive' });
+    }
+    const shareIds = Array.isArray(shares) ? shares.map((s) => s && s.member_id) : [];
+    if (!(await membersOfGroup(req.params.id, [paid_by, ...shareIds]))) {
+      return res.status(400).json({ message: 'Unknown group member' });
+    }
+    if (split_type === 'custom') {
+      const total = Array.isArray(shares) ? money.add(...shares.map((s) => money.round(Number(s.amount) || 0)), 0) : 0;
+      if (!Array.isArray(shares) || shares.length === 0 || total !== money.round(Number(amount))) {
+        return res.status(400).json({ message: 'Custom shares must add up to the expense amount' });
+      }
+    }
 
     const expense = await Split.addExpense({
       group_id: req.params.id,
-      paid_by, description, amount, split_type, date, category, shares
+      paid_by, description, amount, split_type, category, shares,
+      // date NOT NULL: без даты был 500.
+      date: date || dates.todayISO(dates.userTz(req.user)),
     });
 
     res.status(201).json(expense);
@@ -250,6 +276,12 @@ router.post('/groups/:id/settlements', ownGroup, async (req, res) => {
 
     if (!from_member || !to_member || !amount) {
       return res.status(400).json({ message: 'Please fill in the required fields' });
+    }
+    if (!(Number(amount) > 0) || String(from_member) === String(to_member)) {
+      return res.status(400).json({ message: 'Invalid settlement' });
+    }
+    if (!(await membersOfGroup(req.params.id, [from_member, to_member]))) {
+      return res.status(400).json({ message: 'Unknown group member' });
     }
 
     const settlement = await Split.addSettlement({
