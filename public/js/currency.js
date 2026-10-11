@@ -22,7 +22,11 @@ function orderedCurrencies(list) {
 
 // Currency name in the UI language (Intl.DisplayNames); the server list
 // carries a fixed-language name, which is only the fallback.
+const NON_ISO_CURRENCY_NAMES = { BTC: 'Bitcoin', ETH: 'Ethereum', USDT: 'Tether' };
+
 function currencyDisplayName(code, fallback) {
+  const upper = String(code || '').toUpperCase();
+  if (NON_ISO_CURRENCY_NAMES[upper]) return NON_ISO_CURRENCY_NAMES[upper];
   try {
     const locale = (typeof numberLocale === 'function') ? numberLocale() : 'en';
     const dn = new Intl.DisplayNames([locale], { type: 'currency' });
