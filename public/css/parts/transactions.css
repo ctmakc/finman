@@ -768,7 +768,7 @@
   /* Sticky filter toggle bar so it stays reachable while scrolling rows */
   .filters-container {
     position: sticky;
-    top: var(--space-2);
+    top: calc(var(--fm-topbar-h) + var(--space-2));
     z-index: 20;
   }
 
@@ -790,95 +790,7 @@
     width: 100%;
   }
 
-  /* Reflow the table into stacked cards */
-  .transactions-table,
-  .transactions-table tbody,
-  .transactions-table tr,
-  .transactions-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .transactions-table thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
-  .transactions-table tbody tr.tx-row {
-    position: relative;
-    margin: var(--space-3) var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--fm-border);
-    border-radius: var(--radius-md);
-    background: var(--fm-surface);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .transactions-table tbody tr.tx-row:hover {
-    background: var(--fm-surface);
-  }
-
-  .transactions-container .table td.tx-cell,
-  .transactions-table td.tx-cell {
-    padding: var(--space-1) 0 !important;
-    border-bottom: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    text-align: right;
-  }
-
-  /* labels from data-label on the left of each reflowed row */
-  .transactions-table td.tx-cell::before {
-    content: attr(data-label);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fm-ink-3);
-    flex-shrink: 0;
-    text-align: left;
-  }
-
-  /* description spans full width as the row heading */
-  .transactions-table td.tx-cell-desc {
-    border-bottom: 1px solid var(--fm-border);
-    padding-bottom: var(--space-3) !important;
-    margin-bottom: var(--space-2);
-  }
-
-  .transactions-table td.tx-cell-desc::before {
-    display: none;
-  }
-
-  .transactions-table td.tx-cell-desc {
-    justify-content: flex-start;
-    text-align: left;
-    font-weight: 600;
-  }
-
-  .tx-cell-amount {
-    font-size: 1.1rem;
-  }
-
-  .transactions-table td.tx-cell-actions {
-    justify-content: flex-end;
-    padding-top: var(--space-2) !important;
-  }
-
-  .transactions-table td.tx-cell-actions::before {
-    display: none;
-  }
-
-  .transactions-table .table-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
+  /* The stacked-card reflow of the table lives in style.css (NORTHERN LIGHT layer, section 22). */
 
   /* Pagination centers and wraps comfortably */
   .pagination-container .pagination {
@@ -896,12 +808,7 @@
     min-width: 0;
   }
 
-  /* Modals breathe full-width on phones */
-  #transaction-modal,
-  #account-modal,
-  #import-modal {
-    max-width: calc(100vw - var(--space-5));
-  }
+  /* Modals become bottom sheets on phones (style.css, section 14). */
 }
 
 /* --------------------------------------------------------------------------

@@ -2,9 +2,11 @@
 
 Self-hosted personal finance manager: accounts, transactions, budgets, savings
 goals, debts, family/shared finances, investments, subscriptions, net-worth
-tracking, CSV import, receipt OCR, and real bank API sync (Monobank / Revolut /
-Tinkoff). Node/Express + SQLite + a vanilla-JS frontend (no build step), with an
-optional AI assistant and Stripe-based subscription tiers.
+tracking, CSV/OFX import from ten banks, receipt OCR and Monobank API sync.
+Node/Express + SQLite + a vanilla-JS frontend (no build step), with an optional
+AI CFO and Stripe-based subscription tiers. The interface follows the
+NORTHERN LIGHT design system (`DESIGN.md`): sidebar on desktop, tab bar on
+phones, light and dark themes.
 
 ---
 
@@ -96,6 +98,8 @@ development they auto-generate (with a warning).
 | `DEMO_MODE` | no | Marks a demo instance: `/api/health` returns `demo:true`, billing/AI replies carry `_meta.demo`. |
 | `DEMO_SEED_ON_EMPTY` | no | `1` = at boot, when the `users` table is empty, seed the demo household (user `demo`). For staging without a persistent DB; see DEPLOY.md. Never set on production. |
 | `DEMO_PASSWORD` | no | Password of the seeded `demo` / `demo-partner` accounts (default `finman-demo-2026`). |
+| `RESEND_API_KEY` / `MAIL_FROM` | for email | Resend API key and sender for the weekly digest, sign-up notices and password-reset links. Without a key emails are logged, not sent. |
+| `APP_URL` | no | Public origin used in emailed links (e.g. `https://app.finman.money`). Defaults to the request origin. |
 
 ### Demo data
 
@@ -194,17 +198,14 @@ clear error or `503`) until configured — they never break the rest of the app.
 | Financial calendar, dashboard widgets, reports | Ready | — |
 | CSV import | Ready | — |
 | Receipt OCR (tesseract.js) | Ready | Offline fallback; see Receipt vision below. |
-| Manual bank sync (Monobank / Revolut / Tinkoff) | Ready | Per-user bank token entered in-app (encrypted with `ENCRYPTION_KEY`). |
+| Bank file import (RBC, TD, Scotiabank, BMO, CIBC, Tangerine, Wealthsimple Cash, EQ Bank, Revolut, Wise) + Monobank API sync | Ready | CSV/OFX presets; the Monobank token is entered in-app (encrypted with `ENCRYPTION_KEY`). |
+| Forgot / reset password | Ready | Emailed one-hour single-use link (`POST /api/auth/forgot-password`, `/reset-password`). Needs `RESEND_API_KEY`; set `APP_URL` behind a proxy. |
 | **Scheduled bank auto-sync** | Gated | `SYNC_ENABLED=true` + per-user bank tokens. |
 | **AI CFO (chat, streaming, plan, what-if, categorize, insights)** | Gated | Any configured provider (see AI vars). Returns `503 AI_NOT_CONFIGURED` otherwise. The `pro` tier is required only when billing (`STRIPE_SECRET_KEY`) is configured; without billing every authenticated user gets AI. |
 | **Insights block (digest, alerts, monthly story, weekly brief)** | Ready | `GET /api/ai/digest`, `/alerts`, `/insights/monthly` (cached in `ai_insights`), `/insights/weekly`. Digest and alerts are deterministic; stories fall back to deterministic text without a provider. |
 | **Receipt vision** | Gated | Uses the AI provider's vision (google / gemini-oauth / openai) first, tesseract.js fallback. |
 | **Billing / subscription tiers** | Gated | `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. |
 | **Anomaly detection** | Gated | Authenticated; functionality depends on the F7 feature stream. |
-
-> Note: AI, billing, sync, and anomaly endpoints may be wired as stubs in this
-> branch and are filled in by their respective feature streams. The keys above
-> are what they require once implemented.
 
 ---
 

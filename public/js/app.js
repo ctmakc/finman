@@ -97,9 +97,21 @@ const NAV_GROUPS = [
 ];
 
 const LOADING_HTML = `
-  <div class="loading">
+  <div class="loading" role="status" aria-live="polite" aria-label="Loading">
     <div class="spinner"></div>
     <p>Loading…</p>
+    <div class="fm-skeleton" aria-hidden="true">
+      <div class="fm-skeleton-row w-40"></div>
+      <div class="fm-skeleton-card"></div>
+      <div class="fm-skeleton-grid">
+        <div class="fm-skeleton-card"></div>
+        <div class="fm-skeleton-card"></div>
+        <div class="fm-skeleton-card"></div>
+      </div>
+      <div class="fm-skeleton-row w-60"></div>
+      <div class="fm-skeleton-row"></div>
+      <div class="fm-skeleton-row w-40"></div>
+    </div>
   </div>
 `;
 
@@ -270,35 +282,47 @@ function renderAuthenticatedUI() {
   const app = document.getElementById('app');
   const userName = escapeHtmlShell(appState.user && (appState.user.username || appState.user.email) || '');
 
+  const userInitial = escapeHtmlShell((appState.user && (appState.user.username || appState.user.email) || '?').trim().charAt(0) || '?');
+
   app.innerHTML = `
+    <div class="fm-app">
+    <aside class="fm-sidebar" aria-label="Sidebar">
+      <a href="/" class="fm-brand" id="brand-link" aria-label="Finman home">
+        <span class="fm-brand-mark" aria-hidden="true"></span>
+        <span><span class="fm-brand-name">Finman</span><span class="fm-brand-tag">Your money, clarified</span></span>
+      </a>
+      <nav class="fm-nav" aria-label="Primary">
+        <ul class="fm-nav-list" id="nav-list">
+          ${NAV_PRIMARY.map((item) => `<li>${navLinkHtml(item, 'fm-nav-link')}</li>`).join('')}
+        </ul>
+        ${NAV_GROUPS.map((g) => navGroupHtml(g, 'fm-nav-link', 'fm-nav-group-title')).join('')}
+      </nav>
+    </aside>
+    <div class="fm-body">
     <header class="header">
       <div class="container header-content">
         <button class="fm-menu-btn" id="mobile-menu-toggle" type="button"
-                aria-controls="app-drawer" aria-expanded="false" aria-haspopup="dialog">
+                aria-controls="app-drawer" aria-expanded="false" aria-haspopup="dialog" aria-label="Menu">
           <i class="fas fa-bars" aria-hidden="true"></i><span>Menu</span>
         </button>
         <div class="logo">
           <a href="/" id="logo-link" aria-label="Finman home">Finman</a>
         </div>
-        <nav class="fm-nav" aria-label="Primary">
-          <ul class="fm-nav-list" id="nav-list">
-            ${NAV_PRIMARY.map((item) => `<li>${navLinkHtml(item, 'fm-nav-link')}</li>`).join('')}
-            <li class="fm-more" id="nav-more">
-              <button class="fm-nav-link" id="nav-more-btn" type="button"
-                      aria-expanded="false" aria-controls="nav-more-menu">
-                <i class="fas fa-ellipsis-h" aria-hidden="true"></i><span>More</span>
-                <i class="fas fa-chevron-down fm-caret" aria-hidden="true"></i>
-              </button>
-              <div class="fm-more-menu" id="nav-more-menu" aria-label="More sections">
-                ${NAV_GROUPS.map((g) => navGroupHtml(g, 'fm-nav-link', 'fm-nav-group-title')).join('')}
-              </div>
-            </li>
-          </ul>
-        </nav>
+        <div class="fm-topbar-context" aria-hidden="true">
+          <span class="fm-topbar-greeting">${topbarGreeting(userName)}</span>
+          <span class="fm-topbar-date">${topbarDate()}</span>
+        </div>
+        <div class="fm-topbar-spacer"></div>
+        <button class="fm-quick-add" id="quick-add-btn" type="button" title="Add transaction">
+          <i class="fas fa-plus" aria-hidden="true"></i><span>Add transaction</span>
+        </button>
         <div class="user-info">
-          <span class="user-name" title="${userName}">${userName}</span>
           ${themeToggleHtml()}
-          <button id="logout-btn" class="btn btn-sm btn-outline fm-logout" type="button">
+          <span class="user-chip" title="${userName}">
+            <span class="user-avatar" aria-hidden="true">${userInitial}</span>
+            <span class="user-name">${userName}</span>
+          </span>
+          <button id="logout-btn" class="fm-logout" type="button" aria-label="Log out" title="Log out">
             <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Log out</span>
           </button>
         </div>
@@ -330,27 +354,47 @@ function renderAuthenticatedUI() {
     <main class="main">
       <div class="container" id="main-content">${LOADING_HTML}</div>
     </main>
+
+    <nav class="fm-tabbar" id="app-tabbar" aria-label="Quick navigation">
+      <a href="/dashboard" class="fm-nav-link fm-tab" data-page="dashboard"><i class="fas fa-house" aria-hidden="true"></i><span>Home</span></a>
+      <a href="/transactions" class="fm-nav-link fm-tab" data-page="transactions"><i class="fas fa-exchange-alt" aria-hidden="true"></i><span>Activity</span></a>
+      <button class="fm-tab fm-tab-add" id="tab-add-btn" type="button" aria-label="Add transaction"><i class="fas fa-plus" aria-hidden="true"></i><span>Add</span></button>
+      <a href="/budgets" class="fm-nav-link fm-tab" data-page="budgets"><i class="fas fa-piggy-bank" aria-hidden="true"></i><span>Budgets</span></a>
+      <button class="fm-tab" id="tab-more-btn" type="button" aria-controls="app-drawer" aria-haspopup="dialog"><i class="fas fa-grip" aria-hidden="true"></i><span>More</span></button>
+    </nav>
+    </div>
+    </div>
   `;
 
   // Navigation: one delegated handler for header, popover and drawer links.
   const onNavClick = (e) => {
     const link = e.target.closest('[data-page]');
-    if (!link || !link.closest('.fm-nav, .fm-drawer')) return;
+    if (!link || !link.closest('.fm-nav, .fm-drawer, .fm-tabbar')) return;
     e.preventDefault();
     navigateTo(link.dataset.page);
   };
+  app.querySelector('.fm-sidebar').addEventListener('click', onNavClick);
   app.querySelector('.header').addEventListener('click', onNavClick);
   document.getElementById('app-drawer').addEventListener('click', onNavClick);
+  document.getElementById('app-tabbar').addEventListener('click', onNavClick);
 
-  document.getElementById('logo-link').addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('dashboard');
+  ['logo-link', 'brand-link'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', (e) => { e.preventDefault(); navigateTo('dashboard'); });
   });
 
-  // "More" popover (desktop)
+  // Quick add (top bar on desktop, centre tab on phones)
+  ['quick-add-btn', 'tab-add-btn'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', quickAddTransaction);
+  });
+  const moreTab = document.getElementById('tab-more-btn');
+  if (moreTab) moreTab.addEventListener('click', () => { if (isDrawerOpen()) closeDrawer(); else openDrawer(); });
+
+  // "More" popover (legacy inline nav; kept for shells that still render it)
   const more = document.getElementById('nav-more');
   const moreBtn = document.getElementById('nav-more-btn');
-  moreBtn.addEventListener('click', (e) => {
+  if (more && moreBtn) moreBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     setMoreMenu(!more.classList.contains('open'));
   });
@@ -396,6 +440,29 @@ function renderAuthenticatedUI() {
   }
 
   detectIconFont();
+}
+
+// Top bar context: a greeting by time of day and today's date (English shell).
+function topbarGreeting(name, now = new Date()) {
+  const h = now.getHours();
+  const word = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  return name ? `${word}, ${name}` : word;
+}
+function topbarDate(now = new Date()) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
+  } catch (e) {
+    return now.toDateString();
+  }
+}
+
+// The "+" in the shell: open the transaction form wherever the user is.
+function quickAddTransaction() {
+  if (typeof showAddTransactionModal === 'function') {
+    showAddTransactionModal('expense');
+    return;
+  }
+  navigateTo('transactions');
 }
 
 function setMoreMenu(open) {
@@ -752,13 +819,34 @@ function consumeOAuthFragment() {
 function renderLoginPage() {
   const app = document.getElementById('app');
   closeDrawer();
+  // /reset-password?token=… (link from the "forgot password" email)
+  const resetToken = window.location.pathname === '/reset-password'
+    ? (new URLSearchParams(window.location.search).get('token') || '')
+    : '';
 
   app.innerHTML = `
     <div class="auth-container">
+      <aside class="auth-aside" aria-label="About Finman">
+        <a href="/" class="fm-brand" aria-label="Finman home">
+          <span class="fm-brand-mark" aria-hidden="true"></span>
+          <span><span class="fm-brand-name">Finman</span><span class="fm-brand-tag">Personal finance, clarified</span></span>
+        </a>
+        <div class="auth-pitch">
+          <h2>Every account, every currency, one clear picture.</h2>
+          <p>Budgets, goals, debts and investments in one place, with an AI CFO that only ever reasons over your own numbers.</p>
+          <ul class="auth-points">
+            <li><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span><strong>AI CFO</strong><small>Weekly briefs, what-if plans and categorisation, grounded in your data.</small></span></li>
+            <li><i class="fas fa-building-columns" aria-hidden="true"></i><span><strong>Banks and imports</strong><small>CSV and OFX from 10 banks, Monobank sync, receipts by photo.</small></span></li>
+            <li><i class="fas fa-shield-halved" aria-hidden="true"></i><span><strong>Yours to keep</strong><small>Self-hosted, encrypted bank tokens, one-click export.</small></span></li>
+          </ul>
+        </div>
+        <p class="auth-aside-foot"><i class="fas fa-lock" aria-hidden="true"></i> Your data is never sold.</p>
+      </aside>
+      <div class="auth-main">
       <div class="auth-card">
         <div class="auth-header">
-          <h1>Finman</h1>
-          <p>Your money, clarified.</p>
+          <h1>Welcome back</h1>
+          <p>Sign in to your Finman, or create an account.</p>
         </div>
 
         <div class="auth-social" id="auth-social" hidden>
@@ -794,6 +882,35 @@ function renderLoginPage() {
             <div id="login-error" class="auth-error" role="alert"></div>
 
             <button type="submit" class="btn btn-primary w-100">Sign in</button>
+            <p class="auth-links"><button type="button" class="auth-link" id="forgot-password-link">Forgot your password?</button></p>
+          </form>
+
+          <form id="forgot-form" class="auth-form hidden">
+            <p class="auth-form-intro">Enter the email of your account and we will send a link to choose a new password.</p>
+            <div class="form-group">
+              <label for="forgot-email" class="form-label">Email</label>
+              <input type="email" id="forgot-email" class="form-control" autocomplete="email" required>
+            </div>
+            <div id="forgot-error" class="auth-error" role="alert"></div>
+            <div id="forgot-success" class="auth-success" role="status"></div>
+            <button type="submit" class="btn btn-primary w-100">Send reset link</button>
+            <p class="auth-links"><button type="button" class="auth-link" id="forgot-back-link">Back to sign in</button></p>
+          </form>
+
+          <form id="reset-form" class="auth-form hidden">
+            <p class="auth-form-intro">Choose a new password for your account.</p>
+            <input type="hidden" id="reset-token" value="${escapeHtmlShell(resetToken)}">
+            <div class="form-group">
+              <label for="reset-password" class="form-label">New password</label>
+              <input type="password" id="reset-password" class="form-control" autocomplete="new-password" minlength="6" required>
+            </div>
+            <div class="form-group">
+              <label for="reset-confirm-password" class="form-label">Confirm new password</label>
+              <input type="password" id="reset-confirm-password" class="form-control" autocomplete="new-password" minlength="6" required>
+            </div>
+            <div id="reset-error" class="auth-error" role="alert"></div>
+            <button type="submit" class="btn btn-primary w-100">Change password</button>
+            <p class="auth-links"><button type="button" class="auth-link" id="reset-back-link">Back to sign in</button></p>
           </form>
 
           <form id="register-form" class="auth-form hidden">
@@ -833,6 +950,7 @@ function renderLoginPage() {
           <span>Bank connections are encrypted · your data is never sold</span>
         </p>
       </div>
+      </div>
     </div>
   `;
 
@@ -864,7 +982,92 @@ function renderLoginPage() {
   loginForm.addEventListener('submit', withBusyForm(handleLogin));
   registerForm.addEventListener('submit', withBusyForm(handleRegister));
 
+  // Forgot / reset password: the two extra forms share the card with sign-in.
+  const forgotForm = document.getElementById('forgot-form');
+  const resetForm = document.getElementById('reset-form');
+  const authTabsEl = document.querySelector('.auth-tabs');
+  const showAuthForm = (which) => {
+    [loginForm, registerForm, forgotForm, resetForm].forEach((f) => f.classList.add('hidden'));
+    which.classList.remove('hidden');
+    if (authTabsEl) authTabsEl.classList.toggle('hidden', which !== loginForm && which !== registerForm);
+    const first = which.querySelector('input:not([type="hidden"])');
+    if (first) first.focus();
+  };
+  document.getElementById('forgot-password-link').addEventListener('click', () => showAuthForm(forgotForm));
+  document.getElementById('forgot-back-link').addEventListener('click', () => showAuthForm(loginForm));
+  document.getElementById('reset-back-link').addEventListener('click', () => {
+    history.replaceState(null, '', '/');
+    showAuthForm(loginForm);
+  });
+  forgotForm.addEventListener('submit', withBusyForm(handleForgotPassword));
+  resetForm.addEventListener('submit', withBusyForm(handleResetPassword));
+  if (resetToken) showAuthForm(resetForm);
+
   revealGoogleSignIn();
+}
+
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  const email = document.getElementById('forgot-email').value.trim();
+  const errorElement = document.getElementById('forgot-error');
+  const okElement = document.getElementById('forgot-success');
+  errorElement.textContent = '';
+  okElement.textContent = '';
+  if (!email) {
+    errorElement.textContent = 'Enter the email of your account';
+    return;
+  }
+  try {
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      errorElement.textContent = data.message || 'Could not send the reset link';
+      return;
+    }
+    okElement.textContent = data.emailConfigured === false
+      ? 'This server has no email provider configured. Ask the person who runs it to reset your password.'
+      : (data.message || 'If an account exists for that email, a reset link is on its way.');
+  } catch (error) {
+    errorElement.textContent = 'Could not reach the server. Try again.';
+  }
+}
+
+async function handleResetPassword(e) {
+  e.preventDefault();
+  const token = document.getElementById('reset-token').value;
+  const password = document.getElementById('reset-password').value;
+  const confirm = document.getElementById('reset-confirm-password').value;
+  const errorElement = document.getElementById('reset-error');
+  errorElement.textContent = '';
+  if (password.length < 6) {
+    errorElement.textContent = 'Password must be at least 6 characters';
+    return;
+  }
+  if (password !== confirm) {
+    errorElement.textContent = 'The passwords do not match';
+    return;
+  }
+  try {
+    const response = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      errorElement.textContent = data.message || 'This reset link is invalid or has expired';
+      return;
+    }
+    history.replaceState(null, '', '/');
+    renderLoginPage();
+    showNotification(data.message || 'Your password has been changed. Sign in with the new one.', 'success');
+  } catch (error) {
+    errorElement.textContent = 'Could not reach the server. Try again.';
+  }
 }
 
 // Shown when the token exists but the server could not be reached (network
@@ -1065,7 +1268,7 @@ async function renderDashboard() {
     <section class="fm-hero" aria-label="Your finances">
       <div class="fm-hero-grid">
         <div class="fm-hero-main">
-          <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
+          <span class="fm-hero-eyebrow"><i class="fas fa-wand-magic-sparkles"></i> Your money, clarified</span>
           <h1 class="fm-hero-title">Total balance</h1>
           ${hasTotal ? `<div class="fm-hero-figure" id="hero-networth"
                data-countup="${totalBalance}" data-currency="${escapeHtmlShell(symbol)}">
