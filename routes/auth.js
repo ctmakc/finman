@@ -5,6 +5,7 @@ const User = require('../models/user');
 const config = require('../config/config');
 const { googleEnabled } = require('../services/authService');
 const { notifySignup } = require('../services/signupNotify');
+const passwordReset = require('../services/passwordResetService');
 
 const router = express.Router();
 
@@ -55,6 +56,45 @@ router.get('/google/callback', (req, res, next) => {
       return fail('google_failed');
     }
   })(req, res, next);
+});
+
+// --- Forgot / reset password ------------------------------------------------
+// POST /forgot-password { email } always answers 200 with the same message, so
+// the endpoint cannot be used to find out which emails have accounts. The link
+// is mailed through services/emailService (no-op without RESEND_API_KEY).
+router.post('/forgot-password', async (req, res) => {
+  const email = req.body && req.body.email;
+  if (!email || !config.isValidEmail(String(email))) {
+    return res.status(400).json({ error: true, message: 'Enter the email address of your account' });
+  }
+  try {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const result = await passwordReset.requestReset({ email: String(email), baseUrl });
+    res.json({
+      success: true,
+      message: 'If an account exists for that email, a reset link is on its way. It works for one hour.',
+      // Only an operator can act on this: no mail provider configured.
+      emailConfigured: result.reason !== 'EMAIL_NOT_CONFIGURED'
+    });
+  } catch (error) {
+    console.error('Forgot-password error:', error);
+    res.status(500).json({ error: true, message: 'Could not start the password reset' });
+  }
+});
+
+// POST /reset-password { token, password } -> 200 { success } | 400 { error }
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body || {};
+  try {
+    await passwordReset.resetPassword({ token, password });
+    res.json({ success: true, message: 'Your password has been changed. Sign in with the new one.' });
+  } catch (error) {
+    if (error && error.isOperational) {
+      return res.status(error.status || 400).json({ error: true, code: error.code, message: error.message });
+    }
+    console.error('Reset-password error:', error);
+    res.status(500).json({ error: true, message: 'Could not reset the password' });
+  }
 });
 
 // Регистрация

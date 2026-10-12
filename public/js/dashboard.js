@@ -422,7 +422,7 @@ const SmartDashboard = {
       <section class="fm-hero" aria-label="${t('dashboard.heroAria')}">
         <div class="fm-hero-grid">
           <div class="fm-hero-main">
-            <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
+            <span class="fm-hero-eyebrow"><i class="fas fa-wand-magic-sparkles"></i> Your money, clarified</span>
             <h1 class="fm-hero-title">${t('dashboard.heroTitle')}</h1>
             <div class="fm-hero-figure" id="hero-networth" data-countup="0" data-currency="${this.baseCurrency()}">
               <span class="fm-hero-currency">${this.baseSymbol()}</span><span class="fm-hero-amount">—</span>

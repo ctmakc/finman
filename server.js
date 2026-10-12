@@ -48,7 +48,7 @@ const calendarRoutes = require('./routes/calendar');
 const widgetsRoutes = require('./routes/widgets');
 const forecastRoutes = require('./routes/forecast');
 
-// Foundation: новые роутеры (часть — стабы, заменяются feature-стримами)
+// Foundation routers (health, AI CFO, billing, bank sync, anomalies)
 const healthRoutes = require('./routes/health');
 const aiRoutes = require('./routes/ai');
 const billingRoutes = require('./routes/billing');
@@ -118,7 +118,7 @@ const aiLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: config.authRateLimits.windowMs,
   max: config.authRateLimits.max,
-  message: { error: true, message: 'Слишком много попыток входа, попробуйте позже' },
+  message: { error: true, message: 'Too many attempts. Please try again in a few minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -154,6 +154,17 @@ app.use(session({
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+// Password reset has its own bucket so a flood of reset requests cannot lock
+// the login endpoint for the same address.
+const resetLimiter = rateLimit({
+  windowMs: config.authRateLimits.windowMs,
+  max: 10,
+  message: { error: true, message: 'Too many attempts. Please try again in a few minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/forgot-password', resetLimiter);
+app.use('/api/auth/reset-password', resetLimiter);
 app.use('/api/ai', aiLimiter);
 
 // Инициализация Passport.js

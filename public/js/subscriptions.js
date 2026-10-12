@@ -2,6 +2,15 @@
 // Amounts use each subscription's own currency; monthly/yearly totals are
 // grouped per currency client-side (the API total adds currencies together).
 // Modal follows the shared hidden / is-open convention (lib/ui.js).
+// Subscription icon: seeded/user values are icon names ("cloud", "tv") or an
+// emoji. A bare word becomes a Font Awesome glyph; anything else is shown as text.
+function subscriptionIconHtml(icon) {
+  const raw = icon == null ? '' : String(icon).trim();
+  if (!raw) return '<i class="fas fa-box" aria-hidden="true"></i>';
+  if (/^[a-z][a-z0-9-]{1,40}$/.test(raw)) return `<i class="fas fa-${UI.esc(raw)}" aria-hidden="true"></i>`;
+  return UI.esc(raw);
+}
+
 const SubscriptionsModule = {
   subscriptions: [],
   stats: null,
@@ -72,7 +81,7 @@ const SubscriptionsModule = {
       <div class="card subscription-card${this.isActive(sub) ? '' : ' inactive'}" data-id="${Number(sub.id)}" style="border-left: 4px solid ${this.safeColor(sub.color)}">
         <div class="subscription-header">
           <div class="subscription-info">
-            <span class="subscription-icon">${sub.icon ? UI.esc(sub.icon) : '<i class="fas fa-box"></i>'}</span>
+            <span class="subscription-icon">${subscriptionIconHtml(sub.icon)}</span>
             <div>
               <h3>${UI.esc(sub.name)}</h3>
               <small>${UI.esc(sub.category || t('subs.noCategory'))}</small>

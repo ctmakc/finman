@@ -1,4 +1,9 @@
 // jest.config.js — Foundation test harness config.
+//
+// Date tests assume the app's reference zone (Toronto); CI containers run in
+// UTC. The config is evaluated in the parent process before any worker or
+// test module loads, so pinning TZ here is the one place that is early enough.
+process.env.TZ = process.env.FINMAN_TEST_TZ || 'America/Toronto';
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/test/**/*.test.js'],

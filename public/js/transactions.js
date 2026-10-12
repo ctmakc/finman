@@ -693,11 +693,16 @@ async function fetchTransactions(filters = {}) {
         ? 'transfer text-muted'
         : (isIncome ? 'income text-success' : 'expense text-error');
       const sign = isInflow ? '+' : '−';
+      // Merchant avatar: the first letter of the description on a tinted plate
+      // (income / expense / transfer); transfers keep the exchange icon.
+      const avatarText = String(description).trim().charAt(0) || '•';
+      let hue = 0;
+      for (const ch of String(description).toLowerCase()) hue = (hue * 31 + ch.charCodeAt(0)) % 8;
       return `
       <tr data-transaction-id="${escapeHtml(transaction.id)}" class="tx-row ${rowClass}"${isTransfer ? ' data-transfer-id="' + escapeHtml(transaction.transfer_id || '') + '"' : ''}>
         <td data-label="${t('common.date')}" class="tx-cell tx-cell-date">${escapeHtml(formatDate(transaction.date))}</td>
         <td data-label="${t('common.description')}" class="tx-cell tx-cell-desc">
-          <span class="tx-direction" aria-hidden="true"><i class="fas fa-${isTransfer ? 'exchange-alt' : 'arrow-' + arrow}"></i></span>
+          <span class="tx-direction${isTransfer ? '' : ' tx-avatar'}" aria-hidden="true" data-arrow="${arrow}" data-hue="${hue}">${isTransfer ? '<i class="fas fa-exchange-alt"></i>' : escapeHtml(avatarText)}</span>
           <span class="tx-desc-text">${escapeHtml(description)}</span>
           ${isTransfer ? `<span class="chip tx-transfer-badge">${t('transactions.transfer')}</span>` : ''}
         </td>
