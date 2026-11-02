@@ -103,7 +103,14 @@ describe('DEMO_SEED_ON_EMPTY — in-process seed', () => {
     const again = await database.get('SELECT COUNT(*) AS n FROM users');
     expect(again.n).toBe(2);
     const txCount = await database.get('SELECT COUNT(*) AS n FROM transactions');
-    expect(txCount.n).toBe(first.counts.transactions + 2 * first.counts.transfers + 3 /* openings */ + 6 /* partner */ + 1 /* partner opening */);
+    // The partner's six transactions are dated relative to today; the last one
+    // (3rd of the current month) is skipped on the 1st and 2nd of a month.
+    const partnerTx = await database.get(
+      "SELECT COUNT(*) AS n FROM transactions t JOIN users u ON u.id = t.user_id WHERE u.username = 'demo-partner' AND t.type != 'opening'"
+    );
+    expect(partnerTx.n).toBeGreaterThanOrEqual(5);
+    expect(partnerTx.n).toBeLessThanOrEqual(6);
+    expect(txCount.n).toBe(first.counts.transactions + 2 * first.counts.transfers + 3 /* openings */ + partnerTx.n /* partner */ + 1 /* partner opening */);
   }, 180000); // seeds the household: slow on a loaded shared machine
 
   test('demo password works through the model layer', async () => {
