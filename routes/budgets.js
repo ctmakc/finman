@@ -6,6 +6,39 @@ const dates = require('../lib/dates');
 const router = express.Router();
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 
+const VALID_PERIODS = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
+// Same rule as accounts/subscriptions: the code is rendered by the UI and fed
+// to Intl, so only ISO-like letter codes are accepted ('US$' is not).
+const CURRENCY_CODE = /^[A-Za-z]{3,5}$/;
+
+// A money field from the body as a finite number, or NaN. Number('') is 0 and
+// Number(true) is 1, so only numbers and numeric strings are accepted.
+function toMoneyNumber(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+}
+
+// Validates amount/carryover/period/currency. Returns an error message or null.
+// partial=true (PUT): absent fields are not required.
+function validateBudgetBody(body, partial) {
+  const { amount, carryover, period, currency } = body;
+  if (!partial || amount !== undefined) {
+    const n = toMoneyNumber(amount);
+    if (!Number.isFinite(n) || n <= 0) return 'Budget amount must be positive';
+  }
+  if (carryover !== undefined && carryover !== null && carryover !== '' && !Number.isFinite(toMoneyNumber(carryover))) {
+    return 'Carryover must be a number';
+  }
+  if (period !== undefined && period !== null && !VALID_PERIODS.includes(period)) {
+    return 'Invalid period';
+  }
+  if (currency !== undefined && currency !== null && currency !== '' && !CURRENCY_CODE.test(String(currency))) {
+    return 'Currency must be a 3-5 letter code, e.g. CAD';
+  }
+  return null;
+}
+
 // Middleware для проверки аутентификации
 const authenticate = passport.authenticate('jwt', { session: false });
 
@@ -101,13 +134,9 @@ router.post('/', authenticate, async (req, res) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: true, message: 'Budget name is required' });
     }
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
-    }
-
-    const validPeriods = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
-    if (period && !validPeriods.includes(period)) {
-      return res.status(400).json({ error: true, message: 'Invalid period' });
+    const invalid = validateBudgetBody(req.body, false);
+    if (invalid) {
+      return res.status(400).json({ error: true, message: invalid });
     }
 
     // Устанавливаем дату начала если не указана
@@ -117,14 +146,14 @@ router.post('/', authenticate, async (req, res) => {
       userId: req.user.id,
       name: name.trim(),
       category: category?.trim() || null,
-      amount: parseFloat(amount),
+      amount: toMoneyNumber(amount),
       period: period || 'monthly',
       startDate: budgetStartDate,
       endDate: endDate || null,
-      currency: currency || DEFAULT_CURRENCY,
+      currency: currency ? String(currency).toUpperCase() : DEFAULT_CURRENCY,
       notifyAtPercent: notifyAtPercent || 80,
       rollover: rollover ? true : false,
-      carryover: carryover !== undefined ? parseFloat(carryover) : 0
+      carryover: carryover !== undefined && carryover !== null && carryover !== '' ? toMoneyNumber(carryover) : 0
     });
 
     const carryoverVal = budget.carryover || 0;
@@ -158,23 +187,25 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: true, message: 'Budget not found' });
     }
 
-    // Валидация суммы
-    if (amount !== undefined && amount <= 0) {
-      return res.status(400).json({ error: true, message: 'Budget amount must be positive' });
+    // Валидация суммы/переноса/периода/валюты
+    const invalid = validateBudgetBody(req.body, true);
+    if (invalid) {
+      return res.status(400).json({ error: true, message: invalid });
     }
 
     const updated = await Budget.update(id, req.user.id, {
       name: name?.trim(),
       category: category?.trim(),
-      amount: amount ? parseFloat(amount) : undefined,
+      amount: amount !== undefined ? toMoneyNumber(amount) : undefined,
       period,
       startDate,
       endDate,
-      currency,
+      currency: currency ? String(currency).toUpperCase() : currency,
       notifyAtPercent,
       isActive,
       rollover: rollover !== undefined ? (rollover ? true : false) : undefined,
-      carryover: carryover !== undefined ? parseFloat(carryover) : undefined
+      // null/'' resets the carryover to 0 (as before); a number sets it.
+      carryover: carryover === undefined ? undefined : (carryover === null || carryover === '' ? 0 : toMoneyNumber(carryover))
     });
 
     if (updated) {
@@ -246,8 +277,7 @@ router.post('/roll-forward', authenticate, async (req, res) => {
   try {
     const fromPeriod = req.body.period || 'monthly';
 
-    const validPeriods = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
-    if (!validPeriods.includes(fromPeriod)) {
+    if (!VALID_PERIODS.includes(fromPeriod)) {
       return res.status(400).json({ error: true, message: 'Invalid period' });
     }
 
