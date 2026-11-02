@@ -23,8 +23,8 @@ const { isDemo } = require('../lib/demoFlag');
 const logger = require('../lib/logger');
 
 // ---- Каталог планов (статичный, без обращения к Stripe) -----------------
-// price в минорных единицах (центах) для совместимости со Stripe-семантикой,
-// но getPlans отдаёт человекочитаемые поля.
+// price — в основных единицах валюты (долларах: 9 = $9/мес); в Stripe
+// уходит unit_amount = price * 100 (центы), см. createCheckoutSession.
 const PLANS = [
   {
     id: 'free',
@@ -205,6 +205,16 @@ async function applyTier(userId, tier, { subscriptionId, customerId } = {}) {
   await run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, params);
 }
 
+// Тир из metadata Stripe-объекта. Отсутствует -> 'pro' (как раньше).
+// Задан, но это не платный план из PLANS -> null: такой тир не пишем в БД
+// (опечатка/ручная правка metadata в Stripe не должна давать произвольный тир).
+function paidTierFromMetadata(obj) {
+  const raw = obj && obj.metadata ? obj.metadata.tier : undefined;
+  if (raw === undefined || raw === null || raw === '') return 'pro';
+  const plan = PLANS.find((p) => p.tier === raw);
+  return plan && plan.tier !== 'free' ? plan.tier : null;
+}
+
 // Находит userId из объекта Stripe (metadata, либо по stripe_customer_id в БД).
 async function resolveUserId(obj) {
   if (obj && obj.metadata && obj.metadata.userId) {
@@ -255,7 +265,11 @@ async function handleWebhook(rawBody, sig) {
   // Маппинг событий -> изменение тира.
   if (type === 'checkout.session.completed') {
     const userId = await resolveUserId(obj);
-    const tier = (obj.metadata && obj.metadata.tier) || 'pro';
+    const tier = paidTierFromMetadata(obj);
+    if (tier === null) {
+      logger.warn({ type, userId }, 'Stripe webhook: unknown plan tier in metadata, tier unchanged');
+      return { received: true, type, tier: null, userId, ignored: 'unknown_tier' };
+    }
     if (userId != null) {
       await applyTier(userId, tier, {
         subscriptionId: obj.subscription || null,
@@ -268,8 +282,12 @@ async function handleWebhook(rawBody, sig) {
 
   if (type === 'customer.subscription.updated' || type === 'customer.subscription.created') {
     const userId = await resolveUserId(obj);
-    const tier = (obj.metadata && obj.metadata.tier) || 'pro';
+    const tier = paidTierFromMetadata(obj);
     const active = obj.status === 'active' || obj.status === 'trialing';
+    if (active && tier === null) {
+      logger.warn({ type, userId }, 'Stripe webhook: unknown plan tier in metadata, tier unchanged');
+      return { received: true, type, tier: null, userId, ignored: 'unknown_tier' };
+    }
     if (userId != null) {
       await applyTier(userId, active ? tier : 'free', {
         subscriptionId: obj.id || null,
@@ -299,5 +317,5 @@ module.exports = {
   createCheckoutSession,
   handleWebhook,
   // экспортируем для тестов/повторного использования
-  _internal: { applyTier, resolveUserId, stripePriceIdFor, isDemo },
+  _internal: { applyTier, resolveUserId, stripePriceIdFor, paidTierFromMetadata, isDemo },
 };

@@ -522,17 +522,24 @@ router.get('/custom-banks', authenticate, async (req, res) => {
   }
 });
 
+// Custom bank API URL: only http(s). new URL() alone also accepts
+// javascript:, data:, file: and similar schemes.
+function isHttpUrl(value) {
+  try {
+    const u = new URL(String(value).trim());
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 router.post('/custom-banks', authenticate, async (req, res) => {
   try {
     const { name, country, apiUrl, authType, scopes, endpoints, tokenInstructions } = req.body || {};
     if (!name || !name.trim()) return fail(res, 400, 'Bank name is required');
     if (!country || !country.trim()) return fail(res, 400, 'Country is required');
-    if (!apiUrl || !apiUrl.trim()) return fail(res, 400, 'API URL is required');
-    try {
-      new URL(apiUrl); // eslint-disable-line no-new
-    } catch {
-      return fail(res, 400, 'Invalid API URL');
-    }
+    if (!apiUrl || !String(apiUrl).trim()) return fail(res, 400, 'API URL is required');
+    if (!isHttpUrl(apiUrl)) return fail(res, 400, 'Invalid API URL');
     const validAuthTypes = ['api_key', 'bearer'];
     if (authType && !validAuthTypes.includes(authType)) return fail(res, 400, 'Invalid auth type');
 
@@ -560,13 +567,7 @@ router.put('/custom-banks/:id', authenticate, async (req, res) => {
     const { name, country, apiUrl, authType, scopes, endpoints, tokenInstructions } = req.body || {};
     const existingBank = await CustomBank.findById(id, req.user.id);
     if (!existingBank) return fail(res, 404, 'Custom bank not found');
-    if (apiUrl) {
-      try {
-        new URL(apiUrl); // eslint-disable-line no-new
-      } catch {
-        return fail(res, 400, 'Invalid API URL');
-      }
-    }
+    if (apiUrl && !isHttpUrl(apiUrl)) return fail(res, 400, 'Invalid API URL');
     const updated = await CustomBank.update(id, req.user.id, {
       name: name?.trim(),
       country: country?.trim().toUpperCase(),

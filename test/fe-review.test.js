@@ -155,8 +155,13 @@ describe('local dates (UI.ymd / todayYMD / parseYMD / monthRange)', () => {
   test('ymd uses the local calendar, late evening included', () => {
     const lateEvening = new Date(2026, 9, 31, 23, 30);
     expect(UI.ymd(lateEvening)).toBe('2026-10-31');
-    // toISOString() would already say November in Toronto:
-    expect(lateEvening.toISOString().slice(0, 10)).toBe('2026-11-01');
+    // toISOString() would already say November west of Greenwich (Toronto).
+    // Assigning process.env.TZ inside a Jest test file does not reach the
+    // worker process, so this only holds when the process itself runs at a
+    // negative UTC offset; under TZ=UTC (CI, containers) both strings agree.
+    if (lateEvening.getTimezoneOffset() > 0) {
+      expect(lateEvening.toISOString().slice(0, 10)).toBe('2026-11-01');
+    }
   });
 
   test('parseYMD builds a local midnight date and rejects garbage', () => {
