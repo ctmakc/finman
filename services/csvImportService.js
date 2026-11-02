@@ -254,6 +254,10 @@ function parseAmount(input, opts) {
     negative = true;
     s = s.replace(/(DR|D)$/i, '');
   }
+  // Letters between digits ("1e5", "12a34", "0x10") are not an amount: stripping
+  // them would silently turn "1e5" into 15. Currency codes/symbols sit only
+  // before or after the number and are stripped below.
+  if (/\d[.,]?[A-Za-z]+[.,]?\d/.test(s) || /^0x/i.test(s)) return null;
   // Strip currency symbols/codes and anything that is not digit, sign, comma, dot.
   s = s.replace(/[^\d,.\-+]/g, '');
   if (!s || !/\d/.test(s)) return null;
