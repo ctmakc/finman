@@ -284,6 +284,17 @@ class Family {
       [memberId, familyId]
     );
 
+    // То же для бюджетов: BudgetPermission выдаётся только внутри семьи, но
+    // при исключении не отзывался — бывший участник продолжал видеть бюджеты.
+    await run(
+      `DELETE FROM budget_permissions WHERE user_id = ? AND budget_id IN (
+        SELECT b.id FROM budgets b
+        JOIN family_members fm ON b.user_id = fm.user_id
+        WHERE fm.family_id = ?
+      )`,
+      [memberId, familyId]
+    );
+
     await run(
       `DELETE FROM family_members WHERE family_id = ? AND user_id = ?`,
       [familyId, memberId]
@@ -339,6 +350,14 @@ class Family {
     // Удаляем права доступа
     await run(
       `DELETE FROM account_permissions WHERE user_id = ? AND granted_by IN (
+        SELECT user_id FROM family_members WHERE family_id = ?
+      )`,
+      [userId, familyId]
+    );
+
+    // Права на бюджеты семьи тоже отзываем (раньше переживали выход из семьи).
+    await run(
+      `DELETE FROM budget_permissions WHERE user_id = ? AND granted_by IN (
         SELECT user_id FROM family_members WHERE family_id = ?
       )`,
       [userId, familyId]

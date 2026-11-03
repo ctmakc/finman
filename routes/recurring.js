@@ -135,9 +135,12 @@ router.get('/:id', authenticate, async (req, res) => {
 // Обновление платежа
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const newAccountId = req.body.accountId ?? req.body.account_id;
-    if (newAccountId !== undefined && !(await Account.findById(newAccountId, req.user.id))) {
-      return res.status(404).json({ error: true, message: 'Account not found' });
+    // Модель мапит И accountId, И account_id в одну колонку (в UPDATE побеждает
+    // последний) — проверяем владение каждым присланным ключом, а не первым.
+    for (const newAccountId of [req.body.accountId, req.body.account_id]) {
+      if (newAccountId !== undefined && !(await Account.findById(newAccountId, req.user.id))) {
+        return res.status(404).json({ error: true, message: 'Account not found' });
+      }
     }
     const success = await RecurringPayment.update(
       req.params.id,

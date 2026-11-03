@@ -326,6 +326,11 @@ router.put('/:id', authenticate, async (req, res, next) => {
     if (error && error.name === 'AppError') {
       return next(error);
     }
+    // Модель бросает обычный Error для чужой/несуществующей транзакции —
+    // это 404 (ветка выше с !success сюда не доходила), а не 500.
+    if (error && error.message === 'Transaction not found') {
+      return res.status(404).json({ error: true, message: 'Transaction not found or not updated' });
+    }
     console.error('Error updating transaction:', error);
     res.status(500).json({ 
       error: true, 
@@ -351,6 +356,9 @@ router.delete('/:id', authenticate, async (req, res) => {
       });
     }
   } catch (error) {
+    if (error && error.message === 'Transaction not found') {
+      return res.status(404).json({ error: true, message: 'Transaction not found or not deleted' });
+    }
     console.error('Error deleting transaction:', error);
     res.status(500).json({ 
       error: true, 

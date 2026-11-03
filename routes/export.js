@@ -1,4 +1,19 @@
 const express = require('express');
+// Текстовая ячейка CSV: всегда в кавычках с экранированием "", а значения,
+// начинающиеся с = + - @ (или TAB/CR), получают префикс ' — иначе Excel/Sheets
+// исполняют их как формулу (CSV/formula injection через описание/имя счёта).
+const FORMULA_START = /^[=+\-@\t\r]/;
+function csvText(value) {
+  let s = value == null ? '' : String(value);
+  if (FORMULA_START.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+// Обратное для импорта нашего же экспорта: снять защитный префикс '.
+function uncsvText(value) {
+  const s = String(value == null ? '' : value);
+  return /^'[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
+}
+
 const router = express.Router();
 const passport = require('passport');
 const { query, run, transaction } = require('../db/database');
@@ -8,6 +23,7 @@ const Transaction = require('../models/transaction');
 const backupService = require('../services/backupService');
 const ledgerExport = require('../services/ledgerExport');
 const { AppError } = require('../middleware/error');
+const { parseCsv } = require('../services/csvImportService');
 
 const authenticate = passport.authenticate('jwt', { session: false });
 router.use(authenticate);
@@ -86,8 +102,8 @@ router.get('/transactions/csv', async (req, res) => {
     const transactions = await query(sql, params);
     const headers = ['Date', 'Description', 'Category', 'Amount', 'Type', 'Account', 'Currency'];
     const rows = transactions.map(t => [
-      t.date, '"' + (t.description || '').replace(/"/g, '""') + '"', t.category || '',
-      t.amount, t.type === 'income' ? 'Income' : 'Expense', t.account_name || '', t.currency || DEFAULT_CURRENCY
+      t.date, csvText(t.description), csvText(t.category),
+      t.amount, t.type === 'income' ? 'Income' : 'Expense', csvText(t.account_name), t.currency || DEFAULT_CURRENCY
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -100,7 +116,7 @@ router.get('/accounts/csv', async (req, res) => {
   try {
     const accounts = await query('SELECT name, account_number, bank_name, balance, currency, account_type, created_at FROM accounts WHERE user_id = ? AND is_active = 1', [req.user.id]);
     const headers = ['Name', 'Number', 'Bank', 'Balance', 'Currency', 'Type', 'Created'];
-    const rows = accounts.map(a => ['"' + a.name + '"', a.account_number || '', a.bank_name || '', a.balance, a.currency || DEFAULT_CURRENCY, a.account_type || '', a.created_at]);
+    const rows = accounts.map(a => [csvText(a.name), csvText(a.account_number), csvText(a.bank_name), a.balance, a.currency || DEFAULT_CURRENCY, a.account_type || '', a.created_at]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=accounts_' + new Date().toISOString().split('T')[0] + '.csv');
@@ -135,10 +151,11 @@ router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' 
     const account = await Account.findById(accountId, req.user.id);
     if (!account) return res.status(404).json({ message: 'Account not found' });
 
-    const lines = String(req.body || '').replace(/^\ufeff/, '').split('\n').filter(l => l.trim()).slice(1);
+    // Настоящий CSV-разбор (кавычки, запятые внутри описания) — наш же экспорт
+    // кавычит текстовые поля, наивный split(',') сдвигал колонки.
+    const lines = parseCsv(String(req.body || ''), ',').slice(1);
     const rows = [];
-    for (const line of lines) {
-      const parts = line.split(',');
+    for (const parts of lines) {
       if (parts.length < 4) continue;
       const [date, description, category, amount, type] = parts;
       const num = parseFloat(amount);
@@ -147,8 +164,8 @@ router.post('/transactions/csv', express.text({ type: 'text/csv', limit: '10mb' 
         accountId: account.id,
         userId: req.user.id,
         date: date.trim(),
-        description: (description || '').replace(/"/g, ''),
-        category: (category || '').trim() || 'Other',
+        description: uncsvText(description),
+        category: uncsvText(category).trim() || 'Other',
         amount: num,
         // Type column: English, Russian or Ukrainian label (legacy exports).
         type: type && /income|доход|дохід/i.test(type) ? 'income' : 'expense'

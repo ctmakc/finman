@@ -127,6 +127,10 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Частичный PUT: неприсланное поле (undefined) сохраняет старое значение,
+// явный null/'' по-прежнему очищает. Раньше любое неприсланное поле обнулялось.
+const keep = (v, old) => (v !== undefined ? v : old);
+
 // Обновить подписку
 router.put('/:id', async (req, res) => {
   try {
@@ -140,7 +144,7 @@ router.put('/:id', async (req, res) => {
 
     await run(
       `UPDATE subscriptions SET name = ?, description = ?, amount = ?, currency = ?, billing_cycle = ?, category = ?, icon = ?, color = ?, reminder_days = ?, auto_renew = ?, account_id = ?, url = ?, notes = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [name || sub.name, description, amount || sub.amount, currency || sub.currency, billing_cycle || sub.billing_cycle, category, icon, color, reminder_days, auto_renew !== undefined ? (auto_renew ? 1 : 0) : sub.auto_renew, account_id, url, notes, is_active !== undefined ? (is_active ? 1 : 0) : sub.is_active, req.params.id]
+      [name || sub.name, keep(description, sub.description), amount || sub.amount, currency || sub.currency, billing_cycle || sub.billing_cycle, keep(category, sub.category), keep(icon, sub.icon), keep(color, sub.color), keep(reminder_days, sub.reminder_days), auto_renew !== undefined ? (auto_renew ? 1 : 0) : sub.auto_renew, keep(account_id, sub.account_id), keep(url, sub.url), keep(notes, sub.notes), is_active !== undefined ? (is_active ? 1 : 0) : sub.is_active, req.params.id]
     );
 
     res.json({ message: 'Subscription updated' });

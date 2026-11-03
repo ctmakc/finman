@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
 // Получить количество непрочитанных
 router.get('/unread-count', async (req, res) => {
   try {
-    const count = await Notification.getUnreadCount(req.user.id);
+    const count = await Notification.countUnread(req.user.id);
     res.json({ count });
   } catch (error) {
     console.error('Error:', error);
@@ -144,7 +144,7 @@ router.delete('/:id(\\d+)', async (req, res) => {
 router.delete('/old', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
-    await Notification.deleteOld(req.user.id, days);
+    await Notification.clearOld(req.user.id, days);
     res.json({ message: 'Old notifications deleted' });
   } catch (error) {
     console.error('Error:', error);

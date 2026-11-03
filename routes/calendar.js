@@ -130,6 +130,11 @@ router.post('/events', async (req, res) => {
   }
 });
 
+// Частичный PUT: неприсланное поле (undefined) сохраняет старое значение,
+// явный null по-прежнему очищает. Раньше description/amount/end_date/
+// recurrence_rule обнулялись, а выполненное событие снова становилось невыполненным.
+const keep = (v, old) => (v !== undefined ? v : old);
+
 // Обновить событие
 router.put('/events/:id', async (req, res) => {
   try {
@@ -140,7 +145,7 @@ router.put('/events/:id', async (req, res) => {
 
     await run(
       `UPDATE calendar_events SET title = ?, description = ?, event_type = ?, amount = ?, currency = ?, event_date = ?, end_date = ?, is_recurring = ?, recurrence_rule = ?, reminder_enabled = ?, reminder_days = ?, color = ?, is_completed = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [title || event.title, description, event_type || event.event_type, amount, currency || event.currency, event_date || event.event_date, end_date, is_recurring !== undefined ? (is_recurring ? 1 : 0) : event.is_recurring, recurrence_rule, reminder_enabled !== undefined ? (reminder_enabled ? 1 : 0) : event.reminder_enabled, reminder_days || event.reminder_days, color || event.color, is_completed ? 1 : 0, is_completed ? new Date().toISOString() : null, req.params.id]
+      [title || event.title, keep(description, event.description), event_type || event.event_type, keep(amount, event.amount), currency || event.currency, event_date || event.event_date, keep(end_date, event.end_date), is_recurring !== undefined ? (is_recurring ? 1 : 0) : event.is_recurring, keep(recurrence_rule, event.recurrence_rule), reminder_enabled !== undefined ? (reminder_enabled ? 1 : 0) : event.reminder_enabled, reminder_days || event.reminder_days, color || event.color, is_completed !== undefined ? (is_completed ? 1 : 0) : event.is_completed, is_completed !== undefined ? (is_completed ? new Date().toISOString() : null) : event.completed_at, req.params.id]
     );
 
     res.json({ message: 'Event updated' });
