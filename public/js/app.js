@@ -1641,6 +1641,12 @@ function renderSettingsPage() {
           <button class="btn btn-outline" type="button" data-settings-page="onboarding"><i class="fas fa-flag-checkered" aria-hidden="true"></i> Getting started guide</button>
         </div>
       </div>
+
+      <div class="card fm-danger-zone">
+        <h2 class="card-title">${escapeHtmlShell(trShell('account.danger.title', 'Danger zone'))}</h2>
+        <p class="fm-danger-text">${escapeHtmlShell(trShell('account.danger.text', 'Delete your Finman account and all of its data. This cannot be undone.'))}</p>
+        <button class="btn btn-danger" type="button" id="delete-account-btn"><i class="fas fa-trash-alt" aria-hidden="true"></i> ${escapeHtmlShell(trShell('account.danger.button', 'Delete account'))}</button>
+      </div>
     </div>
   `;
 
@@ -1662,6 +1668,136 @@ function renderSettingsPage() {
   document.querySelectorAll('[data-settings-page]').forEach((btn) => {
     btn.addEventListener('click', () => navigateTo(btn.dataset.settingsPage));
   });
+  document.getElementById('delete-account-btn').addEventListener('click', openDeleteAccountModal);
+}
+
+// ---------------------------------------------------------------------------
+// Account deletion (Settings -> Danger zone). Required by the App Store
+// (5.1.1(v)) and Google Play; the same flow runs on the website.
+// ---------------------------------------------------------------------------
+function trShell(key, fallback) {
+  try {
+    if (window.i18n && typeof window.i18n.t === 'function') {
+      const v = window.i18n.t(key);
+      if (v && v !== key) return v;
+    }
+  } catch (e) { /* fall back */ }
+  return fallback;
+}
+
+async function openDeleteAccountModal() {
+  if (typeof UI === 'undefined' || !UI || typeof UI.modal !== 'function') return;
+  // hasPassword decides whether the server wants the password; older cached
+  // profiles may not carry it, so ask the server once.
+  if (appState.user && typeof appState.user.hasPassword === 'undefined') {
+    try {
+      const r = await fetchWithAuth('/api/auth/me');
+      if (r.ok) {
+        const body = await r.json();
+        const u = body && (body.user || body.data || body);
+        if (u && typeof u.hasPassword !== 'undefined') appState.user.hasPassword = !!u.hasPassword;
+      }
+    } catch (e) { /* the server answers wrong_password if it is needed */ }
+  }
+  const needsPassword = !appState.user || appState.user.hasPassword !== false;
+  const passwordField = needsPassword ? `
+        <div class="form-group">
+          <label class="form-label" for="delete-account-password">${escapeHtmlShell(trShell('account.delete.passwordLabel', 'Your password'))}</label>
+          <input type="password" id="delete-account-password" class="form-control" autocomplete="current-password" required>
+        </div>` : '';
+
+  UI.modal({
+    id: 'delete-account-modal',
+    title: trShell('account.delete.title', 'Delete your account?'),
+    body: `
+      <form id="delete-account-form" class="fm-delete-form" novalidate>
+        <p>${escapeHtmlShell(trShell('account.delete.body', 'Everything in your Finman account is erased for good.'))}</p>
+        <p class="fm-delete-export">${escapeHtmlShell(trShell('account.delete.export', 'Want a copy first? Download a backup in Backups and data export.'))}</p>
+        <div class="form-group">
+          <label class="form-label" for="delete-account-confirm">${escapeHtmlShell(trShell('account.delete.typeLabel', 'Type DELETE to confirm'))}</label>
+          <input type="text" id="delete-account-confirm" class="form-control" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+        </div>${passwordField}
+        <p class="auth-error fm-delete-error" id="delete-account-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" data-action="ui:close">${escapeHtmlShell(trShell('account.delete.cancel', 'Cancel'))}</button>
+          <button type="submit" class="btn btn-danger fm-danger-solid">${escapeHtmlShell(trShell('account.delete.confirm', 'Delete account for good'))}</button>
+        </div>
+      </form>`
+  });
+
+  const form = document.getElementById('delete-account-form');
+  if (!form) return;
+  const confirmInput = document.getElementById('delete-account-confirm');
+  if (confirmInput) setTimeout(() => confirmInput.focus(), 50);
+  form.addEventListener('submit', withBusyForm(handleDeleteAccount));
+}
+
+async function handleDeleteAccount(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const errorEl = document.getElementById('delete-account-error');
+  const showError = (msg) => {
+    if (!errorEl) { showNotification(msg, 'error'); return; }
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
+  };
+  if (errorEl) errorEl.hidden = true;
+
+  const confirm = (document.getElementById('delete-account-confirm') || {}).value || '';
+  const pwInput = document.getElementById('delete-account-password');
+  const password = pwInput ? pwInput.value : '';
+  if (confirm.trim() !== 'DELETE') {
+    showError(trShell('account.delete.typeError', 'Type DELETE in capital letters to confirm.'));
+    return;
+  }
+  if (pwInput && !password) {
+    showError(trShell('account.delete.passwordError', 'Enter your password.'));
+    return;
+  }
+
+  let response;
+  try {
+    const payload = { confirm: 'DELETE' };
+    if (pwInput) payload.password = password;
+    response = await fetchWithAuth('/api/auth/me', { method: 'DELETE', body: JSON.stringify(payload) });
+  } catch (e) {
+    showError(trShell('account.delete.failed', 'Could not delete the account. Try again.'));
+    return;
+  }
+  if (!response.ok) {
+    let msg = trShell('account.delete.failed', 'Could not delete the account. Try again.');
+    try {
+      const body = await response.json();
+      if (body && body.code === 'confirm_required') msg = trShell('account.delete.typeError', msg);
+      else if (body && body.code === 'wrong_password') msg = trShell('account.delete.wrongPassword', 'That password is incorrect.');
+      else if (response.status === 400 && body && body.message) msg = body.message;
+    } catch (e) { /* keep the generic message */ }
+    showError(msg);
+    return;
+  }
+
+  try { UI.closeTopModal(); } catch (e) { /* ignore */ }
+  try { localStorage.removeItem('fm_returning'); } catch (e) { /* ignore */ }
+  logout();
+  renderAccountDeleted();
+}
+
+function renderAccountDeleted() {
+  const app = document.getElementById('app');
+  if (!app) return;
+  app.innerHTML = `
+    <div class="auth-container">
+      <div class="auth-card fm-deleted-card">
+        <div class="auth-header">
+          <h1>${escapeHtmlShell(trShell('account.deleted.title', 'Your account is deleted'))}</h1>
+          <p>${escapeHtmlShell(trShell('account.deleted.text', 'Your Finman account and its data are gone.'))}</p>
+        </div>
+        <div class="fm-error-actions">
+          <button class="btn btn-primary" id="deleted-back-btn" type="button">${escapeHtmlShell(trShell('account.deleted.back', 'Back to sign in'))}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('deleted-back-btn').addEventListener('click', () => renderLoginPage());
 }
 
 // ---------------------------------------------------------------------------
