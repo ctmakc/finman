@@ -63,7 +63,8 @@ async function renderGoalsPage() {
         <div class="stats-grid">${renderGoalStats(summary)}</div>
         <div class="card-grid" id="goals-list">
           ${list.length === 0
-            ? UI.emptyState({ icon: 'fa-piggy-bank', title: t('goals.empty.title'), text: t('goals.empty.body'), action: { label: t('goals.new'), action: 'goals:add', icon: 'fa-plus' } })
+            ? window.FMEmpty ? FMEmpty.html({ icon: 'fa-bullseye', title: t('empty.goals.title'), body: t('empty.goals.body'), primary: { label: t('empty.goals.create'), action: 'goals:add', icon: 'fa-plus' } })
+            : UI.emptyState({ icon: 'fa-piggy-bank', title: t('goals.empty.title'), text: t('goals.empty.body'), action: { label: t('goals.new'), action: 'goals:add', icon: 'fa-plus' } })
             : list.map((g) => renderGoalCard(g)).join('')}
         </div>
       </div>`;

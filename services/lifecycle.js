@@ -204,6 +204,8 @@ function start() {
   task = cron.schedule(process.env.LIFECYCLE_CRON || '0 13 * * *', async () => {
     try { await runDigest(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] digest failed'); }
     try { await runNudges(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] nudges failed'); }
+    // Journey sweep + "Your week/month in money" (ENGAGEMENT_EMAILS=1) + push.
+    try { await require('./engagementMail').runDaily(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] engagement failed'); }
   }, { timezone: 'UTC' });
   return task;
 }

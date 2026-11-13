@@ -58,6 +58,16 @@ const SubscriptionsModule = {
       </div>
       <div id="sub-detect-results"></div>`;
 
+    if (this.subscriptions.length === 0 && window.FMEmpty) {
+      // The plate carries "Find subscriptions" itself: no separate toolbar.
+      container.innerHTML = FMEmpty.html({
+        icon: 'fa-box-open',
+        title: t('empty.subs.title'), body: t('empty.subs.body'),
+        primary: { label: t('empty.subs.detect'), action: 'subs:detect', icon: 'fa-search' },
+        secondary: { label: t('empty.subs.add'), action: 'subs:add' }
+      }) + '<div id="sub-detect-results"></div>';
+      return;
+    }
     if (this.subscriptions.length === 0) {
       container.innerHTML = toolbar + UI.emptyState({
         icon: 'fa-box-open',
@@ -101,6 +111,9 @@ const SubscriptionsModule = {
   renderStats() {
     const container = document.getElementById('subscriptions-stats');
     if (!container) return;
+    // A new user sees the "find subscriptions" plate first, not three zeros.
+    container.hidden = !(this.subscriptions && this.subscriptions.length);
+    if (container.hidden) return;
     const sums = this.totals();
     const count = this.stats && typeof this.stats.activeCount === 'number' ? this.stats.activeCount : sums.activeCount;
     container.innerHTML = `
@@ -149,7 +162,12 @@ const SubscriptionsModule = {
     if (!box) return;
     const cands = (data && data.candidates) || [];
     if (!cands.length) {
-      box.innerHTML = `<div class="empty-state"><p>${t('subs.noCandidates')}</p></div>`;
+      box.innerHTML = window.FMEmpty ? FMEmpty.html({
+        icon: 'fa-search', compact: true,
+        title: t('empty.subs.noneFoundTitle'), body: t('empty.subs.noneFoundBody'),
+        primary: { label: t('empty.action.import'), do: 'import', icon: 'fa-file-import' },
+        secondary: { label: t('empty.subs.add'), action: 'subs:add' }
+      }) : `<div class="empty-state"><p>${t('subs.noCandidates')}</p></div>`;
       return;
     }
     const monthly = UI.sumByCurrency(cands, c => Number(c.amount) * UI.monthlyFactor(c.billingCycle), 'currency');

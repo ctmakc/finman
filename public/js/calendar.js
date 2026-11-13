@@ -118,7 +118,12 @@ const CalendarModule = {
       const upcoming = Array.isArray(data) ? data : [];
 
       if (upcoming.length === 0) {
-        container.innerHTML = `<p class="text-secondary">${t('calendar.noUpcoming')}</p>`;
+        container.innerHTML = window.FMEmpty ? FMEmpty.html({
+          icon: 'fa-calendar-check', compact: true,
+          title: t('empty.calendar.title'), body: t('empty.calendar.body'),
+          primary: { label: t('empty.calendar.add'), action: 'cal:add', data: { date: UI.todayYMD() }, icon: 'fa-plus' },
+          secondary: { label: t('empty.recurring.add'), do: 'nav:recurring' }
+        }) : `<p class="text-secondary">${t('calendar.noUpcoming')}</p>`;
         return;
       }
 

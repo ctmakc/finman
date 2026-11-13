@@ -286,7 +286,11 @@ async function loadRecurringPayments() {
   if (payments.length > 0) {
     allList.innerHTML = payments.map(p => renderPaymentCard(p)).join('');
   } else {
-    allList.innerHTML = `<p class="empty-text">${t('recurring.empty.all')}</p>`;
+    allList.innerHTML = window.FMEmpty ? FMEmpty.html({
+      icon: 'fa-sync-alt',
+      title: t('empty.recurring.title'), body: t('empty.recurring.body'),
+      primary: { label: t('empty.recurring.add'), action: 'recurring:add', icon: 'fa-plus' }
+    }) : `<p class="empty-text">${t('recurring.empty.all')}</p>`;
   }
 }
 

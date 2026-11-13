@@ -157,3 +157,12 @@ Value inside the first minute, inside the same direction (no new tokens):
   (pills — the only pills on the page).
 - **Banners** above the dashboard: email confirmation (deeps, ink edge) and demo data
   (warning tint) with "Import my statement" / "Remove demo data".
+
+## Engagement components — habit loop (2026-11-12, branch `feat/engagement-funnel-1112`)
+Extends CLEAR DAY; no new tokens. Styles: `public/css/parts/engage.css` (`:root`-prefixed), script `public/js/engage.js`.
+- **Setup rail** — the signature of this layer: five numbered marks on one track (first insight → second statement → budget → goal → weekly review). Done = cobalt tint + check, next = white mark with a cobalt ring and a slow 2.4s pulse; one next-step plate (surface-2, radius 18) with one primary button and one tint alternative. Dismissible; after five steps it collapses into a "Your week in money" card.
+- **Side column** (7/5 split, one column ≤900px): streak card (big tabular figure, seven day dots, badge pills on warning-tint, fresh badge pops once), invite card (read-only link + Copy/Share), push card only when the browser can subscribe and is not yet subscribed.
+- **AI CFO hero card** shows the rule-based tips from the user's own numbers: bold title + body, action pill, "Ask about this", `1 / 3 →` pager in contrast ink.
+- **/week** — "Your week in money" / month: big period title, a delta pill (spending up = negative tint, down = positive tint), segmented Last week / Last month, the same four soundings as the first insight, category rail, biggest payments, budget/goal meters (8px pill bars: cobalt, over = negative, goal = positive), tips as white plates. Empty: plate with one action + a quiet ghost of the filled page (`aria-hidden`, 70% opacity).
+- Motion: `freshRise` stagger on plates and soundings, meters grow `scaleX` 700ms expo-out, ring pulse on the next step; all off under reduced motion.
+- AI chat replies render markdown (bold, lists, paragraphs) as DOM nodes only.

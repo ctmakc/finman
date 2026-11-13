@@ -311,6 +311,17 @@ function renderContextText(ctx) {
 // System-промпт CFO. Жёстко заземляем ИИ на предоставленные данные.
 // --------------------------------------------------------------------------
 
+// AI CFO tips (services/cfoTips.js) appended to the snapshot: the chat then
+// answers from the same computed facts the dashboard and the weekly email show.
+async function withTips(userId, text) {
+  try {
+    const t = require('./cfoTips').toContext(await require('./cfoTips').tips(userId, { limit: 5 }));
+    return t ? `${text}\n\n${t}` : text;
+  } catch (_) {
+    return text;
+  }
+}
+
 function buildSystemPrompt(contextText) {
   return [
     insights.GROUNDING_SYSTEM,
@@ -415,7 +426,7 @@ async function chat(userId, conversationId, message) {
 
   // Собираем свежий контекст + историю переписки.
   const context = await buildFinancialContext(userId);
-  const system = buildSystemPrompt(context.text);
+  const system = buildSystemPrompt(await withTips(userId, context.text));
 
   const history = await AiConversation.getMessages(conversation.id);
   const promptMessages = history
@@ -491,7 +502,7 @@ async function chatStream(userId, conversationId, message, callbacks = {}) {
   await AiConversation.addMessage(conversation.id, 'user', String(message));
 
   const context = await buildFinancialContext(userId);
-  const system = buildSystemPrompt(context.text);
+  const system = buildSystemPrompt(await withTips(userId, context.text));
 
   const history = await AiConversation.getMessages(conversation.id);
   const promptMessages = history

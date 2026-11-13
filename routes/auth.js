@@ -206,7 +206,7 @@ router.post('/login', (req, res, next) => {
 router.get('/me', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    if (user) tracker.appOpen(user, req);
+    if (user) { tracker.appOpen(user, req); require('../services/journey').touch(user.id); }
 
     if (!user) {
       return res.status(404).json({ 

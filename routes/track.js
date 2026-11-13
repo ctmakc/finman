@@ -62,7 +62,9 @@ function unsubToken(userId) {
   return crypto.createHmac('sha256', String(config.jwtSecret)).update('unsub:' + userId).digest('hex').slice(0, 32);
 }
 
-router.get('/unsubscribe', async (req, res) => {
+// GET from the link in the email; POST is the RFC 8058 one-click
+// (List-Unsubscribe-Post) that mail apps send on their own.
+async function unsubscribe(req, res) {
   const id = parseInt(req.query.u, 10);
   const t = String(req.query.t || '');
   const ok = Number.isInteger(id) && id > 0 && t.length === 32
@@ -76,7 +78,9 @@ router.get('/unsubscribe', async (req, res) => {
   }
   return res.type('html').send('<p style="font-family:sans-serif">Done. Finman will not send you tips and reminders any more. '
     + 'Account emails (password reset, billing) still arrive.</p>');
-});
+}
+router.get('/unsubscribe', unsubscribe);
+router.post('/unsubscribe', unsubscribe);
 
 // ---------- /op relay to the self-hosted OpenPanel ----------
 

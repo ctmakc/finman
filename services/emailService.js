@@ -46,7 +46,7 @@ function normalizeRecipients(to) {
 }
 
 // Отправка письма. Никогда не бросает — всегда резолвится объектом-результатом.
-async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
+async function sendEmail({ to, subject, html, text, from, replyTo, headers } = {}) {
   const recipients = normalizeRecipients(to);
 
   if (recipients.length === 0) {
@@ -70,6 +70,8 @@ async function sendEmail({ to, subject, html, text, from, replyTo } = {}) {
     subject: subject || '(no subject)',
   };
   if (replyTo) payload.reply_to = replyTo;
+  // Extra headers, e.g. List-Unsubscribe for the engagement emails.
+  if (headers && typeof headers === 'object') payload.headers = headers;
   if (html) payload.html = html;
   // Resend требует html или text; если html нет — гарантируем text.
   if (text || !html) payload.text = text || '';

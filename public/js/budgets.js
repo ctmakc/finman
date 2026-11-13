@@ -149,16 +149,16 @@ async function renderBudgetsPage() {
     <div class="page-header">
       <h1 class="page-title">${t('budgets.title')}</h1>
       <div class="page-header-actions">
-        <button class="btn btn-outline" id="roll-forward-btn" title="${t('budgets.rollForward.hint')}">
+        ${budgets.length > 0 ? `<button class="btn btn-outline" id="roll-forward-btn" title="${t('budgets.rollForward.hint')}">
           <i class="fas fa-forward"></i> ${t('budgets.rollForward.btn')}
-        </button>
+        </button>` : ''}
         <button class="btn btn-primary" id="add-budget-btn">
           <i class="fas fa-plus"></i> ${t('budgets.new')}
         </button>
       </div>
     </div>
 
-    ${stats ? renderBudgetStats(stats, budgets) : ''}
+    ${stats && budgets.length > 0 ? renderBudgetStats(stats, budgets) : ''}
 
     <div class="budgets-list">
       ${budgets.length > 0 ? renderBudgetCards(budgets) : renderEmptyBudgets()}
@@ -317,6 +317,14 @@ function renderBudgetCards(budgets) {
 
 // Рендер пустого состояния
 function renderEmptyBudgets() {
+  if (window.FMEmpty) {
+    return FMEmpty.html({
+      icon: 'fa-piggy-bank',
+      title: t('empty.budgets.title'), body: t('empty.budgets.body'),
+      primary: { label: t('empty.budgets.create'), action: 'budgets:create', icon: 'fa-plus' },
+      secondary: { label: t('empty.action.importFirst'), do: 'import', ifNoTransactions: true }
+    });
+  }
   return UI.emptyState({
     icon: 'fa-piggy-bank',
     title: t('budgets.empty.title'),

@@ -20,6 +20,11 @@ async function handleSignup(user, method, rawAttribution, req, extra = {}) {
     logger.warn({ err: e.message }, '[signup] acquisition failed');
   }
   try {
+    await require('./referral').attach(user, acq);
+  } catch (e) {
+    logger.warn({ err: e.message }, '[signup] referral failed');
+  }
+  try {
     notifySignup(user, method, { acquisition: acq });
   } catch (e) {
     logger.error({ err: e.message }, '[signup] notify failed');

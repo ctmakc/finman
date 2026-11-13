@@ -69,6 +69,15 @@ const ReportsModule = {
     const container = document.getElementById('reports-history');
     if (!container) return;
 
+    if (this.reports.length === 0 && window.FMEmpty) {
+      container.innerHTML = FMEmpty.html({
+        icon: 'fa-file-lines',
+        title: t('empty.reports.title'), body: t('empty.reports.body'),
+        primary: { label: t('empty.reports.create'), action: 'reports:generate-modal', data: { type: 'monthly' }, icon: 'fa-plus' },
+        secondary: { label: t('empty.action.importFirst'), do: 'import', ifNoTransactions: true }
+      });
+      return;
+    }
     if (this.reports.length === 0) {
       container.innerHTML = UI.emptyState({
         icon: 'fa-file-lines',

@@ -30,7 +30,8 @@ async function renderSplitPage() {
         </div>
         <div class="card-grid" id="groups-list">
           ${groups.length === 0
-            ? UI.emptyState({ icon: 'fa-users', title: t('split.empty.title'), text: t('split.empty.body'), action: { label: t('split.newGroup'), action: 'split:add-group', icon: 'fa-plus' } })
+            ? window.FMEmpty ? FMEmpty.html({ icon: 'fa-users', title: t('empty.split.title'), body: t('empty.split.body'), primary: { label: t('empty.split.create'), action: 'split:add-group', icon: 'fa-plus' } })
+            : UI.emptyState({ icon: 'fa-users', title: t('split.empty.title'), text: t('split.empty.body'), action: { label: t('split.newGroup'), action: 'split:add-group', icon: 'fa-plus' } })
             : groups.map((g) => renderGroupCard(g)).join('')}
         </div>
       </div>`;

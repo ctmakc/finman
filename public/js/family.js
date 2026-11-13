@@ -308,6 +308,15 @@ async function loadFamilies() {
   const container = document.getElementById('families-list');
   if (!container) return;
 
+  if (families.length === 0 && window.FMEmpty) {
+    container.innerHTML = FMEmpty.html({
+      icon: 'fa-users',
+      title: t('empty.family.title'), body: t('empty.family.body'),
+      primary: { label: t('empty.family.create'), action: 'family:create', icon: 'fa-plus' },
+      secondary: { label: t('empty.family.join'), action: 'family:join' }
+    });
+    return;
+  }
   if (families.length === 0) {
     container.innerHTML = UI.emptyState({
       icon: 'fa-users',

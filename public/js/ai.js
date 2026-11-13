@@ -194,13 +194,13 @@ const AiCfoModule = {
         onChunk: (piece) => {
           acc += piece;
           if (textEl) {
-            textEl.textContent = acc; // textContent — безопасно (без HTML-инъекций)
+            this.renderRich(textEl, acc); // DOM-узлы и textContent, без innerHTML
             this.scrollMessages();
           }
         },
         onDone: ({ reply }) => {
           const finalText = reply != null && reply !== '' ? reply : acc;
-          if (textEl) textEl.textContent = finalText || t('ai.emptyReply');
+          if (textEl) this.renderRich(textEl, finalText || t('ai.emptyReply'));
           this.scrollMessages();
         },
       });
@@ -438,6 +438,61 @@ const AiCfoModule = {
     if (log) log.scrollTop = log.scrollHeight;
   },
 
+  // Ответ модели приходит в markdown: **жирный**, списки "- " / "1. ", абзацы.
+  // Рисуем это DOM-узлами (только textContent), сырой HTML из ответа не попадает в страницу.
+  renderRich(el, text) {
+    el.textContent = '';
+    const inline = (parent, line) => {
+      const parts = String(line).split(/\*\*([^*]+)\*\*/);
+      parts.forEach((part, i) => {
+        if (!part) return;
+        if (i % 2) {
+          const b = document.createElement('strong');
+          b.textContent = part;
+          parent.appendChild(b);
+        } else {
+          parent.appendChild(document.createTextNode(part.replace(/(^|\s)\*(\S[^*]*\S|\S)\*(?=\s|$|[.,;:!?])/g, '$1$2')));
+        }
+      });
+    };
+    let list = null;
+    let para = null;
+    String(text == null ? '' : text).replace(/\r/g, '').split('\n').forEach((raw) => {
+      const line = raw.trim();
+      const bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+      if (!line) { list = null; para = null; return; }
+      if (/^#{1,6}\s+/.test(line)) {
+        list = null; para = null;
+        const h = document.createElement('strong');
+        h.className = 'ai-msg-h';
+        inline(h, line.replace(/^#{1,6}\s+/, ''));
+        el.appendChild(h);
+        return;
+      }
+      if (bullet) {
+        para = null;
+        if (!list) {
+          list = document.createElement(/^\d/.test(line) ? 'ol' : 'ul');
+          list.className = 'ai-msg-list';
+          el.appendChild(list);
+        }
+        const li = document.createElement('li');
+        inline(li, bullet[1]);
+        list.appendChild(li);
+        return;
+      }
+      list = null;
+      if (!para) {
+        para = document.createElement('p');
+        para.className = 'ai-msg-p';
+        el.appendChild(para);
+      } else {
+        para.appendChild(document.createElement('br'));
+      }
+      inline(para, line);
+    });
+  },
+
   // Возвращает созданный DOM-элемент сообщения (нужно для стрим-наполнения).
   appendMessage(role, text) {
     const log = document.getElementById('ai-messages');
@@ -451,7 +506,8 @@ const AiCfoModule = {
     roleSpan.textContent = who;
     const textSpan = document.createElement('span');
     textSpan.className = 'ai-msg-text';
-    textSpan.textContent = text == null ? '' : text;
+    if (role === 'assistant' && text) this.renderRich(textSpan, text);
+    else textSpan.textContent = text == null ? '' : text;
     div.appendChild(roleSpan);
     div.appendChild(textSpan);
     log.appendChild(div);

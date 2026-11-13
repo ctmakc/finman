@@ -8,7 +8,7 @@
 const tracker = require('../services/tracker');
 
 const VERB = { POST: 'created', PUT: 'updated', PATCH: 'updated', DELETE: 'deleted' };
-const SKIP = /^\/api\/(auth|t|billing\/webhook|health|sync\/run)(\/|$)/;
+const SKIP = /^\/api\/(auth|t|billing\/webhook|health|sync\/run|engagement)(\/|$)/;
 
 // [regex on path (no query), method or '*', event name or fn(match, ok)]
 const RULES = [
@@ -52,6 +52,7 @@ function activity(req, res, next) {
       if (event === 'ai_used') props.feature = path.split('/')[3] || null;
       if (req.query && req.query.source) props.source = String(req.query.source).slice(0, 40);
       tracker.track(event, { userId: user.id, props, path, req, test: tracker.isTestEmail(user.email) });
+      if (ok) require('../services/journey').touch(user.id);
     } catch (_) { /* journal must never break a request */ }
   });
   next();

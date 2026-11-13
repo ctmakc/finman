@@ -30,7 +30,8 @@ async function renderInvestmentsPage() {
         </div>
         <div class="card-grid" id="portfolios-list">
           ${portfolios.length === 0
-            ? UI.emptyState({ icon: 'fa-chart-line', title: t('inv.empty.title'), text: t('inv.empty.body'), action: { label: t('inv.newPortfolio'), action: 'inv:add-portfolio', icon: 'fa-plus' } })
+            ? window.FMEmpty ? FMEmpty.html({ icon: 'fa-chart-line', title: t('empty.inv.title'), body: t('empty.inv.body'), primary: { label: t('empty.inv.create'), action: 'inv:add-portfolio', icon: 'fa-plus' } })
+            : UI.emptyState({ icon: 'fa-chart-line', title: t('inv.empty.title'), text: t('inv.empty.body'), action: { label: t('inv.newPortfolio'), action: 'inv:add-portfolio', icon: 'fa-plus' } })
             : portfolios.map(p => renderPortfolioCard(p)).join('')}
         </div>
       </div>`;
@@ -288,7 +289,7 @@ async function saveInvestmentEvent(form) {
 
 // --- Карточка аллокации портфеля (% по типу и по символу) ---
 function renderAllocationBar(rows, labelKey) {
-  if (!rows || rows.length === 0) return `<p class="text-muted">${t('common.empty')}</p>`;
+  if (!rows || rows.length === 0) return `<p class="text-muted">${window.FMEmpty ? t('empty.inv.allocation') : t('common.empty')}</p>`;
   return rows.map(row => {
     const label = escapeHtmlInv(row[labelKey]);
     const pct = Number(row.percent) || 0;

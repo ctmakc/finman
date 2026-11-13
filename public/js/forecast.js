@@ -14,7 +14,28 @@ const ForecastModule = {
   // returns it (summary.currency / currency) with missingRates.
   async init() {
     await UI.loadBaseCurrency();
+    if (window.FMEmpty && (await FMEmpty.hasTransactions()) === false) {
+      this.renderEmpty();
+      return;
+    }
     await Promise.all([this.loadForecast(), this.loadTrends(), this.loadAnomalies()]);
+  },
+
+  // No transactions: nothing to project from. Keep the header, swap the cards.
+  renderEmpty() {
+    const page = document.querySelector('.forecast-page');
+    if (!page) return;
+    const header = page.querySelector('.page-header');
+    const periods = header && header.querySelector('.period-buttons');
+    if (periods) periods.remove();
+    page.innerHTML = '';
+    if (header) page.appendChild(header);
+    page.insertAdjacentHTML('beforeend', FMEmpty.html({
+      icon: 'fa-chart-area',
+      title: t('empty.forecast.title'), body: t('empty.forecast.body'),
+      primary: { label: t('empty.action.import'), do: 'import', icon: 'fa-file-import' },
+      secondary: { label: t('empty.action.addTransaction'), do: 'add-transaction' }
+    }));
   },
 
   async loadForecast(days = 30) {

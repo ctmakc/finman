@@ -18,7 +18,7 @@
 // precache); activate удаляет все НЕ-текущие кэши, включая старый finman-v3-api
 // с ответами API.
 
-const CACHE_VERSION = 'finman-v6';
+const CACHE_VERSION = 'finman-v7';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 
 const STATIC_ASSETS = [
@@ -32,6 +32,7 @@ const STATIC_ASSETS = [
   '/css/parts/finance.css',
   '/css/parts/ai.css',
   '/css/parts/firstrun.css',
+  '/css/parts/engage.css',
   '/css/fresh.css',
   '/vendor/fonts/rubik-latin-wght-normal.woff2',
   '/vendor/fonts/rubik-cyrillic-wght-normal.woff2',
@@ -73,6 +74,8 @@ const STATIC_ASSETS = [
   '/js/widgets.js',
   '/js/onboarding.js',
   '/js/firstrun.js',
+  '/js/engage.js',
+  '/js/empty-states.js',
   '/js/offline.js',
   '/js/data-export.js',
   '/js/rules.js',
@@ -260,25 +263,43 @@ self.addEventListener('message', event => {
 });
 
 // -------------------------------------------------------------------------
-// Push-уведомления (существующее поведение — без изменений).
+// Web Push (services/push.js): weekly / monthly recap, streak reminder.
+// Payload { title, body, url, tag, kind }. A click focuses an open Finman tab
+// (and routes it) or opens a new one.
 // -------------------------------------------------------------------------
 
 self.addEventListener('push', event => {
-  const data = (event.data && event.data.json && event.data.json()) || {};
-
+  let data = {};
+  try { data = (event.data && event.data.json()) || {}; } catch (_) {
+    data = { body: event.data ? event.data.text() : '' };
+  }
   event.waitUntil(
     self.registration.showNotification(data.title || 'Finman', {
-      body: data.body || 'New notification',
+      body: data.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-72.png',
-      data: data.url || '/'
+      tag: data.tag || 'finman',
+      renotify: false,
+      data: { url: data.url || '/', kind: data.kind || 'generic' }
     })
   );
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(
-    self.clients.openWindow(event.notification.data)
-  );
+  const d = event.notification.data || {};
+  const raw = typeof d === 'string' ? d : (d.url || '/');
+  const url = new URL(raw, self.location.origin);
+  if (url.origin !== self.location.origin) return;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) {
+      if (new URL(w.url).origin === url.origin) {
+        await w.focus();
+        w.postMessage({ type: 'push-open', url: url.pathname + url.search });
+        return;
+      }
+    }
+    await self.clients.openWindow(url.href);
+  })());
 });

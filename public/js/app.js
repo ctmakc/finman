@@ -61,6 +61,7 @@ const NAV_GROUPS = [
   {
     title: 'Plan',
     items: [
+      { page: 'week', label: 'Weekly review', icon: 'fa-calendar-week' },
       { page: 'goals', label: 'Goals', icon: 'fa-bullseye' },
       { page: 'debts', label: 'Debts', icon: 'fa-hand-holding-usd' },
       { page: 'subscriptions', label: 'Subscriptions', icon: 'fa-box' },
@@ -172,7 +173,8 @@ const PAGE_RENDERERS = {
     if (!window.DataExportModule) throw new Error('The Data export module is not loaded');
     return window.DataExportModule.render(document.getElementById('data-export-panel'));
   },
-  onboarding: () => renderOnboardingPage()
+  onboarding: () => renderOnboardingPage(),
+  week: () => callGlobal('renderWeekPage')
 };
 
 // '/transactions?page=2' -> 'transactions'; unknown -> 'dashboard'
@@ -513,6 +515,7 @@ function findNavLabel(page) {
   const all = [...NAV_PRIMARY, ...NAV_GROUPS.flatMap((g) => g.items)];
   const hit = all.find((i) => i.page === page);
   if (hit) return hit.label;
+  if (page === 'week') return 'Your week in money';
   return page === 'onboarding' ? 'Getting started' : '';
 }
 
@@ -1083,7 +1086,11 @@ async function renderDashboard() {
       </div>
       <div class="account-balance">${escapeHtmlShell(fmFormatCurrency(account.balance, account.currency))}</div>
     </div>
-  `).join('') || '<p>You have no accounts yet. <a href="#" class="add-account-link">Add an account</a></p>';
+  `).join('') || (window.FMEmpty ? FMEmpty.html({
+    icon: 'fa-wallet', compact: true,
+    title: t('empty.accounts.title'), body: t('empty.accounts.body'),
+    primary: { label: t('empty.action.addAccount'), do: 'add-account', icon: 'fa-plus' }
+  }) : '<p>You have no accounts yet. <a href="#" class="add-account-link">Add an account</a></p>');
 
   const transactionsHtml = recentTransactions.length > 0
     ? recentTransactions.map((transaction) => `
@@ -1098,7 +1105,12 @@ async function renderDashboard() {
         </div>
       </div>
     `).join('')
-    : '<p>You have no transactions yet. <a href="#" class="add-transaction-link">Add a transaction</a></p>';
+    : (window.FMEmpty ? FMEmpty.html({
+      icon: 'fa-receipt', compact: true,
+      title: t('empty.transactions.title'), body: t('empty.transactions.body'),
+      primary: { label: t('empty.action.import'), do: 'import', icon: 'fa-file-import' },
+      secondary: { label: t('empty.action.addTransaction'), do: 'add-transaction' }
+    }) : '<p>You have no transactions yet. <a href="#" class="add-transaction-link">Add a transaction</a></p>');
 
   // ---- Signature hero ----
   // Balance: the server's figure converted into the base currency; without it,
@@ -1260,6 +1272,11 @@ async function renderDashboard() {
     try { window.FirstRun.afterDashboard(mainContent); } catch (error) { console.error('First-run banners failed:', error); }
   }
 
+  // Habit loop: progress checklist, streak, invite, push and AI CFO tips.
+  if (window.Engage && typeof window.Engage.afterDashboard === 'function') {
+    try { window.Engage.afterDashboard(mainContent); } catch (error) { console.error('Engagement panel failed:', error); }
+  }
+
   const heroAiBtn = document.getElementById('hero-ai-more');
   if (heroAiBtn) {
     heroAiBtn.addEventListener('click', () => {
@@ -1317,7 +1334,11 @@ async function renderAccountsPage() {
 
     <div class="accounts-container">
       <div id="accounts-list" class="card-grid">
-        ${appState.accounts.length > 0 ? renderAccountsList(appState.accounts) : `
+        ${appState.accounts.length > 0 ? renderAccountsList(appState.accounts) : window.FMEmpty ? FMEmpty.html({
+          icon: 'fa-wallet',
+          title: t('empty.accounts.title'), body: t('empty.accounts.body'),
+          primary: { label: t('empty.action.addAccount'), id: 'empty-add-account-btn', icon: 'fa-plus' }
+        }) : `
           <div class="empty-state">
             <div class="empty-state-icon">
               <i class="fas fa-wallet"></i>
@@ -1394,6 +1415,8 @@ async function renderTransactionsPage() {
 
   const transactions = await fetchTransactions(appState.filters);
   const categories = await fetchCategories();
+  const f = appState.filters || {};
+  const filtered = Boolean(f.startDate || f.endDate || f.accountId || f.category || f.type || f.search);
 
   mainContent.innerHTML = `
     <div class="page-header">
@@ -1496,7 +1519,18 @@ async function renderTransactionsPage() {
             </tr>
           </thead>
           <tbody id="transactions-list">
-            ${transactions.length > 0 ? renderTransactionsList(transactions) : `
+            ${transactions.length > 0 ? renderTransactionsList(transactions) : window.FMEmpty ? `
+              <tr><td colspan="6">${filtered ? FMEmpty.html({
+                icon: 'fa-filter', compact: true,
+                title: t('empty.transactions.filteredTitle'), body: t('empty.transactions.filteredBody'),
+                primary: { label: t('empty.transactions.clearFilters'), id: 'empty-clear-filters-btn' }
+              }) : FMEmpty.html({
+                icon: 'fa-receipt',
+                title: t('empty.transactions.title'), body: t('empty.transactions.body'),
+                primary: { label: t('empty.action.import'), do: 'import', icon: 'fa-file-import' },
+                secondary: { label: t('empty.action.addTransaction'), do: 'add-transaction' }
+              })}</td></tr>
+            ` : `
               <tr>
                 <td colspan="6" class="text-center">
                   <div class="empty-state-mini">
@@ -1522,6 +1556,7 @@ async function renderTransactionsPage() {
   document.getElementById('toggle-filters-btn').addEventListener('click', toggleFilters);
   document.getElementById('apply-filters-btn').addEventListener('click', applyTransactionFilters);
   document.getElementById('reset-filters-btn').addEventListener('click', resetTransactionFilters);
+  if (window.FMEmpty) FMEmpty.bind(mainContent, { 'empty-clear-filters-btn': resetTransactionFilters });
   document.getElementById('import-transactions-btn').addEventListener('click', showImportTransactionsModal);
 
   document.querySelectorAll('.pagination-link').forEach((button) => {

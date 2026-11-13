@@ -950,3 +950,11 @@
   .ai-dash.is-ready .ai-dash-alert,
   .ai-dash.is-ready .ai-dash-panel { animation: none; }
 }
+
+/* Assistant replies rendered from markdown (ai.js renderRich). */
+:root .ai-msg-text .ai-msg-p { margin: 0 0 8px; }
+:root .ai-msg-text .ai-msg-p:last-child { margin-bottom: 0; }
+:root .ai-msg-text .ai-msg-h { display: block; margin: 10px 0 4px; }
+:root .ai-msg-text .ai-msg-list { margin: 4px 0 8px; padding-left: 1.3em; }
+:root .ai-msg-text .ai-msg-list li { margin: 2px 0; }
+:root .ai-msg-text strong { font-weight: 600; }

@@ -47,6 +47,15 @@ const ReceiptsModule = {
     const container = document.getElementById('receipts-list');
     if (!container) return;
 
+    if (this.receipts.length === 0 && window.FMEmpty) {
+      container.innerHTML = FMEmpty.html({
+        icon: 'fa-receipt',
+        title: t('empty.receipts.title'), body: t('empty.receipts.body'),
+        primary: { label: t('empty.receipts.upload'), action: 'rcpt:upload-modal', icon: 'fa-camera' },
+        secondary: { label: t('empty.receipts.manual'), action: 'rcpt:manual-modal' }
+      });
+      return;
+    }
     if (this.receipts.length === 0) {
       container.innerHTML = UI.emptyState({
         icon: 'fa-receipt',

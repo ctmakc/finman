@@ -244,6 +244,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/anomalies', anomaliesRoutes);
 app.use('/api/onboarding', apiAuthMiddleware, onboardingRoutes);
+app.use('/api/engagement', apiAuthMiddleware, require('./routes/engagement'));
 
 // Wave-2 feature routers — авторизация настроена ВНУТРИ каждого роутера
 // (rules/reconcile: passport-jwt; apiV1: passport-jwt для /tokens + patAuth для данных).

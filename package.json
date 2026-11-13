@@ -55,7 +55,8 @@
         "pino-http": "^11.0.0",
         "sqlite3": "^5.1.6",
         "stripe": "^22.2.2",
-        "tesseract.js": "^7.0.0"
+        "tesseract.js": "^7.0.0",
+        "web-push": "^3.6.7"
     },
     "devDependencies": {
         "jest": "^30.4.2",

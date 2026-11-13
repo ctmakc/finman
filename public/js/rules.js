@@ -71,7 +71,14 @@ const RulesModule = {
       ${this.renderForm()}`;
 
     if (!Array.isArray(this.rules) || this.rules.length === 0) {
-      container.innerHTML = toolbar + `<div class="empty-state"><p>${t('rules.empty')}</p></div>`;
+      // Nothing to apply yet: the plate explains rules, the form sits right under it.
+      container.innerHTML = window.FMEmpty
+        ? FMEmpty.html({
+          icon: 'fa-wand-magic-sparkles',
+          title: t('empty.rules.title'), body: t('empty.rules.body'),
+          primary: { label: t('empty.rules.write'), do: 'focus:rule-value', icon: 'fa-pen' }
+        }) + this.renderForm()
+        : toolbar + `<div class="empty-state"><p>${t('rules.empty')}</p></div>`;
       return;
     }
 

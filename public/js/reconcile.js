@@ -27,6 +27,21 @@ async function renderReconcilePage() {
       .then((r) => r.json())
       .then((d) => (Array.isArray(d) ? d : (d.own || d.all || [])));
 
+    if (accounts.length === 0 && window.FMEmpty) {
+      mainContent.innerHTML = `
+      <div class="reconcile-page">
+        <div class="page-header">
+          <h1><i class="fas fa-balance-scale"></i> ${t('reconcile.title')}</h1>
+        </div>
+        ${FMEmpty.html({
+          icon: 'fa-scale-balanced',
+          title: t('empty.reconcile.title'), body: t('empty.reconcile.body'),
+          primary: { label: t('empty.action.addAccount'), do: 'add-account', icon: 'fa-plus' }
+        })}
+      </div>`;
+      return;
+    }
+
     const options = accounts
       .map(
         (a) =>

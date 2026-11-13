@@ -316,6 +316,12 @@ async function renderBankConnectionsPage() {
           ${
             connections.length > 0
               ? renderBankConnectionsList(connections)
+              : window.FMEmpty ? FMEmpty.html({
+                icon: 'fa-plug',
+                title: t('empty.banks.title'), body: t('empty.banks.body'),
+                primary: { label: t('empty.action.import'), do: 'import', icon: 'fa-file-import' },
+                secondary: { label: t('empty.banks.connect'), id: 'empty-add-connection-btn', icon: 'fa-key' }
+              })
               : `<div class="empty-state bank-empty">
                    <div class="empty-state-icon"><i class="fas fa-plug"></i></div>
                    <h2>No token connections yet</h2>

@@ -69,10 +69,11 @@ async function renderDebtsPage() {
           <h1><i class="fas fa-hand-holding-usd"></i> ${t('debts.title')}</h1>
           <button type="button" class="btn btn-primary" data-action="debts:add"><i class="fas fa-plus"></i> ${t('btn.add')}</button>
         </div>
-        <div class="stats-grid">${renderDebtStats(summary)}</div>
+        ${list.length ? `<div class="stats-grid">${renderDebtStats(summary)}</div>` : ''}
         <div class="card-grid" id="debts-list">
           ${list.length === 0
-            ? UI.emptyState({ icon: 'fa-hand-holding-usd', title: t('debts.empty.title'), text: t('debts.empty.body'), action: { label: t('debts.addDebt'), action: 'debts:add', icon: 'fa-plus' } })
+            ? window.FMEmpty ? FMEmpty.html({ icon: 'fa-hand-holding-usd', title: t('empty.debts.title'), body: t('empty.debts.body'), primary: { label: t('empty.debts.add'), action: 'debts:add', icon: 'fa-plus' } })
+            : UI.emptyState({ icon: 'fa-hand-holding-usd', title: t('debts.empty.title'), text: t('debts.empty.body'), action: { label: t('debts.addDebt'), action: 'debts:add', icon: 'fa-plus' } })
             : list.map((d) => renderDebtCard(d)).join('')}
         </div>
       </div>`;

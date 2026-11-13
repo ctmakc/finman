@@ -160,6 +160,15 @@ const NetWorthModule = {
     if (!container) return;
 
     const active = this.assets.filter(a => a.is_active !== 0 && a.is_active !== false);
+    if (active.length === 0 && window.FMEmpty) {
+      container.innerHTML = FMEmpty.html({
+        icon: 'fa-house-chimney',
+        title: t('empty.networth.title'), body: t('empty.networth.body'),
+        primary: { label: t('empty.networth.add'), action: 'nw:add-asset', icon: 'fa-plus' },
+        secondary: { label: t('empty.action.importFirst'), do: 'import', ifNoTransactions: true }
+      });
+      return;
+    }
     if (active.length === 0) {
       container.innerHTML = UI.emptyState({
         icon: 'fa-house-chimney',

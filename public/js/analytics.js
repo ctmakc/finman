@@ -7,11 +7,24 @@ async function renderAnalyticsPage() {
   mainContent.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     await UI.loadBaseCurrency();
-    const [overview, byCategoryRaw, compare] = await Promise.all([
+    const [overview, byCategoryRaw, compare, hasTx] = await Promise.all([
       fetchWithAuth('/api/analytics/overview').then(r => r.json()),
       fetchWithAuth('/api/analytics/expenses-by-category').then(r => r.json()),
       fetchWithAuth('/api/analytics/compare').then(r => r.json()),
+      window.FMEmpty ? FMEmpty.hasTransactions() : null,
     ]);
+    if (hasTx === false) {
+      mainContent.innerHTML = `<div class="analytics-page">
+      <div class="page-header"><h1><i class="fas fa-chart-bar"></i> ${t('analytics.title')}</h1></div>
+      ${FMEmpty.html({
+        icon: 'fa-chart-bar',
+        title: t('empty.analytics.title'), body: t('empty.analytics.body'),
+        primary: { label: t('empty.action.import'), do: 'import', icon: 'fa-file-import' },
+        secondary: { label: t('empty.action.addTransaction'), do: 'add-transaction' }
+      })}
+    </div>`;
+      return;
+    }
     const byCategory = Array.isArray(byCategoryRaw) ? byCategoryRaw : [];
     const cur = overview.currency || overview.baseCurrency || (compare && compare.currency);
     const money = (v) => UI.esc(UI.convertedMoney(v || 0, cur));
@@ -34,7 +47,7 @@ async function renderAnalyticsPage() {
       </div>
       <div class="card-grid">
         <div class="card"><h3><i class="fas fa-list"></i> ${t('analytics.byCategory')}</h3>
-          <div class="list-group">${byCategory.map(c => `<div class="list-item"><div class="list-item-content"><div class="list-item-title">${esc(c.category || t('common.noCategory'))}</div><div class="list-item-subtitle">${t('analytics.txCount', { n: esc(c.count) })}</div></div><div class="list-item-actions"><strong>${money(c.total)}</strong></div></div>`).join('') || `<p class="text-secondary">${t('common.empty')}</p>`}</div>
+          <div class="list-group">${byCategory.map(c => `<div class="list-item"><div class="list-item-content"><div class="list-item-title">${esc(c.category || t('common.noCategory'))}</div><div class="list-item-subtitle">${t('analytics.txCount', { n: esc(c.count) })}</div></div><div class="list-item-actions"><strong>${money(c.total)}</strong></div></div>`).join('') || (window.FMEmpty ? FMEmpty.html({ icon: 'fa-list', compact: true, title: t('empty.analytics.catTitle'), body: t('empty.analytics.catBody') }) : `<p class="text-secondary">${t('common.empty')}</p>`)}</div>
         </div>
         <div class="card"><h3><i class="fas fa-exchange-alt"></i> ${t('analytics.compare')}</h3>
           <div class="compare-stats">
