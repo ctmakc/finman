@@ -735,6 +735,16 @@ async function revealGoogleSignIn() {
   } catch (_) { /* keep hidden */ }
 }
 
+// Google sign-in started on the MCP connector consent page (/oauth/authorize) comes back
+// to the app root; send the browser back to that page (same origin, that path only).
+function returnToOAuthConsent() {
+  let back = null;
+  try { back = sessionStorage.getItem('fm_oauth_return'); sessionStorage.removeItem('fm_oauth_return'); } catch (_) { back = null; }
+  if (!back || !/^\/oauth\/authorize\?[^#]*$/.test(back) || back.startsWith('//')) return false;
+  window.location.replace(back);
+  return true;
+}
+
 function consumeOAuthFragment() {
   if (typeof window === 'undefined') return false;
   const h = window.location.hash || '';
@@ -742,12 +752,14 @@ function consumeOAuthFragment() {
   if (m) {
     localStorage.setItem('token', decodeURIComponent(m[1]));
     history.replaceState(null, '', window.location.pathname + window.location.search);
+    returnToOAuthConsent();
     return true;
   }
   const q = new URLSearchParams(window.location.search);
   const err = q.get('auth_error');
   if (err) {
     history.replaceState(null, '', window.location.pathname);
+    if (returnToOAuthConsent()) return false;
     console.warn('Google sign-in failed:', err);
     const msg = err === 'email_exists'
       ? 'An account with this email already exists. Sign in with your password.'

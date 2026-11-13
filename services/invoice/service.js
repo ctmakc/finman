@@ -380,6 +380,15 @@ async function compose(userId, body, { prev = null, snapshot, profile }) {
   };
 }
 
+// Paid so far: a 'paid' invoice counts as paid in full; otherwise the sum of its recorded
+// payments (invoice_payments, e.g. a 30 % deposit), capped at the total.
+function paidOf(row) {
+  const total = Number(row.total_cents) || 0;
+  const sum = Number(row.paid_sum) || 0;
+  const paid = row.status === 'paid' ? total : Math.min(sum, total);
+  return { paid_cents: paid, balance_cents: row.status === 'void' ? 0 : total - paid };
+}
+
 function publicInvoice(row, { withSnapshot = false } = {}) {
   if (!row) return null;
   const snap = parseJson(row.snapshot, {});
@@ -407,6 +416,7 @@ function publicInvoice(row, { withSnapshot = false } = {}) {
     terms: row.terms,
     notes: row.notes,
     pay_url: core.payUrl(snap.data && snap.data.pay_online, row.number, row.total_cents, row.currency),
+    ...paidOf(row),
     sent_at: row.sent_at,
     paid_at: row.paid_at,
     created_at: row.created_at,
@@ -417,7 +427,7 @@ function publicInvoice(row, { withSnapshot = false } = {}) {
 }
 
 async function invoiceRow(userId, id) {
-  const row = await get('SELECT * FROM invoices WHERE id = ? AND user_id = ?', [id, userId]);
+  const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
   if (!row) throw notFound('Invoice not found');
   return row;
 }
@@ -544,15 +554,16 @@ async function listInvoices(userId, { status, q } = {}) {
             tax_rate, tax_label, tax_sub, tax_text, subtotal_cents, tax_cents, total_cents, terms, notes,
             json_object('name', json_extract(snapshot, '$.name'), 'layout', json_extract(snapshot, '$.layout'),
                         'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'))) AS snapshot,
-            sent_at, paid_at, created_at, updated_at
+            sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum
        FROM invoices WHERE ${where.join(' AND ')} ORDER BY issue_date DESC, id DESC LIMIT 500`,
     args,
   );
-  const all = await query('SELECT status, currency, total_cents FROM invoices WHERE user_id = ?', [userId]);
+  const all = await query(`SELECT status, currency, total_cents, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE user_id = ?`, [userId]);
   const totals = {};
   for (const r of all) {
     const t = totals[r.currency] || (totals[r.currency] = { outstanding_cents: 0, paid_cents: 0 });
-    if (r.status === 'sent') t.outstanding_cents += r.total_cents;
+    const p = paidOf(r);
+    if (r.status === 'sent') { t.outstanding_cents += p.balance_cents; t.paid_cents += p.paid_cents; }
     if (r.status === 'paid') t.paid_cents += r.total_cents;
   }
   return { invoices: rows.map((r) => publicInvoice(r)), totals };
@@ -626,6 +637,82 @@ async function previewPdf(userId, body) {
   return { buffer: await renderPdf(view, userId), filename: fileName(view) };
 }
 
+// ---------- payments (full or partial) ----------
+function publicPayment(r) {
+  return { id: r.id, invoice_id: r.invoice_id, amount_cents: r.amount_cents, paid_on: r.paid_on, method: r.method, note: r.note, created_at: r.created_at };
+}
+
+async function listPayments(userId, invoiceId) {
+  await invoiceRow(userId, invoiceId);
+  const rows = await query('SELECT * FROM invoice_payments WHERE invoice_id = ? AND user_id = ? ORDER BY paid_on, id', [invoiceId, userId]);
+  return rows.map(publicPayment);
+}
+
+// body: { amount (money string/number) | amount_cents | percent (of the total), paid_on, method, note }.
+// Without an amount the remaining balance is paid. When the payments reach the total the invoice
+// becomes 'paid'; a partial payment on a draft marks it 'sent' (the client has it in hand).
+async function recordPayment(userId, invoiceId, body) {
+  const b = isObj(body) ? body : {};
+  const inv = await invoiceRow(userId, invoiceId);
+  if (inv.status === 'void') throw bad('A void invoice cannot take payments');
+  const { balance_cents: balance } = paidOf(inv);
+  if (balance <= 0) throw bad('This invoice is already paid in full');
+  let amount;
+  if (b.amount !== undefined && b.amount !== null && b.amount !== '') amount = core.toCents(b.amount);
+  else if (b.amount_cents !== undefined && b.amount_cents !== null) amount = Math.round(Number(b.amount_cents));
+  else if (b.percent !== undefined && b.percent !== null && b.percent !== '') {
+    const pct = parseFloat(String(b.percent).replace(',', '.').replace('%', ''));
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) throw bad('Percent must be between 0 and 100');
+    amount = Math.round((inv.total_cents * pct) / 100);
+  } else amount = balance;
+  if (amount === null || !Number.isFinite(amount) || amount <= 0) throw bad('Payment amount must be a positive number');
+  if (amount > balance) throw bad(`Payment is larger than the balance due (${core.fmtCents(balance)} ${inv.currency})`);
+  const paidOn = b.paid_on === undefined || b.paid_on === null || b.paid_on === '' ? core.today() : String(b.paid_on);
+  if (!core.parseYmd(paidOn)) throw bad('Payment date must be YYYY-MM-DD');
+  await run(
+    'INSERT INTO invoice_payments (invoice_id, user_id, amount_cents, paid_on, method, note) VALUES (?, ?, ?, ?, ?, ?)',
+    [invoiceId, userId, amount, paidOn, str(b.method, 60).trim(), str(b.note, 500).trim()],
+  );
+  if (amount >= balance) {
+    await run(`UPDATE invoices SET status = 'paid', paid_at = CURRENT_TIMESTAMP, sent_at = COALESCE(sent_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [invoiceId, userId]);
+  } else if (inv.status === 'draft') {
+    await run(`UPDATE invoices SET status = 'sent', sent_at = COALESCE(sent_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [invoiceId, userId]);
+  }
+  return { invoice: publicInvoice(await invoiceRow(userId, invoiceId)), payments: await listPayments(userId, invoiceId) };
+}
+
+async function deletePayment(userId, invoiceId, paymentId) {
+  const inv = await invoiceRow(userId, invoiceId);
+  const r = await run('DELETE FROM invoice_payments WHERE id = ? AND invoice_id = ? AND user_id = ?', [paymentId, invoiceId, userId]);
+  if (!r.changes) throw notFound('Payment not found');
+  if (inv.status === 'paid') {
+    await run(`UPDATE invoices SET status = 'sent', paid_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [invoiceId, userId]);
+  }
+  return { invoice: publicInvoice(await invoiceRow(userId, invoiceId)), payments: await listPayments(userId, invoiceId) };
+}
+
+// ---------- clients (from the invoices issued so far) ----------
+async function listClients(userId, { q } = {}) {
+  const args = [userId];
+  let where = "user_id = ? AND client_name != ''";
+  if (q) { where += ' AND (client_name LIKE ? OR client_details LIKE ?)'; const like = `%${String(q).slice(0, 100).replace(/[%_]/g, '')}%`; args.push(like, like); }
+  const rows = await query(
+    `SELECT client_name, client_details, currency, status, total_cents, issue_date, number, id
+       FROM invoices WHERE ${where} ORDER BY issue_date DESC, id DESC`, args);
+  const byName = new Map();
+  for (const r of rows) {
+    const key = r.client_name.trim().toLowerCase();
+    let c = byName.get(key);
+    if (!c) {
+      c = { client_name: r.client_name, client_details: r.client_details, invoices: 0, billed: {}, last_invoice: { id: r.id, number: r.number, issue_date: r.issue_date } };
+      byName.set(key, c);
+    }
+    c.invoices += 1;
+    if (r.status !== 'void' && r.status !== 'draft') c.billed[r.currency] = (c.billed[r.currency] || 0) + r.total_cents;
+  }
+  return [...byName.values()].map(({ billed, ...c }) => ({ ...c, billed_cents: billed }));
+}
+
 module.exports = {
   InvoiceError,
   mergeData,
@@ -633,4 +720,5 @@ module.exports = {
   shareProfile, insertShare, shareUrl, getShared, importShared, listPresets,
   nextNumber, createInvoice, updateInvoice, setStatus, duplicateInvoice, deleteInvoice,
   listInvoices, getInvoice, invoicePdf, previewPdf,
+  listPayments, recordPayment, deletePayment, listClients,
 };

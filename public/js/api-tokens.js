@@ -63,6 +63,9 @@
         '</div>' +
         '<div id="api-token-new"></div>' +
         '<div id="api-tokens-list"></div>' +
+        '<h3 class="api-apps-title" style="margin-top:var(--space-6)">' + t('apiTokens.appsTitle') + '</h3>' +
+        '<p class="muted">' + t('apiTokens.appsIntro') + ' <code>' + escapeHtml(location.origin + '/mcp') + '</code></p>' +
+        '<div id="api-apps-list"></div>' +
         '</div>'
       );
     },
@@ -87,6 +90,14 @@
         btn.dataset.bound = '1';
         btn.addEventListener('click', () => this.create());
       }
+      const apps = document.getElementById('api-apps-list');
+      if (apps && !apps.dataset.bound) {
+        apps.dataset.bound = '1';
+        apps.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-app-id]');
+          if (b) this.disconnect(b.getAttribute('data-app-id'));
+        });
+      }
       const input = document.getElementById('api-token-name');
       if (input && !input.dataset.bound) {
         input.dataset.bound = '1';
@@ -105,6 +116,55 @@
         this.tokens = [];
       }
       this.render();
+      await this.loadApps();
+    },
+
+    // Приложения, подключённые через OAuth (Claude и другие MCP-клиенты).
+    async loadApps() {
+      const box = document.getElementById('api-apps-list');
+      if (!box) return;
+      let apps = [];
+      try {
+        const res = await fetch('/api/mcp/connections', { headers: authHeaders() });
+        const body = await res.json();
+        apps = (body && body.connections) || [];
+      } catch (e) {
+        apps = [];
+      }
+      if (!apps.length) {
+        box.innerHTML = '<div class="empty-state"><p>' + t('apiTokens.appsEmpty') + '</p></div>';
+        return;
+      }
+      box.innerHTML =
+        '<table class="api-tokens-table"><thead><tr>' +
+        '<th>' + t('common.name') + '</th><th>' + t('apiTokens.appsConnected') + '</th><th>' + t('apiTokens.lastUsed') + '</th><th></th>' +
+        '</tr></thead><tbody>' +
+        apps.map(function (a) {
+          return (
+            '<tr>' +
+            '<td>' + escapeHtml(a.app) + '</td>' +
+            '<td>' + fmtDate(a.created_at ? String(a.created_at).replace(' ', 'T') + 'Z' : null) + '</td>' +
+            '<td>' + fmtDate(a.last_used_at ? String(a.last_used_at).replace(' ', 'T') + 'Z' : null) + '</td>' +
+            '<td><button class="btn btn-danger btn-sm" data-app-id="' + escapeHtml(a.id) + '">' + i18nT('apiTokens.disconnect') + '</button></td>' +
+            '</tr>'
+          );
+        }).join('') +
+        '</tbody></table>';
+    },
+
+    async disconnect(id) {
+      if (!confirm(t('apiTokens.confirmDisconnect'))) return;
+      try {
+        const res = await fetch('/api/mcp/connections/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() });
+        if (!res.ok) {
+          alert(t('apiTokens.disconnectError'));
+          return;
+        }
+      } catch (e) {
+        alert(t('apiTokens.disconnectError'));
+        return;
+      }
+      await this.loadApps();
     },
 
     render() {

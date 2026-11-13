@@ -273,6 +273,9 @@ app.use('/api/rules', rulesRoutes);
 app.use('/api/reconcile', reconcileRoutes);
 app.use('/api/v1', apiV1Routes);
 app.use('/api/invoices', invoicesRoutes);
+// MCP connector: OAuth 2.1 (discovery, registration, consent, tokens) and the /mcp endpoint.
+app.use('/', require('./routes/oauth'));
+app.use('/', require('./routes/mcp'));
 
 // Маршрут для всех остальных запросов (SPA) — НЕ перехватываем /api/*,
 // чтобы неизвестные API-роуты дошли до notFound + errorHandler.
