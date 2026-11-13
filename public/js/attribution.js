@@ -121,13 +121,35 @@
     var args = [].slice.call(arguments);
     if (opState === 'pending') { if (opPending.length < 50) opPending.push(args); return; }
     if (opState !== 'on') return;
-    try { window.op.apply(null, args); } catch (e) { /* ignore */ }
+    try { Function.prototype.apply.call(window.op, null, args); } catch (e) { /* ignore */ }
   }
   function opRaw() {
-    try { window.op.apply(null, arguments); } catch (e) { /* ignore */ }
+    // window.op is a Proxy (queue stub, then the SDK): reading .apply on it
+    // would go through its get trap, so call it via Function.prototype.
+    try { Function.prototype.apply.call(window.op, null, arguments); } catch (e) { /* ignore */ }
+  }
+
+  // QA / smoke traffic stays out of OpenPanel: ?utm_source=test|qa|smoke (or
+  // ?fm_qa=1) marks this browser; a .test / +smoke account does the same.
+  var QA = 'fm_qa';
+  function isQaEmail(e) { return /(\.test$|\+smoke@)/i.test(String(e || '')); }
+  function markQa() {
+    var s = store();
+    if (s) try { s.setItem(QA, '1'); } catch (e) { /* ignore */ }
+    opState = 'off'; opPending = [];
+  }
+  function isQa() {
+    var s = store();
+    if (s && s.getItem(QA) === '1') return true;
+    try {
+      var p = new URLSearchParams(window.location.search);
+      if (/^(test|qa|smoke)$/i.test(p.get('utm_source') || '') || p.get('fm_qa') === '1') { markQa(); return true; }
+    } catch (e) { /* ignore */ }
+    return false;
   }
 
   function startOpenPanel() {
+    if (isQa()) { opState = 'off'; opPending = []; return; }
     fetch('/api/t/config', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (cfg) {
@@ -138,6 +160,8 @@
           trackScreenViews: true,
           trackOutgoingLinks: true,
           trackAttributes: true,
+          // re-checked on every event: a QA account found after login stops autocapture too
+          filter: function () { var st = store(); return !(st && st.getItem(QA) === '1'); },
         });
         var first = load().first || {};
         opRaw('setGlobalProperties', {
@@ -157,6 +181,7 @@
 
   function identify(user) {
     if (!user || !user.id) return;
+    if (isQaEmail(user.email)) { markQa(); return; }
     var name = String(user.fullName || '').trim().split(/\s+/);
     op('identify', {
       profileId: String(user.id),
