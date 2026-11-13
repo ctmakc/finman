@@ -183,8 +183,12 @@ if (require.main === module) {
     });
 }
 
-// Статические файлы
-app.use(express.static(path.join(__dirname, 'public')));
+// Статические файлы. index.html и style.css отдаются с ?v=<хеш> на ссылках
+// (lib/assetVersion.js): новый релиз = новые URL, кэш SW не подмешает старый CSS.
+const assetVersion = require('./lib/assetVersion').create(path.join(__dirname, 'public'));
+app.get(['/', '/index.html'], assetVersion.sendIndex);
+app.get('/css/style.css', assetVersion.styleMiddleware);
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // Журнал действий пользователя (после успешных изменений; см. middleware/activity.js)
 app.use('/api', require('./middleware/activity').activity);
@@ -256,7 +260,7 @@ app.use('/api/v1', apiV1Routes);
 // чтобы неизвестные API-роуты дошли до notFound + errorHandler.
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  return assetVersion.sendIndex(req, res);
 });
 
 // 404 для неизвестных API-маршрутов (форматируется errorHandler-ом).

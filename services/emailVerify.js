@@ -58,12 +58,13 @@ function buildLetter(link) {
     '',
     'Finman · app.finman.money',
   ].join('\n');
-  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#EDF7F6;font-family:Arial,Helvetica,sans-serif;color:#0B2A2E">
-<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #9CC3C6">
-<tr><td style="padding:28px 28px 8px;font-size:20px;font-weight:bold;letter-spacing:-0.01em">Finman</td></tr>
-<tr><td style="padding:8px 28px 0;font-size:15px;line-height:1.55">Confirm your email so we can reach you about your Finman account: password resets and security notices.</td></tr>
-<tr><td style="padding:22px 28px"><a href="${link}" style="display:inline-block;background:#0B2A2E;color:#ffffff;text-decoration:none;padding:12px 20px;font-size:15px;font-weight:bold">Confirm email</a></td></tr>
-<tr><td style="padding:0 28px 26px;font-size:12px;line-height:1.5;color:#3D5A5E">The link works once. If you did not create a Finman account, ignore this letter.<br>${link}</td></tr>
+  // CLEAR DAY palette (same as the app and services/engagementMail.js).
+  const html = `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#F1F4F9;font-family:Rubik,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#10131A">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#FFFFFF;border-radius:24px">
+<tr><td style="padding:28px 28px 8px;font-size:20px;font-weight:600;letter-spacing:-0.02em"><span style="display:inline-block;width:14px;height:14px;border-radius:5px;background:#2B50F0;margin-right:8px;vertical-align:-1px"></span>Finman</td></tr>
+<tr><td style="padding:8px 28px 0;font-size:15px;line-height:1.55;color:#4A5262">Confirm your email so we can reach you about your Finman account: password resets and security notices.</td></tr>
+<tr><td style="padding:22px 28px"><a href="${link}" style="display:inline-block;background:#2B50F0;color:#FFFFFF;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:15px;font-weight:600">Confirm email</a></td></tr>
+<tr><td style="padding:0 28px 26px;font-size:12px;line-height:1.5;color:#4A5262">The link works once. If you did not create a Finman account, ignore this letter.<br><span style="word-break:break-all">${link}</span></td></tr>
 </table></body></html>`;
   return { subject, text, html };
 }

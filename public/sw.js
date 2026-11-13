@@ -18,7 +18,7 @@
 // precache); activate удаляет все НЕ-текущие кэши, включая старый finman-v3-api
 // с ответами API.
 
-const CACHE_VERSION = 'finman-v7';
+const CACHE_VERSION = 'finman-v8';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 
 const STATIC_ASSETS = [
@@ -164,7 +164,30 @@ async function navigationNetworkFirst(request) {
   }
 }
 
-// STALE-WHILE-REVALIDATE для статики: отдаём кэш, обновляем в фоне.
+// NETWORK-FIRST для кода и стилей (.css/.js): после релиза страница сразу
+// получает свежие файлы; кэш — только офлайн-фолбэк. index.html ставит на эти
+// ссылки ?v=<хеш>, поэтому ищем и без query (precache хранит чистые URL).
+// 12.11.2026: со stale-while-revalidate экран входа красился старым style.css.
+function isCodeAsset(url) {
+  return /\.(css|js)$/.test(url.pathname) && url.pathname !== '/sw.js';
+}
+
+async function codeNetworkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      const clone = response.clone();
+      caches.open(STATIC_CACHE).then(cache => cache.put(request, clone)).catch(() => {});
+    }
+    return response;
+  } catch (err) {
+    const cached = (await caches.match(request)) || (await caches.match(request, { ignoreSearch: true }));
+    if (cached) return cached;
+    return new Response('', { status: 504 });
+  }
+}
+
+// STALE-WHILE-REVALIDATE для остальной статики (картинки, шрифты): отдаём кэш, обновляем в фоне.
 async function staticStaleWhileRevalidate(request) {
   const cached = await caches.match(request);
   const network = fetch(request)
@@ -207,6 +230,11 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(navigationNetworkFirst(request));
+    return;
+  }
+
+  if (request.method === 'GET' && url.origin === self.location.origin && isCodeAsset(url)) {
+    event.respondWith(codeNetworkFirst(request));
     return;
   }
 
