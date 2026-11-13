@@ -155,6 +155,20 @@ module.exports = {
     successRedirect: process.env.GOOGLE_SUCCESS_REDIRECT || 'https://app.finman.money/'
   },
 
+  // Native iOS/Android app (Capacitor shell, bundle id money.finman.app).
+  // Sign in with Apple checks aud = bundleId. The SIWA key (.p8 on disk, never in
+  // the repo) is optional: with it the server exchanges the authorization code for
+  // a refresh token and revokes it on account deletion; without it both steps are
+  // skipped and sign-in still works.
+  apple: {
+    bundleId: process.env.APPLE_BUNDLE_ID || 'money.finman.app',
+    teamId: process.env.APPLE_TEAM_ID || '',
+    keyId: process.env.APPLE_SIWA_KEY_ID || '',
+    keyPath: process.env.APPLE_SIWA_KEY_PATH || '',
+  },
+  // URL scheme of the native shell: money.finman.app://auth-done
+  appScheme: process.env.APP_URL_SCHEME || 'money.finman.app',
+
   // Валидация
   isValidEmail,
 
