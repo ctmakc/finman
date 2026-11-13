@@ -43,7 +43,14 @@
   var LOCK_AFTER_MS = 60 * 1000;
 
   // ---- plugins (never on the website or in the preview) --------------------
-  var P = (n) => window.Capacitor && window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : null;
+  // A remote-URL page gets the native bridge without @capacitor/core: the
+  // plugins sit on Capacitor.Plugins and registerPlugin is missing.
+  var P = (n) => {
+    var C = window.Capacitor;
+    if (!C) return null;
+    if (C.Plugins && C.Plugins[n]) return C.Plugins[n];
+    return typeof C.registerPlugin === 'function' ? C.registerPlugin(n) : null;
+  };
   var plugins = {};
   function plugin(name) {
     if (!isNative) return null;

@@ -132,9 +132,10 @@ describe('native.js on the website', () => {
     expect(window.open).toBe(open);
   });
 
-  test('plugins go through registerPlugin only and nothing is logged', () => {
+  test('plugins come from Capacitor.Plugins first, registerPlugin second, and nothing is logged', () => {
     const src = read('js/native.js');
-    expect(src).toContain('window.Capacitor && window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : null');
+    expect(src).toContain('if (C.Plugins && C.Plugins[n]) return C.Plugins[n];');
+    expect(src).toContain("return typeof C.registerPlugin === 'function' ? C.registerPlugin(n) : null;");
     expect(src).not.toMatch(/console\.(log|info|debug)\(/);
   });
 });
