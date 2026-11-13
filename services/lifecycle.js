@@ -107,7 +107,7 @@ async function runDigest() {
 
   const r = await emailService.sendEmail({
     to,
-    from: process.env.LEAD_NOTIFY_FROM || 'INNOVA Leads <leads@remolda.com>',
+    from: process.env.LEAD_NOTIFY_FROM || 'INNOVA Leads <leads@finman.money>',
     subject: `Finman users · day 1 / day 7 · ${rows.length}`,
     text,
     html,

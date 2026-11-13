@@ -21,7 +21,7 @@ const axios = require('axios');
 const logger = require('../lib/logger');
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const DEFAULT_FROM = 'FinMan <noreply@finman.app>';
+const DEFAULT_FROM = 'Finman <noreply@finman.money>';
 
 // Ключ читаем динамически (на каждый вызов), чтобы тесты могли
 // выставлять/сбрасывать env без перезагрузки модуля.
