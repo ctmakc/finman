@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Finman</string>
+    <string name="title_activity_main">Finman</string>
+    <string name="package_name">money.finman.app</string>
+    <string name="custom_url_scheme">money.finman.app</string>
+</resources>

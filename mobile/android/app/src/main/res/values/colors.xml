@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#2B50F0</color>
+    <color name="colorPrimaryDark">#1E3BC4</color>
+    <color name="colorAccent">#2B50F0</color>
+    <color name="finman_bg">#F1F4F9</color>
+</resources>
