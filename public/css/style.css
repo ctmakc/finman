@@ -73,67 +73,66 @@
 :root {
     color-scheme: light dark;
 
-    /* ---- Chart water: ground + bands ---- */
-    --shallows:          light-dark(#C6E4E6, #0B2A2E);   /* printed chart-water cyan / ink ground */
-    --deeps:             light-dark(#EDF7F6, #10363B);   /* lighter "deep water" band / raised plate */
+    /* ---- CLEAR DAY: fresh cool ground, white plates that float ---- */
+    --shallows:          light-dark(#F1F4F9, #0B101B);   /* page ground */
+    --deeps:             light-dark(#FEFEFF, #151C2B);   /* plates: cards, header, modals */
     --fm-bg:             var(--shallows);
     --fm-surface:        var(--deeps);
-    --fm-surface-2:      light-dark(#D9EDEE, #164247);   /* sunken: table heads, chips */
+    --fm-surface-2:      light-dark(#EAEFF7, #1D2537);   /* sunken: inputs, chips, table heads */
 
-    /* ---- Chart ink ---- */
-    --fm-ink:            light-dark(#0B2A2E, #D9EEF0);   /* all body text */
-    --fm-ink-2:          light-dark(#37585B, #A9CBCE);   /* secondary, >=4.5:1 on both grounds */
-    --fm-ink-3:          light-dark(#37585B, #9DC2C5);   /* tertiary — kept at AA, never lighter */
+    /* ---- Ink ---- */
+    --fm-ink:            light-dark(#121A2E, #EEF2FA);
+    --fm-ink-2:          light-dark(#4A5570, #AEB8CD);
+    --fm-ink-3:          light-dark(#5B6682, #9AA5BD);
 
-    /* ---- Contour + datum ---- */
-    --fm-contour:        light-dark(#527E80, #5F9094);   /* 1px depth-contour rule, >=3:1 */
-    --fm-datum:          light-dark(#0B2A2E, #D9EEF0);   /* 2px safety-floor rule */
+    /* ---- Hairlines (soft; depth comes from shadow, not from rules) ---- */
+    --fm-contour:        light-dark(#DCE3EE, #283146);
+    --fm-datum:          light-dark(#C9D3E3, #36405A);
     --fm-border:         var(--fm-contour);
     --fm-border-strong:  var(--fm-datum);
 
-    /* ---- Primary = ink. The app has no brand chroma; buttons are ink-filled. ---- */
-    --fm-primary:          var(--fm-ink);
-    --fm-primary-strong:   light-dark(#061A1D, #EDF7F6);
-    --fm-primary-soft:     var(--fm-contour);
-    --fm-primary-tint:     var(--deeps);
-    --fm-primary-contrast: light-dark(#EDF7F6, #0B2A2E);
+    /* ---- One bright accent: Finman cobalt ---- */
+    --fm-primary:          light-dark(#2B50F0, #8098FF);
+    --fm-primary-strong:   light-dark(#1E3CD0, #A7B8FF);
+    --fm-primary-soft:     light-dark(#8DA2F8, #4E62B8);
+    --fm-primary-tint:     light-dark(#E8EDFF, #1C2650);
+    --fm-primary-contrast: light-dark(#FEFEFF, #0B101B);
     --fm-secondary:        var(--fm-ink-2);
     --fm-secondary-tint:   var(--fm-surface-2);
-    --fm-info:             var(--fm-ink-2);
+    --fm-info:             var(--fm-primary);
 
-    /* ---- Advisory magenta: FORECAST / PREDICTED ONLY (<=3 per viewport) ---- */
-    --fm-advisory:       #BE0079;
-    --fm-advisory-ink:   light-dark(#8E0059, #F39BD3);   /* small predicted text */
-    --fm-advisory-band:  #BE0079;                        /* used at low alpha for the envelope */
+    /* ---- Forecast = the accent, lighter (no second brand colour) ---- */
+    --fm-advisory:       light-dark(#2B50F0, #8098FF);
+    --fm-advisory-ink:   light-dark(#1E3CD0, #A7B8FF);
+    --fm-advisory-band:  light-dark(#2B50F0, #8098FF);
 
-    /* ---- Drying height: ground that dries at low water = below the datum ---- */
-    --fm-drying:         light-dark(#3F6B38, #9BCB92);
-    --fm-drying-tint:    light-dark(#D3E3CF, #1D3A22);
+    --fm-drying:         light-dark(#B4232F, #FF8F8A);
+    --fm-drying-tint:    light-dark(#FDE8E8, #3A1C22);
 
-    /* ---- Semantic money colours (surveyed fact, never magenta) ---- */
-    --fm-positive:       light-dark(#1E6B5B, #7FD1B8);
-    --fm-positive-tint:  light-dark(#D4ECE4, #15403A);
-    --fm-negative:       light-dark(#9E3A2B, #F2A292);
-    --fm-negative-tint:  light-dark(#EEDAD5, #43231F);
-    --fm-warning:        light-dark(#7A5200, #E3C06A);
-    --fm-warning-tint:   light-dark(#EBE3CC, #3B3116);
+    /* ---- Semantic money colours ---- */
+    --fm-positive:       light-dark(#0A7752, #4FD39A);
+    --fm-positive-tint:  light-dark(#DEF5EA, #123A2C);
+    --fm-negative:       light-dark(#C62F3B, #FF8F8A);
+    --fm-negative-tint:  light-dark(#FDE8E8, #3A1C22);
+    --fm-warning:        light-dark(#945B00, #F2C063);
+    --fm-warning-tint:   light-dark(#FFF2D9, #3A2E14);
 
     /* ---- Chart series (charts.js reads these via getComputedStyle) ---- */
-    --fm-chart-1:        var(--fm-ink);
-    --fm-chart-2:        var(--fm-contour);
-    --fm-chart-3:        light-dark(#8AB0B3, #7FA9AC);
-    --fm-chart-4:        var(--fm-drying);
+    --fm-chart-1:        var(--fm-primary);
+    --fm-chart-2:        light-dark(#8DA2F8, #4E62B8);
+    --fm-chart-3:        light-dark(#13A7A0, #4CC9C2);
+    --fm-chart-4:        light-dark(#F0A020, #F2C063);
     --fm-chart-5:        var(--fm-negative);
-    --fm-chart-6:        light-dark(#1E4C50, #B9D9DB);
+    --fm-chart-6:        light-dark(#7A86A3, #8792AD);
     --fm-chart-income:   var(--fm-positive);
     --fm-chart-expense:  var(--fm-negative);
     --fm-chart-forecast: var(--fm-advisory);
     --fm-chart-forecast-band: var(--fm-advisory-band);
-    --fm-chart-forecast-band-alpha: 0.14;
+    --fm-chart-forecast-band-alpha: 0.12;
     --fm-chart-datum:    var(--fm-datum);
     --fm-chart-grid:     var(--fm-contour);
-    --fm-chart-grid-alpha: 0.35;
-    --fm-chart-tick:     var(--fm-ink-2);
+    --fm-chart-grid-alpha: 0.9;
+    --fm-chart-tick:     var(--fm-ink-3);
     --fm-chart-surface:  var(--deeps);
     --fm-chart-font:     var(--fm-font-num);
 
@@ -153,24 +152,25 @@
     --text-tertiary:   var(--fm-ink-3);
     --border-color:    var(--fm-border);
 
-    /* ---- Elevation: none. Depth is water tint + contour lines. ---- */
-    --shadow-sm: none;
-    --shadow:    none;
-    --shadow-lg: none;
-    --fm-shadow-primary: none;
+    /* ---- Elevation: soft, wide, low — plates float, nothing is outlined ---- */
+    --fm-shadow-ink: light-dark(rgb(18 26 46 / 0.06), rgb(0 0 0 / 0.35));
+    --shadow-sm: 0 1px 2px var(--fm-shadow-ink);
+    --shadow:    0 1px 2px var(--fm-shadow-ink), 0 6px 20px var(--fm-shadow-ink);
+    --shadow-lg: 0 2px 6px var(--fm-shadow-ink), 0 18px 48px light-dark(rgb(18 26 46 / 0.12), rgb(0 0 0 / 0.5));
+    --fm-shadow-primary: 0 6px 18px light-dark(rgb(43 80 240 / 0.28), rgb(0 0 0 / 0.4));
 
-    /* ---- Radius: 0 everywhere; one pill for chips ---- */
-    --radius-xs: 0;
-    --radius-sm: 0;
-    --radius-md: 0;
-    --radius-lg: 0;
+    /* ---- Radius: plates 20, inner blocks 14, controls pill ---- */
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
     --radius-pill: 999px;
-    --fm-radius: 0;          /* ai.css fallbacks (--fm-radius, 14px) */
-    --fm-radius-sm: 0;
-    --fm-radius-lg: 0;
-    --border-radius-sm: 0;
-    --border-radius:    0;
-    --border-radius-lg: 0;
+    --fm-radius: 20px;
+    --fm-radius-sm: 14px;
+    --fm-radius-lg: 24px;
+    --border-radius-sm: 12px;
+    --border-radius:    16px;
+    --border-radius-lg: 24px;
 
     /* ---- Spacing scale (4px base) ---- */
     --space-1: 4px;
@@ -182,24 +182,23 @@
     --space-7: 48px;
     --space-8: 64px;
 
-    /* ---- Typography: Familjen Grotesk UI/display, Azeret Mono numerals,
-            Newsreader only for long-form AI text (never a heading) ---- */
-    --fm-font-ui:      'Familjen Grotesk', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+    /* ---- Typography: Rubik for everything (Cyrillic native), tabular figures for money ---- */
+    --fm-font-ui:      'Rubik', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
     --fm-font-display: var(--fm-font-ui);
-    --fm-font-num:     'Azeret Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
-    --fm-font-text:    'Newsreader', Georgia, 'Times New Roman', serif;
+    --fm-font-num:     var(--fm-font-ui);
+    --fm-font-text:    var(--fm-font-ui);
     --font-family:     var(--fm-font-ui);
-    --fm-num: 'tnum' 1, 'lnum' 1;   /* tabular + lining figures for money */
+    --fm-num: 'tnum' 1, 'lnum' 1;
 
-    /* ---- Motion: chart-recorder constant rate + expo-out contours ---- */
-    --transition-speed: 0.14s;
-    --fm-ease:          cubic-bezier(0.32, 0.72, 0, 1);     /* micro 140ms */
-    --fm-ease-contour:  cubic-bezier(0.16, 1, 0.3, 1);      /* contour scaleX 520ms */
+    /* ---- Motion: soft and quick ---- */
+    --transition-speed: 0.16s;
+    --fm-ease:          cubic-bezier(0.32, 0.72, 0, 1);
+    --fm-ease-contour:  cubic-bezier(0.16, 1, 0.3, 1);
     --fm-dur-contour:   520ms;
-    --fm-dur-count:     380ms;
-    --fm-dur-trace:     1400ms;                             /* linear pen trace */
+    --fm-dur-count:     520ms;
+    --fm-dur-trace:     1100ms;
 
-    --fm-focus: 0 0 0 2px var(--fm-bg), 0 0 0 4px var(--fm-ink);
+    --fm-focus: 0 0 0 3px light-dark(rgb(43 80 240 / 0.28), rgb(128 152 255 / 0.4));
 }
 
 /* Explicit theme choice from public/js/theme.js (data-theme set) — the only
@@ -207,19 +206,11 @@
 html[data-theme="light"] { color-scheme: light; }
 html[data-theme="dark"]  { color-scheme: dark; }
 
-/* ---- Self-hosted type (copied from finman.money; CSP font-src 'self') ---- */
-@font-face { font-family: 'Familjen Grotesk'; font-style: italic; font-weight: 400 700; font-display: swap; src: url(/vendor/fonts/familjen-grotesk-latin-ext-i.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: 'Familjen Grotesk'; font-style: italic; font-weight: 400 700; font-display: swap; src: url(/vendor/fonts/familjen-grotesk-latin-i.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Familjen Grotesk'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/vendor/fonts/familjen-grotesk-latin-ext-r.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: 'Familjen Grotesk'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/vendor/fonts/familjen-grotesk-latin-r.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Azeret Mono'; font-style: italic; font-weight: 400 600; font-display: swap; src: url(/vendor/fonts/azeret-mono-latin-ext-i.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: 'Azeret Mono'; font-style: italic; font-weight: 400 600; font-display: swap; src: url(/vendor/fonts/azeret-mono-latin-i.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Azeret Mono'; font-style: normal; font-weight: 400 600; font-display: swap; src: url(/vendor/fonts/azeret-mono-latin-ext-r.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: 'Azeret Mono'; font-style: normal; font-weight: 400 600; font-display: swap; src: url(/vendor/fonts/azeret-mono-latin-r.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Newsreader'; font-style: normal; font-weight: 400; font-display: swap; src: url(/vendor/fonts/newsreader-latin-ext-400.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: 'Newsreader'; font-style: normal; font-weight: 400; font-display: swap; src: url(/vendor/fonts/newsreader-latin-400.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Newsreader'; font-style: normal; font-weight: 600; font-display: swap; src: url(/vendor/fonts/newsreader-latin-ext-600.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: 'Newsreader'; font-style: normal; font-weight: 600; font-display: swap; src: url(/vendor/fonts/newsreader-latin-600.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* ---- Self-hosted type: Rubik variable 300–900 (CSP font-src 'self') ---- */
+@font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-cyrillic-wght-normal.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-latin-ext-wght-normal.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-latin-wght-normal.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Rubik'; font-style: italic; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-latin-wght-italic.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 
   /* Основные стили */

@@ -1,5 +1,56 @@
 # finman app — DESIGN.md
 
+## Direction: CLEAR DAY (12.11.2026, supersedes CHART DATUM's look)
+
+Owner brief (via the front): closer to Wise in spirit, not a copy; fresher,
+brighter, modern, friendly, rounder; money must feel trustworthy. Screens:
+sign-in, sign-up, first-run start, post-import insight, dashboard, menu, forms,
+buttons. Light and dark.
+
+### Three directions considered
+1. **CLEAR DAY** (chosen): cool daylight ground `#F1F4F9`, white plates floating
+   on soft shadows, one cobalt accent `#2B50F0` (dark `#8098FF`), Rubik variable
+   for everything, big calm money figures, pills and 14–28px radii, one solid
+   accent card per screen (the AI CFO insight), `freshRise` spring entrance.
+2. **MINT LEDGER**: pale mint ground, forest-green accent, Manrope, flat tinted
+   panels with no shadows. Rejected: green collides with "positive" money
+   colour, and green-on-mint reads as a Wise copy.
+3. **PAPER BANK**: warm off-white, navy + coral, serif display figures. Rejected:
+   cream + serif is the house slop the design ledger bans; it reads older.
+
+### Locked rules
+- **Ground and plates.** Page = `--shallows` (cool light / deep navy). Every card is a plate:
+  `--deeps` fill, radius 24 (18 small), `--shadow`, no border, no `::before` rules.
+  Section headers and rows separate with spacing and a soft 70% contour, never dashed.
+- **One accent.** `--fm-primary` cobalt. Solid fill only on primary buttons, the
+  drop-mark tile, the first category bar and the AI CFO insight card. Everything
+  else uses `--fm-primary-tint`.
+- **Type.** Rubik variable (`/vendor/fonts/rubik-*.woff2`, latin + latin-ext +
+  cyrillic). Headings 600–650 with tight tracking; money figures tabular 600; no uppercase
+  labels, no mono labels. Hero balance `clamp(2.8rem,…,4.6rem)` with the
+  currency sign at 0.42em in ink-3.
+- **Controls.** Buttons are pills (`.btn` surface-2, `.btn-primary` accent with
+  `--fm-shadow-primary`); inputs are radius 14 on surface-2 fill with a 1.5px
+  transparent border that turns primary on focus with a `--fm-focus` ring.
+  Tabs are a segmented pill. Buttons never wrap.
+- **Shell.** Header translucent with blur; nav links are pills, active = tint.
+  Drawer panel radius `0 28 28 0`, pill links.
+- **Motion.** `freshRise` 520ms `cubic-bezier(.3,1.3,.5,1)` on hero, drop plate,
+  soundings (staggered) and auth card; hover lifts 2px. `prefers-reduced-motion`
+  turns it off.
+- **Implementation.** `public/css/fresh.css` is loaded after `style.css` and
+  overrides it with `:root`-prefixed selectors; tokens stay in `style.css`
+  `:root` (`light-dark()`). New components take radius/shadow from the
+  `--fresh-*` variables in fresh.css.
+- **Gates.** WCAG contrast on start / insight / dashboard / drawer in both
+  themes; `test/fe-shell.test.js` token contrast (positive light is `#0A7752` so it
+  passes on surface-2); `hero-image-check` on `/` (login hero = product shot `img/auth-hero.webp`).
+
+---
+
+## Previous direction (CHART DATUM) — kept for token history
+
+
 **Direction: CHART DATUM** — the app is the same product as the marketing site.
 The site's `/data/projects/finman-money-site/DESIGN.md` is the parent law (why
 the hydrographic chart, the tide staff, the upright/italic rule, the magenta
