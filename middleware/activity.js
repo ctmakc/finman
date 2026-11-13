@@ -25,6 +25,14 @@ const RULES = [
   [/^\/api\/onboarding\/demo$/, 'DELETE', 'demo_removed'],
   [/^\/api\/billing\/checkout$/, 'POST', 'checkout_started'],
   [/^\/api\/receipts/, 'POST', 'receipt_scanned'],
+  [/^\/api\/invoices\/preview$/, 'POST', () => null],
+  [/^\/api\/invoices\/profiles\/\d+\/share$/, 'POST', 'invoice_template_shared'],
+  [/^\/api\/invoices\/profiles\/?$/, 'POST', 'invoice_template_created'],
+  [/^\/api\/invoices\/profiles\/\d+$/, 'PUT', 'invoice_template_updated'],
+  [/^\/api\/invoices\/profiles\/\d+$/, 'DELETE', 'invoice_template_deleted'],
+  [/^\/api\/invoices\/shared\/[^/]+\/import$/, 'POST', 'invoice_template_imported'],
+  [/^\/api\/invoices\/\d+\/status$/, 'POST', 'invoice_status_changed'],
+  [/^\/api\/invoices\/\d+\/duplicate$/, 'POST', 'invoice_duplicated'],
 ];
 
 function eventFor(method, path, ok) {

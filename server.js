@@ -60,6 +60,7 @@ const onboardingRoutes = require('./routes/onboarding');
 const rulesRoutes = require('./routes/rules');
 const reconcileRoutes = require('./routes/reconcile');
 const apiV1Routes = require('./routes/apiV1');
+const invoicesRoutes = require('./routes/invoices');
 
 // Настройка Express
 const app = express();
@@ -86,7 +87,9 @@ app.use(helmet({
       // supertest этого не видит, ломается только браузер.
       scriptSrcAttr: ["'unsafe-inline'"],
       fontSrc: ["'self'", "data:", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      // Invoice editor shows the PDF preview from a blob: URL in an iframe.
+      frameSrc: ["'self'", "blob:"],
     },
   },
 }));
@@ -269,6 +272,7 @@ app.use('/api/engagement', apiAuthMiddleware, require('./routes/engagement'));
 app.use('/api/rules', rulesRoutes);
 app.use('/api/reconcile', reconcileRoutes);
 app.use('/api/v1', apiV1Routes);
+app.use('/api/invoices', invoicesRoutes);
 
 // Маршрут для всех остальных запросов (SPA) — НЕ перехватываем /api/*,
 // чтобы неизвестные API-роуты дошли до notFound + errorHandler.

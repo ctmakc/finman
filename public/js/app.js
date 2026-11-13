@@ -82,6 +82,7 @@ const NAV_GROUPS = [
   {
     title: 'Tools',
     items: [
+      { page: 'invoices', label: 'Invoices', icon: 'fa-file-invoice-dollar' },
       { page: 'receipts', label: 'Receipts', icon: 'fa-receipt' },
       { page: 'rules', label: 'Rules', icon: 'fa-magic' },
       { page: 'reconcile', label: 'Reconcile', icon: 'fa-balance-scale' },
@@ -163,6 +164,7 @@ const PAGE_RENDERERS = {
   },
   reconcile: () => callGlobal('renderReconcilePage'),
   billing: () => callGlobal('renderBillingPage'),
+  invoices: () => callGlobal('renderInvoicesPage'),
   'api-tokens': () => {
     mountHtml('');
     if (!window.ApiTokensModule) throw new Error('The API tokens module is not loaded');
@@ -224,7 +226,13 @@ async function initApp() {
     loadBaseCurrencySettings()
   ]);
 
-  navigateTo(resolvePageFromPath(window.location.pathname), { replace: true });
+  // A shared invoice template link (?tpl=<code>, kept by invoices.js across
+  // sign-up / sign-in) opens the Invoices page, which offers the import.
+  let startPage = resolvePageFromPath(window.location.pathname);
+  try {
+    if (localStorage.getItem('fm_tpl')) startPage = 'invoices';
+  } catch (e) { /* storage blocked */ }
+  navigateTo(startPage, { replace: true });
 }
 
 // ---------------------------------------------------------------------------
