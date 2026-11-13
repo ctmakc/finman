@@ -11,7 +11,7 @@
 //   RESEND_API_KEY        ключ Resend (общий с emailService)
 //   LEAD_NOTIFY_TO        получатели через запятую (по умолчанию ctmakc@gmail.com)
 //   LEAD_NOTIFY_FROM      отправитель этого письма; имеет приоритет над MAIL_FROM
-//                         (по умолчанию "INNOVA Leads <leads@remolda.com>")
+//                         (по умолчанию "INNOVA Leads <leads@finman.money>")
 //   GA4_MEASUREMENT_ID + GA4_API_SECRET  дополнительно анонимное событие sign_up
 //                         в GA4 через Measurement Protocol (без данных пользователя)
 //
@@ -26,7 +26,7 @@ const emailService = require('./emailService');
 const logger = require('../lib/logger');
 
 const DEFAULT_TO = 'ctmakc@gmail.com';
-const DEFAULT_FROM = 'INNOVA Leads <leads@remolda.com>';
+const DEFAULT_FROM = 'INNOVA Leads <leads@finman.money>';
 const SITE = 'finman.money';
 
 const esc = (s) => String(s == null ? '' : s)

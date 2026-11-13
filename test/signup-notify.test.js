@@ -80,7 +80,7 @@ describe('signupNotify via /api/auth/register and /login', () => {
 
     const mail = sendSpy.mock.calls[0][0];
     expect(mail.subject).toBe(`Signup · finman.money · ${body.email}`);
-    expect(mail.from).toBe('INNOVA Leads <leads@remolda.com>');
+    expect(mail.from).toBe('INNOVA Leads <leads@finman.money>');
     expect(mail.to).toEqual(['ctmakc@gmail.com']);
     expect(mail.replyTo).toBe(body.email);
     expect(mail.text).toContain(`Username: ${body.username}`);
