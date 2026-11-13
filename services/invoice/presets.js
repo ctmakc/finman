@@ -265,8 +265,9 @@ const INNOVA_UK_EUR = {
 };
 
 // ---- OH! Catering (Anastasiia Stepanenko), as on her invoice No. 4 of 12.11.2026.
-// No business/HST number and no e-Transfer address: they are not on her invoices yet
-// (open questions to the owner). Tax line follows invoice No. 4 (TAX 13%). ----
+// She has no CRA business number and no HST registration (owner, 13.11.2026), so the tax
+// line stays "TAX 13%" as on invoice No. 4 with no number printed. Interac e-Transfer goes to
+// anastamst@gmail.com, as on ohcatering.ca/etransfer. ----
 const OH_CATERING = {
   key: 'oh-catering',
   name: 'OH! Catering',
@@ -292,7 +293,7 @@ const OH_CATERING = {
       label: 'Pay online by card:',
       currencies: ['CAD'],
     },
-    terms: '',
+    terms: 'Or pay by Interac e-Transfer to anastamst@gmail.com',
   },
 };
 
