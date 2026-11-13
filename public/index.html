@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#F1F4F9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0B101B" media="(prefers-color-scheme: dark)">
@@ -10,6 +10,36 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Finman">
   <meta name="description" content="Finman is a personal finance manager with an AI CFO: accounts, transactions, budgets, goals, debts, investments and net worth in one place.">
+
+  <!-- Native app shell (iOS / Android): mark <html> before the first paint so
+       native.css applies without a flash. The shell appends "FinmanApp/1.0" to
+       the user agent; ?native=ios|android previews the app look on a desktop
+       (?native=off ends the preview). native.js does the rest. -->
+  <script>
+    (function () {
+      var d = document.documentElement, ua = navigator.userAgent || '', p = null, dbg = false;
+      try {
+        var q = new URLSearchParams(location.search).get('native');
+        if (q === 'ios' || q === 'android') { localStorage.setItem('fm_native_debug', '1'); localStorage.setItem('fm_native_platform', q); }
+        else if (q === 'off') { localStorage.removeItem('fm_native_debug'); localStorage.removeItem('fm_native_platform'); }
+      } catch (e) {}
+      if (/FinmanApp\//.test(ua)) p = /Android/.test(ua) ? 'android' : 'ios';
+      var cap = window.Capacitor;
+      if (!p && cap && cap.isNativePlatform && cap.isNativePlatform()) p = cap.getPlatform();
+      if (!p) {
+        try {
+          if (localStorage.getItem('fm_native_debug') === '1') {
+            p = localStorage.getItem('fm_native_platform') === 'android' ? 'android' : 'ios';
+            dbg = true;
+          }
+        } catch (e) {}
+      }
+      if (p === 'ios' || p === 'android') {
+        d.classList.add('is-native', 'platform-' + p);
+        window.FM_NATIVE = { platform: p, debug: dbg };
+      }
+    })();
+  </script>
 
   <title>Finman</title>
 
@@ -25,6 +55,7 @@
   <link rel="stylesheet" href="/vendor/fa.min.css">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/fresh.css">
+  <link rel="stylesheet" href="/css/native.css">
 </head>
 <body>
   <div id="app">
@@ -78,10 +109,14 @@
   <script src="/js/reconcile.js"></script>
   <script src="/js/api-tokens.js"></script>
   <script src="/js/billing.js"></script>
+  <!-- iOS / Android app shell only; a no-op on the website -->
+  <script src="/js/native.js"></script>
 
   <!-- Service Worker registration + PWA install prompt -->
   <script>
-    if ('serviceWorker' in navigator) {
+    // The iOS app shell (WKWebView) gets no service worker; Android and the web do.
+    var fmNativeIos = !!(window.FM_NATIVE && !window.FM_NATIVE.debug && window.FM_NATIVE.platform === 'ios');
+    if ('serviceWorker' in navigator && !fmNativeIos) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
           .then(reg => console.log('SW registered:', reg.scope))
@@ -92,6 +127,7 @@
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
+      if (window.FM_NATIVE) return; // installed as an app already
       deferredPrompt = e;
       const installBtn = document.getElementById('install-btn');
       if (installBtn) installBtn.style.display = 'block';

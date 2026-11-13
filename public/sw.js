@@ -18,7 +18,7 @@
 // precache); activate удаляет все НЕ-текущие кэши, включая старый finman-v3-api
 // с ответами API.
 
-const CACHE_VERSION = 'finman-v6';
+const CACHE_VERSION = 'finman-v7';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 
 const STATIC_ASSETS = [
@@ -33,6 +33,7 @@ const STATIC_ASSETS = [
   '/css/parts/ai.css',
   '/css/parts/firstrun.css',
   '/css/fresh.css',
+  '/css/native.css',
   '/vendor/fonts/rubik-latin-wght-normal.woff2',
   '/vendor/fonts/rubik-cyrillic-wght-normal.woff2',
   '/vendor/chart.min.js',
@@ -79,6 +80,7 @@ const STATIC_ASSETS = [
   '/js/reconcile.js',
   '/js/api-tokens.js',
   '/js/billing.js',
+  '/js/native.js',
 ];
 
 // Install — precache app shell. Используем addAll по одному с защитой, чтобы

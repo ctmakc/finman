@@ -1,0 +1,141 @@
+/* public/css/native.css — Finman inside the iOS / Android app shell.
+ *
+ * Every rule is scoped to html.is-native (set in index.html <head> from the
+ * "FinmanApp" user agent, the Capacitor bridge, or ?native=ios|android for a
+ * desktop preview), so the website is untouched.
+ *
+ * The status bar draws over the WebView on both platforms. Insets come from the
+ * shell (Android: --safe-area-inset-*, injected by SystemBars) with env() as
+ * the fallback (iOS WKWebView, desktop preview = 0).
+ */
+
+html.is-native {
+  --fm-inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --fm-inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --fm-inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --fm-inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+html.is-native body {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* App chrome does not select like a web page; content and fields still do. */
+html.is-native :is(.header, .fm-nav, .fm-drawer-panel, .btn, .auth-tabs, .auth-tab, .fm-nav-link, .fm-drawer-link, .modal-header, .page-header) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.is-native :is(input, textarea, select, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ---- safe areas ----------------------------------------------------------- */
+html.is-native .header {
+  padding-top: calc(var(--fm-inset-top) + var(--space-2, 8px));
+  padding-left: var(--fm-inset-left);
+  padding-right: var(--fm-inset-right);
+}
+html.is-native .main {
+  padding-left: var(--fm-inset-left);
+  padding-right: var(--fm-inset-right);
+  padding-bottom: calc(var(--fm-inset-bottom) + 16px);
+}
+html.is-native .fm-drawer-panel {
+  padding-top: var(--fm-inset-top);
+  padding-bottom: var(--fm-inset-bottom);
+  padding-left: var(--fm-inset-left);
+}
+html.is-native .modal-backdrop {
+  padding: calc(var(--fm-inset-top) + 8px) calc(var(--fm-inset-right) + 8px) calc(var(--fm-inset-bottom) + 8px) calc(var(--fm-inset-left) + 8px);
+}
+html.is-native .modal {
+  max-height: calc(100dvh - var(--fm-inset-top) - var(--fm-inset-bottom) - 16px);
+}
+html.is-native .fm-toasts {
+  bottom: calc(var(--fm-inset-bottom) + var(--space-4, 16px));
+  right: calc(var(--fm-inset-right) + var(--space-4, 16px));
+}
+html.is-native .auth-container,
+html.is-native .loading-screen {
+  padding-top: calc(var(--fm-inset-top) + 16px);
+  padding-bottom: calc(var(--fm-inset-bottom) + 16px);
+  padding-left: calc(var(--fm-inset-left) + 16px);
+  padding-right: calc(var(--fm-inset-right) + 16px);
+  min-height: 100dvh;
+}
+/* The keyboard covers the bottom inset; drop the extra padding while it is up. */
+html.is-native.fm-keyboard-open .main { padding-bottom: 16px; }
+
+/* ---- sign-in screen ------------------------------------------------------- */
+/* The marketing panel is for the website; the app opens straight on the form. */
+html.is-native .auth-split .auth-visual { display: none; }
+html.is-native .auth-social .fm-social-stack { display: grid; gap: 10px; }
+html.is-native .auth-social .fm-social-stack > [hidden] { display: none !important; }
+html.is-native .auth-social :is(.btn-google, .btn-apple) { min-height: 50px; font-size: 1rem; }
+
+/* Sign in with Apple (HIG): black on light, white on dark, same size and
+   placement weight as the Google button. */
+.btn-apple {
+  display: flex; align-items: center; justify-content: center; gap: .55rem;
+  width: 100%; padding: .7rem 1rem; cursor: pointer;
+  border: 1px solid #000; border-radius: var(--radius-pill, 999px);
+  background: #000; color: #fff;
+  font: inherit; font-size: .95rem; font-weight: 500; letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.btn-apple svg { flex: none; width: 17px; height: 20px; margin-top: -2px; }
+.btn-apple:disabled { opacity: .6; cursor: default; }
+.btn-apple:focus-visible { outline: 2px solid var(--fm-primary); outline-offset: 2px; }
+html[data-theme="dark"] .btn-apple { background: #fff; color: #000; border-color: #fff; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .btn-apple { background: #fff; color: #000; border-color: #fff; }
+}
+
+/* ---- web-only pieces ------------------------------------------------------- */
+/* Plans are sold on the website only (App Store 3.1.1 / Play payments policy). */
+html.is-native :is([data-page="billing"], [data-settings-page="billing"], #install-btn, .fm-billing-cta) {
+  display: none !important;
+}
+
+/* ---- app lock (biometric) -------------------------------------------------- */
+.fm-lock {
+  position: fixed; inset: 0; z-index: 5000;
+  display: grid; place-items: center; text-align: center;
+  background: var(--fm-bg); color: var(--fm-ink);
+  padding: calc(var(--fm-inset-top, 0px) + 24px) 24px calc(var(--fm-inset-bottom, 0px) + 24px);
+}
+.fm-lock[hidden] { display: none; }
+.fm-lock-inner { width: 100%; max-width: 22rem; display: grid; gap: 12px; }
+.fm-lock-mark {
+  width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 20px;
+  display: grid; place-items: center; font-size: 1.6rem;
+  background: var(--fm-primary); color: var(--fm-primary-contrast);
+}
+.fm-lock h1 { font-size: 1.35rem; letter-spacing: -0.02em; }
+.fm-lock p { color: var(--fm-ink-2); margin: 0 0 8px; }
+.fm-lock .btn { min-height: 48px; width: 100%; }
+body.fm-locked > :not(.fm-lock) { visibility: hidden; }
+
+/* App lock switch in Settings */
+.fm-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.fm-switch-row p { margin: 4px 0 0; color: var(--fm-ink-2); font-size: .9rem; }
+.fm-switch { position: relative; flex: none; width: 52px; height: 32px; }
+.fm-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.fm-switch span {
+  position: absolute; inset: 0; border-radius: 999px; background: var(--fm-contour);
+  transition: background .2s ease; pointer-events: none;
+}
+.fm-switch span::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform .2s var(--fresh-ease, ease);
+}
+.fm-switch input:checked + span { background: var(--fm-primary); }
+.fm-switch input:checked + span::after { transform: translateX(20px); }
+.fm-switch input:focus-visible + span { outline: 2px solid var(--fm-primary); outline-offset: 2px; }
