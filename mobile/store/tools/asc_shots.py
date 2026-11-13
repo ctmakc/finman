@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from asc import get, post, patch, req
 
 APP = os.environ["ASC_APP"]
-DISPLAY = "APP_IPHONE_67"
+DISPLAY = os.environ.get("ASC_DISPLAY", "APP_IPHONE_67")  # APP_IPHONE_65 for 1284x2778
 src, locales = sys.argv[1], sys.argv[2:]
 files = sorted(f for f in os.listdir(src) if f.endswith(".png"))[:10]
 ver = get(f"/v1/apps/{APP}/appStoreVersions?filter[platform]=IOS")["data"][0]["id"]
