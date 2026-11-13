@@ -42,8 +42,13 @@ async function dueUsers(kind, fromH, toH) {
 }
 
 async function activitySummary(userId) {
-  const tx = await get('SELECT COUNT(*) AS n FROM transactions WHERE user_id = ?', [userId]).catch(() => ({ n: 0 }));
-  const accounts = await get('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ?', [userId]).catch(() => ({ n: 0 }));
+  // Demo data (accounts.is_demo, "Explore with demo data") is not the user's
+  // own money: it must not count as activation.
+  const tx = await get(
+    `SELECT COUNT(*) AS n FROM transactions t
+      WHERE t.user_id = ? AND NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = t.account_id AND a.is_demo = 1)`, [userId],
+  ).catch(() => ({ n: 0 }));
+  const accounts = await get('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ? AND is_demo = 0', [userId]).catch(() => ({ n: 0 }));
   const events = await query(
     `SELECT event, COUNT(*) AS n, MAX(created_at) AS last FROM analytics_events
       WHERE user_id = ? GROUP BY event ORDER BY n DESC`, [userId],

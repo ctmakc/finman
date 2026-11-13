@@ -21,6 +21,8 @@ const RULES = [
   [/^\/api\/ai\//, 'POST', 'ai_used'],
   [/^\/api\/onboarding\/quickstart$/, 'POST', 'onboarding_quickstart'],
   [/^\/api\/onboarding\/complete-step$/, 'POST', 'onboarding_step'],
+  [/^\/api\/onboarding\/demo$/, 'POST', 'demo_loaded'],
+  [/^\/api\/onboarding\/demo$/, 'DELETE', 'demo_removed'],
   [/^\/api\/billing\/checkout$/, 'POST', 'checkout_started'],
   [/^\/api\/receipts/, 'POST', 'receipt_scanned'],
 ];

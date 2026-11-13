@@ -201,3 +201,21 @@ describe('email-first sign-up and verification', () => {
     delete process.env.LEAD_NOTIFY_FROM;
   });
 });
+
+describe('demo data does not count as activation', () => {
+  let ctx;
+  beforeAll(async () => { ctx = await makeApp(); });
+  afterAll(async () => { await ctx.close(); });
+
+  test('activitySummary ignores demo accounts and rows; demo calls are journaled', async () => {
+    const { activitySummary } = require('../services/lifecycle');
+    const { eventFor } = require('../middleware/activity');
+    const r = await ctx.request.post('/api/onboarding/demo').set(AUTH(ctx.token)).send({});
+    expect(r.body.data.transactions).toBeGreaterThan(80);
+    const s = await activitySummary(ctx.userId);
+    expect(s.transactions).toBe(0);
+    expect(s.accounts).toBe(0);
+    expect(eventFor('POST', '/api/onboarding/demo', true)).toBe('demo_loaded');
+    expect(eventFor('DELETE', '/api/onboarding/demo', true)).toBe('demo_removed');
+  });
+});
