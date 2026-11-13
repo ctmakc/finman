@@ -18,6 +18,8 @@ jobs:
 
     env:
       NODE_ENV: test
+      # The local-date tests (fe-review) check a day boundary west of Greenwich, as on prod users' devices.
+      TZ: America/Toronto
 
     steps:
       - name: Checkout
