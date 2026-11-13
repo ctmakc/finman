@@ -127,6 +127,9 @@ const authLimiter = rateLimit({
 app.use(cors(config.corsOptions));
 // Stripe webhook требует СЫРОЕ тело для проверки подписи — монтируем raw ДО json-парсера.
 app.use('/api/billing/webhook', express.raw({ type: '*/*' }));
+// Relay to the self-hosted OpenPanel: raw body, so ДО json-парсера.
+const trackRoutes = require('./routes/track');
+app.use('/op', trackRoutes.opRelay);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
@@ -182,6 +185,10 @@ if (require.main === module) {
 
 // Статические файлы
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Журнал действий пользователя (после успешных изменений; см. middleware/activity.js)
+app.use('/api', require('./middleware/activity').activity);
+app.use('/api/t', trackRoutes.router);
 
 // Маршруты API
 app.use('/api/auth', authRoutes);
@@ -290,6 +297,16 @@ if (require.main === module) {
       }
     } catch (e) {
       logger.warn({ err: e }, 'Sync scheduler not started');
+    }
+
+    // Сводка по новым юзерам (1 и 7 день) + письма-реактивация (LIFECYCLE_EMAILS=1).
+    if (process.env.LIFECYCLE_DISABLED !== '1') {
+      try {
+        require('./services/lifecycle').start();
+        logger.info('Lifecycle scheduler started');
+      } catch (e) {
+        logger.warn({ err: e }, 'Lifecycle scheduler not started');
+      }
     }
   });
 

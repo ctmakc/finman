@@ -4,8 +4,9 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const config = require('../config/config');
 const { googleEnabled } = require('../services/authService');
-const { notifySignup } = require('../services/signupNotify');
 const emailVerify = require('../services/emailVerify');
+const { handleSignup } = require('../services/signupFlow');
+const tracker = require('../services/tracker');
 
 const router = express.Router();
 
@@ -31,6 +32,11 @@ router.get('/google', (req, res, next) => {
   if (!googleEnabled()) {
     return res.status(503).json({ error: true, message: 'Google sign-in is not configured' });
   }
+  // Откуда пришёл человек (utm, referrer, лендинг) — до возврата из Google
+  // держим в сессии; googleVerify запишет это новому аккаунту.
+  if (req.query.att && req.session && String(req.query.att).length <= 4000) {
+    req.session.signupAtt = String(req.query.att);
+  }
   passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
 });
 
@@ -49,6 +55,7 @@ router.get('/google/callback', (req, res, next) => {
     try {
       // Тот же payload, что и у входа по паролю.
       const token = signToken(user);
+      tracker.track('login', { userId: user.id, props: { method: 'google' }, req, test: tracker.isTestEmail(user.email) });
       // Токен уезжает во фрагменте URL — так он не попадает в серверные логи.
       return res.redirect(config.google.successRedirect + '#token=' + encodeURIComponent(token));
     } catch (e) {
@@ -65,6 +72,13 @@ router.post('/register', async (req, res) => {
     // Username is optional since 22.11: the form asks for email + password only,
     // and the username is derived from the email.
     let username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+
+    // Honeypot: скрытое поле «website» человек не видит и не заполняет.
+    // Бот получает обычный «успех» без аккаунта, чтобы не подбирал обход.
+    if (req.body.website) {
+      console.warn('Registration honeypot hit from', req.ip);
+      return res.json({ ok: true, pending: true });
+    }
 
     // Проверка, что обязательные поля заполнены
     if (!email || !password) {
@@ -130,9 +144,10 @@ router.post('/register', async (req, res) => {
     const token = signToken(newUser);
 
     // Уведомление оператора о регистрации (письмо владельцу; ответ не ждёт).
-    notifySignup(
+    // Источник регистрации + письмо с ним (ответ не ждёт).
+    await handleSignup(
       { id: newUser.id, username: newUser.username, email: newUser.email, fullName: newUser.fullName },
-      'password'
+      'password', req.body.attribution, req
     );
     // Email confirmation (non-blocking: the app works before the link is opened).
     emailVerify.sendVerificationLater(newUser.id, req);
@@ -172,7 +187,8 @@ router.post('/login', (req, res, next) => {
     
     // Создание токена JWT
     const token = signToken(user);
-    
+    tracker.track('login', { userId: user.id, props: { method: 'password' }, req, test: tracker.isTestEmail(user.email) });
+
     // Отправка токена и данных пользователя
     return res.json({
       token,
@@ -190,7 +206,8 @@ router.post('/login', (req, res, next) => {
 router.get('/me', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    
+    if (user) tracker.appOpen(user, req);
+
     if (!user) {
       return res.status(404).json({ 
         error: true, 

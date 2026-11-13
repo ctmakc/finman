@@ -16,7 +16,9 @@
 // opening the confirmation link (?email_verified=1|0).
 //
 // Analytics: every step emits `fm:onboarding` (CustomEvent on window, detail
-// { event, ...props }) and, when PostHog is on the page, posthog.capture().
+// { event, ...props }) and goes to the self-hosted OpenPanel through
+// FMTrack.beacon('onboarding_<event>') (public/js/attribution.js). The server
+// keeps its own journal of the API calls (middleware/activity.js).
 // Events: firstrun_shown, import_started, import_failed, import_done,
 // demo_loaded, demo_removed, scratch_started, insight_shown, ai_question,
 // verify_resent, email_verified.
@@ -94,8 +96,8 @@
     var detail = Object.assign({ event: event }, props || {});
     try { window.dispatchEvent(new CustomEvent('fm:onboarding', { detail: detail })); } catch (_) {}
     try {
-      if (window.posthog && typeof window.posthog.capture === 'function') {
-        window.posthog.capture('onboarding_' + event, props || {});
+      if (window.FMTrack && typeof window.FMTrack.beacon === 'function') {
+        window.FMTrack.beacon('onboarding_' + event, props || {});
       }
     } catch (_) {}
   }

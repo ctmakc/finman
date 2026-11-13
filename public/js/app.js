@@ -621,6 +621,7 @@ async function fetchCurrentUser() {
     const data = await response.json();
     appState.isAuthenticated = true;
     appState.user = data;
+    if (window.FMTrack) window.FMTrack.identify(data);
 
     return data;
   } catch (error) {
@@ -835,6 +836,12 @@ function renderLoginPage() {
               <input type="text" id="register-fullname" class="form-control" autocomplete="name">
             </div>
 
+            <!-- Honeypot: hidden from people, bots fill it in. -->
+            <div class="fm-hp" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden">
+              <label for="register-website">Website</label>
+              <input type="text" id="register-website" name="website" tabindex="-1" autocomplete="off">
+            </div>
+
             <div id="register-error" class="auth-error" role="alert"></div>
 
             <button type="submit" class="btn btn-primary w-100">Create free account</button>
@@ -871,6 +878,7 @@ function renderLoginPage() {
       } else {
         loginForm.classList.add('hidden');
         registerForm.classList.remove('hidden');
+        if (window.FMTrack) window.FMTrack.beacon('register_view');
       }
     });
   });
@@ -892,6 +900,19 @@ function renderLoginPage() {
 
   loginForm.addEventListener('submit', withBusyForm(handleLogin));
   registerForm.addEventListener('submit', withBusyForm(handleRegister));
+
+  // Source travels with the Google sign-up through the OAuth round trip.
+  const googleBtn = document.querySelector('.btn-google');
+  if (googleBtn && window.FMTrack) {
+    googleBtn.addEventListener('click', () => {
+      googleBtn.href = '/api/auth/google?att=' + window.FMTrack.attributionParam();
+      window.FMTrack.beacon('google_click');
+    });
+  }
+  if (window.FMTrack) {
+    registerForm.addEventListener('input', () => window.FMTrack.formStart(), { once: true });
+    window.FMTrack.beacon('login_view');
+  }
 
   revealGoogleSignIn();
 }
@@ -1001,7 +1022,12 @@ async function handleRegister(e) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(fullName ? { email, password, fullName } : { email, password })
+      body: JSON.stringify({
+        email, password,
+        ...(fullName ? { fullName } : {}),
+        website: (document.getElementById('register-website') || {}).value || '',
+        attribution: window.FMTrack ? window.FMTrack.attribution() : null,
+      })
     });
 
     let data = null;
@@ -1009,8 +1035,10 @@ async function handleRegister(e) {
 
     if (!response.ok) {
       errorElement.textContent = (data && data.message) || `Registration failed (HTTP ${response.status})`;
+      if (window.FMTrack) window.FMTrack.beacon('register_error', { status: response.status });
       return;
     }
+    if (!data || !data.token) return;
 
     localStorage.setItem('token', data.token);
     try { localStorage.setItem('fm_returning', '1'); } catch (_) { /* private mode */ }
@@ -1729,6 +1757,7 @@ function clearApiCaches() {
 
 function logout() {
   localStorage.removeItem('token');
+  if (window.FMTrack) window.FMTrack.reset();
 
   appState.isAuthenticated = false;
   appState.user = null;

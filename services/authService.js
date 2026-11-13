@@ -52,7 +52,8 @@ function googleEnabled() {
 //   2) совпал email зарегистрированного по паролю -> привязываем Google к нему
 //      (без дубликата аккаунта);
 //   3) иначе создаём нового пользователя и один раз уведомляем оператора.
-async function googleVerify(accessToken, refreshToken, profile, done) {
+// req (optional 5th arg) carries the attribution saved by GET /api/auth/google.
+async function googleVerify(accessToken, refreshToken, profile, done, req) {
   try {
     const googleId = profile && profile.id;
     if (!googleId) return done(null, false, { message: 'Google profile has no id' });
@@ -86,9 +87,12 @@ async function googleVerify(accessToken, refreshToken, profile, done) {
     const created = await User.createFromGoogle({ googleId, email, fullName, avatarUrl });
     const fresh = await User.findById(created.id);
     // Уведомление оператора о новом аккаунте — никогда не блокирует вход.
-    require('./signupNotify').notifySignup(
+    // Источник берём из сессии (его положил GET /api/auth/google?att=...).
+    const att = req && req.session ? req.session.signupAtt : null;
+    if (req && req.session) delete req.session.signupAtt;
+    await require('./signupFlow').handleSignup(
       { id: created.id, username: created.username, email, fullName },
-      'google'
+      'google', att, req
     );
     return done(null, fresh || created);
   } catch (error) {
@@ -112,7 +116,9 @@ function registerGoogleStrategy() {
     // OAuth state in the session: a callback carrying someone else's code
     // (login CSRF) is rejected.
     state: true,
-  }, googleVerify));
+    passReqToCallback: true,
+  }, (req, accessToken, refreshToken, profile, done) =>
+    googleVerify(accessToken, refreshToken, profile, done, req)));
   console.log('Passport: Google OAuth strategy enabled');
   return true;
 }

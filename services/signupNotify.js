@@ -45,7 +45,45 @@ function buildSubject(user) {
   return `Signup · ${SITE} · ${u.email || u.username || 'unknown'}`;
 }
 
-function buildMessage(user, method) {
+function hostPath(url) {
+  if (!url) return null;
+  try { const x = new URL(url); return (x.hostname + x.pathname + x.search).slice(0, 200); } catch (_) { return String(url).slice(0, 200); }
+}
+
+function ago(iso) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return null;
+  const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (min < 60) return `${min} min before signup`;
+  if (min < 48 * 60) return `${Math.round(min / 60)} h before signup`;
+  return `${Math.round(min / 1440)} days before signup`;
+}
+
+// Where the person came from: rows for the "Source" section of the email.
+function sourceRows(a) {
+  if (!a) return [];
+  const utm = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']
+    .filter((k) => a[k]).map((k) => `${k.slice(4)}=${a[k]}`).join(' · ');
+  const clickIds = ['gclid', 'fbclid', 'msclkid'].filter((k) => a[k]).join(', ');
+  const place = [a.city, a.region, a.countryName || a.country].filter(Boolean).join(', ');
+  return [
+    ['Source', a.source || 'direct'],
+    ['UTM', utm || null],
+    ['Ad click id', clickIds || null],
+    ['Referrer', hostPath(a.referrer)],
+    ['Landing (app)', hostPath(a.landing)],
+    ['Site page (finman.money)', hostPath(a.site_landing)],
+    ['Site referrer', hostPath(a.site_referrer)],
+    ['Country', place || null],
+    ['Device', a.device],
+    ['Browser tz / lang', [a.tz, a.lang].filter(Boolean).join(' / ') || null],
+    ['IP', a.ip],
+    ['First visit', ago(a.first_seen_at)],
+    ['Form filled in', a.form_ms != null ? `${Math.round(a.form_ms / 1000)} s` : null],
+  ].filter(([k, v]) => k === 'Source' || (v != null && v !== ''));
+}
+
+function buildMessage(user, method, acquisition) {
   const u = user || {};
   const when = new Date().toISOString();
   const rows = [
@@ -58,11 +96,15 @@ function buildMessage(user, method) {
     ['Site', SITE],
   ];
   const dash = (v) => (v == null || v === '' ? '-' : v);
+  const src = sourceRows(acquisition);
+  const tr = ([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${esc(k)}</td><td style="padding:4px 0"><b>${esc(dash(v))}</b></td></tr>`;
   const text = rows.map(([k, v]) => `${k}: ${dash(v)}`).join('\n')
+    + (src.length ? '\n\nWhere from\n' + src.map(([k, v]) => `${k}: ${dash(v)}`).join('\n') : '')
     + `\n\nNew signup in the Finman app (app.${SITE}).`;
   const html = `<p style="font-family:sans-serif">New signup in the Finman app (app.${SITE}).</p>`
     + '<table style="font-family:sans-serif;border-collapse:collapse">'
-    + rows.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${esc(k)}</td><td style="padding:4px 0"><b>${esc(dash(v))}</b></td></tr>`).join('')
+    + rows.map(tr).join('')
+    + (src.length ? '<tr><td colspan="2" style="padding:14px 0 4px;font-weight:bold">Where from</td></tr>' + src.map(tr).join('') : '')
     + '</table>';
   return { subject: buildSubject(u), text, html };
 }
@@ -70,7 +112,7 @@ function buildMessage(user, method) {
 // Письмо через emailService (Resend). Собственный ретрай: 3 попытки с паузой,
 // 4xx (кроме 429) не повторяем — это ошибка данных, а не сети.
 async function sendMail(user, method, opts = {}) {
-  const msg = buildMessage(user, method);
+  const msg = buildMessage(user, method, opts.acquisition);
   if (!emailService.isConfigured()) {
     logger.info({ subject: msg.subject }, '[signup-notify] RESEND_API_KEY not set, skipped');
     return { sent: false, skipped: true, reason: 'EMAIL_NOT_CONFIGURED' };
@@ -176,4 +218,4 @@ function flush() {
   return Promise.all(Array.from(inflight));
 }
 
-module.exports = { notifySignup, isTestSignup, flush, buildSubject, buildMessage, sendGa4SignUp, sendMail };
+module.exports = { notifySignup, isTestSignup, flush, buildSubject, buildMessage, sourceRows, sendGa4SignUp, sendMail };
