@@ -67,6 +67,32 @@ class User {
     }
   }
 
+  static async findByAppleId(appleId) {
+    return get('SELECT * FROM users WHERE apple_id = ?', [appleId]);
+  }
+
+  // Which sign-in methods the account has. Accounts created through Google or
+  // Apple carry an unusable random password hash, so they have no password.
+  static async authMethods(id) {
+    const row = await get('SELECT google_id, apple_id FROM users WHERE id = ?', [id]);
+    const google = Boolean(row && row.google_id);
+    const apple = Boolean(row && row.apple_id);
+    return { google, apple, password: Boolean(row) && !google && !apple };
+  }
+
+  // Account from Sign in with Apple. Apple has confirmed the address (it may be
+  // a private relay address), so it is marked verified like a Google one.
+  static async createFromApple({ appleId, email, fullName }) {
+    const unusable = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), bcryptRounds());
+    const username = await User.usernameFromEmail(email);
+    const result = await run(
+      `INSERT INTO users (username, email, password, full_name, apple_id) VALUES (?, ?, ?, ?, ?)`,
+      [username, email, unusable, fullName || '', appleId]
+    );
+    await run('UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = ?', [result.id]);
+    return { id: result.id, username, email, fullName: fullName || '', appleId };
+  }
+
   // Free username derived from an email ("anna.k@x.com" -> "anna_k", then
   // "anna_k_3f2a" on a clash). Matches the /register rule ^[a-zA-Z0-9_]{3,30}$.
   static async usernameFromEmail(email) {

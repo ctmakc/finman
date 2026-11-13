@@ -1184,7 +1184,25 @@
     'empty.banks.body': "Monobank синхронизируется через персональный токен только для чтения. Для любого другого банка импортируйте выписку CSV, OFX или QFX из интернет-банка.",
     'empty.banks.connect': "Подключить Monobank",
     'empty.reconcile.title': "Нет счетов для сверки",
-    'empty.reconcile.body': "Сверка сравнивает баланс счёта с банковской выпиской и показывает расходящиеся транзакции."
+    'empty.reconcile.body': "Сверка сравнивает баланс счёта с банковской выпиской и показывает расходящиеся транзакции.",
+    // ---- native-app: account deletion ----
+    'account.danger.title': 'Опасная зона',
+    'account.danger.text': 'Удалить аккаунт Finman и все его данные: счета, транзакции, бюджеты, цели, файлы и чаты с AI. Отменить это нельзя.',
+    'account.danger.button': 'Удалить аккаунт',
+    'account.delete.title': 'Удалить аккаунт?',
+    'account.delete.body': 'Всё в вашем аккаунте Finman будет стёрто навсегда. Семьи, которыми вы владеете, перейдут другому участнику. Другие участники общих семей и групп разделения расходов сохранят свои записи.',
+    'account.delete.export': 'Нужна копия? Скачайте её в разделе «Резервные копии и экспорт».',
+    'account.delete.typeLabel': 'Введите DELETE для подтверждения',
+    'account.delete.passwordLabel': 'Ваш пароль',
+    'account.delete.confirm': 'Удалить аккаунт навсегда',
+    'account.delete.cancel': 'Отмена',
+    'account.delete.typeError': 'Введите DELETE заглавными буквами.',
+    'account.delete.passwordError': 'Введите пароль.',
+    'account.delete.wrongPassword': 'Неверный пароль.',
+    'account.delete.failed': 'Не удалось удалить аккаунт. Попробуйте ещё раз.',
+    'account.deleted.title': 'Аккаунт удалён',
+    'account.deleted.text': 'Ваш аккаунт Finman и его данные стёрты. Спасибо, что попробовали Finman.',
+    'account.deleted.back': 'Вернуться ко входу'
     // ---- /fe-i18n-c ----
   };
 

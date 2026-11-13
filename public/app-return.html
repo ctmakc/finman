@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex">
+  <title>Back to Finman</title>
+  <!-- Last page of the Google sign-in started from the Finman iOS/Android app.
+       The session token is parked on the server under the app's one-time nonce;
+       this page only sends the browser back to the app, which claims it. -->
+  <style>
+    @font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-latin-wght-normal.woff2) format('woff2'); }
+    :root {
+      color-scheme: light dark;
+      --bg: #F1F4F9; --plate: #FEFEFF; --ink: #121A2E; --ink-2: #4A5570;
+      --line: #DCE3EE; --accent: #2B50F0; --on-accent: #FFFFFF; --bad: #C2281D;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0B101B; --plate: #151C2B; --ink: #EEF2FA; --ink-2: #AEB8CD;
+        --line: #283146; --accent: #8098FF; --on-accent: #0B101B; --bad: #FF8A80;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Rubik', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--bg); color: var(--ink);
+      display: grid; place-items: center;
+      padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+      -webkit-text-size-adjust: 100%;
+    }
+    main {
+      width: 100%; max-width: 400px; background: var(--plate);
+      border: 1px solid var(--line); border-radius: 24px;
+      padding: 36px 28px 28px; text-align: center;
+    }
+    .mark {
+      width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 18px;
+      display: grid; place-items: center; background: var(--accent); color: var(--on-accent);
+    }
+    .mark.bad { background: transparent; color: var(--bad); border: 2px solid var(--bad); }
+    h1 { font-size: 1.45rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+    p { color: var(--ink-2); line-height: 1.5; margin-top: 10px; font-size: 0.98rem; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 28px; min-height: 52px; border-radius: 999px; padding: 0 24px;
+      background: var(--accent); color: var(--on-accent); text-decoration: none;
+      font-weight: 600; font-size: 1.02rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.98); }
+    .hint { font-size: 0.86rem; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" id="mark" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    </div>
+    <h1 id="title">You're signed in</h1>
+    <p id="text">Return to the Finman app to continue.</p>
+    <a class="btn" id="back" href="money.finman.app://auth-done">Return to Finman</a>
+    <p class="hint" id="hint">If the app does not open, close this window. Finman picks up the sign-in when you are back.</p>
+  </main>
+  <script>
+    (function () {
+      var MESSAGES = {
+        email_exists: ['This email already has a Finman account', 'Sign in with your email and password in the app.'],
+        google_denied: ['Google sign-in was cancelled', 'Go back to the app and try again, or sign in with your password.'],
+        google_failed: ['Google sign-in did not finish', 'Go back to the app and try again, or sign in with your password.']
+      };
+      var raw = new URLSearchParams(window.location.search).get('error');
+      var reason = raw && /^[a-z_]{1,40}$/.test(raw) ? raw : null;
+      var target = 'money.finman.app://auth-done';
+      if (reason) {
+        var msg = MESSAGES[reason] || MESSAGES.google_failed;
+        document.getElementById('title').textContent = msg[0];
+        document.getElementById('text').textContent = msg[1];
+        document.getElementById('mark').className = 'mark bad';
+        document.getElementById('mark').innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 7v6"/><path d="M12 17.2v.1"/></svg>';
+        document.getElementById('back').textContent = 'Back to Finman';
+        target += '?error=' + encodeURIComponent(reason);
+      }
+      document.getElementById('back').setAttribute('href', target);
+      // Some browsers open the app straight away; others need the button tap.
+      setTimeout(function () { try { window.location.href = target; } catch (_) {} }, 150);
+    })();
+  </script>
+</body>
+</html>

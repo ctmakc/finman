@@ -1184,7 +1184,25 @@
     'empty.banks.body': "Monobank синхронізується через персональний токен лише для читання. Для будь-якого іншого банку імпортуйте виписку CSV, OFX чи QFX з інтернет-банкінгу.",
     'empty.banks.connect': "Підключити Monobank",
     'empty.reconcile.title': "Немає рахунків для звірки",
-    'empty.reconcile.body': "Звірка порівнює баланс рахунку з банківською випискою і показує транзакції, що розходяться."
+    'empty.reconcile.body': "Звірка порівнює баланс рахунку з банківською випискою і показує транзакції, що розходяться.",
+    // ---- native-app: account deletion ----
+    'account.danger.title': 'Небезпечна зона',
+    'account.danger.text': 'Видалити акаунт Finman і всі його дані: рахунки, транзакції, бюджети, цілі, файли та чати з AI. Скасувати це неможливо.',
+    'account.danger.button': 'Видалити акаунт',
+    'account.delete.title': 'Видалити акаунт?',
+    'account.delete.body': 'Усе у вашому акаунті Finman буде стерто назавжди. Сім’ї, якими ви володієте, перейдуть іншому учаснику. Інші учасники спільних сімей і груп розподілу витрат збережуть власні записи.',
+    'account.delete.export': 'Потрібна копія? Завантажте її в розділі «Резервні копії та експорт».',
+    'account.delete.typeLabel': 'Введіть DELETE для підтвердження',
+    'account.delete.passwordLabel': 'Ваш пароль',
+    'account.delete.confirm': 'Видалити акаунт назавжди',
+    'account.delete.cancel': 'Скасувати',
+    'account.delete.typeError': 'Введіть DELETE великими літерами.',
+    'account.delete.passwordError': 'Введіть пароль.',
+    'account.delete.wrongPassword': 'Пароль неправильний.',
+    'account.delete.failed': 'Не вдалося видалити акаунт. Спробуйте ще раз.',
+    'account.deleted.title': 'Акаунт видалено',
+    'account.deleted.text': 'Ваш акаунт Finman і його дані стерто. Дякуємо, що спробували Finman.',
+    'account.deleted.back': 'Повернутися до входу'
     // ---- /fe-i18n-c ----
   };
 

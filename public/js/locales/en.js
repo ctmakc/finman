@@ -1186,7 +1186,25 @@
     'empty.banks.body': "Monobank syncs through a read-only personal token. For any other bank, import the CSV, OFX or QFX statement from online banking.",
     'empty.banks.connect': "Connect Monobank",
     'empty.reconcile.title': "No accounts to reconcile",
-    'empty.reconcile.body': "Reconcile checks an account balance against your bank statement and lists the transactions that differ."
+    'empty.reconcile.body': "Reconcile checks an account balance against your bank statement and lists the transactions that differ.",
+    // ---- native-app: account deletion ----
+    'account.danger.title': 'Danger zone',
+    'account.danger.text': 'Delete your Finman account and all of its data: accounts, transactions, budgets, goals, files and AI chats. This cannot be undone.',
+    'account.danger.button': 'Delete account',
+    'account.delete.title': 'Delete your account?',
+    'account.delete.body': 'Everything in your Finman account is erased for good. Families you own pass to another member. Other members of shared families and split groups keep their own records.',
+    'account.delete.export': 'Want a copy first? Download a backup in Backups and data export.',
+    'account.delete.typeLabel': 'Type DELETE to confirm',
+    'account.delete.passwordLabel': 'Your password',
+    'account.delete.confirm': 'Delete account for good',
+    'account.delete.cancel': 'Cancel',
+    'account.delete.typeError': 'Type DELETE in capital letters to confirm.',
+    'account.delete.passwordError': 'Enter your password.',
+    'account.delete.wrongPassword': 'That password is incorrect.',
+    'account.delete.failed': 'Could not delete the account. Try again.',
+    'account.deleted.title': 'Your account is deleted',
+    'account.deleted.text': 'Your Finman account and its data are gone. Thank you for trying Finman.',
+    'account.deleted.back': 'Back to sign in'
     // ---- /fe-i18n-c ----
   };
 

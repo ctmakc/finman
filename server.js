@@ -123,6 +123,17 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Native app sign-in (claim of the Google hand-off, Sign in with Apple) and
+// account deletion (password check): own budget, looser than login because the
+// app may claim a few times per sign-in (link, browser closed, app resumed).
+const appAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: true, message: 'Too many attempts, try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Настройка middleware
 app.use(cors(config.corsOptions));
 // Stripe webhook требует СЫРОЕ тело для проверки подписи — монтируем raw ДО json-парсера.
@@ -157,6 +168,9 @@ app.use(session({
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/app/claim', appAuthLimiter);
+app.use('/api/auth/apple', appAuthLimiter);
+app.use('/api/auth/me', (req, res, next) => (req.method === 'DELETE' ? appAuthLimiter(req, res, next) : next()));
 app.use('/api/ai', aiLimiter);
 
 // Инициализация Passport.js
