@@ -14,6 +14,8 @@ const ENV = ['LEAD_NOTIFY_TO', 'LEAD_NOTIFY_FROM', 'RESEND_API_KEY', 'MAIL_FROM'
   'OPENPANEL_API_URL', 'OPENPANEL_SERVER_CLIENT_ID', 'OPENPANEL_SERVER_CLIENT_SECRET', 'OPENPANEL_WEB_CLIENT_ID',
   'LIFECYCLE_EMAILS', 'LIFECYCLE_FROM'];
 const clearEnv = () => { for (const k of ENV) delete process.env[k]; };
+// Operator letters only: password sign-ups also get the email confirmation letter.
+const opCalls = (spy) => spy.mock.calls.filter((c) => !/^Confirm your email/.test(c[0].subject || ''));
 
 describe('acquisition + activity', () => {
   let ctx, emailService, sendSpy, db, signupFlow, tracker, fetchSpy;
@@ -30,7 +32,7 @@ describe('acquisition + activity', () => {
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 200, text: async () => '{}' });
   });
   afterAll(async () => { sendSpy.mockRestore(); fetchSpy.mockRestore(); clearEnv(); await ctx.close(); });
-  afterEach(() => { sendSpy.mockClear(); fetchSpy.mockClear(); });
+  afterEach(async () => { await require('../services/emailVerify').flush(); sendSpy.mockClear(); fetchSpy.mockClear(); });
 
   test('register with attribution stores the source and puts it in the email', async () => {
     const r = await ctx.request.post('/api/auth/register').set('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile Safari/604.1').send({
@@ -57,8 +59,8 @@ describe('acquisition + activity', () => {
     const ev = await db.get("SELECT * FROM analytics_events WHERE user_id = ? AND event = 'sign_up'", [r.body.user.id]);
     expect(ev).toBeTruthy();
 
-    expect(sendSpy).toHaveBeenCalledTimes(1);
-    const mail = sendSpy.mock.calls[0][0];
+    expect(opCalls(sendSpy)).toHaveLength(1);
+    const mail = opCalls(sendSpy)[0][0];
     expect(mail.text).toMatch(/Where from/);
     expect(mail.text).toMatch(/Source: utm: test \/ cpc \/ fall/);
     expect(mail.text).toMatch(/Form filled in: 42 s/);
@@ -72,7 +74,7 @@ describe('acquisition + activity', () => {
     expect(r.status).toBe(200);
     const row = await db.get('SELECT * FROM user_acquisition WHERE user_id = ?', [r.body.user.id]);
     expect(row.source).toBe('direct');
-    expect(sendSpy.mock.calls[0][0].text).toMatch(/Source: direct/);
+    expect(opCalls(sendSpy)[0][0].text).toMatch(/Source: direct/);
   });
 
   test('honeypot filled -> no account and no email', async () => {
