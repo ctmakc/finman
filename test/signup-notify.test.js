@@ -41,6 +41,10 @@ function fakeHttps(status = 204) {
   return { calls, spy };
 }
 
+// Owner notifications only (the register handler also sends the
+// email-confirmation letter through the same sendEmail).
+const notifyCalls = (spy) => spy.mock.calls.filter((c) => /^Signup/.test(c[0].subject));
+
 let n = 0;
 function regBody(over = {}) {
   n += 1;
@@ -64,7 +68,9 @@ describe('signupNotify via /api/auth/register and /login', () => {
     sendSpy = jest.spyOn(emailService, 'sendEmail').mockResolvedValue({ sent: true, id: 'mail-1' });
   });
   afterAll(async () => { sendSpy.mockRestore(); clearNotifyEnv(); await ctx.close(); });
-  afterEach(() => sendSpy.mockClear());
+  // The register handler also sends the email-confirmation letter; let it land
+  // before the next test counts notification calls.
+  afterEach(async () => { await require('../services/emailVerify').flush(); sendSpy.mockClear(); });
 
   test('register -> 200 immediately and exactly one notification with the inbox-safe subject', async () => {
     // Почта «висит» — ответ клиенту всё равно приходит сразу.
@@ -74,11 +80,11 @@ describe('signupNotify via /api/auth/register and /login', () => {
     const r = await ctx.request.post('/api/auth/register').send(body);
     expect(r.status).toBe(200);
     expect(r.body.token).toBeTruthy();
-    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(notifyCalls(sendSpy)).toHaveLength(1);
     release({ sent: true, id: 'late' });
     await signupNotify.flush();
 
-    const mail = sendSpy.mock.calls[0][0];
+    const mail = notifyCalls(sendSpy)[0][0];
     expect(mail.subject).toBe(`Signup · finman.money · ${body.email}`);
     expect(mail.from).toBe('INNOVA Leads <leads@remolda.com>');
     expect(mail.to).toEqual(['ctmakc@gmail.com']);
@@ -109,8 +115,8 @@ describe('signupNotify via /api/auth/register and /login', () => {
     const r = await ctx.request.post('/api/auth/register').send(body);
     expect(r.status).toBe(200);
     await signupNotify.flush();
-    expect(sendSpy).toHaveBeenCalledTimes(1);
-    const mail = sendSpy.mock.calls[0][0];
+    expect(notifyCalls(sendSpy)).toHaveLength(1);
+    const mail = notifyCalls(sendSpy)[0][0];
     expect(mail.html).not.toContain('<img');
     expect(mail.html).toContain('&lt;img');
   });

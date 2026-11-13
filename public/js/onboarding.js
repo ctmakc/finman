@@ -96,10 +96,9 @@
       this.fetchStatus()
         .then(function (status) {
           self.status = status;
-          if (status && status.showWizard) {
-            self.activeIndex = self.firstIncompleteIndex();
-            self.render();
-          }
+          // The checklist no longer opens by itself: a new account gets the
+          // first-run screen (firstrun.js: import / demo / manual) instead.
+          // It still opens on demand (openOnboardingWizard / Settings).
         })
         .catch(function () {
           /* offline / ошибка — тихо не показываем оверлей */

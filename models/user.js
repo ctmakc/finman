@@ -33,7 +33,7 @@ class User {
       const user = await get(
         `SELECT id, username, email, full_name, created_at, updated_at,
                 subscription_tier, stripe_customer_id, stripe_subscription_id, timezone,
-                google_id, avatar_url, token_version
+                google_id, avatar_url, token_version, email_verified_at
          FROM users WHERE id = ?`,
         [id]
       );
@@ -67,6 +67,21 @@ class User {
     }
   }
 
+  // Free username derived from an email ("anna.k@x.com" -> "anna_k", then
+  // "anna_k_3f2a" on a clash). Matches the /register rule ^[a-zA-Z0-9_]{3,30}$.
+  static async usernameFromEmail(email) {
+    let base = String(email || '').split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    if (base.length < 3) base = (base + '_user').replace(/^_/, '');
+    base = base.slice(0, 24);
+    let username = base;
+    for (let i = 0; i < 50; i++) {
+      const clash = await get('SELECT id FROM users WHERE username = ? COLLATE NOCASE', [username]);
+      if (!clash) return username;
+      username = base + '_' + crypto.randomBytes(2).toString('hex');
+    }
+    return base + '_' + crypto.randomBytes(4).toString('hex');
+  }
+
   // Создание пользователя из Google-профиля.
   // Пароль заполняется недостижимым случайным хешем: колонка NOT NULL,
   // но войти по паролю в такой аккаунт нельзя — сравнение никогда не совпадёт.
@@ -86,6 +101,8 @@ class User {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [username, email, unusable, fullName || '', googleId, avatarUrl || null]
     );
+    // Google has confirmed the address (migration 022; older DBs lack the column).
+    await run('UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = ?', [result.id]).catch(() => {});
     return { id: result.id, username, email, fullName, googleId };
   }
 
@@ -93,6 +110,7 @@ class User {
   static async linkGoogle(userId, googleId, avatarUrl) {
     await run('UPDATE users SET google_id = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?',
       [googleId, avatarUrl || null, userId]);
+    await run('UPDATE users SET email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP) WHERE id = ?', [userId]).catch(() => {});
   }
 
   // Поиск пользователя по email. Регистр не учитываем: /register хранит email

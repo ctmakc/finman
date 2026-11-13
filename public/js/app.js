@@ -753,8 +753,28 @@ function renderLoginPage() {
   const app = document.getElementById('app');
   closeDrawer();
 
+  // New visitors land on "Create account"; returning ones on "Sign in".
+  let returning = false;
+  try { returning = localStorage.getItem('fm_returning') === '1'; } catch (_) { returning = false; }
+  const wantsSignup = /[?&#](signup|register)\b/.test(window.location.search + window.location.hash);
+  const startTab = (wantsSignup || !returning) ? 'register' : 'login';
+
   app.innerHTML = `
-    <div class="auth-container">
+    <div class="auth-container auth-split">
+      <aside class="auth-visual">
+        <div class="auth-visual-copy">
+          <p class="auth-visual-eyebrow">Personal finance · AI CFO</p>
+          <h2 class="auth-visual-title">Drop a bank statement. See where your money goes in a minute.</h2>
+          <ul class="auth-visual-points">
+            <li>Every transaction sorted into categories</li>
+            <li>Recurring charges found for you</li>
+            <li>An AI CFO that answers with your own numbers</li>
+          </ul>
+        </div>
+        <figure class="auth-visual-shot">
+          <img src="/img/auth-hero.webp" width="1168" height="649" alt="Finman summary of an imported bank statement: spending by category and recurring charges" fetchpriority="high" decoding="async">
+        </figure>
+      </aside>
       <div class="auth-card">
         <div class="auth-header">
           <h1>Finman</h1>
@@ -775,15 +795,15 @@ function renderLoginPage() {
         </div>
 
         <div class="auth-tabs" role="tablist">
-          <button class="auth-tab active" data-tab="login" type="button" role="tab" aria-selected="true">Sign in</button>
           <button class="auth-tab" data-tab="register" type="button" role="tab" aria-selected="false">Create account</button>
+          <button class="auth-tab" data-tab="login" type="button" role="tab" aria-selected="false">Sign in</button>
         </div>
 
         <div class="auth-form-container">
-          <form id="login-form" class="auth-form">
+          <form id="login-form" class="auth-form hidden">
             <div class="form-group">
-              <label for="login-username" class="form-label">Username</label>
-              <input type="text" id="login-username" class="form-control" autocomplete="username" required>
+              <label for="login-username" class="form-label">Email or username</label>
+              <input type="text" id="login-username" class="form-control" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required>
             </div>
 
             <div class="form-group">
@@ -796,35 +816,29 @@ function renderLoginPage() {
             <button type="submit" class="btn btn-primary w-100">Sign in</button>
           </form>
 
-          <form id="register-form" class="auth-form hidden">
-            <div class="form-group">
-              <label for="register-username" class="form-label">Username</label>
-              <input type="text" id="register-username" class="form-control" autocomplete="username" required>
-            </div>
-
+          <form id="register-form" class="auth-form hidden" novalidate>
             <div class="form-group">
               <label for="register-email" class="form-label">Email</label>
-              <input type="email" id="register-email" class="form-control" autocomplete="email" required>
+              <input type="email" id="register-email" class="form-control" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required>
             </div>
 
             <div class="form-group">
-              <label for="register-fullname" class="form-label">Full name</label>
+              <label for="register-password" class="form-label">Password <span class="auth-hint">at least 6 characters</span></label>
+              <div class="auth-pass">
+                <input type="password" id="register-password" class="form-control" autocomplete="new-password" minlength="6" required>
+                <button type="button" class="auth-pass-toggle" data-for="register-password" aria-label="Show password" aria-pressed="false">Show</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="register-fullname" class="form-label">Name <span class="auth-hint">optional</span></label>
               <input type="text" id="register-fullname" class="form-control" autocomplete="name">
-            </div>
-
-            <div class="form-group">
-              <label for="register-password" class="form-label">Password</label>
-              <input type="password" id="register-password" class="form-control" autocomplete="new-password" required>
-            </div>
-
-            <div class="form-group">
-              <label for="register-confirm-password" class="form-label">Confirm password</label>
-              <input type="password" id="register-confirm-password" class="form-control" autocomplete="new-password" required>
             </div>
 
             <div id="register-error" class="auth-error" role="alert"></div>
 
-            <button type="submit" class="btn btn-primary w-100">Create account</button>
+            <button type="submit" class="btn btn-primary w-100">Create free account</button>
+            <p class="auth-fineprint">Next: import a statement or explore demo data. We will send one email to confirm your address.</p>
           </form>
         </div>
 
@@ -858,6 +872,21 @@ function renderLoginPage() {
         loginForm.classList.add('hidden');
         registerForm.classList.remove('hidden');
       }
+    });
+  });
+
+  const startBtn = document.querySelector(`.auth-tab[data-tab="${startTab}"]`);
+  if (startBtn) startBtn.click();
+
+  document.querySelectorAll('.auth-pass-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.for);
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Hide' : 'Show';
+      btn.setAttribute('aria-pressed', String(show));
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
     });
   });
 
@@ -933,6 +962,7 @@ async function handleLogin(e) {
     }
 
     localStorage.setItem('token', data.token);
+    try { localStorage.setItem('fm_returning', '1'); } catch (_) { /* private mode */ }
 
     appState.isAuthenticated = true;
     appState.user = data.user;
@@ -947,22 +977,23 @@ async function handleLogin(e) {
 async function handleRegister(e) {
   e.preventDefault();
 
-  const username = document.getElementById('register-username').value;
-  const email = document.getElementById('register-email').value;
-  const fullName = document.getElementById('register-fullname').value;
+  const email = document.getElementById('register-email').value.trim();
+  const fullName = document.getElementById('register-fullname').value.trim();
   const password = document.getElementById('register-password').value;
-  const confirmPassword = document.getElementById('register-confirm-password').value;
   const errorElement = document.getElementById('register-error');
 
-  if (!username || !email || !password || !confirmPassword) {
-    errorElement.textContent = 'Please fill in all required fields';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errorElement.textContent = 'Enter your email address, for example name@example.com';
+    document.getElementById('register-email').focus();
     return;
   }
 
-  if (password !== confirmPassword) {
-    errorElement.textContent = 'Passwords do not match';
+  if (password.length < 6) {
+    errorElement.textContent = 'The password needs at least 6 characters';
+    document.getElementById('register-password').focus();
     return;
   }
+  errorElement.textContent = '';
 
   try {
     const response = await fetch('/api/auth/register', {
@@ -970,7 +1001,7 @@ async function handleRegister(e) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, email, password, fullName })
+      body: JSON.stringify(fullName ? { email, password, fullName } : { email, password })
     });
 
     let data = null;
@@ -982,6 +1013,8 @@ async function handleRegister(e) {
     }
 
     localStorage.setItem('token', data.token);
+    try { localStorage.setItem('fm_returning', '1'); } catch (_) { /* private mode */ }
+    if (window.FirstRun) window.FirstRun.track('signup_done', { method: 'email' });
 
     appState.isAuthenticated = true;
     appState.user = data.user;
@@ -998,6 +1031,13 @@ async function handleRegister(e) {
 // ---------------------------------------------------------------------------
 async function renderDashboard() {
   const mainContent = document.getElementById('main-content');
+
+  // First run: an empty account gets the start screen (import / demo / manual).
+  if (window.FirstRun && typeof window.FirstRun.beforeDashboard === 'function') {
+    try {
+      if (await window.FirstRun.beforeDashboard(mainContent)) return;
+    } catch (error) { console.error('First-run screen failed:', error); }
+  }
 
   const recentTransactions = await fetchTransactions({ limit: 5 });
   const statsData = (await fetchTransactionStats()) || {};
@@ -1054,7 +1094,10 @@ async function renderDashboard() {
   const netText = statsData.mixedCurrencies
     ? formatTotals(netByCurrency(statsData.incomeByCurrency, statsData.expenseByCurrency), flowCurrency)
     : fmFormatCurrency(Math.abs(netFlow), flowCurrency);
-  const aiInsight = (typeof getDashboardInsight === 'function')
+  const noActivity = monthIn === 0 && monthOut === 0;
+  const aiInsight = (noActivity && window.FirstRun && typeof window.FirstRun.emptyInsight === 'function')
+    ? window.FirstRun.emptyInsight()
+    : (typeof getDashboardInsight === 'function')
     ? getDashboardInsight(statsData)
     : (flowUp
         ? 'You are spending less than you earn this month, so your balance is growing.'
@@ -1184,6 +1227,10 @@ async function renderDashboard() {
   }
 
   animateHeroNetWorth();
+
+  if (window.FirstRun && typeof window.FirstRun.afterDashboard === 'function') {
+    try { window.FirstRun.afterDashboard(mainContent); } catch (error) { console.error('First-run banners failed:', error); }
+  }
 
   const heroAiBtn = document.getElementById('hero-ai-more');
   if (heroAiBtn) {

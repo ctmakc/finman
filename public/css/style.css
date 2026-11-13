@@ -10,6 +10,7 @@
 @import url("/css/parts/bank-import.css");
 @import url("/css/parts/modals.css");
 @import url("/css/parts/ui-shared.css");
+@import url("/css/parts/firstrun.css");
 
 /* --------------------------------------------------------------------------
    TOKENS — CHART DATUM (one source of truth for both themes)

@@ -87,3 +87,22 @@ Row "finman app «CHART DATUM / dark variant»" — same direction as finman.mon
 (row 75); novelty is not claimed, consistency is. Not used: cream/paper, serif
 display, amber/gold accent, indigo, gradients, glassmorphism, shadows, the
 template skeleton, uniform fade-up.
+
+## First run (2026-11-12, branch `feat/onboarding-activation-1112`)
+
+Value inside the first minute, inside the same direction (no new tokens):
+
+- **Front door** (`renderLoginPage`, `.auth-split`): 7/5 split, left plate = shallows
+  `--fm-surface-2` with the promise ("Drop a bank statement…") + three ruled points
+  + a crop of the real insight screen (`/img/auth-hero.webp`, demo data) as the hero
+  picture; right = the form, "Create account" first for new visitors, email + password
+  only (name optional). ≤900px: the plate becomes a top band (shot 13.5rem), points hidden.
+- **Start screen** (`public/js/firstrun.js`, `parts/firstrun.css`): one step,
+  7/4 grid — the statement dropzone is the primary action; demo data and "start from
+  scratch" sit in the aside as ruled rows. Progress = a sounding line (`frTrack`).
+- **Insight** (after import or demo): title "Your money, <range>", Newsreader lede with
+  the three numbers that matter, a soundings row (in / spending / net / count), category
+  bars (`fmContour` scaleX), recurring charges, biggest one-off expenses, AI CFO chips
+  (pills — the only pills on the page).
+- **Banners** above the dashboard: email confirmation (deeps, ink edge) and demo data
+  (warning tint) with "Import my statement" / "Remove demo data".

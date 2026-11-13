@@ -15,8 +15,11 @@ const jwtOptions = {
 passport.use(new LocalStrategy(
   async function(username, password, done) {
     try {
-      // Поиск пользователя по имени
-      const user = await User.findByUsername(username);
+      // Username or email (password sign-ups since 22.11 register with email only).
+      const login = String(username || '').trim();
+      const user = login.includes('@')
+        ? await User.findByEmail(login)
+        : await User.findByUsername(login);
 
       if (!user) {
         return done(null, false, { message: 'Invalid username or password' });

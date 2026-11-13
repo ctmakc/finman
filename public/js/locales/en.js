@@ -6,7 +6,7 @@
   'use strict';
   var dict = {
     // ---- app ----
-    'app.name': 'FinManager',
+    'app.name': 'Finman',
     'app.tagline': 'Personal finance manager',
     'app.loading': 'Loading application...',
 
@@ -115,7 +115,7 @@
     'lang.ru': 'Russian',
 
     // ---- onboarding (wave-2) ----
-    'onboarding.title': 'Welcome to FinManager',
+    'onboarding.title': 'Welcome to Finman',
     'onboarding.subtitle': 'Let’s set up your finances in a few steps',
     'onboarding.step': 'Step {current} of {total}',
     'onboarding.start': 'Get started',

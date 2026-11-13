@@ -5,6 +5,7 @@ const User = require('../models/user');
 const config = require('../config/config');
 const { googleEnabled } = require('../services/authService');
 const { notifySignup } = require('../services/signupNotify');
+const emailVerify = require('../services/emailVerify');
 
 const router = express.Router();
 
@@ -60,13 +61,16 @@ router.get('/google/callback', (req, res, next) => {
 // Регистрация
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, fullName } = req.body;
+    const { email, password, fullName } = req.body;
+    // Username is optional since 22.11: the form asks for email + password only,
+    // and the username is derived from the email.
+    let username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
 
     // Проверка, что обязательные поля заполнены
-    if (!username || !email || !password) {
+    if (!email || !password) {
       return res.status(400).json({
         error: true,
-        message: 'Username, email and password are required'
+        message: 'Email and password are required'
       });
     }
 
@@ -77,6 +81,8 @@ router.post('/register', async (req, res) => {
         message: 'Invalid email format'
       });
     }
+
+    if (!username) username = await User.usernameFromEmail(email);
 
     // Валидация username (только буквы, цифры, подчёркивания, 3-30 символов)
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
@@ -128,6 +134,8 @@ router.post('/register', async (req, res) => {
       { id: newUser.id, username: newUser.username, email: newUser.email, fullName: newUser.fullName },
       'password'
     );
+    // Email confirmation (non-blocking: the app works before the link is opened).
+    emailVerify.sendVerificationLater(newUser.id, req);
     
     // Отправка токена и данных пользователя
     res.json({
@@ -195,7 +203,9 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
       username: user.username,
       email: user.email,
       fullName: user.full_name,
-      createdAt: user.created_at
+      createdAt: user.created_at,
+      emailVerified: Boolean(user.email_verified_at),
+      google: Boolean(user.google_id)
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -203,6 +213,36 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
       error: true, 
       message: 'Failed to fetch user data' 
     });
+  }
+});
+
+// Email confirmation. The link in the letter lands here and redirects to the app.
+router.get('/verify-email', async (req, res) => {
+  try {
+    const userId = await emailVerify.verifyToken(req.query.token);
+    res.redirect(302, userId ? '/?email_verified=1' : '/?email_verified=0');
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.redirect(302, '/?email_verified=0');
+  }
+});
+
+// Resend the confirmation letter (throttled to one per minute).
+router.post('/verify-email/send', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const result = await emailVerify.sendVerification(req.user.id, req);
+    if (result.reason === 'ALREADY_VERIFIED') return res.json({ success: true, alreadyVerified: true });
+    if (result.reason === 'COOLDOWN') {
+      res.set('Retry-After', String(result.retryAfter));
+      return res.status(429).json({ error: true, message: `Wait ${result.retryAfter} s before sending another letter`, retryAfter: result.retryAfter });
+    }
+    if (!result.sent && !result.skipped) {
+      return res.status(502).json({ error: true, message: 'Could not send the letter. Try again later.' });
+    }
+    res.json({ success: true, sent: result.sent });
+  } catch (error) {
+    console.error('Error sending verification email:', error);
+    res.status(500).json({ error: true, message: 'Could not send the letter' });
   }
 });
 
@@ -259,6 +299,12 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
     });
     
     if (success) {
+      if (emailChanging) {
+        // A new address has to be confirmed again.
+        const { run } = require('../db/database');
+        await run('UPDATE users SET email_verified_at = NULL, email_verify_hash = NULL, email_verify_sent_at = NULL WHERE id = ?', [req.user.id]);
+        emailVerify.sendVerificationLater(req.user.id, req);
+      }
       const updatedUser = await User.findById(req.user.id);
       
       res.json({
