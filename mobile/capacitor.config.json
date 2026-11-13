@@ -1,0 +1,45 @@
+{
+  "appId": "money.finman.app",
+  "appName": "Finman",
+  "webDir": "www",
+  "backgroundColor": "#F1F4F9",
+  "server": {
+    "url": "https://app.finman.money",
+    "errorPath": "offline.html",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#F1F4F9",
+    "preferredContentMode": "mobile"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#F1F4F9",
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 250,
+      "backgroundColor": "#F1F4F9",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": false,
+      "splashImmersive": false
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    },
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "DEFAULT"
+    },
+    "Keyboard": {
+      "resizeOnFullScreen": true
+    }
+  },
+  "appendUserAgent": "FinmanApp/1.0"
+}

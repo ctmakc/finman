@@ -1,0 +1,18 @@
+Finman is a personal finance app (budgets, statement import, goals, debts, net worth, AI assistant). Every feature is free; there are no in-app purchases, subscriptions or ads in the app.
+
+SIGN IN
+Demo account: DEMO_EMAIL (password in the demo account fields). On the first screen tap "Sign in", enter the email and password. The account already has sample accounts, transactions, budgets, goals and debts.
+You can also create a new account with any email, or use "Continue with Google" / "Sign in with Apple". A new account starts empty and offers "Explore with demo data".
+
+STATEMENT IMPORT
+Dashboard or Transactions -> Import CSV. Pick a CSV, OFX or QFX bank statement file; Finman shows a preview of the rows and columns, and nothing is saved until you confirm. The app never asks for bank passwords and does not connect to banks.
+
+AI CFO
+Menu -> AI CFO. AI features are off until the user turns them on (opt-in prompt). Type a question, e.g. "How much can I save this month?". Answers use only the user's own data. The chat is private; users cannot message each other.
+
+ACCOUNT DELETION
+Menu -> Settings -> Danger zone -> Delete account. Type DELETE (and the password for email accounts) and confirm; the account and all its data are erased. Web alternative: https://finman.money/delete-account/
+
+OTHER
+External links (website, privacy policy, Google sign-in) open in the system browser.
+Support: info@finman.money

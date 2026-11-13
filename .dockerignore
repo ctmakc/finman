@@ -51,3 +51,6 @@ Dockerfile
 docker-compose.yml
 scripts/deploy.sh
 README.md
+
+# Native shells (Capacitor) live in mobile/ and are built separately.
+mobile

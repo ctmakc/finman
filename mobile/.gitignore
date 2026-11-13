@@ -1,0 +1,8 @@
+node_modules/
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+upload.properties
+__pycache__/
