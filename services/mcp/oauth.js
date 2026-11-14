@@ -35,10 +35,10 @@ function protectedResourceMetadata() {
   return {
     resource: resourceUrl(),
     authorization_servers: [baseUrl()],
-    scopes_supported: [SCOPE],
+    scopes_supported: [SCOPE, 'offline_access'],
     bearer_methods_supported: ['header'],
     resource_name: 'Finman',
-    resource_documentation: `${baseUrl()}/#api-tokens`,
+    resource_documentation: `${baseUrl()}/connect-ai`,
   };
 }
 
@@ -56,8 +56,10 @@ function authorizationServerMetadata() {
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
     revocation_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
-    scopes_supported: [SCOPE],
-    service_documentation: `${b}/#api-tokens`,
+    scopes_supported: [SCOPE, 'offline_access'],
+    // RFC 9207: every authorization redirect carries ?iss= (ChatGPT checks it).
+    authorization_response_iss_parameter_supported: true,
+    service_documentation: `${b}/connect-ai`,
   };
 }
 
@@ -122,8 +124,14 @@ async function getClient(clientId) {
 // Who is asking: a readable name for the consent screen.
 function clientLabel(client) {
   const name = client.client_name || '';
-  const host = (() => { try { return new URL(client.redirect_uris[0]).hostname; } catch (_) { return ''; } })();
+  let host = '';
+  let proto = '';
+  try { const u = new URL(client.redirect_uris[0]); host = u.hostname; proto = u.protocol; } catch (_) { /* no label */ }
   if (/(^|\.)claude\.(ai|com)$/.test(host)) return name && /claude/i.test(name) ? name : 'Claude';
+  if (/(^|\.)(chatgpt\.com|openai\.com)$/.test(host)) return name && /chatgpt|openai/i.test(name) ? name : 'ChatGPT';
+  if (/(^|\.)cursor\.(com|sh)$/.test(host) || proto === 'cursor:') return name || 'Cursor';
+  if (/(^|\.)vscode\.dev$/.test(host)) return name || 'VS Code';
+  if (/(^|\.)(antigravity\.google|vertexaisearch\.cloud\.google\.com)$/.test(host)) return name || 'Gemini';
   return name || host || 'An MCP app';
 }
 

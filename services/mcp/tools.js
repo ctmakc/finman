@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const svc = require('../invoice/service');
 const core = require('../invoice/core');
 const config = require('../../config/config');
+const { TX_TOOLS, TxToolError } = require('./txTools');
 
 const PDF_TTL = 7 * 24 * 60 * 60; // seconds
 
@@ -90,7 +91,9 @@ function toItems(args) {
 }
 
 const dateProp = (d) => ({ type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: d });
-const amountProp = (d) => ({ type: ['number', 'string'], description: d });
+// One JSON type per field: some MCP clients (ChatGPT, Gemini) reject type unions.
+// run() still accepts "45.50" strings, which models sometimes send anyway.
+const amountProp = (d) => ({ type: 'number', description: d });
 const lineSchema = {
   type: 'object',
   properties: {
@@ -229,6 +232,7 @@ const TOOLS = [
   },
   {
     name: 'set_invoice_status',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     title: 'Mark invoice sent or void',
     description: 'Marks an invoice as sent (given to the client) or void (cancelled), or back to draft. Payments are recorded with record_payment.',
     inputSchema: { type: 'object', required: ['invoice_id', 'status'], properties: { invoice_id: { type: 'integer' }, status: { type: 'string', enum: ['draft', 'sent', 'void'] } } },
@@ -281,12 +285,24 @@ async function findInvoice(userId, a) {
   return svc.getInvoice(userId, hit.id);
 }
 
+TOOLS.push(...TX_TOOLS);
+// Write tools say so explicitly: hosts treat a missing readOnlyHint as "may change data".
+for (const t of TOOLS) {
+  if (!t.annotations) t.annotations = { readOnlyHint: false, destructiveHint: false };
+  else if (t.annotations.readOnlyHint === undefined) t.annotations = { readOnlyHint: false, ...t.annotations };
+}
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 
 function listTools() {
   return TOOLS.map(({ name, title, description, inputSchema, annotations }) => ({
     name, title, description, inputSchema, ...(annotations ? { annotations: { title, ...annotations } } : {}),
   }));
+}
+
+// For the in-app assistant: does this tool change data (and so needs the person's OK)?
+function isReadOnly(name) {
+  const t = BY_NAME.get(name);
+  return !!(t && t.annotations && t.annotations.readOnlyHint === true);
 }
 
 // -> MCP CallToolResult. Problems the model can fix come back as isError results.
@@ -299,11 +315,11 @@ async function callTool(userId, name, args) {
     const data = await tool.run(userId, a);
     return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data, isError: false };
   } catch (e) {
-    if (e instanceof ToolError || e instanceof svc.InvoiceError) {
+    if (e instanceof ToolError || e instanceof TxToolError || e instanceof svc.InvoiceError) {
       return { content: [{ type: 'text', text: e.message }], isError: true };
     }
     throw e;
   }
 }
 
-module.exports = { listTools, callTool, checkPdfLink, pdfUrl, ToolError };
+module.exports = { listTools, callTool, isReadOnly, checkPdfLink, pdfUrl, ToolError };

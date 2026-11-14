@@ -19,10 +19,10 @@
     <aside class="auth-visual">
       <div class="auth-visual-copy">
         <p class="auth-visual-eyebrow">Finman · Connected apps</p>
-        <h2 class="auth-visual-title">Ask Claude to draw up an invoice. Finman numbers it, adds the tax and keeps the PDF.</h2>
+        <h2 class="auth-visual-title">Ask your AI chat what you spent, add a purchase or draw up an invoice. Finman keeps the books.</h2>
         <ul class="auth-visual-points">
-          <li>Invoices from your own templates</li>
-          <li>Payments and deposits recorded as they arrive</li>
+          <li>Spending answers from your own transactions</li>
+          <li>Purchases and invoices added in one sentence</li>
           <li>Disconnect any time in Settings → API tokens</li>
         </ul>
       </div>
@@ -71,14 +71,16 @@
       <!-- step 2: consent -->
       <section id="oa-consent" hidden>
         <p class="oauth-who">Signed in as <strong id="oa-user"></strong> · <a href="#" id="oa-switch">use another account</a></p>
-        <p class="oauth-lead"><strong id="oa-app">Claude</strong> will be able to work with the invoices of this account:</p>
+        <p class="oauth-lead"><strong id="oa-app">Claude</strong> will be able to work with this account:</p>
         <ul class="oauth-scope">
+          <li>see your accounts, transactions and spending by category</li>
+          <li>add, edit and delete transactions</li>
           <li>see invoice templates, invoices and clients</li>
           <li>create invoices from your templates (numbers come from Finman)</li>
           <li>record payments and mark invoices sent or void</li>
           <li>delete invoices that are still drafts</li>
         </ul>
-        <p class="oauth-note">Your bank accounts, transactions and password stay out of reach. After you allow, you return to <span id="oa-host"></span>.</p>
+        <p class="oauth-note">Bank logins, passwords and your plan settings stay out of reach. After you allow, you return to <span id="oa-host"></span>.</p>
         <div id="oa-consent-error" class="auth-error" role="alert"></div>
         <div class="oauth-actions">
           <button type="button" class="btn btn-primary" id="oa-allow">Allow</button>

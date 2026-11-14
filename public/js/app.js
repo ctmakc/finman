@@ -91,6 +91,8 @@ const NAV_GROUPS = [
       { page: 'currency', label: 'Currency', icon: 'fa-coins' },
       { page: 'bank-connections', label: 'Banks', icon: 'fa-university' },
       { page: 'data-export', label: 'Data export', icon: 'fa-download' },
+      { page: 'my-ai', label: 'Your AI', icon: 'fa-comments' },
+      { page: 'connect-ai', label: 'Connect to AI', icon: 'fa-plug' },
       { page: 'api-tokens', label: 'API tokens', icon: 'fa-key' },
       { page: 'billing', label: 'Billing', icon: 'fa-credit-card' },
       { page: 'settings', label: 'Settings', icon: 'fa-cog' }
@@ -165,6 +167,16 @@ const PAGE_RENDERERS = {
   reconcile: () => callGlobal('renderReconcilePage'),
   billing: () => callGlobal('renderBillingPage'),
   invoices: () => callGlobal('renderInvoicesPage'),
+  'my-ai': () => {
+    mountHtml('');
+    if (!window.MyAiModule) throw new Error('The Your AI module is not loaded');
+    return window.MyAiModule.init();
+  },
+  'connect-ai': () => {
+    mountHtml('');
+    if (!window.ConnectAiModule) throw new Error('The Connect to AI module is not loaded');
+    return window.ConnectAiModule.init();
+  },
   'api-tokens': () => {
     mountHtml('');
     if (!window.ApiTokensModule) throw new Error('The API tokens module is not loaded');
@@ -1690,6 +1702,8 @@ function renderSettingsPage() {
         <h2 class="card-title">More</h2>
         <div class="fm-link-grid">
           <button class="btn btn-outline" type="button" data-settings-page="data-export"><i class="fas fa-download" aria-hidden="true"></i> Backups and data export</button>
+          <button class="btn btn-outline" type="button" data-settings-page="connect-ai"><i class="fas fa-plug" aria-hidden="true"></i> Connect to AI</button>
+          <button class="btn btn-outline" type="button" data-settings-page="my-ai"><i class="fas fa-comments" aria-hidden="true"></i> Your AI</button>
           <button class="btn btn-outline" type="button" data-settings-page="api-tokens"><i class="fas fa-key" aria-hidden="true"></i> API tokens</button>
           <button class="btn btn-outline" type="button" data-settings-page="billing"><i class="fas fa-credit-card" aria-hidden="true"></i> Plan and billing</button>
           <button class="btn btn-outline" type="button" data-settings-page="currency"><i class="fas fa-coins" aria-hidden="true"></i> Base currency</button>

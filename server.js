@@ -114,7 +114,8 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
   // Детерминированные GET без LLM (дашборд дёргает их на каждом показе) не
   // съедают лимит, иначе 4-й показ дашборда за минуту блокировал AI-чат.
-  skip: (req) => req.method === 'GET' && /^\/(alerts|digest|opt-in)(\/|$)/.test(req.path),
+  // /api/ai/my = «Свой ИИ» на ключе пользователя: свой лимит в routes/userAi.js.
+  skip: (req) => /^\/my(\/|$)/.test(req.path) || (req.method === 'GET' && /^\/(alerts|digest|opt-in)(\/|$)/.test(req.path)),
 });
 
 // Rate limiting - для аутентификации (более строгий)
@@ -138,7 +139,19 @@ const appAuthLimiter = rateLimit({
 });
 
 // Настройка middleware
-app.use(cors(config.corsOptions));
+// MCP and OAuth endpoints are called by AI apps from anywhere (browser-based MCP clients
+// too). They authenticate by Bearer token only, never cookies, so any origin is safe here.
+const appCors = cors(config.corsOptions);
+const mcpCors = cors({
+  origin: '*',
+  credentials: false,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Mcp-Protocol-Version', 'Mcp-Session-Id', 'Last-Event-ID', 'Accept'],
+  exposedHeaders: ['WWW-Authenticate', 'Mcp-Session-Id', 'Mcp-Protocol-Version'],
+  maxAge: 86400,
+});
+const MCP_PUBLIC = /^\/(mcp\/?$|\.well-known\/|oauth\/(token|register|revoke)$)/;
+app.use((req, res, next) => (MCP_PUBLIC.test(req.path) ? mcpCors : appCors)(req, res, next));
 // Stripe webhook требует СЫРОЕ тело для проверки подписи — монтируем raw ДО json-парсера.
 app.use('/api/billing/webhook', express.raw({ type: '*/*' }));
 // Relay to the self-hosted OpenPanel: raw body, so ДО json-парсера.
@@ -260,6 +273,8 @@ app.use('/api', healthRoutes);
 const requireProForAi = requireTier('pro');
 const aiTierGate = (req, res, next) =>
   (require('./services/billingService').isConfigured() ? requireProForAi(req, res, next) : next());
+// «Свой ИИ»: ключ пользователя, тариф не нужен — до тарифного шлюза оператора.
+app.use('/api/ai/my', apiAuthMiddleware, require('./routes/userAi'));
 app.use('/api/ai', apiAuthMiddleware, aiTierGate, aiRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/sync', syncRoutes);

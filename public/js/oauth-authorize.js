@@ -46,7 +46,7 @@
 
   function askConsent(app, host, user) {
     setText('oa-title', 'Allow ' + app + '?');
-    setText('oa-sub', 'Connect ' + app + ' to your Finman invoices.');
+    setText('oa-sub', 'Connect ' + app + ' to your Finman account.');
     setText('oa-app', app);
     setText('oa-user', user.email || user.username);
     setText('oa-host', host || 'the app');
