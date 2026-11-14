@@ -2,6 +2,7 @@ const { query, get, run, transaction } = require('../db/database');
 const money = require('../lib/money');
 const { defaultCurrency: DEFAULT_CURRENCY } = require('../config/config');
 const { OPENING_TYPE, OPENING_CATEGORY, OPENING_DESCRIPTION } = require('../lib/txFilter');
+const dates = require('../lib/dates');
 
 class Account {
   // Создание счета
@@ -34,8 +35,23 @@ class Account {
   // a second balance increment. The row keeps SUM(amount) per account equal to
   // the balance (reconcile, Beancount export) and is excluded from income/
   // expense by every aggregate that filters type IN ('income','expense'). Atomic.
+  // Today's date in the user's time zone (users.timezone or the default zone).
+  static async userToday(userId, now = new Date()) {
+    let row = null;
+    try {
+      row = await get('SELECT timezone FROM users WHERE id = ?', [userId]);
+    } catch (e) {
+      row = null;
+    }
+    return dates.todayISO(dates.userTz(row), now);
+  }
+
   static async createWithOpeningBalance(accountData) {
     const balance = money.round(accountData.balance || 0);
+    // Opening balance is dated «today» in the user's zone (users.timezone,
+    // America/Toronto by default). UTC «today» put tomorrow's date on accounts
+    // created in a Toronto evening.
+    const openingDate = accountData.openingDate || (balance !== 0 ? await Account.userToday(accountData.userId) : null);
     return transaction(async () => {
       const result = await run(
         `INSERT INTO accounts
@@ -59,7 +75,7 @@ class Account {
           [
             result.id,
             accountData.userId,
-            accountData.openingDate || new Date().toISOString().split('T')[0],
+            openingDate,
             OPENING_DESCRIPTION,
             OPENING_CATEGORY,
             balance,
