@@ -87,6 +87,7 @@ function baseFor(provider, baseUrl) {
 }
 
 const BUSY = new Set([502, 503, 529]);
+const GEMINI_SPARE = 'gemini-flash-lite-latest';
 let retryDelayMs = 1500;
 
 // Test seam: tests replace the HTTP layer; nothing leaves the machine.
@@ -308,8 +309,16 @@ async function complete({ provider, key, model, baseUrl, system, messages, tools
       generationConfig: { maxOutputTokens: MAX_OUT * 2 },
     };
     if (specs.length) body.tools = [{ functionDeclarations: specs }];
-    const url = `${base}/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const d = await send({ method: 'POST', url, data: body, headers: { 'x-goog-api-key': key, 'content-type': 'application/json' } }, key);
+    const call = (m, timeout) => send({ method: 'POST', url: `${base}/v1beta/models/${encodeURIComponent(m)}:generateContent`, data: body, timeout, headers: { 'x-goog-api-key': key, 'content-type': 'application/json' } }, key);
+    let d;
+    if (model === GEMINI_SPARE) d = await call(model);
+    else {
+      // Free-tier Flash is often overloaded (503) or hangs for a minute: one answer from Flash-Lite instead.
+      try { d = await call(model, 40000); } catch (e) {
+        if (!(e instanceof UserAiError) || !['AI_BUSY', 'AI_TIMEOUT'].includes(e.code)) throw e;
+        try { d = await call(GEMINI_SPARE); } catch (_) { throw e; }
+      }
+    }
     const cand = (d.candidates || [])[0];
     if (!cand) {
       const why = d.promptFeedback && d.promptFeedback.blockReason;

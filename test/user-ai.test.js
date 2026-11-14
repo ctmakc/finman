@@ -323,6 +323,30 @@ describe('Your AI: the assistant', () => {
     providers._setHttp(fakeHttp);
   });
 
+  test('busy or silent Gemini Flash hands the turn to Flash-Lite once', async () => {
+    const k = (await ctx.request.get('/api/ai/my/keys').set(auth(ann.token))).body.keys.find((x) => x.provider === 'google');
+    expect(k.model).toBe('gemini-flash-latest');
+    const seen = [];
+    providers._setHttp((cfg) => {
+      seen.push(cfg.url.match(/models\/([^:]+):/)[1]);
+      if (/gemini-flash-latest/.test(cfg.url)) return Promise.resolve({ status: 503, data: { error: { message: 'high demand' } } });
+      return Promise.resolve({ status: 200, data: { candidates: [{ content: { parts: [{ text: 'Lite here.' }] } }] } });
+    }, 0);
+    const ok = await ctx.request.post('/api/ai/my/chat').set(auth(ann.token)).send({ message: 'ping', key_id: k.id });
+    expect(ok.status).toBe(200);
+    expect(seen).toEqual(['gemini-flash-latest', 'gemini-flash-latest', 'gemini-flash-latest', 'gemini-flash-lite-latest']);
+    expect(ok.body.messages.filter((m) => m.role === 'assistant').pop().text).toBe('Lite here.');
+
+    providers._setHttp((cfg) => {
+      if (/gemini-flash-latest/.test(cfg.url)) { expect(cfg.timeout).toBe(40000); return Promise.reject(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' })); }
+      return Promise.resolve({ status: 503, data: { error: { message: 'busy too' } } });
+    }, 0);
+    const both = await ctx.request.post('/api/ai/my/chat').set(auth(ann.token)).send({ message: 'ping', key_id: k.id });
+    expect(both.status).toBe(504);
+    expect(both.body.code).toBe('AI_TIMEOUT');
+    providers._setHttp(fakeHttp);
+  });
+
   test('a saved key that can no longer be decrypted asks to add it again', async () => {
     const k = (await ctx.request.get('/api/ai/my/keys').set(auth(ann.token))).body.keys.find((x) => x.provider === 'openai');
     const before = (await dbAll(ctx.db, 'SELECT key_enc FROM user_ai_keys WHERE id = ?', [k.id]))[0].key_enc;
