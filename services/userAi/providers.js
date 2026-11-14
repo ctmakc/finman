@@ -313,9 +313,10 @@ async function complete({ provider, key, model, baseUrl, system, messages, tools
     let d;
     if (model === GEMINI_SPARE) d = await call(model);
     else {
-      // Free-tier Flash is often overloaded (503) or hangs for a minute: one answer from Flash-Lite instead.
+      // Free-tier Flash is often overloaded (503), hangs for a minute or runs out of its 20 requests a day:
+      // Flash-Lite (its own, larger quota) answers instead.
       try { d = await call(model, 40000); } catch (e) {
-        if (!(e instanceof UserAiError) || !['AI_BUSY', 'AI_TIMEOUT'].includes(e.code)) throw e;
+        if (!(e instanceof UserAiError) || !['AI_BUSY', 'AI_TIMEOUT', 'AI_RATE_LIMIT'].includes(e.code)) throw e;
         try { d = await call(GEMINI_SPARE); } catch (_) { throw e; }
       }
     }

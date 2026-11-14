@@ -323,7 +323,7 @@ describe('Your AI: the assistant', () => {
     providers._setHttp(fakeHttp);
   });
 
-  test('busy or silent Gemini Flash hands the turn to Flash-Lite once', async () => {
+  test('busy, silent or out-of-quota Gemini Flash hands the turn to Flash-Lite', async () => {
     const k = (await ctx.request.get('/api/ai/my/keys').set(auth(ann.token))).body.keys.find((x) => x.provider === 'google');
     expect(k.model).toBe('gemini-flash-latest');
     const seen = [];
@@ -342,6 +342,14 @@ describe('Your AI: the assistant', () => {
       return Promise.resolve({ status: 503, data: { error: { message: 'busy too' } } });
     }, 0);
     const both = await ctx.request.post('/api/ai/my/chat').set(auth(ann.token)).send({ message: 'ping', key_id: k.id });
+    const dayLimit = []; providers._setHttp((cfg) => {
+      dayLimit.push(cfg.url);
+      if (/gemini-flash-latest/.test(cfg.url)) return Promise.resolve({ status: 429, data: { error: { message: 'Quota exceeded, limit: 20' } } });
+      return Promise.resolve({ status: 200, data: { candidates: [{ content: { parts: [{ text: 'Lite again.' }] } }] } });
+    }, 0);
+    const quota = await ctx.request.post('/api/ai/my/chat').set(auth(ann.token)).send({ message: 'ping', key_id: k.id });
+    expect(quota.status).toBe(200);
+    expect(dayLimit).toHaveLength(2);
     expect(both.status).toBe(504);
     expect(both.body.code).toBe('AI_TIMEOUT');
     providers._setHttp(fakeHttp);
