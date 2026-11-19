@@ -135,9 +135,11 @@ router.get('/:id', authenticate, async (req, res) => {
 // Обновление платежа
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const newAccountId = req.body.accountId ?? req.body.account_id;
-    if (newAccountId !== undefined && !(await Account.findById(newAccountId, req.user.id))) {
-      return res.status(404).json({ error: true, message: 'Account not found' });
+    // The model writes BOTH keys to account_id (SQLite keeps the last), so check each.
+    for (const newAccountId of [req.body.accountId, req.body.account_id]) {
+      if (newAccountId !== undefined && !(await Account.findById(newAccountId, req.user.id))) {
+        return res.status(404).json({ error: true, message: 'Account not found' });
+      }
     }
     const success = await RecurringPayment.update(
       req.params.id,

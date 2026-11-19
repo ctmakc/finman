@@ -131,7 +131,7 @@ class Currency {
         https.get('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json', (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
-          res.on('end', () => resolve(JSON.parse(data)));
+          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
           res.on('error', reject);
         }).on('error', reject);
       });

@@ -67,7 +67,9 @@ function unsubToken(userId) {
 async function unsubscribe(req, res) {
   const id = parseInt(req.query.u, 10);
   const t = String(req.query.t || '');
-  const ok = Number.isInteger(id) && id > 0 && t.length === 32
+  // Hex-only check first: timingSafeEqual throws on byte-length mismatch
+  // (a 32-char token with a multibyte char used to crash the request).
+  const ok = Number.isInteger(id) && id > 0 && /^[0-9a-f]{32}$/.test(t)
     && crypto.timingSafeEqual(Buffer.from(t), Buffer.from(unsubToken(id)));
   if (!ok) return res.status(400).type('html').send('<p style="font-family:sans-serif">Link is invalid.</p>');
   try {
