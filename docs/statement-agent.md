@@ -59,7 +59,25 @@ STATEMENT_AI_VISION_MODEL=gemini-3.8-flash node eval/run_eval.js        # writes
 
 Results: see the newest file in `eval/results/` and the table below.
 
-RESULTS_TABLE
+Run 20 Nov 2026 01:28–01:50 Toronto, `eval/results/gemini-3.5-flash-lite-2026-11-200650.json`: instance AI on the free Gemini tier, text pages
+`gemini-3.5-flash-lite`, scans/photos `gemini-3.8-flash` (thinking low) with hand-over to the light
+model when it is busy or silent.
+
+| Metric | Result |
+|---|---|
+| Statements that balance on paper, proven with every row right (date + amount) | **22 / 22** (text PDF 14/14, scan 4/4, photo 4/4) |
+| Planted errors caught (dropped row, flipped sign, wrong digit, duplicated row) | **8 / 8**, import refused; first breaking row shown in 6 of 8 (the other 2 print no running balance at that point, the gap is shown) |
+| No closing balance → asked the person | **2 / 2** |
+| False accepts (proven while wrong) | **0** |
+| Rows read right, all 32 files | 1,044 / 1,045 (the miss is inside a planted-error file that was refused anyway) |
+| Model calls per statement | median 1; 3 on refused files (first read + 2 page re-reads) |
+| Tokens per statement (median in / out) | text PDF 2,212 / 3,207 · scan 1,340 / 2,797 · photo 2,481 / 2,118 |
+| Seconds per statement (median, from Toronto to the free tier) | text PDF 7.8 (p90 19.1) · scan 115 · photo 93 — the vision model was slow and often handed over |
+| Cost per statement at paid-tier prices (aistudio.google.com/docs/pricing, read 20 Nov 2026: 3.5 Flash-Lite $0.30/$2.50, 3.8 Flash $0.75/$3.75 per 1M) | median ≈ $0.009 text, ≈ $0.007 scan, ≈ $0.008 photo; max $0.03. Actual tonight: $0 (free tier) |
+
+An earlier run the same night (light model on photos too) proved 2 of 6 photos with dates shifted by
+one row while every amount was right: the reason scans and photos now go to the vision model and
+the reason for the date check. Those two would have been false accepts on dates.
 
 ## Known limits
 
