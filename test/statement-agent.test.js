@@ -113,6 +113,7 @@ describe('Statement Agent: read, prove, import', () => {
     ctx = await makeApp();
     providers = require('../services/userAi/providers');
     providers._setHttp(fakeHttp, 0);
+    require('../services/statement/agent')._setRetryDelay(0);
     ann = await makeUser(ctx, 'ann_st');
     bob = await makeUser(ctx, 'bob_st');
     const k = await ctx.request.post('/api/ai/my/keys').set(auth(ann.token)).send({ provider: 'google', key: GEMINI_KEY });
@@ -255,5 +256,16 @@ describe('Statement Agent: read, prove, import', () => {
     expect(yes.structuredContent).toMatchObject({ imported: true, inserted: 2 });
     const list = await tools.callTool(ann.id, 'list_statements', {});
     expect(list.structuredContent.statements.length).toBeGreaterThan(3);
+  });
+});
+
+describe('Statement Agent: date check', () => {
+  const { dateIssues } = require('../services/statement/agent');
+  test('dates outside the period or out of order are flagged; the amounts proof alone is not enough', () => {
+    const m = { period_start: '2026-10-01', period_end: '2026-10-31' };
+    const rows = [{ date: '2026-10-02' }, { date: '2026-10-05' }, { date: '2026-01-07' }, { date: '2026-10-09' }, { date: '2026-12-25' }];
+    expect(dateIssues(m, rows)).toEqual([2, 4]);
+    expect(dateIssues({}, [{ date: '2026-10-02' }, { date: '2026-10-20' }, { date: '2026-10-05' }, { date: '2026-10-06' }])).toEqual([1]);
+    expect(dateIssues(m, [{ date: '2026-10-02' }, { date: '2026-10-02' }, { date: '2026-10-03' }])).toEqual([]);
   });
 });

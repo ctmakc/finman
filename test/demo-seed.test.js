@@ -94,14 +94,14 @@ describe('DEMO_SEED_ON_EMPTY — in-process seed', () => {
     expect(demoSeed.getState().seededAt).toBeTruthy();
 
     const users = await database.query('SELECT username, email FROM users ORDER BY id');
-    expect(users.map((u) => u.username)).toEqual(['demo', 'demo-partner']);
+    expect(users.map((u) => u.username)).toEqual(['demo', 'demo-partner', 'judge']);
     expect(users[0].email).toBe('demo@finman.money');
 
     const second = await demoSeed.bootHook(silent);
     expect(second.seeded).toBe(false);
     expect(second.reason).toBe('users_exist');
     const again = await database.get('SELECT COUNT(*) AS n FROM users');
-    expect(again.n).toBe(2);
+    expect(again.n).toBe(3); // demo, partner, judge sandbox (empty ledger)
     const txCount = await database.get('SELECT COUNT(*) AS n FROM transactions');
     expect(txCount.n).toBe(first.counts.transactions + 2 * first.counts.transfers + 3 /* openings */ + 6 /* partner */ + 1 /* partner opening */);
   }, 180000); // seeds the household: slow on a loaded shared machine
@@ -323,7 +323,7 @@ describe('demo seed safety: atomic cleanup + production guard', () => {
       const again = await demoSeed.bootHook(silent);
       expect(again.seeded).toBe(true);
       const users = await database.query('SELECT username FROM users ORDER BY id');
-      expect(users.map((u) => u.username)).toEqual(['demo', 'demo-partner']);
+      expect(users.map((u) => u.username)).toEqual(['demo', 'demo-partner', 'judge']);
     } finally {
       await database.closeDatabase();
       rm(dbFile);
@@ -454,7 +454,7 @@ describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
     expect((await acc2.json()).own).toHaveLength(3);
     await stop(second.child);
 
-    // Direct count through sqlite: exactly the two demo users.
+    // Direct count through sqlite: exactly the two demo users and the judge sandbox.
     const sqlite3 = require('sqlite3');
     const n = await new Promise((resolve, reject) => {
       const db = new sqlite3.Database(dbFile, sqlite3.OPEN_READONLY);
@@ -464,6 +464,6 @@ describe('real boot: node server.js with DEMO_SEED_ON_EMPTY=1', () => {
         else resolve(row.n);
       });
     });
-    expect(n).toBe(2);
+    expect(n).toBe(3);
   }, 180000);
 });

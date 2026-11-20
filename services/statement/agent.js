@@ -43,6 +43,7 @@ const SYSTEM = [
   '- date: YYYY-MM-DD; when a row shows only day and month, take the year from the statement period.',
   '- description: the description text of the row; join a description that wraps onto a second line.',
   '- page: the 1-based page where the row is printed.',
+  '- A photo may be tilted or curved: follow each printed line across the page so the date, description, amount and balance of a row come from the same line.',
   '- account_ref: the account or card number as printed (masked is fine).',
 ].join('\n');
 
@@ -107,20 +108,45 @@ function meta(json) {
   };
 }
 
-async function callModel(ai, parts) {
+let retryDelayMs = 3000;
+const busy = (e) => !!e && (['AI_BUSY', 'AI_RATE_LIMIT', 'AI_TIMEOUT'].includes(e.code) || /HTTP (429|500|502|503|504)\b/.test(String(e.message || '')));
+
+// Instance AI: text pages go to STATEMENT_AI_MODEL; scans and photos to STATEMENT_AI_VISION_MODEL
+// (a stronger reader: on tilted photos the light model paired dates with the row below). A busy
+// or rate-limited model gets two quiet retries (3 s, 6 s); the vision model hands over to the
+// text model on the retry.
+function platformModels(vision) {
+  const text = process.env.STATEMENT_AI_MODEL || undefined;
+  const vis = process.env.STATEMENT_AI_VISION_MODEL || text;
+  return vision && vis !== text ? [vis, text] : [text];
+}
+
+async function callModel(ai, parts, { vision = false } = {}) {
+  const models = ai.source === 'user' ? [ai.model] : platformModels(vision);
+  for (let attempt = 0; ; attempt += 1) {
+    const model = models[Math.min(attempt, models.length - 1)];
+    try { return await callModelOnce(ai, parts, model); } catch (e) {
+      if (!busy(e) || attempt >= 2) throw e;
+      await new Promise((ok) => setTimeout(ok, retryDelayMs * (attempt + 1)));
+    }
+  }
+}
+function _setRetryDelay(ms) { retryDelayMs = ms; }
+
+async function callModelOnce(ai, parts, model) {
   if (ai.source === 'user') {
     return userProviders.generate({ provider: ai.provider, key: ai.key, model: ai.model, baseUrl: ai.baseUrl, system: SYSTEM, parts, json: true });
   }
   return platform.generate({
     system: SYSTEM, parts, json: true, maxTokens: 32768,
-    provider: process.env.STATEMENT_AI_PROVIDER || undefined, model: process.env.STATEMENT_AI_MODEL || undefined,
+    provider: process.env.STATEMENT_AI_PROVIDER || undefined, model,
   });
 }
 
 // One model reading -> parsed JSON (one quiet retry when the JSON comes back broken).
-async function readOnce(ai, parts, usage) {
+async function readOnce(ai, parts, usage, opts) {
   for (let i = 0; i < 2; i += 1) {
-    const r = await callModel(ai, parts);
+    const r = await callModel(ai, parts, opts);
     usage.calls += 1;
     if (r.usage) { usage.input += r.usage.input || 0; usage.output += r.usage.output || 0; }
     if (r.model) usage.model = r.model;
@@ -239,7 +265,8 @@ async function read({ buffer, mime, fileName, ai }) {
     return [{ mime: k.mime, data: b64 }, { text: extra || 'Read this statement.' }];
   };
 
-  const first = await readOnce(ai, wholeParts(), usage);
+  const vision = { vision: mode !== 'text' };
+  const first = await readOnce(ai, wholeParts(), usage, vision);
   const m = meta(first);
   let best = check(m, normalizeRows(first.rows), pageAmounts);
   const attempts = [{ attempt: 1, scope: 'all pages', status: best.proof.status, gap_cents: best.proof.gap_cents, breaks: best.proof.breaks.length }];
@@ -255,7 +282,7 @@ async function read({ buffer, mime, fileName, ai }) {
       parts = [{ text: `${ask}\n\n=== Page ${page} of ${pages} ===\n${pg ? pg.text : ''}` }];
     } else parts = wholeParts(ask);
     let again;
-    try { again = await readOnce(ai, parts, usage); } catch (e) { break; }
+    try { again = await readOnce(ai, parts, usage, vision); } catch (e) { break; }
     const am = meta(again);
     let rows;
     const m2 = { ...m };
@@ -300,4 +327,4 @@ function reprove({ meta: m, rows, opening_cents: o, closing_cents: c }) {
   return { meta: m2, proof: p };
 }
 
-module.exports = { read, reprove, detectKind, parseJson, normalizeRows, meta, check, dateIssues, SYSTEM, StatementError, MAX_REREADS };
+module.exports = { _setRetryDelay, read, reprove, detectKind, parseJson, normalizeRows, meta, check, dateIssues, SYSTEM, StatementError, MAX_REREADS };
