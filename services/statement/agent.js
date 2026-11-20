@@ -109,7 +109,8 @@ function meta(json) {
 }
 
 let retryDelayMs = 3000;
-const busy = (e) => !!e && (['AI_BUSY', 'AI_RATE_LIMIT', 'AI_TIMEOUT'].includes(e.code) || /HTTP (429|500|502|503|504)\b/.test(String(e.message || '')));
+// Busy, rate-limited or silent (timeout: the platform error then carries no HTTP status).
+const busy = (e) => !!e && (['AI_BUSY', 'AI_RATE_LIMIT', 'AI_TIMEOUT'].includes(e.code) || /HTTP (429|500|502|503|504)\b/.test(String(e.message || '')) || (e.code === 'AI_REQUEST_FAILED' && !/HTTP \d/.test(String(e.message || ''))));
 
 // Instance AI: text pages go to STATEMENT_AI_MODEL; scans and photos to STATEMENT_AI_VISION_MODEL
 // (a stronger reader: on tilted photos the light model paired dates with the row below). A busy
