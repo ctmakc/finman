@@ -11,6 +11,8 @@ const svc = require('../invoice/service');
 const core = require('../invoice/core');
 const config = require('../../config/config');
 const { TX_TOOLS, TxToolError } = require('./txTools');
+const { STATEMENT_TOOLS, StatementToolError } = require('./statementTools');
+const { StatementError } = require('../statement/agent');
 
 const PDF_TTL = 7 * 24 * 60 * 60; // seconds
 
@@ -285,7 +287,7 @@ async function findInvoice(userId, a) {
   return svc.getInvoice(userId, hit.id);
 }
 
-TOOLS.push(...TX_TOOLS);
+TOOLS.push(...TX_TOOLS, ...STATEMENT_TOOLS);
 // Write tools say so explicitly: hosts treat a missing readOnlyHint as "may change data".
 for (const t of TOOLS) {
   if (!t.annotations) t.annotations = { readOnlyHint: false, destructiveHint: false };
@@ -315,7 +317,7 @@ async function callTool(userId, name, args) {
     const data = await tool.run(userId, a);
     return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data, isError: false };
   } catch (e) {
-    if (e instanceof ToolError || e instanceof TxToolError || e instanceof svc.InvoiceError) {
+    if (e instanceof ToolError || e instanceof TxToolError || e instanceof StatementToolError || e instanceof StatementError || e instanceof svc.InvoiceError) {
       return { content: [{ type: 'text', text: e.message }], isError: true };
     }
     throw e;

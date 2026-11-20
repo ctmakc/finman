@@ -30,6 +30,7 @@ const bankApiService = require('../services/bankApiService');
 const csvImportService = require('../services/csvImportService');
 const ofxImportService = require('../services/ofxImportService');
 const { query, run, transaction } = require('../db/database');
+const importCommit = require('../services/importCommit');
 const money = require('../lib/money');
 
 const router = express.Router();
@@ -56,27 +57,8 @@ function bankSummary(bankId) {
   return bankApiConfig.listBanks().find((b) => b.id === bankId) || null;
 }
 
-// Fingerprints of what the account already holds, as a count Map
-// (fingerprint -> stored copies). Dedupe consumes one stored copy per incoming
-// row, so two identical real transactions (same day, amount, merchant) both
-// import, and a re-import of the same statement still skips both.
-// The transactions table has no column for a bank id (FITID / Monobank op id),
-// so identity across imports can only be the (date, amount, description) count.
-async function loadExistingFingerprints(accountId, userId) {
-  const rows = await query(
-    `SELECT date, amount, description FROM transactions WHERE account_id = ? AND user_id = ?`,
-    [accountId, userId]
-  );
-  return csvImportService.fingerprintCounts(rows.map((r) => csvImportService.fingerprintOf(r.date, r.amount, r.description)));
-}
-
-// Take one stored copy of `fp` if any is left; true = this row is already stored.
-function consumeExisting(counts, fp) {
-  const left = counts.get(fp) || 0;
-  if (left <= 0) return false;
-  counts.set(fp, left - 1);
-  return true;
-}
+// Fingerprints of what the account already holds (count Map) — shared with the commit path.
+const { loadExistingFingerprints, consumeExisting } = require('../services/importCommit');
 
 // ==================== CATALOGUE ====================
 
@@ -419,13 +401,6 @@ router.post('/import/preview', authenticate, (req, res) => {
   });
 });
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-// V8 turns "2026-02-31" into March 2nd, so check the calendar, not just the shape.
-function isCalendarDate(iso) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
-}
-
 // JSON: { accountId, rows:[{date, description, amount, category, type}], skipDuplicates=true, updateBalance=true }
 router.post('/import/commit', authenticate, async (req, res) => {
   try {
@@ -443,56 +418,10 @@ router.post('/import/commit', authenticate, async (req, res) => {
     if (!account) return fail(res, 404, 'Account not found');
 
     // Validate before touching the DB.
-    const prepared = [];
-    const errors = [];
-    rows.forEach((r, i) => {
-      const date = String(r.date || '').trim();
-      const amount = Number(r.amount);
-      if (!ISO_DATE.test(date) || !isCalendarDate(date)) {
-        errors.push({ index: i, message: `Row ${i + 1}: invalid date "${r.date}"` });
-        return;
-      }
-      if (!Number.isFinite(amount)) {
-        errors.push({ index: i, message: `Row ${i + 1}: invalid amount "${r.amount}"` });
-        return;
-      }
-      const description = String(r.description || 'Transaction').replace(/\s+/g, ' ').trim().slice(0, 500);
-      const category = String(r.category || 'Other').trim().slice(0, 100) || 'Other';
-      const rounded = money.round(amount);
-      const type = r.type === 'income' || r.type === 'expense' ? r.type : rounded >= 0 ? 'income' : 'expense';
-      // Same rule as every other writer (models/transaction.js): the type
-      // fixes the sign, expense < 0 and income > 0. A row sent as
-      // { type:'income', amount:-50 } must not store a negative income.
-      const signed = Transaction.signedAmount(rounded, type) || 0;
-      prepared.push({ date, description, category, amount: signed, type, fingerprint: csvImportService.fingerprintOf(date, signed, description) });
-    });
+    const { prepared, errors } = importCommit.prepareRows(rows);
     if (errors.length && prepared.length === 0) return res.status(400).json({ error: true, message: errors[0].message, errors });
 
-    const existing = await loadExistingFingerprints(account.id, req.user.id);
-    let inserted = 0;
-    let skipped = 0;
-    let delta = 0;
-    await transaction(async () => {
-      for (const tx of prepared) {
-        if (skipDuplicates && consumeExisting(existing, tx.fingerprint)) {
-          skipped++;
-          continue;
-        }
-        await run(
-          `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [account.id, req.user.id, tx.date, tx.description, tx.category, tx.amount, tx.type]
-        );
-        inserted++;
-        delta = money.add(delta, tx.amount);
-      }
-      if (updateBalance && inserted > 0 && delta !== 0) {
-        await run(
-          `UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
-          [delta, account.id, req.user.id]
-        );
-      }
-    });
+    const { inserted, skipped, delta } = await importCommit.commitPrepared(account, req.user.id, prepared, { skipDuplicates, updateBalance });
 
     const refreshed = await Account.findById(account.id, req.user.id);
     res.json({
@@ -502,7 +431,7 @@ router.post('/import/commit', authenticate, async (req, res) => {
       skipped,
       rejected: errors.length,
       errors,
-      balanceDelta: updateBalance ? delta : 0,
+      balanceDelta: delta,
       newBalance: refreshed ? refreshed.balance : null
     });
   } catch (error) {

@@ -1,0 +1,8114 @@
+{
+ "note": "FICTIONAL synthetic bank statements for the Finman Statement Agent evaluation (fictional banks, people, addresses, merchants). All amounts are integer cents. rows[].cents is the amount AS PRINTED (planted errors included), negative = money out of the account holder's pocket. Bank accounts: opening_cents/closing_cents are the printed balances. Credit cards (sign_convention \"card (purchases positive on paper)\"): purchases/charges are printed positive and payments/credits negative or with CR; in this manifest purchases are negative and payments positive, opening_cents = -(Previous balance owed) and closing_cents = -(New balance owed), so opening + sum(rows) = closing holds in the same algebra. For cards, rows[].date is the transaction date (first column); the posting date is in rows[].post_date. balance_cents is the printed running balance or null. \"Balance brought/carried forward\" lines (t01, t12) and OPENING/CLOSING BALANCE table lines are not transactions and are not in rows. planted.row_index = index in rows of the bad row (flipped_sign, wrong_digit), of the extra copy (duplicated_row), or of the printed row right after the gap (dropped_row; with a running balance this is the first row whose balance breaks). expect: proof_ok = opening + sum(rows) == closing and every running balance matches; proof_fail = it does not (agent must flag, never force-fit); needs_closing = no closing balance printed, agent must ask for it. Regenerate: node make_eval.mjs",
+ "files": {
+  "t01-nhb-chequing-cad-2026-10.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Northwind Harbour Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 280464,
+   "closing_cents": 436012,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -169921,
+     "balance_cents": 110543,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -2002,
+     "balance_cents": 108541,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -5207,
+     "balance_cents": 103334,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7618,
+     "balance_cents": 95716,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2221,
+     "balance_cents": 93495,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3738,
+     "balance_cents": 89757,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -563,
+     "balance_cents": 89194,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE REF CA2664932355 MEMO SHARED BILLS",
+     "cents": 23774,
+     "balance_cents": 112968,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-10",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1704,
+     "balance_cents": 111264,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -10706,
+     "balance_cents": 100558,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1998,
+     "balance_cents": 98560,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -4289,
+     "balance_cents": 94271,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -12004,
+     "balance_cents": 82267,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -1785,
+     "balance_cents": 80482,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -3432,
+     "balance_cents": 77050,
+     "page": 1
+    },
+    {
+     "date": "2026-10-14",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1338,
+     "balance_cents": 75712,
+     "page": 1
+    },
+    {
+     "date": "2026-10-14",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2908,
+     "balance_cents": 72804,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 255992,
+     "balance_cents": 328796,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2947,
+     "balance_cents": 325849,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9200,
+     "balance_cents": 316649,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1908,
+     "balance_cents": 314741,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1542,
+     "balance_cents": 313199,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -4438,
+     "balance_cents": 308761,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4771,
+     "balance_cents": 303990,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "description": "CHEQUE #000132",
+     "cents": -12188,
+     "balance_cents": 291802,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -1744,
+     "balance_cents": 290058,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1718,
+     "balance_cents": 288340,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -6658,
+     "balance_cents": 281682,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2134,
+     "balance_cents": 279548,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "ONLINE TRANSFER TO SAVINGS ACCT ****8812 RECURRING MONTHLY",
+     "cents": -27300,
+     "balance_cents": 252248,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-25",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2408,
+     "balance_cents": 249840,
+     "page": 1
+    },
+    {
+     "date": "2026-10-25",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9395,
+     "balance_cents": 240445,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6036,
+     "balance_cents": 234409,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -8483,
+     "balance_cents": 225926,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -679,
+     "balance_cents": 225247,
+     "page": 2
+    },
+    {
+     "date": "2026-10-27",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -4199,
+     "balance_cents": 221048,
+     "page": 2
+    },
+    {
+     "date": "2026-10-28",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -8858,
+     "balance_cents": 212190,
+     "page": 2
+    },
+    {
+     "date": "2026-10-28",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1000,
+     "balance_cents": 211190,
+     "page": 2
+    },
+    {
+     "date": "2026-10-28",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -11540,
+     "balance_cents": 199650,
+     "page": 2
+    },
+    {
+     "date": "2026-10-29",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -12270,
+     "balance_cents": 187380,
+     "page": 2
+    },
+    {
+     "date": "2026-10-29",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1841,
+     "balance_cents": 185539,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 256968,
+     "balance_cents": 442507,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -909,
+     "balance_cents": 441598,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "INTEREST PAID",
+     "cents": 56,
+     "balance_cents": 441654,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5100,
+     "balance_cents": 436554,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -542,
+     "balance_cents": 436012,
+     "page": 2
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok",
+   "carry_forward_lines": true
+  },
+  "t02-lnb-checking-usd-2026-09.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Larkhaven National Bank (fictional)",
+   "layout": "single signed amount column",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 519891,
+   "closing_cents": 840897,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -195486,
+     "balance_cents": 324405,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -7428,
+     "balance_cents": 316977,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2351,
+     "balance_cents": 314626,
+     "page": 1
+    },
+    {
+     "date": "2026-09-05",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7281,
+     "balance_cents": 307345,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -8441,
+     "balance_cents": 298904,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5173,
+     "balance_cents": 293731,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3631,
+     "balance_cents": 290100,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "BEANHOUSE CAFE",
+     "cents": -986,
+     "balance_cents": 289114,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 41018,
+     "balance_cents": 330132,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -13149,
+     "balance_cents": 316983,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5110,
+     "balance_cents": 311873,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5812,
+     "balance_cents": 306061,
+     "page": 1
+    },
+    {
+     "date": "2026-09-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 335187,
+     "balance_cents": 641248,
+     "page": 1
+    },
+    {
+     "date": "2026-09-17",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7671,
+     "balance_cents": 633577,
+     "page": 1
+    },
+    {
+     "date": "2026-09-18",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2498,
+     "balance_cents": 631079,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1743,
+     "balance_cents": 629336,
+     "page": 1
+    },
+    {
+     "date": "2026-09-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -11059,
+     "balance_cents": 618277,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -40128,
+     "balance_cents": 578149,
+     "page": 1
+    },
+    {
+     "date": "2026-09-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -5051,
+     "balance_cents": 573098,
+     "page": 1
+    },
+    {
+     "date": "2026-09-27",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2150,
+     "balance_cents": 570948,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 272067,
+     "balance_cents": 843015,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2118,
+     "balance_cents": 840897,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t03-dwb-current-aed-2026-08.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Dunewell Bank (fictional)",
+   "layout": "amount with CR/DR suffix",
+   "paper": "a4",
+   "currency": "AED",
+   "number_format": "1,234.56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 2457454,
+   "closing_cents": 3298425,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-08-01",
+     "description": "RENT CHEQUE NO. 000723",
+     "cents": -650600,
+     "balance_cents": 1806854,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "FALCON TAXI SVC",
+     "cents": -5466,
+     "balance_cents": 1801388,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -27423,
+     "balance_cents": 1773965,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -14437,
+     "balance_cents": 1759528,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "FALCON TAXI SVC",
+     "cents": -4714,
+     "balance_cents": 1754814,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -2601,
+     "balance_cents": 1752213,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "SOUQLANE ONLINE",
+     "cents": -20109,
+     "balance_cents": 1732104,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -44500,
+     "balance_cents": 1687604,
+     "page": 1
+    },
+    {
+     "date": "2026-08-03",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -8393,
+     "balance_cents": 1679211,
+     "page": 1
+    },
+    {
+     "date": "2026-08-03",
+     "description": "SANDCASTLE CAFE",
+     "cents": -5658,
+     "balance_cents": 1673553,
+     "page": 1
+    },
+    {
+     "date": "2026-08-03",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -28851,
+     "balance_cents": 1644702,
+     "page": 1
+    },
+    {
+     "date": "2026-08-04",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -4574,
+     "balance_cents": 1640128,
+     "page": 1
+    },
+    {
+     "date": "2026-08-04",
+     "description": "FALCON TAXI SVC",
+     "cents": -3556,
+     "balance_cents": 1636572,
+     "page": 1
+    },
+    {
+     "date": "2026-08-05",
+     "description": "GULFSTAR TELECOM POSTPAID",
+     "cents": -26813,
+     "balance_cents": 1609759,
+     "page": 1
+    },
+    {
+     "date": "2026-08-05",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -11064,
+     "balance_cents": 1598695,
+     "page": 1
+    },
+    {
+     "date": "2026-08-05",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -3347,
+     "balance_cents": 1595348,
+     "page": 1
+    },
+    {
+     "date": "2026-08-05",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -12544,
+     "balance_cents": 1582804,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "FALCON TAXI SVC",
+     "cents": -4292,
+     "balance_cents": 1578512,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "SANDCASTLE CAFE",
+     "cents": -4492,
+     "balance_cents": 1574020,
+     "page": 1
+    },
+    {
+     "date": "2026-08-08",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -38329,
+     "balance_cents": 1535691,
+     "page": 1
+    },
+    {
+     "date": "2026-08-10",
+     "description": "INWARD REMITTANCE FROM SAMIRA DEMO REF AE2667676442 FAMILY SUPPORT",
+     "cents": 326444,
+     "balance_cents": 1862135,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-08-12",
+     "description": "CITY UTILITY AUTHORITY BILL",
+     "cents": -66551,
+     "balance_cents": 1795584,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "SOUQLANE ONLINE",
+     "cents": -58065,
+     "balance_cents": 1737519,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "SANDCASTLE CAFE",
+     "cents": -1588,
+     "balance_cents": 1735931,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -17257,
+     "balance_cents": 1718674,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -9158,
+     "balance_cents": 1709516,
+     "page": 1
+    },
+    {
+     "date": "2026-08-14",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -6396,
+     "balance_cents": 1703120,
+     "page": 1
+    },
+    {
+     "date": "2026-08-14",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -40488,
+     "balance_cents": 1662632,
+     "page": 1
+    },
+    {
+     "date": "2026-08-14",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -7999,
+     "balance_cents": 1654633,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -15394,
+     "balance_cents": 1639239,
+     "page": 1
+    },
+    {
+     "date": "2026-08-16",
+     "description": "ATM CASH WITHDRAWAL · MALL BRANCH",
+     "cents": -61027,
+     "balance_cents": 1578212,
+     "page": 1
+    },
+    {
+     "date": "2026-08-16",
+     "description": "SANDCASTLE CAFE",
+     "cents": -2845,
+     "balance_cents": 1575367,
+     "page": 2
+    },
+    {
+     "date": "2026-08-17",
+     "description": "SOUQLANE ONLINE",
+     "cents": -28808,
+     "balance_cents": 1546559,
+     "page": 2
+    },
+    {
+     "date": "2026-08-18",
+     "description": "FALCON TAXI SVC",
+     "cents": -3702,
+     "balance_cents": 1542857,
+     "page": 2
+    },
+    {
+     "date": "2026-08-18",
+     "description": "OASIS PETROL STN 12",
+     "cents": -6664,
+     "balance_cents": 1536193,
+     "page": 2
+    },
+    {
+     "date": "2026-08-18",
+     "description": "OASIS PETROL STN 12",
+     "cents": -18956,
+     "balance_cents": 1517237,
+     "page": 2
+    },
+    {
+     "date": "2026-08-19",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -8071,
+     "balance_cents": 1509166,
+     "page": 2
+    },
+    {
+     "date": "2026-08-20",
+     "description": "SOUQLANE ONLINE",
+     "cents": -56347,
+     "balance_cents": 1452819,
+     "page": 2
+    },
+    {
+     "date": "2026-08-20",
+     "description": "OASIS PETROL STN 12",
+     "cents": -8320,
+     "balance_cents": 1444499,
+     "page": 2
+    },
+    {
+     "date": "2026-08-21",
+     "description": "OWN ACCOUNT TRANSFER TO SAVINGS ****3301 STANDING ORDER",
+     "cents": -285420,
+     "balance_cents": 1159079,
+     "page": 2,
+     "wrapped": true
+    },
+    {
+     "date": "2026-08-21",
+     "description": "OASIS PETROL STN 12",
+     "cents": -19004,
+     "balance_cents": 1140075,
+     "page": 2
+    },
+    {
+     "date": "2026-08-21",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -5830,
+     "balance_cents": 1134245,
+     "page": 2
+    },
+    {
+     "date": "2026-08-21",
+     "description": "OASIS PETROL STN 12",
+     "cents": -10831,
+     "balance_cents": 1123414,
+     "page": 2
+    },
+    {
+     "date": "2026-08-22",
+     "description": "SANDCASTLE CAFE",
+     "cents": -3161,
+     "balance_cents": 1120253,
+     "page": 2
+    },
+    {
+     "date": "2026-08-23",
+     "description": "OASIS PETROL STN 12",
+     "cents": -6754,
+     "balance_cents": 1113499,
+     "page": 2
+    },
+    {
+     "date": "2026-08-23",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -13331,
+     "balance_cents": 1100168,
+     "page": 2
+    },
+    {
+     "date": "2026-08-23",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -6295,
+     "balance_cents": 1093873,
+     "page": 2
+    },
+    {
+     "date": "2026-08-23",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -7264,
+     "balance_cents": 1086609,
+     "page": 2
+    },
+    {
+     "date": "2026-08-25",
+     "description": "SALARY CREDIT · FALCONRIDGE TRADING LLC (FICT.)",
+     "cents": 2483010,
+     "balance_cents": 3569619,
+     "page": 2
+    },
+    {
+     "date": "2026-08-25",
+     "description": "SANDCASTLE CAFE",
+     "cents": -1622,
+     "balance_cents": 3567997,
+     "page": 2
+    },
+    {
+     "date": "2026-08-25",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -17779,
+     "balance_cents": 3550218,
+     "page": 2
+    },
+    {
+     "date": "2026-08-26",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -27833,
+     "balance_cents": 3522385,
+     "page": 2
+    },
+    {
+     "date": "2026-08-26",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -6153,
+     "balance_cents": 3516232,
+     "page": 2
+    },
+    {
+     "date": "2026-08-27",
+     "description": "SANDCASTLE CAFE",
+     "cents": -6415,
+     "balance_cents": 3509817,
+     "page": 2
+    },
+    {
+     "date": "2026-08-28",
+     "description": "CAR LOAN INSTALMENT · CONTRACT 77455",
+     "cents": -162946,
+     "balance_cents": 3346871,
+     "page": 2
+    },
+    {
+     "date": "2026-08-28",
+     "description": "SANDCASTLE CAFE",
+     "cents": -3641,
+     "balance_cents": 3343230,
+     "page": 2
+    },
+    {
+     "date": "2026-08-30",
+     "description": "FALCON TAXI SVC",
+     "cents": -3329,
+     "balance_cents": 3339901,
+     "page": 2
+    },
+    {
+     "date": "2026-08-30",
+     "description": "OASIS PETROL STN 12",
+     "cents": -7799,
+     "balance_cents": 3332102,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "ACCOUNT MAINTENANCE FEE",
+     "cents": -3027,
+     "balance_cents": 3329075,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "PROFIT CREDIT",
+     "cents": 2030,
+     "balance_cents": 3331105,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -4682,
+     "balance_cents": 3326423,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -27998,
+     "balance_cents": 3298425,
+     "page": 2
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t04-vmb-giro-eur-2026-10.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Velmora Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "a4",
+   "currency": "EUR",
+   "number_format": "1.234,56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 610581,
+   "closing_cents": 769186,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "SEPA DIRECT DEBIT · RENT",
+     "cents": -87427,
+     "balance_cents": 523154,
+     "page": 1
+    },
+    {
+     "date": "2026-10-01",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -6745,
+     "balance_cents": 516409,
+     "page": 1
+    },
+    {
+     "date": "2026-10-01",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -5804,
+     "balance_cents": 510605,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -316,
+     "balance_cents": 510289,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1319,
+     "balance_cents": 508970,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -6062,
+     "balance_cents": 502908,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "STADTRAD VERLEIH",
+     "cents": -974,
+     "balance_cents": 501934,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "MOBILFUNK KLARNETZ",
+     "cents": -4171,
+     "balance_cents": 497763,
+     "page": 1
+    },
+    {
+     "date": "2026-10-07",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -1992,
+     "balance_cents": 495771,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "SEPA TRANSFER FROM CHRIS MOCKFORD REF SEPA-2659376390 HOLIDAY SHARE",
+     "cents": 18527,
+     "balance_cents": 514298,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-08",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1747,
+     "balance_cents": 512551,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -734,
+     "balance_cents": 511817,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -604,
+     "balance_cents": 511213,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "STADTRAD VERLEIH",
+     "cents": -321,
+     "balance_cents": 510892,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "STROM UND GAS STADTWERKE DEMO",
+     "cents": -7823,
+     "balance_cents": 503069,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -9342,
+     "balance_cents": 493727,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1068,
+     "balance_cents": 492659,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -929,
+     "balance_cents": 491730,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "CASH WITHDRAWAL ATM 2214",
+     "cents": -6229,
+     "balance_cents": 485501,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -6486,
+     "balance_cents": 479015,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1666,
+     "balance_cents": 477349,
+     "page": 1
+    },
+    {
+     "date": "2026-10-19",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -2199,
+     "balance_cents": 475150,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -2503,
+     "balance_cents": 472647,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -8454,
+     "balance_cents": 464193,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -11868,
+     "balance_cents": 452325,
+     "page": 1
+    },
+    {
+     "date": "2026-10-22",
+     "description": "STANDING ORDER TO SAVINGS IBAN XX00 0000 0000 0000 4417",
+     "cents": -35361,
+     "balance_cents": 416964,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-22",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -6873,
+     "balance_cents": 410091,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -1418,
+     "balance_cents": 408673,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "description": "LIBRERIA SOLE",
+     "cents": -2438,
+     "balance_cents": 406235,
+     "page": 1
+    },
+    {
+     "date": "2026-10-25",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -7968,
+     "balance_cents": 398267,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "description": "MERCATO VERDE",
+     "cents": -3359,
+     "balance_cents": 394908,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "SALARY · LORENTA STUDIO GMBH (FICT.)",
+     "cents": 384956,
+     "balance_cents": 779864,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -4938,
+     "balance_cents": 774926,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -643,
+     "balance_cents": 774283,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -4033,
+     "balance_cents": 770250,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "ACCOUNT FEE",
+     "cents": -596,
+     "balance_cents": 769654,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "CREDIT INTEREST",
+     "cents": 64,
+     "balance_cents": 769718,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "STADTRAD VERLEIH",
+     "cents": -532,
+     "balance_cents": 769186,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t05-qcu-chequing-cad-2026-07.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Quillmoor Credit Union (fictional)",
+   "layout": "negatives in parentheses",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "DD Mon YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 564794,
+   "closing_cents": 739313,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-07-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -141124,
+     "balance_cents": 423670,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3346,
+     "balance_cents": 420324,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1595,
+     "balance_cents": 418729,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9440,
+     "balance_cents": 409289,
+     "page": 1
+    },
+    {
+     "date": "2026-07-02",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -1881,
+     "balance_cents": 407408,
+     "page": 1
+    },
+    {
+     "date": "2026-07-03",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -851,
+     "balance_cents": 406557,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -2121,
+     "balance_cents": 404436,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -3388,
+     "balance_cents": 401048,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7162,
+     "balance_cents": 393886,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7863,
+     "balance_cents": 386023,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -6624,
+     "balance_cents": 379399,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -12044,
+     "balance_cents": 367355,
+     "page": 1
+    },
+    {
+     "date": "2026-07-08",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -5200,
+     "balance_cents": 362155,
+     "page": 1
+    },
+    {
+     "date": "2026-07-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE REF CA2653196013 MEMO SHARED BILLS",
+     "cents": 9829,
+     "balance_cents": 371984,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-07-09",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2607,
+     "balance_cents": 369377,
+     "page": 1
+    },
+    {
+     "date": "2026-07-10",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7911,
+     "balance_cents": 361466,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -11431,
+     "balance_cents": 350035,
+     "page": 1
+    },
+    {
+     "date": "2026-07-13",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1947,
+     "balance_cents": 348088,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 318487,
+     "balance_cents": 666575,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -2583,
+     "balance_cents": 663992,
+     "page": 1
+    },
+    {
+     "date": "2026-07-16",
+     "description": "HARVEST LANE MARKET",
+     "cents": -5159,
+     "balance_cents": 658833,
+     "page": 1
+    },
+    {
+     "date": "2026-07-17",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1480,
+     "balance_cents": 657353,
+     "page": 1
+    },
+    {
+     "date": "2026-07-18",
+     "description": "CHEQUE #000783",
+     "cents": -13108,
+     "balance_cents": 644245,
+     "page": 1
+    },
+    {
+     "date": "2026-07-18",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2232,
+     "balance_cents": 642013,
+     "page": 1
+    },
+    {
+     "date": "2026-07-19",
+     "description": "BEANHOUSE CAFE",
+     "cents": -904,
+     "balance_cents": 641109,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -19418,
+     "balance_cents": 621691,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -4196,
+     "balance_cents": 617495,
+     "page": 1
+    },
+    {
+     "date": "2026-07-21",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9385,
+     "balance_cents": 599999,
+     "page": 1
+    },
+    {
+     "date": "2026-07-22",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4470,
+     "balance_cents": 595529,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "ONLINE TRANSFER TO SAVINGS ACCT ****8812 RECURRING MONTHLY",
+     "cents": -23739,
+     "balance_cents": 571790,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-07-24",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7054,
+     "balance_cents": 564736,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5694,
+     "balance_cents": 559042,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3223,
+     "balance_cents": 555819,
+     "page": 1
+    },
+    {
+     "date": "2026-07-26",
+     "description": "BEANHOUSE CAFE",
+     "cents": -534,
+     "balance_cents": 555285,
+     "page": 1
+    },
+    {
+     "date": "2026-07-26",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -4274,
+     "balance_cents": 551011,
+     "page": 2
+    },
+    {
+     "date": "2026-07-26",
+     "description": "HARVEST LANE MARKET",
+     "cents": -4364,
+     "balance_cents": 546647,
+     "page": 2
+    },
+    {
+     "date": "2026-07-26",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -895,
+     "balance_cents": 545752,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -8002,
+     "balance_cents": 537750,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7152,
+     "balance_cents": 530598,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -1595,
+     "balance_cents": 529003,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2158,
+     "balance_cents": 526845,
+     "page": 2
+    },
+    {
+     "date": "2026-07-28",
+     "description": "LUMEN STREAMING",
+     "cents": -1343,
+     "balance_cents": 525502,
+     "page": 2
+    },
+    {
+     "date": "2026-07-28",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -9401,
+     "balance_cents": 516101,
+     "page": 2
+    },
+    {
+     "date": "2026-07-28",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2336,
+     "balance_cents": 513765,
+     "page": 2
+    },
+    {
+     "date": "2026-07-29",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5985,
+     "balance_cents": 507780,
+     "page": 2
+    },
+    {
+     "date": "2026-07-29",
+     "description": "HARVEST LANE MARKET",
+     "cents": -8692,
+     "balance_cents": 499088,
+     "page": 2
+    },
+    {
+     "date": "2026-07-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 240706,
+     "balance_cents": 739794,
+     "page": 2
+    },
+    {
+     "date": "2026-07-31",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -686,
+     "balance_cents": 739108,
+     "page": 2
+    },
+    {
+     "date": "2026-07-31",
+     "description": "INTEREST PAID",
+     "cents": 205,
+     "balance_cents": 739313,
+     "page": 2
+    }
+   ],
+   "planted": {
+    "type": "dropped_row",
+    "row_index": 27,
+    "page": 1,
+    "detail": "Row 2026-07-21 \"HARVEST LANE MARKET\" (81.11) (true cents -8111) is missing from the table; opening, closing and running balances still include it. row_index = printed row that now follows the gap.",
+    "true_row": {
+     "date": "2026-07-21",
+     "description": "HARVEST LANE MARKET",
+     "cents": -8111
+    }
+   },
+   "expect": "proof_fail"
+  },
+  "t06-pls-savings-usd-2026-06.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Prairie Lantern Savings (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 625595,
+   "closing_cents": 967210,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-06-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -198832,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-02",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9828,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-02",
+     "description": "LUMEN STREAMING",
+     "cents": -1422,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-02",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2910,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-03",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -2833,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-03",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7936,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6867,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-06",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -12617,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 16579,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-09",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2207,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -13392,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 301662,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-18",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7576,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -18389,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-26",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1396,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-26",
+     "description": "LUMEN STREAMING",
+     "cents": -1265,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-27",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1926,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 312770,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t07-hvb-rewards-card-cad-2026-10.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Halverine Bank (fictional)",
+   "layout": "credit card, payments shown with minus",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "card (purchases positive on paper)",
+   "opening_cents": -91617,
+   "closing_cents": -152856,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-10-02",
+     "post_date": "2026-10-04",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -1863,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "post_date": "2026-10-04",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2055,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "post_date": "2026-10-04",
+     "description": "BEANHOUSE CAFE",
+     "cents": -930,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "post_date": "2026-10-06",
+     "description": "PAYMENT RECEIVED · THANK YOU",
+     "cents": 61236,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "post_date": "2026-10-05",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9417,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-07",
+     "post_date": "2026-10-09",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2032,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "post_date": "2026-10-10",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1591,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "post_date": "2026-10-10",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1996,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "post_date": "2026-10-11",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2457,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "post_date": "2026-10-12",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1467,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "post_date": "2026-10-12",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2414,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-14",
+     "post_date": "2026-10-16",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -3630,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "post_date": "2026-10-15",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1909,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "post_date": "2026-10-16",
+     "description": "LUMEN STREAMING",
+     "cents": -1527,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "post_date": "2026-10-19",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -7300,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "post_date": "2026-10-20",
+     "description": "RETURN · PARCELBOX ONLINE MKTP ORDER 26-703527 REFUND TO CARD",
+     "cents": 6519,
+     "balance_cents": null,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-18",
+     "post_date": "2026-10-20",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -3934,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "post_date": "2026-10-19",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2873,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-19",
+     "post_date": "2026-10-20",
+     "description": "HARVEST LANE MARKET",
+     "cents": -6771,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-19",
+     "post_date": "2026-10-21",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -5186,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-19",
+     "post_date": "2026-10-19",
+     "description": "FOREIGN PURCHASE · CAFE LUMIERE EXEMPLE EUR 42.10 @ 1.5023 INCL. FX FEE",
+     "cents": -6325,
+     "balance_cents": null,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-20",
+     "post_date": "2026-10-21",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2507,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "post_date": "2026-10-20",
+     "description": "HARVEST LANE MARKET",
+     "cents": -6437,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "post_date": "2026-10-22",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5421,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-22",
+     "post_date": "2026-10-24",
+     "description": "BEANHOUSE CAFE",
+     "cents": -783,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "post_date": "2026-10-23",
+     "description": "LUMEN STREAMING",
+     "cents": -1304,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "post_date": "2026-10-25",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2015,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "post_date": "2026-10-24",
+     "description": "BEANHOUSE CAFE",
+     "cents": -726,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "post_date": "2026-10-26",
+     "description": "LUMEN STREAMING",
+     "cents": -1225,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "post_date": "2026-10-28",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1156,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "post_date": "2026-10-26",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1407,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "post_date": "2026-10-27",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -3046,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "post_date": "2026-10-28",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -801,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "post_date": "2026-10-28",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -1299,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "post_date": "2026-10-30",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1237,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "post_date": "2026-10-29",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -8247,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "post_date": "2026-10-30",
+     "description": "HARVEST LANE MARKET",
+     "cents": -10887,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "post_date": "2026-10-31",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1078,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "post_date": "2026-10-30",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2203,
+     "balance_cents": null,
+     "page": 2
+    },
+    {
+     "date": "2026-10-30",
+     "post_date": "2026-10-31",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1277,
+     "balance_cents": null,
+     "page": 2
+    },
+    {
+     "date": "2026-10-30",
+     "post_date": "2026-10-31",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4673,
+     "balance_cents": null,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "post_date": "2026-10-31",
+     "description": "INTEREST CHARGE · PURCHASES",
+     "cents": -1921,
+     "balance_cents": null,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "post_date": "2026-10-31",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2721,
+     "balance_cents": null,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "post_date": "2026-10-31",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -946,
+     "balance_cents": null,
+     "page": 2
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok",
+   "card_note": "Printed Previous balance $916.17 => opening_cents -91617; printed New balance $1,528.56 => closing_cents -152856."
+  },
+  "t08-lnb-checking-usd-2026-08.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Larkhaven National Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 272869,
+   "closing_cents": 546848,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-08-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -159364,
+     "balance_cents": 113505,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3196,
+     "balance_cents": 110309,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -6257,
+     "balance_cents": 104052,
+     "page": 1
+    },
+    {
+     "date": "2026-08-04",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -13106,
+     "balance_cents": 90946,
+     "page": 1
+    },
+    {
+     "date": "2026-08-04",
+     "description": "LUMEN STREAMING",
+     "cents": -1836,
+     "balance_cents": 89110,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -9259,
+     "balance_cents": 79851,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1672,
+     "balance_cents": 78179,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5485,
+     "balance_cents": 72694,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1549,
+     "balance_cents": 71145,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -1124,
+     "balance_cents": 70021,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -4884,
+     "balance_cents": 65137,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 26770,
+     "balance_cents": 91907,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -516,
+     "balance_cents": 91391,
+     "page": 1
+    },
+    {
+     "date": "2026-08-11",
+     "description": "HARVEST LANE MARKET",
+     "cents": -4501,
+     "balance_cents": 86890,
+     "page": 1
+    },
+    {
+     "date": "2026-08-11",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5509,
+     "balance_cents": 81381,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -13836,
+     "balance_cents": 67545,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": 4489,
+     "balance_cents": 63056,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1071,
+     "balance_cents": 61985,
+     "page": 1
+    },
+    {
+     "date": "2026-08-14",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4635,
+     "balance_cents": 57350,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 295062,
+     "balance_cents": 352412,
+     "page": 1
+    },
+    {
+     "date": "2026-08-16",
+     "description": "HARVEST LANE MARKET",
+     "cents": -6341,
+     "balance_cents": 346071,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "CHEQUE #000404",
+     "cents": -16380,
+     "balance_cents": 329691,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -454,
+     "balance_cents": 329237,
+     "page": 1
+    },
+    {
+     "date": "2026-08-19",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -6148,
+     "balance_cents": 323089,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -17741,
+     "balance_cents": 305348,
+     "page": 1
+    },
+    {
+     "date": "2026-08-22",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1295,
+     "balance_cents": 304053,
+     "page": 1
+    },
+    {
+     "date": "2026-08-22",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -801,
+     "balance_cents": 303252,
+     "page": 1
+    },
+    {
+     "date": "2026-08-23",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1505,
+     "balance_cents": 301747,
+     "page": 1
+    },
+    {
+     "date": "2026-08-23",
+     "description": "BEANHOUSE CAFE",
+     "cents": -435,
+     "balance_cents": 301312,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -31197,
+     "balance_cents": 270115,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -5697,
+     "balance_cents": 264418,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "LUMEN STREAMING",
+     "cents": -1299,
+     "balance_cents": 263119,
+     "page": 1
+    },
+    {
+     "date": "2026-08-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -8039,
+     "balance_cents": 255080,
+     "page": 1
+    },
+    {
+     "date": "2026-08-27",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3666,
+     "balance_cents": 251414,
+     "page": 1
+    },
+    {
+     "date": "2026-08-28",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2891,
+     "balance_cents": 248523,
+     "page": 1
+    },
+    {
+     "date": "2026-08-30",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2427,
+     "balance_cents": 246096,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 303374,
+     "balance_cents": 549470,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -628,
+     "balance_cents": 548842,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "INTEREST PAID",
+     "cents": 157,
+     "balance_cents": 548999,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2151,
+     "balance_cents": 546848,
+     "page": 2
+    }
+   ],
+   "planted": {
+    "type": "flipped_sign",
+    "row_index": 16,
+    "page": 1,
+    "detail": "Withdrawal of 44.89 printed in the Deposits column (true cents -4489).",
+    "true_row": {
+     "date": "2026-08-12",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4489
+    }
+   },
+   "expect": "proof_fail"
+  },
+  "t09-lvb-compte-eur-2026-09.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Banque de Lorvenne (fictional)",
+   "layout": "single signed amount column",
+   "paper": "a4",
+   "currency": "EUR",
+   "number_format": "1,234.56",
+   "date_format": "DD Mon YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 505772,
+   "closing_cents": 652904,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "description": "SEPA DIRECT DEBIT · RENT",
+     "cents": -124253,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "description": "MOBILFUNK KLARNETZ",
+     "cents": -4998,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -3417,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -5808,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-05",
+     "description": "MERCATO VERDE",
+     "cents": -2837,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -713,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-07",
+     "description": "LIBRERIA SOLE",
+     "cents": -3548,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "SEPA TRANSFER FROM CHRIS MOCKFORD",
+     "cents": 24984,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -3577,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "MERCATO VERDE",
+     "cents": -6542,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-11",
+     "description": "STROM UND GAS STADTWERKE DEMO",
+     "cents": -7558,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -3823,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -842,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -8848,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-16",
+     "description": "STADTRAD VERLEIH",
+     "cents": -669,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-17",
+     "description": "CASH WITHDRAWAL ATM 2214",
+     "cents": -18710,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-17",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -2913,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-18",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -9210,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -7510,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -403,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-22",
+     "description": "STANDING ORDER TO SAVINGS",
+     "cents": -23518,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-23",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -5697,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -7867,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-27",
+     "description": "SALARY · LORENTA STUDIO GMBH (FICT.)",
+     "cents": 377854,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-27",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1598,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "ACCOUNT FEE",
+     "cents": -903,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "CREDIT INTEREST",
+     "cents": 56,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t10-srb-platinum-card-aed-2026-09.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Sarabel Bank (fictional)",
+   "layout": "credit card, payments shown with CR",
+   "paper": "a4",
+   "currency": "AED",
+   "number_format": "1,234.56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "card (purchases positive on paper)",
+   "opening_cents": -212362,
+   "closing_cents": -327716,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "post_date": "2026-09-02",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -8831,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-01",
+     "post_date": "2026-09-01",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -11054,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "post_date": "2026-09-03",
+     "description": "FALCON TAXI SVC",
+     "cents": -7305,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "post_date": "2026-09-05",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -11790,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "post_date": "2026-09-06",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -3524,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-05",
+     "post_date": "2026-09-06",
+     "description": "PAYMENT RECEIVED · THANK YOU",
+     "cents": 155136,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "post_date": "2026-09-07",
+     "description": "SANDCASTLE CAFE",
+     "cents": -2021,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "post_date": "2026-09-10",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -6302,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-11",
+     "post_date": "2026-09-13",
+     "description": "FALCON TAXI SVC",
+     "cents": -5624,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-11",
+     "post_date": "2026-09-13",
+     "description": "SANDCASTLE CAFE",
+     "cents": -6158,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-11",
+     "post_date": "2026-09-13",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -8177,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "post_date": "2026-09-14",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -13434,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "post_date": "2026-09-14",
+     "description": "FALCON TAXI SVC",
+     "cents": -2528,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-13",
+     "post_date": "2026-09-14",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -3954,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-16",
+     "post_date": "2026-09-18",
+     "description": "OASIS PETROL STN 12",
+     "cents": -8612,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-18",
+     "post_date": "2026-09-18",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -10787,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-18",
+     "post_date": "2026-09-19",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -34634,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "post_date": "2026-09-21",
+     "description": "OASIS PETROL STN 12",
+     "cents": -10453,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "post_date": "2026-09-20",
+     "description": "SANDCASTLE CAFE",
+     "cents": -5167,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-21",
+     "post_date": "2026-09-23",
+     "description": "SOUQLANE ONLINE",
+     "cents": -49405,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-22",
+     "post_date": "2026-09-23",
+     "description": "RETURN · MERCHANT CREDIT",
+     "cents": 2860,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-23",
+     "post_date": "2026-09-25",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -3613,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "post_date": "2026-09-24",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -9247,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "post_date": "2026-09-25",
+     "description": "OASIS PETROL STN 12",
+     "cents": -16412,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-26",
+     "post_date": "2026-09-26",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -15286,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-26",
+     "post_date": "2026-09-27",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -7560,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-29",
+     "post_date": "2026-09-30",
+     "description": "OASIS PETROL STN 12",
+     "cents": -8465,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "post_date": "2026-09-30",
+     "description": "INTEREST CHARGE · PURCHASES",
+     "cents": -3007,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok",
+   "card_note": "Printed Previous balance AED 2,123.62 => opening_cents -212362; printed New balance AED 3,277.16 => closing_cents -327716."
+  },
+  "t11-nhb-chequing-cad-2026-06.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Northwind Harbour Bank (fictional)",
+   "layout": "amount with CR/DR suffix",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 558227,
+   "closing_cents": 838043,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-06-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -207434,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-02",
+     "description": "BEANHOUSE CAFE",
+     "cents": -814,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-02",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -2553,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-03",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -4295,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-05",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2602,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6085,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-07",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4426,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-07",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -3395,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-08",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4782,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE REF CA2643104290 MEMO SHARED BILLS",
+     "cents": 57331,
+     "balance_cents": null,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-06-10",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1793,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-11",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1583,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-11",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1900,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -12155,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-12",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -4163,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 282250,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-18",
+     "description": "CHEQUE #000375",
+     "cents": -32600,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-18",
+     "description": "LUMEN STREAMING",
+     "cents": -1603,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-19",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2519,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -15262,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-22",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1722,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-22",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2236,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-24",
+     "description": "ONLINE TRANSFER TO SAVINGS ACCT ****8812 RECURRING MONTHLY",
+     "cents": -22368,
+     "balance_cents": null,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-06-24",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6172,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-24",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2741,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-25",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -4437,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-25",
+     "description": "BEANHOUSE CAFE",
+     "cents": -771,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -6711,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-28",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -1579,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-28",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1784,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 306191,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -1671,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "INTEREST PAID",
+     "cents": 200,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": {
+    "type": "wrong_digit",
+    "row_index": 19,
+    "page": 1,
+    "detail": "Amount printed 152.62 DR, true 192.62 DR (true cents -19262); one digit differs.",
+    "true_row": {
+     "date": "2026-06-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -19262
+    }
+   },
+   "expect": "proof_fail"
+  },
+  "t12-vmb-giro-eur-2026-07.pdf": {
+   "kind": "text-pdf",
+   "pages": 3,
+   "bank": "Velmora Bank (fictional)",
+   "layout": "single signed amount column",
+   "paper": "a4",
+   "currency": "EUR",
+   "number_format": "1.234,56",
+   "date_format": "DD Mon YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 347663,
+   "closing_cents": 413605,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-07-01",
+     "description": "SEPA DIRECT DEBIT · RENT",
+     "cents": -113846,
+     "balance_cents": 233817,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1126,
+     "balance_cents": 232691,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "STADTRAD VERLEIH",
+     "cents": -887,
+     "balance_cents": 231804,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -3751,
+     "balance_cents": 228053,
+     "page": 1
+    },
+    {
+     "date": "2026-07-02",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -4262,
+     "balance_cents": 223791,
+     "page": 1
+    },
+    {
+     "date": "2026-07-02",
+     "description": "STADTRAD VERLEIH",
+     "cents": -433,
+     "balance_cents": 223358,
+     "page": 1
+    },
+    {
+     "date": "2026-07-03",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -695,
+     "balance_cents": 222663,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "MOBILFUNK KLARNETZ",
+     "cents": -4134,
+     "balance_cents": 218529,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "STADTRAD VERLEIH",
+     "cents": -611,
+     "balance_cents": 217918,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -2037,
+     "balance_cents": 215881,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -6547,
+     "balance_cents": 209334,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -1172,
+     "balance_cents": 208162,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -6962,
+     "balance_cents": 201200,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1830,
+     "balance_cents": 199370,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -7189,
+     "balance_cents": 192181,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "MERCATO VERDE",
+     "cents": -3887,
+     "balance_cents": 188294,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -7053,
+     "balance_cents": 181241,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1220,
+     "balance_cents": 180021,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -9283,
+     "balance_cents": 170738,
+     "page": 1
+    },
+    {
+     "date": "2026-07-08",
+     "description": "SEPA TRANSFER FROM CHRIS MOCKFORD REF SEPA-2620651951 HOLIDAY SHARE",
+     "cents": 19042,
+     "balance_cents": 189780,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-07-09",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -2821,
+     "balance_cents": 186959,
+     "page": 1
+    },
+    {
+     "date": "2026-07-10",
+     "description": "MERCATO VERDE",
+     "cents": -2838,
+     "balance_cents": 184121,
+     "page": 1
+    },
+    {
+     "date": "2026-07-11",
+     "description": "STROM UND GAS STADTWERKE DEMO",
+     "cents": -8730,
+     "balance_cents": 175391,
+     "page": 1
+    },
+    {
+     "date": "2026-07-13",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -4366,
+     "balance_cents": 171025,
+     "page": 1
+    },
+    {
+     "date": "2026-07-13",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1825,
+     "balance_cents": 169200,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -6387,
+     "balance_cents": 162813,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -3836,
+     "balance_cents": 158977,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "MERCATO VERDE",
+     "cents": -6082,
+     "balance_cents": 152895,
+     "page": 1
+    },
+    {
+     "date": "2026-07-17",
+     "description": "CASH WITHDRAWAL ATM 2214",
+     "cents": -6542,
+     "balance_cents": 146353,
+     "page": 2
+    },
+    {
+     "date": "2026-07-18",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -317,
+     "balance_cents": 146036,
+     "page": 2
+    },
+    {
+     "date": "2026-07-19",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1170,
+     "balance_cents": 144866,
+     "page": 2
+    },
+    {
+     "date": "2026-07-20",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -886,
+     "balance_cents": 143980,
+     "page": 2
+    },
+    {
+     "date": "2026-07-20",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -7594,
+     "balance_cents": 136386,
+     "page": 2
+    },
+    {
+     "date": "2026-07-20",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -3780,
+     "balance_cents": 132606,
+     "page": 2
+    },
+    {
+     "date": "2026-07-20",
+     "description": "MERCATO VERDE",
+     "cents": -6189,
+     "balance_cents": 126417,
+     "page": 2
+    },
+    {
+     "date": "2026-07-20",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -3169,
+     "balance_cents": 123248,
+     "page": 2
+    },
+    {
+     "date": "2026-07-21",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -3093,
+     "balance_cents": 120155,
+     "page": 2
+    },
+    {
+     "date": "2026-07-21",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -3816,
+     "balance_cents": 116339,
+     "page": 2
+    },
+    {
+     "date": "2026-07-21",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1288,
+     "balance_cents": 115051,
+     "page": 2
+    },
+    {
+     "date": "2026-07-22",
+     "description": "STANDING ORDER TO SAVINGS IBAN XX00 0000 0000 0000 4417",
+     "cents": -13225,
+     "balance_cents": 101826,
+     "page": 2,
+     "wrapped": true
+    },
+    {
+     "date": "2026-07-22",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -5313,
+     "balance_cents": 96513,
+     "page": 2
+    },
+    {
+     "date": "2026-07-22",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -685,
+     "balance_cents": 95828,
+     "page": 2
+    },
+    {
+     "date": "2026-07-22",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -7865,
+     "balance_cents": 87963,
+     "page": 2
+    },
+    {
+     "date": "2026-07-23",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1036,
+     "balance_cents": 86927,
+     "page": 2
+    },
+    {
+     "date": "2026-07-23",
+     "description": "MERCATO VERDE",
+     "cents": -2356,
+     "balance_cents": 84571,
+     "page": 2
+    },
+    {
+     "date": "2026-07-23",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -497,
+     "balance_cents": 84074,
+     "page": 2
+    },
+    {
+     "date": "2026-07-23",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -3173,
+     "balance_cents": 80901,
+     "page": 2
+    },
+    {
+     "date": "2026-07-24",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1041,
+     "balance_cents": 79860,
+     "page": 2
+    },
+    {
+     "date": "2026-07-24",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1414,
+     "balance_cents": 78446,
+     "page": 2
+    },
+    {
+     "date": "2026-07-24",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -269,
+     "balance_cents": 78177,
+     "page": 2
+    },
+    {
+     "date": "2026-07-25",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1371,
+     "balance_cents": 76806,
+     "page": 2
+    },
+    {
+     "date": "2026-07-25",
+     "description": "MERCATO VERDE",
+     "cents": -4434,
+     "balance_cents": 72372,
+     "page": 2
+    },
+    {
+     "date": "2026-07-26",
+     "description": "STADTRAD VERLEIH",
+     "cents": -948,
+     "balance_cents": 71424,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "SALARY · LORENTA STUDIO GMBH (FICT.)",
+     "cents": 407630,
+     "balance_cents": 479054,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -2777,
+     "balance_cents": 476277,
+     "page": 2
+    },
+    {
+     "date": "2026-07-27",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -1596,
+     "balance_cents": 474681,
+     "page": 2
+    },
+    {
+     "date": "2026-07-28",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -9609,
+     "balance_cents": 465072,
+     "page": 2
+    },
+    {
+     "date": "2026-07-28",
+     "description": "MERCATO VERDE",
+     "cents": -7425,
+     "balance_cents": 457647,
+     "page": 2
+    },
+    {
+     "date": "2026-07-28",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1364,
+     "balance_cents": 456283,
+     "page": 3
+    },
+    {
+     "date": "2026-07-30",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -14687,
+     "balance_cents": 441596,
+     "page": 3
+    },
+    {
+     "date": "2026-07-30",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -7513,
+     "balance_cents": 434083,
+     "page": 3
+    },
+    {
+     "date": "2026-07-30",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -1778,
+     "balance_cents": 432305,
+     "page": 3
+    },
+    {
+     "date": "2026-07-30",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -6134,
+     "balance_cents": 426171,
+     "page": 3
+    },
+    {
+     "date": "2026-07-31",
+     "description": "ACCOUNT FEE",
+     "cents": -566,
+     "balance_cents": 425605,
+     "page": 3
+    },
+    {
+     "date": "2026-07-31",
+     "description": "CREDIT INTEREST",
+     "cents": 11,
+     "balance_cents": 425616,
+     "page": 3
+    },
+    {
+     "date": "2026-07-31",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -2762,
+     "balance_cents": 422854,
+     "page": 3
+    },
+    {
+     "date": "2026-07-31",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -8545,
+     "balance_cents": 414309,
+     "page": 3
+    },
+    {
+     "date": "2026-07-31",
+     "description": "STADTRAD VERLEIH",
+     "cents": -704,
+     "balance_cents": 413605,
+     "page": 3
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok",
+   "carry_forward_lines": true
+  },
+  "t13-dwb-current-aed-2026-10.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Dunewell Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "a4",
+   "currency": "AED",
+   "number_format": "1,234.56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 1731971,
+   "closing_cents": 2833952,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "RENT CHEQUE NO. 000578",
+     "cents": -646216,
+     "balance_cents": 1085755,
+     "page": 1
+    },
+    {
+     "date": "2026-10-01",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -4729,
+     "balance_cents": 1081026,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "description": "OASIS PETROL STN 12",
+     "cents": -6942,
+     "balance_cents": 1074084,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "SANDCASTLE CAFE",
+     "cents": -3197,
+     "balance_cents": 1070887,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -20134,
+     "balance_cents": 1050753,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -18484,
+     "balance_cents": 1032269,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "SANDCASTLE CAFE",
+     "cents": -4779,
+     "balance_cents": 1027490,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "description": "GULFSTAR TELECOM POSTPAID",
+     "cents": -24191,
+     "balance_cents": 1003299,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -4858,
+     "balance_cents": 998441,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "FALCON TAXI SVC",
+     "cents": -2305,
+     "balance_cents": 996136,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -17703,
+     "balance_cents": 978433,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -7637,
+     "balance_cents": 970796,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -7955,
+     "balance_cents": 962841,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "INWARD REMITTANCE FROM SAMIRA DEMO",
+     "cents": 335258,
+     "balance_cents": 1298099,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -25287,
+     "balance_cents": 1272812,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "SOUQLANE ONLINE",
+     "cents": -38951,
+     "balance_cents": 1233861,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "OASIS PETROL STN 12",
+     "cents": -9888,
+     "balance_cents": 1223973,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "SANDCASTLE CAFE",
+     "cents": -2526,
+     "balance_cents": 1221447,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "description": "CITY UTILITY AUTHORITY BILL",
+     "cents": -89956,
+     "balance_cents": 1131491,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "description": "OASIS PETROL STN 12",
+     "cents": -19691,
+     "balance_cents": 1111800,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "description": "OASIS PETROL STN 12",
+     "cents": -19691,
+     "balance_cents": 1111800,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "ATM CASH WITHDRAWAL · MALL BRANCH",
+     "cents": -73440,
+     "balance_cents": 1038360,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -6133,
+     "balance_cents": 1032227,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -23611,
+     "balance_cents": 1008616,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "OASIS PETROL STN 12",
+     "cents": -7973,
+     "balance_cents": 1000643,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "description": "OWN ACCOUNT TRANSFER",
+     "cents": -171575,
+     "balance_cents": 829068,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "description": "SANDCASTLE CAFE",
+     "cents": -4933,
+     "balance_cents": 824135,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -17463,
+     "balance_cents": 806672,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -17598,
+     "balance_cents": 789074,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -4170,
+     "balance_cents": 784904,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -6107,
+     "balance_cents": 778797,
+     "page": 1
+    },
+    {
+     "date": "2026-10-25",
+     "description": "SALARY CREDIT · FALCONRIDGE TRADING LLC (FICT.)",
+     "cents": 2382340,
+     "balance_cents": 3161137,
+     "page": 1
+    },
+    {
+     "date": "2026-10-25",
+     "description": "SANDCASTLE CAFE",
+     "cents": -3365,
+     "balance_cents": 3157772,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "description": "OASIS PETROL STN 12",
+     "cents": -18635,
+     "balance_cents": 3139137,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -4883,
+     "balance_cents": 3134254,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -13641,
+     "balance_cents": 3120613,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -4336,
+     "balance_cents": 3116277,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -5093,
+     "balance_cents": 3111184,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "description": "CAR LOAN INSTALMENT · CONTRACT 77731",
+     "cents": -203410,
+     "balance_cents": 2907774,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -6597,
+     "balance_cents": 2901177,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -49674,
+     "balance_cents": 2851503,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -9216,
+     "balance_cents": 2842287,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "description": "FALCON TAXI SVC",
+     "cents": -6454,
+     "balance_cents": 2835833,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "ACCOUNT MAINTENANCE FEE",
+     "cents": -4225,
+     "balance_cents": 2831608,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "PROFIT CREDIT",
+     "cents": 2344,
+     "balance_cents": 2833952,
+     "page": 2
+    }
+   ],
+   "planted": {
+    "type": "duplicated_row",
+    "row_index": 20,
+    "page": 1,
+    "detail": "Row 2026-10-13 \"OASIS PETROL STN 12\" 196.91 is printed twice (indexes 19 and 20); the copy at 20 is extra and repeats the same running balance."
+   },
+   "expect": "proof_fail"
+  },
+  "t14-pls-checking-usd-2026-10.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Prairie Lantern Savings (fictional)",
+   "layout": "negatives in parentheses",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 424745,
+   "closing_cents": 700502,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -208164,
+     "balance_cents": 216581,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -3427,
+     "balance_cents": 213154,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -3861,
+     "balance_cents": 209293,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7838,
+     "balance_cents": 201455,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 13304,
+     "balance_cents": 214759,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -12140,
+     "balance_cents": 202619,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -7139,
+     "balance_cents": 195480,
+     "page": 1
+    },
+    {
+     "date": "2026-10-14",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7539,
+     "balance_cents": 187941,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 224636,
+     "balance_cents": 412577,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1512,
+     "balance_cents": 411065,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1384,
+     "balance_cents": 409681,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -2568,
+     "balance_cents": 407113,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -983,
+     "balance_cents": 406130,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5344,
+     "balance_cents": 400786,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 299716,
+     "balance_cents": 700502,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t15-hvb-card-activity-cad-no-closing.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Halverine Bank (fictional)",
+   "layout": "credit card, payments shown with minus",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "card (purchases positive on paper)",
+   "opening_cents": -34265,
+   "closing_cents": null,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-10-02",
+     "post_date": "2026-10-02",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3550,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "post_date": "2026-10-06",
+     "description": "LUMEN STREAMING",
+     "cents": -1452,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "post_date": "2026-10-06",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -3896,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "post_date": "2026-10-06",
+     "description": "PAYMENT RECEIVED · THANK YOU",
+     "cents": 29476,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "post_date": "2026-10-06",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -5304,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "post_date": "2026-10-10",
+     "description": "LUMEN STREAMING",
+     "cents": -1145,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "post_date": "2026-10-10",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -1634,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "post_date": "2026-10-14",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -811,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "post_date": "2026-10-18",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5977,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "post_date": "2026-10-17",
+     "description": "RETURN · MERCHANT CREDIT",
+     "cents": 2744,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "post_date": "2026-10-17",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -11741,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "post_date": "2026-10-19",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2481,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "post_date": "2026-10-18",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -763,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "post_date": "2026-10-18",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1213,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-19",
+     "post_date": "2026-10-21",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1905,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "post_date": "2026-10-21",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -3516,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "post_date": "2026-10-22",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -360,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "post_date": "2026-10-21",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1453,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "post_date": "2026-10-25",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6241,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "post_date": "2026-10-25",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1566,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "post_date": "2026-10-24",
+     "description": "HARVEST LANE MARKET",
+     "cents": -10943,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-10-25",
+     "post_date": "2026-10-27",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1916,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "needs_closing",
+   "card_note": "Printed Previous balance $342.65 => opening_cents -34265; New balance not printed (interim activity page, \"continued on next page\").",
+   "printed_page_label": "Page 1 of 3 (only page 1 provided)"
+  },
+  "t16-lnb-card-activity-usd-no-closing.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Larkhaven National Bank (fictional)",
+   "layout": "credit card, payments shown with CR",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "card (purchases positive on paper)",
+   "opening_cents": -98879,
+   "closing_cents": null,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "post_date": "2026-09-01",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1567,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "post_date": "2026-09-02",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7139,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "post_date": "2026-09-02",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -4708,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "post_date": "2026-09-04",
+     "description": "PAYMENT RECEIVED · THANK YOU",
+     "cents": 97160,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "post_date": "2026-09-05",
+     "description": "LUMEN STREAMING",
+     "cents": -1806,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "post_date": "2026-09-03",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2677,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "post_date": "2026-09-04",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5372,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-05",
+     "post_date": "2026-09-07",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -3019,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "post_date": "2026-09-06",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2483,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "post_date": "2026-09-09",
+     "description": "HARVEST LANE MARKET",
+     "cents": -8444,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "post_date": "2026-09-10",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -9341,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "post_date": "2026-09-12",
+     "description": "HARVEST LANE MARKET",
+     "cents": -2188,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-13",
+     "post_date": "2026-09-14",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -7719,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-13",
+     "post_date": "2026-09-15",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -3507,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "post_date": "2026-09-15",
+     "description": "RETURN · MERCHANT CREDIT",
+     "cents": 7880,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-17",
+     "post_date": "2026-09-19",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -3632,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-17",
+     "post_date": "2026-09-18",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1606,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "post_date": "2026-09-20",
+     "description": "LUMEN STREAMING",
+     "cents": -1780,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "post_date": "2026-09-20",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1646,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-22",
+     "post_date": "2026-09-24",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2486,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-22",
+     "post_date": "2026-09-23",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1093,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-23",
+     "post_date": "2026-09-24",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4896,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "post_date": "2026-09-26",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1408,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "post_date": "2026-09-24",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -11390,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "needs_closing",
+   "card_note": "Printed Previous balance $988.79 => opening_cents -98879; New balance not printed (interim activity page, \"continued on next page\").",
+   "printed_page_label": "Page 1 of 3 (only page 1 provided)"
+  },
+  "t17-qcu-chequing-cad-2026-09.pdf": {
+   "kind": "text-pdf",
+   "pages": 3,
+   "bank": "Quillmoor Credit Union (fictional)",
+   "layout": "single signed amount column",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 223014,
+   "closing_cents": 274261,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -190849,
+     "balance_cents": 32165,
+     "page": 1
+    },
+    {
+     "date": "2026-09-01",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1509,
+     "balance_cents": 30656,
+     "page": 1
+    },
+    {
+     "date": "2026-09-01",
+     "description": "BEANHOUSE CAFE",
+     "cents": -466,
+     "balance_cents": 30190,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2724,
+     "balance_cents": 27466,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2031,
+     "balance_cents": 25435,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9381,
+     "balance_cents": 16054,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4239,
+     "balance_cents": 11815,
+     "page": 1
+    },
+    {
+     "date": "2026-09-04",
+     "description": "BEANHOUSE CAFE",
+     "cents": -328,
+     "balance_cents": 11487,
+     "page": 1
+    },
+    {
+     "date": "2026-09-05",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9810,
+     "balance_cents": 1677,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -8995,
+     "balance_cents": -7318,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2007,
+     "balance_cents": -9325,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5057,
+     "balance_cents": -14382,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "HARVEST LANE MARKET",
+     "cents": -4496,
+     "balance_cents": -18878,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7816,
+     "balance_cents": -26694,
+     "page": 1
+    },
+    {
+     "date": "2026-09-07",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2263,
+     "balance_cents": -28957,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "LUMEN STREAMING",
+     "cents": -1896,
+     "balance_cents": -30853,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE REF CA2685070640 MEMO SHARED BILLS",
+     "cents": 56602,
+     "balance_cents": 25749,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-09-09",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3686,
+     "balance_cents": 22063,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -9437,
+     "balance_cents": 12626,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4758,
+     "balance_cents": 7868,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2037,
+     "balance_cents": 5831,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3376,
+     "balance_cents": 2455,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1878,
+     "balance_cents": 577,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1053,
+     "balance_cents": -476,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3829,
+     "balance_cents": -4305,
+     "page": 1
+    },
+    {
+     "date": "2026-09-11",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4105,
+     "balance_cents": -8410,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -13336,
+     "balance_cents": -21746,
+     "page": 2
+    },
+    {
+     "date": "2026-09-12",
+     "description": "LUMEN STREAMING",
+     "cents": -1538,
+     "balance_cents": -23284,
+     "page": 2
+    },
+    {
+     "date": "2026-09-12",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3541,
+     "balance_cents": -26825,
+     "page": 2
+    },
+    {
+     "date": "2026-09-12",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1615,
+     "balance_cents": -28440,
+     "page": 2
+    },
+    {
+     "date": "2026-09-12",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7098,
+     "balance_cents": -35538,
+     "page": 2
+    },
+    {
+     "date": "2026-09-12",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -8617,
+     "balance_cents": -44155,
+     "page": 2
+    },
+    {
+     "date": "2026-09-13",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -11392,
+     "balance_cents": -55547,
+     "page": 2
+    },
+    {
+     "date": "2026-09-13",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1316,
+     "balance_cents": -56863,
+     "page": 2
+    },
+    {
+     "date": "2026-09-14",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1739,
+     "balance_cents": -58602,
+     "page": 2
+    },
+    {
+     "date": "2026-09-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 222016,
+     "balance_cents": 163414,
+     "page": 2
+    },
+    {
+     "date": "2026-09-16",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2078,
+     "balance_cents": 161336,
+     "page": 2
+    },
+    {
+     "date": "2026-09-16",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -10085,
+     "balance_cents": 151251,
+     "page": 2
+    },
+    {
+     "date": "2026-09-17",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5531,
+     "balance_cents": 145720,
+     "page": 2
+    },
+    {
+     "date": "2026-09-18",
+     "description": "CHEQUE #000536",
+     "cents": -10839,
+     "balance_cents": 134881,
+     "page": 2
+    },
+    {
+     "date": "2026-09-18",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2195,
+     "balance_cents": 132686,
+     "page": 2
+    },
+    {
+     "date": "2026-09-19",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2019,
+     "balance_cents": 130667,
+     "page": 2
+    },
+    {
+     "date": "2026-09-19",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -9400,
+     "balance_cents": 121267,
+     "page": 2
+    },
+    {
+     "date": "2026-09-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -11257,
+     "balance_cents": 110010,
+     "page": 2
+    },
+    {
+     "date": "2026-09-20",
+     "description": "HARVEST LANE MARKET",
+     "cents": -5372,
+     "balance_cents": 104638,
+     "page": 2
+    },
+    {
+     "date": "2026-09-21",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -4774,
+     "balance_cents": 99864,
+     "page": 2
+    },
+    {
+     "date": "2026-09-21",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3246,
+     "balance_cents": 96618,
+     "page": 2
+    },
+    {
+     "date": "2026-09-23",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -8491,
+     "balance_cents": 88127,
+     "page": 2
+    },
+    {
+     "date": "2026-09-23",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1784,
+     "balance_cents": 86343,
+     "page": 2
+    },
+    {
+     "date": "2026-09-24",
+     "description": "ONLINE TRANSFER TO SAVINGS ACCT ****8812 RECURRING MONTHLY",
+     "cents": -40164,
+     "balance_cents": 46179,
+     "page": 2,
+     "wrapped": true
+    },
+    {
+     "date": "2026-09-24",
+     "description": "LUMEN STREAMING",
+     "cents": -1894,
+     "balance_cents": 44285,
+     "page": 2
+    },
+    {
+     "date": "2026-09-24",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1361,
+     "balance_cents": 42924,
+     "page": 2
+    },
+    {
+     "date": "2026-09-24",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -1736,
+     "balance_cents": 41188,
+     "page": 2
+    },
+    {
+     "date": "2026-09-25",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5236,
+     "balance_cents": 35952,
+     "page": 2
+    },
+    {
+     "date": "2026-09-25",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2128,
+     "balance_cents": 33824,
+     "page": 2
+    },
+    {
+     "date": "2026-09-25",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4022,
+     "balance_cents": 29802,
+     "page": 3
+    },
+    {
+     "date": "2026-09-25",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1747,
+     "balance_cents": 28055,
+     "page": 3
+    },
+    {
+     "date": "2026-09-25",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -3478,
+     "balance_cents": 24577,
+     "page": 3
+    },
+    {
+     "date": "2026-09-26",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5933,
+     "balance_cents": 18644,
+     "page": 3
+    },
+    {
+     "date": "2026-09-26",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7246,
+     "balance_cents": 11398,
+     "page": 3
+    },
+    {
+     "date": "2026-09-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -4518,
+     "balance_cents": 6880,
+     "page": 3
+    },
+    {
+     "date": "2026-09-27",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -8413,
+     "balance_cents": -1533,
+     "page": 3
+    },
+    {
+     "date": "2026-09-28",
+     "description": "BEANHOUSE CAFE",
+     "cents": -416,
+     "balance_cents": -1949,
+     "page": 3
+    },
+    {
+     "date": "2026-09-29",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1595,
+     "balance_cents": -3544,
+     "page": 3
+    },
+    {
+     "date": "2026-09-29",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -4481,
+     "balance_cents": -8025,
+     "page": 3
+    },
+    {
+     "date": "2026-09-29",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1315,
+     "balance_cents": -9340,
+     "page": 3
+    },
+    {
+     "date": "2026-09-30",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 286439,
+     "balance_cents": 277099,
+     "page": 3
+    },
+    {
+     "date": "2026-09-30",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -1117,
+     "balance_cents": 275982,
+     "page": 3
+    },
+    {
+     "date": "2026-09-30",
+     "description": "INTEREST PAID",
+     "cents": 195,
+     "balance_cents": 276177,
+     "page": 3
+    },
+    {
+     "date": "2026-09-30",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1916,
+     "balance_cents": 274261,
+     "page": 3
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t18-pls-checking-usd-2026-07.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Prairie Lantern Savings (fictional)",
+   "layout": "amount with CR/DR suffix",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 429903,
+   "closing_cents": 639345,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-07-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -194154,
+     "balance_cents": 235749,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "HARVEST LANE MARKET",
+     "cents": -5354,
+     "balance_cents": 230395,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6856,
+     "balance_cents": 223539,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3869,
+     "balance_cents": 219670,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "HARVEST LANE MARKET",
+     "cents": -8530,
+     "balance_cents": 211140,
+     "page": 1
+    },
+    {
+     "date": "2026-07-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 14432,
+     "balance_cents": 225572,
+     "page": 1
+    },
+    {
+     "date": "2026-07-09",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -3325,
+     "balance_cents": 222247,
+     "page": 1
+    },
+    {
+     "date": "2026-07-10",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -8689,
+     "balance_cents": 213558,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -8047,
+     "balance_cents": 205511,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -724,
+     "balance_cents": 204787,
+     "page": 1
+    },
+    {
+     "date": "2026-07-13",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -6202,
+     "balance_cents": 198585,
+     "page": 1
+    },
+    {
+     "date": "2026-07-13",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2754,
+     "balance_cents": 195831,
+     "page": 1
+    },
+    {
+     "date": "2026-07-14",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1520,
+     "balance_cents": 194311,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 287595,
+     "balance_cents": 481906,
+     "page": 1
+    },
+    {
+     "date": "2026-07-18",
+     "description": "CHEQUE #000131",
+     "cents": -40040,
+     "balance_cents": 441866,
+     "page": 1
+    },
+    {
+     "date": "2026-07-18",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -901,
+     "balance_cents": 440965,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -12429,
+     "balance_cents": 428536,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1232,
+     "balance_cents": 427304,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2489,
+     "balance_cents": 424815,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -46195,
+     "balance_cents": 378620,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -3802,
+     "balance_cents": 374818,
+     "page": 1
+    },
+    {
+     "date": "2026-07-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -5441,
+     "balance_cents": 369377,
+     "page": 1
+    },
+    {
+     "date": "2026-07-27",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2003,
+     "balance_cents": 367374,
+     "page": 1
+    },
+    {
+     "date": "2026-07-28",
+     "description": "BEANHOUSE CAFE",
+     "cents": -878,
+     "balance_cents": 366496,
+     "page": 1
+    },
+    {
+     "date": "2026-07-29",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -4280,
+     "balance_cents": 362216,
+     "page": 1
+    },
+    {
+     "date": "2026-07-29",
+     "description": "HARVEST LANE MARKET",
+     "cents": -8174,
+     "balance_cents": 354042,
+     "page": 1
+    },
+    {
+     "date": "2026-07-30",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -5992,
+     "balance_cents": 348050,
+     "page": 1
+    },
+    {
+     "date": "2026-07-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 292413,
+     "balance_cents": 640463,
+     "page": 1
+    },
+    {
+     "date": "2026-07-31",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -1136,
+     "balance_cents": 639327,
+     "page": 1
+    },
+    {
+     "date": "2026-07-31",
+     "description": "INTEREST PAID",
+     "cents": 18,
+     "balance_cents": 639345,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t19-srb-current-aed-2026-06.pdf": {
+   "kind": "text-pdf",
+   "pages": 1,
+   "bank": "Sarabel Bank (fictional)",
+   "layout": "negatives in parentheses",
+   "paper": "a4",
+   "currency": "AED",
+   "number_format": "1,234.56",
+   "date_format": "DD Mon YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 1408422,
+   "closing_cents": 2708495,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-06-01",
+     "description": "RENT CHEQUE NO. 000389",
+     "cents": -720970,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-02",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -9106,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-04",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -18136,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-05",
+     "description": "GULFSTAR TELECOM POSTPAID",
+     "cents": -20450,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-09",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -4288,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-10",
+     "description": "INWARD REMITTANCE FROM SAMIRA DEMO REF AE2687559721 FAMILY SUPPORT",
+     "cents": 433080,
+     "balance_cents": null,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-06-10",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -5905,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-11",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -2380,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-12",
+     "description": "CITY UTILITY AUTHORITY BILL",
+     "cents": -58089,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-12",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -7528,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-16",
+     "description": "ATM CASH WITHDRAWAL · MALL BRANCH",
+     "cents": -51425,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-19",
+     "description": "OASIS PETROL STN 12",
+     "cents": -17608,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-21",
+     "description": "OWN ACCOUNT TRANSFER TO SAVINGS ****3301 STANDING ORDER",
+     "cents": -117202,
+     "balance_cents": null,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-06-21",
+     "description": "SANDCASTLE CAFE",
+     "cents": -5550,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-22",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -15620,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-23",
+     "description": "FALCON TAXI SVC",
+     "cents": -2271,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-24",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -4616,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-24",
+     "description": "OASIS PETROL STN 12",
+     "cents": -10597,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-25",
+     "description": "SALARY CREDIT · FALCONRIDGE TRADING LLC (FICT.)",
+     "cents": 2231229,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-26",
+     "description": "SOUQLANE ONLINE",
+     "cents": -20829,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-26",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -3059,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-28",
+     "description": "CAR LOAN INSTALMENT · CONTRACT 77963",
+     "cents": -244778,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-29",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -20495,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "ACCOUNT MAINTENANCE FEE",
+     "cents": -4802,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "PROFIT CREDIT",
+     "cents": 1468,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "t20-lvb-compte-eur-2026-08.pdf": {
+   "kind": "text-pdf",
+   "pages": 2,
+   "bank": "Banque de Lorvenne (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "a4",
+   "currency": "EUR",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 553472,
+   "closing_cents": 575164,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-08-01",
+     "description": "SEPA DIRECT DEBIT · RENT",
+     "cents": -135975,
+     "balance_cents": 417497,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "STADTRAD VERLEIH",
+     "cents": -265,
+     "balance_cents": 417232,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -7946,
+     "balance_cents": 409286,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -13377,
+     "balance_cents": 395909,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "STADTRAD VERLEIH",
+     "cents": -245,
+     "balance_cents": 395664,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -2388,
+     "balance_cents": 393276,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -2715,
+     "balance_cents": 390561,
+     "page": 1
+    },
+    {
+     "date": "2026-08-03",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -8058,
+     "balance_cents": 382503,
+     "page": 1
+    },
+    {
+     "date": "2026-08-04",
+     "description": "MOBILFUNK KLARNETZ",
+     "cents": -4215,
+     "balance_cents": 378288,
+     "page": 1
+    },
+    {
+     "date": "2026-08-05",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -1940,
+     "balance_cents": 376348,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -8289,
+     "balance_cents": 368059,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -6792,
+     "balance_cents": 361267,
+     "page": 1
+    },
+    {
+     "date": "2026-08-08",
+     "description": "SEPA TRANSFER FROM CHRIS MOCKFORD",
+     "cents": 22307,
+     "balance_cents": 383574,
+     "page": 1
+    },
+    {
+     "date": "2026-08-08",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -2416,
+     "balance_cents": 381158,
+     "page": 1
+    },
+    {
+     "date": "2026-08-08",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1100,
+     "balance_cents": 380058,
+     "page": 1
+    },
+    {
+     "date": "2026-08-10",
+     "description": "STADTRAD VERLEIH",
+     "cents": -828,
+     "balance_cents": 379230,
+     "page": 1
+    },
+    {
+     "date": "2026-08-10",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -1265,
+     "balance_cents": 377965,
+     "page": 1
+    },
+    {
+     "date": "2026-08-11",
+     "description": "STROM UND GAS STADTWERKE DEMO",
+     "cents": -11058,
+     "balance_cents": 366907,
+     "page": 1
+    },
+    {
+     "date": "2026-08-11",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -10249,
+     "balance_cents": 356658,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -4523,
+     "balance_cents": 352135,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -3485,
+     "balance_cents": 348650,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -2249,
+     "balance_cents": 346401,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -3448,
+     "balance_cents": 342953,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "MERCATO VERDE",
+     "cents": -4557,
+     "balance_cents": 338396,
+     "page": 1
+    },
+    {
+     "date": "2026-08-16",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -861,
+     "balance_cents": 337535,
+     "page": 1
+    },
+    {
+     "date": "2026-08-16",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -2122,
+     "balance_cents": 335413,
+     "page": 1
+    },
+    {
+     "date": "2026-08-17",
+     "description": "CASH WITHDRAWAL ATM 2214",
+     "cents": -8146,
+     "balance_cents": 327267,
+     "page": 1
+    },
+    {
+     "date": "2026-08-17",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -3196,
+     "balance_cents": 324071,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "STADTRAD VERLEIH",
+     "cents": -507,
+     "balance_cents": 323564,
+     "page": 1
+    },
+    {
+     "date": "2026-08-19",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1502,
+     "balance_cents": 322062,
+     "page": 1
+    },
+    {
+     "date": "2026-08-19",
+     "description": "MERCATO VERDE",
+     "cents": -1977,
+     "balance_cents": 320085,
+     "page": 1
+    },
+    {
+     "date": "2026-08-19",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -6445,
+     "balance_cents": 313640,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -2553,
+     "balance_cents": 311087,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "MERCATO VERDE",
+     "cents": -4945,
+     "balance_cents": 306142,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -318,
+     "balance_cents": 305824,
+     "page": 1
+    },
+    {
+     "date": "2026-08-22",
+     "description": "STANDING ORDER TO SAVINGS",
+     "cents": -34214,
+     "balance_cents": 271610,
+     "page": 1
+    },
+    {
+     "date": "2026-08-23",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -8312,
+     "balance_cents": 263298,
+     "page": 1
+    },
+    {
+     "date": "2026-08-23",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -4578,
+     "balance_cents": 258720,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -6129,
+     "balance_cents": 252591,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -10926,
+     "balance_cents": 241665,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -1197,
+     "balance_cents": 240468,
+     "page": 1
+    },
+    {
+     "date": "2026-08-25",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -3343,
+     "balance_cents": 237125,
+     "page": 1
+    },
+    {
+     "date": "2026-08-26",
+     "description": "MERCATO VERDE",
+     "cents": -5429,
+     "balance_cents": 231696,
+     "page": 1
+    },
+    {
+     "date": "2026-08-27",
+     "description": "SALARY · LORENTA STUDIO GMBH (FICT.)",
+     "cents": 368529,
+     "balance_cents": 600225,
+     "page": 2
+    },
+    {
+     "date": "2026-08-28",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -1717,
+     "balance_cents": 598508,
+     "page": 2
+    },
+    {
+     "date": "2026-08-30",
+     "description": "STADTRAD VERLEIH",
+     "cents": -1202,
+     "balance_cents": 597306,
+     "page": 2
+    },
+    {
+     "date": "2026-08-30",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -3736,
+     "balance_cents": 593570,
+     "page": 2
+    },
+    {
+     "date": "2026-08-30",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -8266,
+     "balance_cents": 585304,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "ACCOUNT FEE",
+     "cents": -629,
+     "balance_cents": 584675,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "CREDIT INTEREST",
+     "cents": 85,
+     "balance_cents": 584760,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "LIBRERIA SOLE",
+     "cents": -3070,
+     "balance_cents": 581690,
+     "page": 2
+    },
+    {
+     "date": "2026-08-31",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -6526,
+     "balance_cents": 575164,
+     "page": 2
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "s01-nhb-chequing-cad-2026-09-scan.pdf": {
+   "kind": "scan-pdf",
+   "pages": 1,
+   "bank": "Northwind Harbour Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 379104,
+   "closing_cents": 760989,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -144635,
+     "balance_cents": 234469,
+     "page": 1
+    },
+    {
+     "date": "2026-09-01",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -852,
+     "balance_cents": 233617,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "description": "LUMEN STREAMING",
+     "cents": -1664,
+     "balance_cents": 231953,
+     "page": 1
+    },
+    {
+     "date": "2026-09-02",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5860,
+     "balance_cents": 226093,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4721,
+     "balance_cents": 221372,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3121,
+     "balance_cents": 218251,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6085,
+     "balance_cents": 212166,
+     "page": 1
+    },
+    {
+     "date": "2026-09-07",
+     "description": "BEANHOUSE CAFE",
+     "cents": -885,
+     "balance_cents": 211281,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -2199,
+     "balance_cents": 209082,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 40620,
+     "balance_cents": 249702,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "HARVEST LANE MARKET",
+     "cents": -2057,
+     "balance_cents": 247645,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -9739,
+     "balance_cents": 237906,
+     "page": 1
+    },
+    {
+     "date": "2026-09-11",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -2397,
+     "balance_cents": 235509,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -11032,
+     "balance_cents": 224477,
+     "page": 1
+    },
+    {
+     "date": "2026-09-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 318642,
+     "balance_cents": 543119,
+     "page": 1
+    },
+    {
+     "date": "2026-09-16",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2477,
+     "balance_cents": 540642,
+     "page": 1
+    },
+    {
+     "date": "2026-09-18",
+     "description": "CHEQUE #000110",
+     "cents": -29252,
+     "balance_cents": 511390,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -3667,
+     "balance_cents": 507723,
+     "page": 1
+    },
+    {
+     "date": "2026-09-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -16624,
+     "balance_cents": 491099,
+     "page": 1
+    },
+    {
+     "date": "2026-09-20",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -4567,
+     "balance_cents": 486532,
+     "page": 1
+    },
+    {
+     "date": "2026-09-21",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -473,
+     "balance_cents": 486059,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -33618,
+     "balance_cents": 452441,
+     "page": 1
+    },
+    {
+     "date": "2026-09-25",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -7957,
+     "balance_cents": 444484,
+     "page": 1
+    },
+    {
+     "date": "2026-09-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -8997,
+     "balance_cents": 435487,
+     "page": 1
+    },
+    {
+     "date": "2026-09-28",
+     "description": "BEANHOUSE CAFE",
+     "cents": -477,
+     "balance_cents": 435010,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 325979,
+     "balance_cents": 760989,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "s02-lnb-checking-usd-2026-10-scan.pdf": {
+   "kind": "scan-pdf",
+   "pages": 2,
+   "bank": "Larkhaven National Bank (fictional)",
+   "layout": "single signed amount column",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 276641,
+   "closing_cents": 517829,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -177995,
+     "balance_cents": 98646,
+     "page": 1
+    },
+    {
+     "date": "2026-10-01",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6777,
+     "balance_cents": 91869,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -5085,
+     "balance_cents": 86784,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -1882,
+     "balance_cents": 84902,
+     "page": 1
+    },
+    {
+     "date": "2026-10-05",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -3032,
+     "balance_cents": 81870,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7353,
+     "balance_cents": 74517,
+     "page": 1
+    },
+    {
+     "date": "2026-10-07",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1656,
+     "balance_cents": 72861,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "LUMEN STREAMING",
+     "cents": -1634,
+     "balance_cents": 71227,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -3453,
+     "balance_cents": 67774,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2521,
+     "balance_cents": 65253,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1397,
+     "balance_cents": 63856,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE REF CA2667096590 MEMO SHARED BILLS",
+     "cents": 30361,
+     "balance_cents": 94217,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-09",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2490,
+     "balance_cents": 91727,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1486,
+     "balance_cents": 90241,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "BEANHOUSE CAFE",
+     "cents": -573,
+     "balance_cents": 89668,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -10688,
+     "balance_cents": 78980,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -1870,
+     "balance_cents": 77110,
+     "page": 1
+    },
+    {
+     "date": "2026-10-14",
+     "description": "LUMEN STREAMING",
+     "cents": -1263,
+     "balance_cents": 75847,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 285708,
+     "balance_cents": 361555,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1796,
+     "balance_cents": 359759,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1040,
+     "balance_cents": 358719,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "description": "CHEQUE #000751",
+     "cents": -12529,
+     "balance_cents": 346190,
+     "page": 1
+    },
+    {
+     "date": "2026-10-18",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -4586,
+     "balance_cents": 341604,
+     "page": 1
+    },
+    {
+     "date": "2026-10-19",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1337,
+     "balance_cents": 340267,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -8643,
+     "balance_cents": 331624,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1522,
+     "balance_cents": 330102,
+     "page": 1
+    },
+    {
+     "date": "2026-10-22",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1408,
+     "balance_cents": 328694,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6888,
+     "balance_cents": 321806,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "ONLINE TRANSFER TO SAVINGS ACCT ****8812 RECURRING MONTHLY",
+     "cents": -48951,
+     "balance_cents": 272855,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-10-24",
+     "description": "BEANHOUSE CAFE",
+     "cents": -667,
+     "balance_cents": 272188,
+     "page": 1
+    },
+    {
+     "date": "2026-10-26",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -3507,
+     "balance_cents": 268681,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -5105,
+     "balance_cents": 263576,
+     "page": 1
+    },
+    {
+     "date": "2026-10-28",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2513,
+     "balance_cents": 261063,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -8860,
+     "balance_cents": 252203,
+     "page": 1
+    },
+    {
+     "date": "2026-10-29",
+     "description": "LUMEN STREAMING",
+     "cents": -1569,
+     "balance_cents": 250634,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -3309,
+     "balance_cents": 247325,
+     "page": 2
+    },
+    {
+     "date": "2026-10-30",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -1993,
+     "balance_cents": 245332,
+     "page": 2
+    },
+    {
+     "date": "2026-10-30",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2724,
+     "balance_cents": 242608,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 277965,
+     "balance_cents": 520573,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -922,
+     "balance_cents": 519651,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "INTEREST PAID",
+     "cents": 229,
+     "balance_cents": 519880,
+     "page": 2
+    },
+    {
+     "date": "2026-10-31",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2051,
+     "balance_cents": 517829,
+     "page": 2
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "s03-srb-current-aed-2026-07-scan.pdf": {
+   "kind": "scan-pdf",
+   "pages": 1,
+   "bank": "Sarabel Bank (fictional)",
+   "layout": "amount with CR/DR suffix",
+   "paper": "a4",
+   "currency": "AED",
+   "number_format": "1,234.56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 2081135,
+   "closing_cents": 2762764,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-07-01",
+     "description": "RENT CHEQUE NO. 000734",
+     "cents": -635941,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-01",
+     "description": "SOUQLANE ONLINE",
+     "cents": -33525,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-02",
+     "description": "SOUQLANE ONLINE",
+     "cents": -32306,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-03",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -2078,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "SOUQLANE ONLINE",
+     "cents": -9832,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-04",
+     "description": "SOUQLANE ONLINE",
+     "cents": -16972,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "GULFSTAR TELECOM POSTPAID",
+     "cents": -23734,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -7382,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-05",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -6641,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -10620,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -9226,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-09",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -15151,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-10",
+     "description": "INWARD REMITTANCE FROM SAMIRA DEMO",
+     "cents": 358616,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-11",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -7230,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "CITY UTILITY AUTHORITY BILL",
+     "cents": -95361,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -28338,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -28577,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "OASIS PETROL STN 12",
+     "cents": -10696,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-16",
+     "description": "ATM CASH WITHDRAWAL · MALL BRANCH",
+     "cents": -74538,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-17",
+     "description": "OASIS PETROL STN 12",
+     "cents": -14729,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-17",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -5622,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-17",
+     "description": "OASIS PETROL STN 12",
+     "cents": -19308,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-19",
+     "description": "FALCON TAXI SVC",
+     "cents": -5238,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "SANDCASTLE CAFE",
+     "cents": -4168,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-21",
+     "description": "OWN ACCOUNT TRANSFER",
+     "cents": -139422,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -18985,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-25",
+     "description": "SALARY CREDIT · FALCONRIDGE TRADING LLC (FICT.)",
+     "cents": 1882899,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-28",
+     "description": "CAR LOAN INSTALMENT · CONTRACT 77513",
+     "cents": -169360,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-28",
+     "description": "SOUQLANE ONLINE",
+     "cents": -42302,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-29",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -20135,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-29",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -10976,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-30",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -43864,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-30",
+     "description": "MARINA METRO CARD TOPUP",
+     "cents": -7775,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-31",
+     "description": "ACCOUNT MAINTENANCE FEE",
+     "cents": -3137,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-07-31",
+     "description": "PROFIT CREDIT",
+     "cents": 2269,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": {
+    "type": "dropped_row",
+    "row_index": 18,
+    "page": 1,
+    "detail": "Row 2026-07-15 \"SAFFRON SPICE KITCHEN\" 89.86 DR (true cents -8986) is missing from the table; opening, closing still include it. row_index = printed row that now follows the gap.",
+    "true_row": {
+     "date": "2026-07-15",
+     "description": "SAFFRON SPICE KITCHEN",
+     "cents": -8986
+    }
+   },
+   "expect": "proof_fail"
+  },
+  "s04-lvb-compte-eur-2026-10-scan.pdf": {
+   "kind": "scan-pdf",
+   "pages": 1,
+   "bank": "Banque de Lorvenne (fictional)",
+   "layout": "negatives in parentheses",
+   "paper": "a4",
+   "currency": "EUR",
+   "number_format": "1,234.56",
+   "date_format": "DD Mon YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 358278,
+   "closing_cents": 538924,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "SEPA DIRECT DEBIT · RENT",
+     "cents": -100876,
+     "balance_cents": 257402,
+     "page": 1
+    },
+    {
+     "date": "2026-10-03",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -3751,
+     "balance_cents": 253651,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "MOBILFUNK KLARNETZ",
+     "cents": -4067,
+     "balance_cents": 249584,
+     "page": 1
+    },
+    {
+     "date": "2026-10-04",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -3375,
+     "balance_cents": 246209,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "SEPA TRANSFER FROM CHRIS MOCKFORD",
+     "cents": 12956,
+     "balance_cents": 259165,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "VELOCITE ONLINE SHOP",
+     "cents": -6340,
+     "balance_cents": 252825,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "KAFFEEHAUS LINDE",
+     "cents": -1153,
+     "balance_cents": 251672,
+     "page": 1
+    },
+    {
+     "date": "2026-10-10",
+     "description": "MERCATO VERDE",
+     "cents": -2900,
+     "balance_cents": 248772,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "STROM UND GAS STADTWERKE DEMO",
+     "cents": -9023,
+     "balance_cents": 239749,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -3880,
+     "balance_cents": 235869,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "CASH WITHDRAWAL ATM 2214",
+     "cents": -5078,
+     "balance_cents": 230791,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -6737,
+     "balance_cents": 224054,
+     "page": 1
+    },
+    {
+     "date": "2026-10-17",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -5181,
+     "balance_cents": 218873,
+     "page": 1
+    },
+    {
+     "date": "2026-10-21",
+     "description": "LIBRERIA SOLE",
+     "cents": -2454,
+     "balance_cents": 216419,
+     "page": 1
+    },
+    {
+     "date": "2026-10-22",
+     "description": "STANDING ORDER TO SAVINGS",
+     "cents": -27226,
+     "balance_cents": 189193,
+     "page": 1
+    },
+    {
+     "date": "2026-10-22",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -4728,
+     "balance_cents": 184465,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -4595,
+     "balance_cents": 179870,
+     "page": 1
+    },
+    {
+     "date": "2026-10-24",
+     "description": "STADTRAD VERLEIH",
+     "cents": -628,
+     "balance_cents": 179242,
+     "page": 1
+    },
+    {
+     "date": "2026-10-27",
+     "description": "SALARY · LORENTA STUDIO GMBH (FICT.)",
+     "cents": 363389,
+     "balance_cents": 542631,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "description": "FARMACIA CENTRALE 3",
+     "cents": -2911,
+     "balance_cents": 539720,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "ACCOUNT FEE",
+     "cents": -811,
+     "balance_cents": 538909,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "CREDIT INTEREST",
+     "cents": 15,
+     "balance_cents": 538924,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "s05-qcu-chequing-cad-2026-08-scan.pdf": {
+   "kind": "scan-pdf",
+   "pages": 1,
+   "bank": "Quillmoor Credit Union (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 320824,
+   "closing_cents": 573748,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-08-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -203713,
+     "balance_cents": 117111,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7085,
+     "balance_cents": 110026,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -4768,
+     "balance_cents": 105258,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE REF CA2655482117 MEMO SHARED BILLS",
+     "cents": 7207,
+     "balance_cents": 112465,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-08-09",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -4462,
+     "balance_cents": 108003,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6417,
+     "balance_cents": 101586,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -8049,
+     "balance_cents": 93537,
+     "page": 1
+    },
+    {
+     "date": "2026-08-14",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -908,
+     "balance_cents": 92629,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 324921,
+     "balance_cents": 417550,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6504,
+     "balance_cents": 411046,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "CHEQUE #000927",
+     "cents": -13019,
+     "balance_cents": 401027,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -1883,
+     "balance_cents": 399144,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1459,
+     "balance_cents": 397685,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -11080,
+     "balance_cents": 386605,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -2296,
+     "balance_cents": 384309,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -1629,
+     "balance_cents": 382680,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -3471,
+     "balance_cents": 379209,
+     "page": 1
+    },
+    {
+     "date": "2026-08-21",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -7465,
+     "balance_cents": 371744,
+     "page": 1
+    },
+    {
+     "date": "2026-08-22",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2603,
+     "balance_cents": 369141,
+     "page": 1
+    },
+    {
+     "date": "2026-08-22",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -9021,
+     "balance_cents": 360120,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "ONLINE TRANSFER TO SAVINGS ACCT ****8812 RECURRING MONTHLY",
+     "cents": -48981,
+     "balance_cents": 311139,
+     "page": 1,
+     "wrapped": true
+    },
+    {
+     "date": "2026-08-25",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1689,
+     "balance_cents": 309450,
+     "page": 1
+    },
+    {
+     "date": "2026-08-27",
+     "description": "HOME INSURANCE · NORTHGUARD MUTUAL (FICT.)",
+     "cents": -3682,
+     "balance_cents": 305768,
+     "page": 1
+    },
+    {
+     "date": "2026-08-29",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -14464,
+     "balance_cents": 291304,
+     "page": 1
+    },
+    {
+     "date": "2026-08-29",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1916,
+     "balance_cents": 289388,
+     "page": 1
+    },
+    {
+     "date": "2026-08-30",
+     "description": "HARVEST LANE MARKET",
+     "cents": -5214,
+     "balance_cents": 284174,
+     "page": 1
+    },
+    {
+     "date": "2026-08-30",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1450,
+     "balance_cents": 282724,
+     "page": 1
+    },
+    {
+     "date": "2026-08-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 292295,
+     "balance_cents": 575019,
+     "page": 1
+    },
+    {
+     "date": "2026-08-31",
+     "description": "MONTHLY ACCOUNT FEE",
+     "cents": -1488,
+     "balance_cents": 573531,
+     "page": 1
+    },
+    {
+     "date": "2026-08-31",
+     "description": "INTEREST PAID",
+     "cents": 217,
+     "balance_cents": 573748,
+     "page": 1
+    }
+   ],
+   "planted": {
+    "type": "wrong_digit",
+    "row_index": 10,
+    "page": 1,
+    "detail": "Amount printed 130.19, true 100.19 (true cents -10019); one digit differs.",
+    "true_row": {
+     "date": "2026-08-18",
+     "description": "CHEQUE #000927",
+     "cents": -10019
+    }
+   },
+   "expect": "proof_fail"
+  },
+  "s06-pls-checking-usd-2026-09-scan.pdf": {
+   "kind": "scan-pdf",
+   "pages": 1,
+   "bank": "Prairie Lantern Savings (fictional)",
+   "layout": "amount with CR/DR suffix",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 588464,
+   "closing_cents": 932669,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -172054,
+     "balance_cents": 416410,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -702,
+     "balance_cents": 415708,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6720,
+     "balance_cents": 408988,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -2020,
+     "balance_cents": 406968,
+     "page": 1
+    },
+    {
+     "date": "2026-09-08",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -7913,
+     "balance_cents": 399055,
+     "page": 1
+    },
+    {
+     "date": "2026-09-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 35262,
+     "balance_cents": 434317,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -10808,
+     "balance_cents": 423509,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1025,
+     "balance_cents": 422484,
+     "page": 1
+    },
+    {
+     "date": "2026-09-13",
+     "description": "LUMEN STREAMING",
+     "cents": -1879,
+     "balance_cents": 420605,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -4975,
+     "balance_cents": 415630,
+     "page": 1
+    },
+    {
+     "date": "2026-09-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 334843,
+     "balance_cents": 750473,
+     "page": 1
+    },
+    {
+     "date": "2026-09-15",
+     "description": "BEANHOUSE CAFE",
+     "cents": -677,
+     "balance_cents": 749796,
+     "page": 1
+    },
+    {
+     "date": "2026-09-18",
+     "description": "HARVEST LANE MARKET",
+     "cents": -7865,
+     "balance_cents": 741931,
+     "page": 1
+    },
+    {
+     "date": "2026-09-19",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2009,
+     "balance_cents": 739922,
+     "page": 1
+    },
+    {
+     "date": "2026-09-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -4766,
+     "balance_cents": 735156,
+     "page": 1
+    },
+    {
+     "date": "2026-09-20",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1066,
+     "balance_cents": 734090,
+     "page": 1
+    },
+    {
+     "date": "2026-09-21",
+     "description": "PAGEFOLD BOOKS",
+     "cents": -3282,
+     "balance_cents": 730808,
+     "page": 1
+    },
+    {
+     "date": "2026-09-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -34007,
+     "balance_cents": 696801,
+     "page": 1
+    },
+    {
+     "date": "2026-09-29",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -4151,
+     "balance_cents": 692650,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 240019,
+     "balance_cents": 932669,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "p01-nhb-chequing-cad-2026-08-photo.jpg": {
+   "kind": "photo",
+   "pages": 1,
+   "bank": "Northwind Harbour Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 282017,
+   "closing_cents": 660992,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-08-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -205756,
+     "balance_cents": 76261,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2003,
+     "balance_cents": 74258,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7329,
+     "balance_cents": 66929,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -2630,
+     "balance_cents": 64299,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 24495,
+     "balance_cents": 88794,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -2802,
+     "balance_cents": 85992,
+     "page": 1
+    },
+    {
+     "date": "2026-08-10",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2531,
+     "balance_cents": 83461,
+     "page": 1
+    },
+    {
+     "date": "2026-08-11",
+     "description": "LUMEN STREAMING",
+     "cents": -1828,
+     "balance_cents": 81633,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -9252,
+     "balance_cents": 72381,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -5084,
+     "balance_cents": 67297,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -3215,
+     "balance_cents": 64082,
+     "page": 1
+    },
+    {
+     "date": "2026-08-13",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2289,
+     "balance_cents": 61793,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 319922,
+     "balance_cents": 381715,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -5373,
+     "balance_cents": 376342,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -15283,
+     "balance_cents": 361059,
+     "page": 1
+    },
+    {
+     "date": "2026-08-27",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -5511,
+     "balance_cents": 355548,
+     "page": 1
+    },
+    {
+     "date": "2026-08-30",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -6955,
+     "balance_cents": 348593,
+     "page": 1
+    },
+    {
+     "date": "2026-08-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 312399,
+     "balance_cents": 660992,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "p02-lnb-checking-usd-2026-07-photo.jpg": {
+   "kind": "photo",
+   "pages": 1,
+   "bank": "Larkhaven National Bank (fictional)",
+   "layout": "single signed amount column",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 324658,
+   "closing_cents": 504141,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-07-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -206412,
+     "balance_cents": 118246,
+     "page": 1
+    },
+    {
+     "date": "2026-07-02",
+     "description": "HARVEST LANE MARKET",
+     "cents": -9562,
+     "balance_cents": 108684,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6482,
+     "balance_cents": 102202,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1934,
+     "balance_cents": 100268,
+     "page": 1
+    },
+    {
+     "date": "2026-07-06",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2498,
+     "balance_cents": 97770,
+     "page": 1
+    },
+    {
+     "date": "2026-07-07",
+     "description": "BEANHOUSE CAFE",
+     "cents": -704,
+     "balance_cents": 97066,
+     "page": 1
+    },
+    {
+     "date": "2026-07-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 50128,
+     "balance_cents": 147194,
+     "page": 1
+    },
+    {
+     "date": "2026-07-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -6498,
+     "balance_cents": 140696,
+     "page": 1
+    },
+    {
+     "date": "2026-07-13",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -2485,
+     "balance_cents": 138211,
+     "page": 1
+    },
+    {
+     "date": "2026-07-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 223253,
+     "balance_cents": 361464,
+     "page": 1
+    },
+    {
+     "date": "2026-07-18",
+     "description": "QUICKCART VARIETY #31",
+     "cents": 1928,
+     "balance_cents": 359536,
+     "page": 1
+    },
+    {
+     "date": "2026-07-19",
+     "description": "BEANHOUSE CAFE",
+     "cents": -1341,
+     "balance_cents": 358195,
+     "page": 1
+    },
+    {
+     "date": "2026-07-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -15397,
+     "balance_cents": 342798,
+     "page": 1
+    },
+    {
+     "date": "2026-07-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -39188,
+     "balance_cents": 303610,
+     "page": 1
+    },
+    {
+     "date": "2026-07-25",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2235,
+     "balance_cents": 301375,
+     "page": 1
+    },
+    {
+     "date": "2026-07-26",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1665,
+     "balance_cents": 299710,
+     "page": 1
+    },
+    {
+     "date": "2026-07-28",
+     "description": "NORTHSTAR FUEL 8821",
+     "cents": -6734,
+     "balance_cents": 292976,
+     "page": 1
+    },
+    {
+     "date": "2026-07-28",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -3571,
+     "balance_cents": 289405,
+     "page": 1
+    },
+    {
+     "date": "2026-07-29",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1125,
+     "balance_cents": 288280,
+     "page": 1
+    },
+    {
+     "date": "2026-07-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 215861,
+     "balance_cents": 504141,
+     "page": 1
+    }
+   ],
+   "planted": {
+    "type": "flipped_sign",
+    "row_index": 10,
+    "page": 1,
+    "detail": "Printed as 19.28, true amount -19.28 (true cents -1928).",
+    "true_row": {
+     "date": "2026-07-18",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -1928
+    }
+   },
+   "expect": "proof_fail"
+  },
+  "p03-dwb-current-aed-2026-09-photo.jpg": {
+   "kind": "photo",
+   "pages": 1,
+   "bank": "Dunewell Bank (fictional)",
+   "layout": "withdrawals/deposits columns",
+   "paper": "a4",
+   "currency": "AED",
+   "number_format": "1,234.56",
+   "date_format": "DD/MM/YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 1525649,
+   "closing_cents": 3203874,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-09-01",
+     "description": "RENT CHEQUE NO. 000246",
+     "cents": -884874,
+     "balance_cents": 640775,
+     "page": 1
+    },
+    {
+     "date": "2026-09-03",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -7199,
+     "balance_cents": 633576,
+     "page": 1
+    },
+    {
+     "date": "2026-09-05",
+     "description": "GULFSTAR TELECOM POSTPAID",
+     "cents": -28506,
+     "balance_cents": 605070,
+     "page": 1
+    },
+    {
+     "date": "2026-09-06",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -7781,
+     "balance_cents": 597289,
+     "page": 1
+    },
+    {
+     "date": "2026-09-07",
+     "description": "OASIS PETROL STN 12",
+     "cents": -11464,
+     "balance_cents": 585825,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "INWARD REMITTANCE FROM SAMIRA DEMO",
+     "cents": 321121,
+     "balance_cents": 906946,
+     "page": 1
+    },
+    {
+     "date": "2026-09-10",
+     "description": "CORAL BAY LAUNDRY",
+     "cents": -5587,
+     "balance_cents": 901359,
+     "page": 1
+    },
+    {
+     "date": "2026-09-12",
+     "description": "CITY UTILITY AUTHORITY BILL",
+     "cents": -33758,
+     "balance_cents": 867601,
+     "page": 1
+    },
+    {
+     "date": "2026-09-14",
+     "description": "OASIS PETROL STN 12",
+     "cents": -17735,
+     "balance_cents": 849866,
+     "page": 1
+    },
+    {
+     "date": "2026-09-16",
+     "description": "ATM CASH WITHDRAWAL · MALL BRANCH",
+     "cents": -49992,
+     "balance_cents": 799874,
+     "page": 1
+    },
+    {
+     "date": "2026-09-21",
+     "description": "DUNEVIEW FITNESS CLUB",
+     "cents": -28679,
+     "balance_cents": 771195,
+     "page": 1
+    },
+    {
+     "date": "2026-09-23",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -14277,
+     "balance_cents": 756918,
+     "page": 1
+    },
+    {
+     "date": "2026-09-23",
+     "description": "OASIS PETROL STN 12",
+     "cents": -6042,
+     "balance_cents": 750876,
+     "page": 1
+    },
+    {
+     "date": "2026-09-25",
+     "description": "SALARY CREDIT · FALCONRIDGE TRADING LLC (FICT.)",
+     "cents": 2502776,
+     "balance_cents": 3253652,
+     "page": 1
+    },
+    {
+     "date": "2026-09-28",
+     "description": "PEARL COVE PHARMACY",
+     "cents": -12816,
+     "balance_cents": 3240836,
+     "page": 1
+    },
+    {
+     "date": "2026-09-30",
+     "description": "DESERT BLOOM HYPERMARKET",
+     "cents": -36962,
+     "balance_cents": 3203874,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "p04-vmb-giro-eur-2026-06-photo.jpg": {
+   "kind": "photo",
+   "pages": 1,
+   "bank": "Velmora Bank (fictional)",
+   "layout": "single signed amount column",
+   "paper": "a4",
+   "currency": "EUR",
+   "number_format": "1,234.56",
+   "date_format": "DD Mon YYYY",
+   "sign_convention": "bank",
+   "opening_cents": 299045,
+   "closing_cents": 488030,
+   "has_running_balance": false,
+   "rows": [
+    {
+     "date": "2026-06-01",
+     "description": "SEPA DIRECT DEBIT · RENT",
+     "cents": -104794,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-03",
+     "description": "LIBRERIA SOLE",
+     "cents": -2429,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-04",
+     "description": "MOBILFUNK KLARNETZ",
+     "cents": -3897,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-08",
+     "description": "SEPA TRANSFER FROM CHRIS MOCKFORD",
+     "cents": 15215,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-08",
+     "description": "LIBRERIA SOLE",
+     "cents": -3236,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-09",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1501,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-11",
+     "description": "STROM UND GAS STADTWERKE DEMO",
+     "cents": -13691,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-11",
+     "description": "MERCATO VERDE",
+     "cents": -5939,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-17",
+     "description": "CASH WITHDRAWAL ATM 2214",
+     "cents": -9278,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-18",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -5958,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-20",
+     "description": "MARKTHALLE FRISCH 0412",
+     "cents": -4265,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-21",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1391,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-22",
+     "description": "STANDING ORDER TO SAVINGS",
+     "cents": -34162,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-22",
+     "description": "BOULANGERIE DU PONT",
+     "cents": -1576,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-24",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -7100,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-27",
+     "description": "SALARY · LORENTA STUDIO GMBH (FICT.)",
+     "cents": 385775,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-28",
+     "description": "TANKSTELLE NORDLICHT",
+     "cents": -8256,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-29",
+     "description": "APOTHEKE AM WEIHER",
+     "cents": -3741,
+     "balance_cents": null,
+     "page": 1
+    },
+    {
+     "date": "2026-06-30",
+     "description": "ACCOUNT FEE",
+     "cents": -791,
+     "balance_cents": null,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  },
+  "p05-qcu-chequing-cad-2026-10-photo.jpg": {
+   "kind": "photo",
+   "pages": 1,
+   "bank": "Quillmoor Credit Union (fictional)",
+   "layout": "negatives in parentheses",
+   "paper": "letter",
+   "currency": "CAD",
+   "number_format": "1,234.56",
+   "date_format": "YYYY-MM-DD",
+   "sign_convention": "bank",
+   "opening_cents": 351823,
+   "closing_cents": 715214,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-10-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -208727,
+     "balance_cents": 143096,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "description": "PARCELBOX ONLINE MKTP",
+     "cents": -7503,
+     "balance_cents": 135593,
+     "page": 1
+    },
+    {
+     "date": "2026-10-02",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2424,
+     "balance_cents": 133169,
+     "page": 1
+    },
+    {
+     "date": "2026-10-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -6913,
+     "balance_cents": 126256,
+     "page": 1
+    },
+    {
+     "date": "2026-10-08",
+     "description": "HARVEST LANE MARKET",
+     "cents": -2060,
+     "balance_cents": 124196,
+     "page": 1
+    },
+    {
+     "date": "2026-10-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 12187,
+     "balance_cents": 136383,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -6255,
+     "balance_cents": 130128,
+     "page": 1
+    },
+    {
+     "date": "2026-10-11",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -6255,
+     "balance_cents": 130128,
+     "page": 1
+    },
+    {
+     "date": "2026-10-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -7976,
+     "balance_cents": 122152,
+     "page": 1
+    },
+    {
+     "date": "2026-10-13",
+     "description": "SAFFRON NOODLE BAR",
+     "cents": -3350,
+     "balance_cents": 118802,
+     "page": 1
+    },
+    {
+     "date": "2026-10-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 300844,
+     "balance_cents": 419646,
+     "page": 1
+    },
+    {
+     "date": "2026-10-16",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -3438,
+     "balance_cents": 416208,
+     "page": 1
+    },
+    {
+     "date": "2026-10-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -9708,
+     "balance_cents": 406500,
+     "page": 1
+    },
+    {
+     "date": "2026-10-22",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -3116,
+     "balance_cents": 403384,
+     "page": 1
+    },
+    {
+     "date": "2026-10-23",
+     "description": "QUICKCART VARIETY #31",
+     "cents": -2238,
+     "balance_cents": 401146,
+     "page": 1
+    },
+    {
+     "date": "2026-10-25",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -1125,
+     "balance_cents": 400021,
+     "page": 1
+    },
+    {
+     "date": "2026-10-30",
+     "description": "BEANHOUSE CAFE",
+     "cents": -752,
+     "balance_cents": 399269,
+     "page": 1
+    },
+    {
+     "date": "2026-10-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 315945,
+     "balance_cents": 715214,
+     "page": 1
+    }
+   ],
+   "planted": {
+    "type": "duplicated_row",
+    "row_index": 7,
+    "page": 1,
+    "detail": "Row 2026-10-11 \"HARBOUR HARDWARE CO\" (62.55) is printed twice (indexes 6 and 7); the copy at 7 is extra and repeats the same running balance."
+   },
+   "expect": "proof_fail"
+  },
+  "p06-pls-checking-usd-2026-08-photo.jpg": {
+   "kind": "photo",
+   "pages": 1,
+   "bank": "Prairie Lantern Savings (fictional)",
+   "layout": "amount with CR/DR suffix",
+   "paper": "letter",
+   "currency": "USD",
+   "number_format": "1,234.56",
+   "date_format": "Mon DD",
+   "sign_convention": "bank",
+   "opening_cents": 313079,
+   "closing_cents": 642132,
+   "has_running_balance": true,
+   "rows": [
+    {
+     "date": "2026-08-01",
+     "description": "RENT PAYMENT · E-TRANSFER SENT",
+     "cents": -178831,
+     "balance_cents": 134248,
+     "page": 1
+    },
+    {
+     "date": "2026-08-01",
+     "description": "POS PURCHASE CORNER DELI 44",
+     "cents": -2111,
+     "balance_cents": 132137,
+     "page": 1
+    },
+    {
+     "date": "2026-08-02",
+     "description": "HARBOUR HARDWARE CO",
+     "cents": -7755,
+     "balance_cents": 124382,
+     "page": 1
+    },
+    {
+     "date": "2026-08-03",
+     "description": "RIDEWAVE *TRIP",
+     "cents": -1760,
+     "balance_cents": 122622,
+     "page": 1
+    },
+    {
+     "date": "2026-08-06",
+     "description": "BRIGHTWIRE MOBILE PAD",
+     "cents": -7359,
+     "balance_cents": 115263,
+     "page": 1
+    },
+    {
+     "date": "2026-08-07",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2764,
+     "balance_cents": 112499,
+     "page": 1
+    },
+    {
+     "date": "2026-08-09",
+     "description": "E-TRANSFER RECEIVED FROM JORDAN EXAMPLE",
+     "cents": 48276,
+     "balance_cents": 160775,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "CITY POWER & WATER PAD",
+     "cents": -8133,
+     "balance_cents": 152642,
+     "page": 1
+    },
+    {
+     "date": "2026-08-12",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2956,
+     "balance_cents": 149686,
+     "page": 1
+    },
+    {
+     "date": "2026-08-15",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 275486,
+     "balance_cents": 425172,
+     "page": 1
+    },
+    {
+     "date": "2026-08-17",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2292,
+     "balance_cents": 422880,
+     "page": 1
+    },
+    {
+     "date": "2026-08-18",
+     "description": "HARVEST LANE MARKET",
+     "cents": -4645,
+     "balance_cents": 418235,
+     "page": 1
+    },
+    {
+     "date": "2026-08-20",
+     "description": "ATM WITHDRAWAL · BRANCH 0442",
+     "cents": -6975,
+     "balance_cents": 411260,
+     "page": 1
+    },
+    {
+     "date": "2026-08-22",
+     "description": "CITYLINK TRANSIT RELOAD",
+     "cents": -2883,
+     "balance_cents": 408377,
+     "page": 1
+    },
+    {
+     "date": "2026-08-23",
+     "description": "PINEWOOD PHARMACY #07",
+     "cents": -2232,
+     "balance_cents": 406145,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "ONLINE TRANSFER TO SAVINGS",
+     "cents": -45354,
+     "balance_cents": 360791,
+     "page": 1
+    },
+    {
+     "date": "2026-08-24",
+     "description": "GREENLEAF GROCERS #1123",
+     "cents": -9546,
+     "balance_cents": 351245,
+     "page": 1
+    },
+    {
+     "date": "2026-08-25",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1641,
+     "balance_cents": 349604,
+     "page": 1
+    },
+    {
+     "date": "2026-08-25",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1865,
+     "balance_cents": 347739,
+     "page": 1
+    },
+    {
+     "date": "2026-08-27",
+     "description": "SUNNYSIDE BAKERY",
+     "cents": -1642,
+     "balance_cents": 346097,
+     "page": 1
+    },
+    {
+     "date": "2026-08-31",
+     "description": "PAYROLL DEPOSIT · NORTHWIND STUDIO",
+     "cents": 296035,
+     "balance_cents": 642132,
+     "page": 1
+    }
+   ],
+   "planted": null,
+   "expect": "proof_ok"
+  }
+ }
+}
