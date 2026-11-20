@@ -138,10 +138,10 @@
         '<div class="fr-grid">' +
           '<div class="fr-import">' +
             '<label class="fr-drop" id="fr-drop" for="fr-file">' +
-              '<input type="file" id="fr-file" class="fr-file" accept=".csv,.ofx,.qfx,.qbo,.txt,text/csv">' +
+              '<input type="file" id="fr-file" class="fr-file" accept=".csv,.ofx,.qfx,.qbo,.txt,text/csv,.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">' +
               '<span class="fr-drop-mark" aria-hidden="true"><i class="fas fa-file-arrow-up"></i></span>' +
               '<span class="fr-drop-title">Import a bank statement</span>' +
-              '<span class="fr-drop-sub">Drop a CSV, OFX or QFX file here, or <u>choose a file</u></span>' +
+              '<span class="fr-drop-sub">Drop a CSV, OFX or QFX file, or a PDF / photo of your statement, or <u>choose a file</u></span>' +
               '<span class="fr-drop-rule" aria-hidden="true"></span>' +
               '<span class="fr-drop-banks">Recognised automatically: ' + esc(BANKS) + '. Other banks work too: you confirm which column is which.</span>' +
             '</label>' +
@@ -155,7 +155,7 @@
               '<ol>' +
                 '<li>Sign in to your bank’s website on a computer (most banking apps cannot export).</li>' +
                 '<li>Open the account, then find <b>Download transactions</b> or <b>Export</b> (often next to the date filter).</li>' +
-                '<li>Pick the last 3 to 12 months and the <b>CSV</b>, <b>Quicken (QFX)</b> or <b>Money (OFX)</b> format.</li>' +
+                '<li>Pick the last 3 to 12 months and the <b>CSV</b>, <b>Quicken (QFX)</b> or <b>Money (OFX)</b> format. A PDF statement, or a photo of a paper one, works too.</li>' +
                 '<li>Drop the downloaded file above. One file is one account; repeat for a credit card.</li>' +
               '</ol>' +
             '</details>' +
@@ -259,6 +259,15 @@
   }
 
   async function importFile(file) {
+    // PDF and photos go to the Statement Agent in the import wizard: the AI reads
+    // the statement, the balance is proven before anything is written.
+    if (typeof bankIsAgentFile === 'function' && bankIsAgentFile(file) && typeof showImportWizard === 'function') {
+      track('import_started', { kind: 'statement-agent', sizeKb: Math.round(file.size / 1024) });
+      var input = document.getElementById('fr-file');
+      if (input) input.value = '';
+      showImportWizard({ file: file });
+      return;
+    }
     var t0 = Date.now();
     track('import_started', { kind: /\.(ofx|qfx|qbo)$/i.test(file.name) ? 'ofx' : 'csv', sizeKb: Math.round(file.size / 1024) });
     if (file.size > 10 * 1024 * 1024) { showError('This file is larger than 10 MB. Export a shorter period (3 to 12 months).'); return; }

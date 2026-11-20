@@ -269,3 +269,19 @@ describe('Statement Agent: date check', () => {
     expect(dateIssues(m, [{ date: '2026-10-02' }, { date: '2026-10-02' }, { date: '2026-10-03' }])).toEqual([]);
   });
 });
+
+describe('Statement Agent: phantom lines', () => {
+  const agent = require('../services/statement/agent');
+  test('a line without an amount and with an unchanged balance is left out, not imported as 0.00', () => {
+    const m = { statement_type: 'bank', opening_cents: 10000, closing_cents: 12500, period_start: '2026-10-01', period_end: '2026-10-31' };
+    const rows = [
+      { date: '2026-10-02', description: 'PAYROLL', cents: 2500, balance_cents: 12500, page: 1 },
+      { date: '2026-10-02', description: 'PAYROLL', cents: null, unclear: true, balance_cents: 12500, page: 1 },
+    ];
+    const c = agent.check(m, rows, null);
+    expect(c.rows).toHaveLength(1);
+    expect(c.proof.status).toBe('proven');
+    expect(c.proof.phantom_rows).toBe(1);
+    expect(c.proof.line).toMatch(/left out/);
+  });
+});

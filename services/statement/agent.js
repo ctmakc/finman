@@ -194,9 +194,18 @@ function dateIssues(m, rows) {
 }
 
 function check(m, rows, pageAmounts) {
-  const ungrounded = ground(rows, pageAmounts);
-  const badDates = dateIssues(m, rows);
   const d = proof.deriveUnclear(rows, m.opening_cents, m.statement_type);
+  // A "row" whose amount would derive to 0.00 is a wrapped line or a repeated balance, not a
+  // transaction (a phantom copy of the row above on a photo): it is left out and said so.
+  const phantom = d.rows.filter((r) => r.derived && r.cents === 0).length;
+  if (phantom) {
+    d.rows = d.rows.filter((r) => !(r.derived && r.cents === 0));
+    d.derived = d.rows.map((r, i) => (r.derived ? i : -1)).filter((i) => i >= 0);
+  }
+  // Derived amounts are not printed (that is why they were unreadable): grounding skips them.
+  const ungrounded = ground(d.rows.map((r) => (r.derived ? { ...r, cents: null } : r)), pageAmounts);
+  d.rows.forEach((r, i) => { if (ungrounded.includes(i)) r.ungrounded = true; });
+  const badDates = dateIssues(m, d.rows);
   const p = proof.prove({ opening_cents: m.opening_cents, closing_cents: m.closing_cents, rows: d.rows, kind: m.statement_type });
   p.derived_rows = d.derived;
   p.ungrounded_rows = ungrounded;
@@ -212,8 +221,10 @@ function check(m, rows, pageAmounts) {
   const notes = [];
   if (p.opening_inferred) notes.push('opening taken from the first row\'s printed balance');
   if (d.derived.length) notes.push(`${d.derived.length} unreadable amount(s) derived from the printed balances around them, not guessed`);
+  if (phantom) notes.push(`${phantom} line(s) without an amount and with an unchanged balance left out`);
   p.notes = notes;
   if (notes.length && p.status === 'proven') p.line += ` (${notes.join('; ')})`;
+  p.phantom_rows = phantom;
   return { rows: d.rows, proof: p };
 }
 
