@@ -178,6 +178,31 @@ describe('acquisition + activity', () => {
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
+  test('nudge_not_activated skips a user activated by events only (vault users keep no transaction rows)', async () => {
+    const lifecycle = require('../services/lifecycle');
+    const env = { LIFECYCLE_EMAILS: process.env.LIFECYCLE_EMAILS, LIFECYCLE_FROM: process.env.LIFECYCLE_FROM };
+    process.env.LIFECYCLE_EMAILS = '1'; process.env.LIFECYCLE_FROM = 'Finman <noreply@finman.money>';
+    try {
+      const mk = async (email) => {
+        const u = await db.run("INSERT INTO users (username, email, password, created_at) VALUES (?, ?, 'x', datetime('now', '-30 hours'))", [email.split('@')[0], email]);
+        await db.run("INSERT INTO user_acquisition (user_id, method, source, backfilled) VALUES (?, 'google', 'chatgpt.com (AI)', 0)", [u.id]);
+        return u.id;
+      };
+      const vault = await mk('vaultuser@example.com');
+      for (let i = 0; i < 3; i++) await db.run("INSERT INTO analytics_events (user_id, event, props) VALUES (?, 'transaction_added', '{}')", [vault]);
+      const idle = await mk('idleuser@example.com');
+      sendSpy.mockClear();
+      await lifecycle.runNudges();
+      const to = sendSpy.mock.calls.map((c) => c[0].to[0]);
+      expect(to).toContain('idleuser@example.com');
+      expect(to).not.toContain('vaultuser@example.com');
+      expect(idle).toBeTruthy();
+    } finally {
+      process.env.LIFECYCLE_EMAILS = env.LIFECYCLE_EMAILS || ''; process.env.LIFECYCLE_FROM = env.LIFECYCLE_FROM || '';
+      if (!env.LIFECYCLE_EMAILS) delete process.env.LIFECYCLE_EMAILS; if (!env.LIFECYCLE_FROM) delete process.env.LIFECYCLE_FROM;
+    }
+  });
+
   test('nudges stay off without LIFECYCLE_EMAILS=1', async () => {
     const lifecycle = require('../services/lifecycle');
     expect(await lifecycle.runNudges()).toEqual({ skipped: true });
