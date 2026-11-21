@@ -122,6 +122,69 @@
     return n || '';
   }
 
+  // ---------------------------------------------------------------- bank picker
+  // Steps checked against each bank's help pages on 12 Nov 2026 (finman.money/banks/).
+  var BANK_STEPS = [
+    { id: 'rbc', name: 'RBC', url: 'https://www.rbcroyalbank.com/', steps: ['Sign in to RBC Online Banking in a desktop browser (the app does not export).', 'Choose <b>Download Transactions</b> from the menu.', 'Pick the account and the longest date range offered.', 'Choose <b>CSV</b> and save the file, then drop it above.'] },
+    { id: 'td', name: 'TD', url: 'https://easyweb.td.com/', steps: ['Sign in to TD EasyWeb in a desktop browser and open <b>Accounts</b>.', 'Open the chequing or savings account.', 'Choose 30, 60, 90 or 120 days.', 'At the bottom, pick <b>Spreadsheet (.CSV)</b> beside Download. The file is usually accountactivity.csv.'] },
+    { id: 'cibc', name: 'CIBC', url: 'https://www.cibc.com/', steps: ['Sign in to CIBC Online Banking in a browser.', 'Under <b>More</b>, choose <b>Download Transactions</b>.', 'Pick the account and the period.', 'Choose a CSV option, or Quicken or Microsoft Money, and save the file.'] },
+    { id: 'scotiabank', name: 'Scotiabank', url: 'https://www.scotiabank.com/', steps: ['Sign in to Scotiabank online banking in a browser.', 'Open the account and choose the statement period.', 'Scroll down and press <b>Load more</b> until every transaction shows.', 'Press the download icon and pick the <b>Quicken</b> or QuickBooks format.'] },
+    { id: 'bmo', name: 'BMO', url: 'https://www.bmo.com/', steps: ['Sign in to BMO Online Banking in a desktop browser.', 'Under My Accounts, open the account or BMO Mastercard.', 'Choose <b>Download Account Details</b>.', 'Set up to 123 days, choose <b>CSV</b> or a Quicken format and save.'] },
+    { id: 'tangerine', name: 'Tangerine', url: 'https://www.tangerine.ca/', steps: ['Sign in at tangerine.ca in a browser (the app cannot download).', 'Open <b>Transactions</b>.', 'Press <b>Download Transactions</b>.', 'Choose Excel CSV, QFX or Microsoft Money and save.'] },
+    { id: 'wealthsimple', name: 'Wealthsimple', url: 'https://my.wealthsimple.com/', steps: ['Log in to Wealthsimple in a browser.', 'Profile menu, then <b>Documents</b>, then <b>Generate document</b>.', 'Pick <b>Custom activity statement</b> and the period.', 'Select the accounts and press <b>Download CSV</b>.'] },
+    { id: 'eq-bank', name: 'EQ Bank', url: 'https://www.eqbank.ca/', steps: ['Sign in to EQ Bank online banking in a browser.', 'Open the account from the Dashboard.', 'Press the download icon to the left of the printer and save the CSV.'] }
+  ];
+
+  function bankStepsHtml(b) {
+    if (!b) {
+      return '<ol class="fr-bank-steps">' +
+        '<li>Sign in to your bank’s website on a computer (most banking apps cannot export).</li>' +
+        '<li>Open the account, then find <b>Download transactions</b> or <b>Export</b> (often next to the date filter).</li>' +
+        '<li>Pick the last 3 to 12 months and the <b>CSV</b>, <b>Quicken (QFX)</b> or <b>Money (OFX)</b> format.</li>' +
+        '<li>Drop the downloaded file above. One file is one account; repeat for a credit card.</li>' +
+      '</ol>';
+    }
+    return '<ol class="fr-bank-steps">' + b.steps.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ol>' +
+      '<p class="fr-bank-links"><a href="' + b.url + '" target="_blank" rel="noopener">Open ' + esc(b.name) + ' online banking</a>' +
+      '<a href="https://finman.money/banks/' + b.id + '/" target="_blank" rel="noopener">Full guide on finman.money</a></p>';
+  }
+
+  function bankPickerHtml() {
+    return '<div class="fr-banks" role="group" aria-label="Your bank">' +
+        BANK_STEPS.map(function (b) { return '<button type="button" class="fr-bank" data-bank="' + b.id + '" aria-pressed="false">' + esc(b.name) + '</button>'; }).join('') +
+        '<button type="button" class="fr-bank" data-bank="other" aria-pressed="true">Other bank</button>' +
+      '</div>' +
+      '<div class="fr-bank-body" id="fr-bank-body" aria-live="polite">' + bankStepsHtml(null) + '</div>';
+  }
+
+  function bindBankPicker(root) {
+    var body = root.querySelector('#fr-bank-body');
+    root.querySelectorAll('.fr-bank').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-bank');
+        root.querySelectorAll('.fr-bank').forEach(function (x) { x.setAttribute('aria-pressed', String(x === btn)); });
+        var b = BANK_STEPS.filter(function (x) { return x.id === id; })[0] || null;
+        if (body) body.innerHTML = bankStepsHtml(b);
+        track('bank_picked', { bank: id });
+      });
+    });
+  }
+
+  function isPhone() {
+    try { return window.matchMedia('(max-width: 640px), (pointer: coarse) and (max-width: 900px)').matches; } catch (_) { return false; }
+  }
+
+  function fromChatGpt() {
+    try {
+      var src = (window.FMTrack && typeof window.FMTrack.firstSource === 'function' && window.FMTrack.firstSource()) || '';
+      if (/chatgpt|openai/i.test(String(src))) return true;
+      return /chatgpt|openai/i.test(String(localStorage.getItem('fm_first_source') || '') + ' ' + String(document.referrer || '') + ' ' + location.search);
+    } catch (_) { return false; }
+  }
+
+  // Wrong file kinds get their own help: the bank steps open right under the message.
+  var FILE_HELP = { FILE_PDF: 1, FILE_IMAGE: 1, FILE_SPREADSHEET: 1, FILE_TYPE: 1 };
+
   // ---------------------------------------------------------------- start screen
 
   var BANKS = 'RBC, TD, CIBC, Scotiabank, BMO, Tangerine, Wealthsimple, EQ Bank, Revolut, Wise, Monobank';
@@ -134,9 +197,11 @@
           '<p class="fr-eyebrow">' + (name ? 'Welcome, ' + esc(name) : 'Welcome to Finman') + ' · step 1 of 1</p>' +
           '<h1 id="fr-title" class="fr-title">See where your money went, in under a minute.</h1>' +
           '<p class="fr-lede">Drop a statement you downloaded from online banking. Finman sorts every transaction into categories, finds your recurring charges and lets the AI CFO answer questions about your own numbers.</p>' +
+          (fromChatGpt() ? '<p class="fr-note fr-note-ai"><i class="fas fa-comments" aria-hidden="true"></i> <span>Came from ChatGPT? Once your transactions are in, you can ask ChatGPT or Claude about them too: Finman connects to both under <b>More, Connect to AI</b>.</span></p>' : '') +
         '</header>' +
         '<div class="fr-grid">' +
           '<div class="fr-import">' +
+            (isPhone() ? '<p class="fr-note fr-note-phone"><i class="fas fa-mobile-screen" aria-hidden="true"></i> <span>On a phone? Most bank apps cannot export a file. Look around with sample data now, then import from your bank’s website on a computer: your account will be waiting.</span> <button type="button" class="btn btn-sm btn-primary fr-btn" id="fr-demo-phone">Try with sample data</button></p>' : '') +
             '<label class="fr-drop" id="fr-drop" for="fr-file">' +
               '<input type="file" id="fr-file" class="fr-file" accept=".csv,.ofx,.qfx,.qbo,.txt,text/csv">' +
               '<span class="fr-drop-mark" aria-hidden="true"><i class="fas fa-file-arrow-up"></i></span>' +
@@ -150,14 +215,9 @@
               '<span class="fr-progress-text" id="fr-progress-text">Reading the file…</span>' +
             '</div>' +
             '<p class="fr-error" id="fr-error" role="alert" hidden></p>' +
-            '<details class="fr-how">' +
-              '<summary>Where do I get the file?</summary>' +
-              '<ol>' +
-                '<li>Sign in to your bank’s website on a computer (most banking apps cannot export).</li>' +
-                '<li>Open the account, then find <b>Download transactions</b> or <b>Export</b> (often next to the date filter).</li>' +
-                '<li>Pick the last 3 to 12 months and the <b>CSV</b>, <b>Quicken (QFX)</b> or <b>Money (OFX)</b> format.</li>' +
-                '<li>Drop the downloaded file above. One file is one account; repeat for a credit card.</li>' +
-              '</ol>' +
+            '<details class="fr-how" id="fr-how"' + (isPhone() ? '' : ' open') + '>' +
+              '<summary>Where do I get the file? Pick your bank</summary>' +
+              bankPickerHtml() +
             '</details>' +
             '<p class="fr-privacy"><i class="fas fa-lock" aria-hidden="true"></i> Nothing connects to your bank. The file is read once, only the transactions are kept, and they stay in your account.</p>' +
           '</div>' +
@@ -198,7 +258,10 @@
       var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if (f) importFile(f);
     });
+    bindBankPicker(main);
     document.getElementById('fr-demo').addEventListener('click', loadDemo);
+    var demoPhone = document.getElementById('fr-demo-phone');
+    if (demoPhone) demoPhone.addEventListener('click', loadDemo);
     document.getElementById('fr-scratch').addEventListener('click', startScratch);
   }
 
@@ -267,7 +330,14 @@
     try {
       preview = await previewStatementFile(file, {});
     } catch (err) {
-      track('import_failed', { stage: 'preview', message: String(err && err.message || '').slice(0, 120) });
+      var code = (err && err.code) || null;
+      track('import_failed', { stage: 'preview', code: code, ext: (String(file.name).match(/\.([a-z0-9]{1,8})$/i) || [])[1] || null, message: String(err && err.message || '').slice(0, 120) });
+      if (code && FILE_HELP[code]) {
+        showError((err && err.message) || 'Could not read this file.', false);
+        var how = document.getElementById('fr-how');
+        if (how) { how.open = true; how.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+        return;
+      }
       showError((err && err.message) || 'Could not read this file.', true);
       return;
     }

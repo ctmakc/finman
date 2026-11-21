@@ -440,6 +440,25 @@ describe('HTTP /api/bank-api', () => {
     }
   });
 
+  test('POST /import/preview names PDF, photo and Excel files with their own code and a next step', async () => {
+    const send = (buf, name) => ctx.request.post('/api/bank-api/import/preview').set(auth).attach('file', buf, name);
+    const pdfByName = await send(Buffer.from('anything'), 'statement.pdf');
+    expect(pdfByName.status).toBe(400);
+    expect(pdfByName.body.code).toBe('FILE_PDF');
+    expect(pdfByName.body.message).toMatch(/Download transactions/);
+    const pdfInCsv = await send(Buffer.from('%PDF-1.7 body'), 'statement.csv');
+    expect(pdfInCsv.body.code).toBe('FILE_PDF');
+    const photo = await send(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]), 'IMG_0001.jpg');
+    expect(photo.body.code).toBe('FILE_IMAGE');
+    const heic = await send(Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypheic')]), 'scan.txt');
+    expect(heic.body.code).toBe('FILE_IMAGE');
+    const xlsx = await send(Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]), 'export.xlsx');
+    expect(xlsx.body.code).toBe('FILE_SPREADSHEET');
+    expect(xlsx.body.message).toMatch(/CSV/);
+    const other = await send(Buffer.from('x'), 'notes.docx');
+    expect(other.body.code).toBe('FILE_TYPE');
+  });
+
   test('POST /import/preview parses an RBC CSV, detects the preset and reports no duplicates on an empty account', async () => {
     const res = await ctx.request
       .post('/api/bank-api/import/preview')

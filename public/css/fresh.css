@@ -755,3 +755,32 @@
   :root .fm-delete-form .form-actions .btn { width: 100%; }
 }
 :root .fm-deleted-card .auth-header { text-align: center; }
+
+/* ---- 11. First run: bank picker, phone and ChatGPT notes (growth 21.11) ---- */
+:root .fr-note {
+  border-left: 0;
+  display: flex; gap: var(--space-3); align-items: flex-start;
+  margin: var(--space-4) 0 0; padding: var(--space-3) var(--space-4);
+  border-radius: 18px; background: var(--fm-surface-2); color: var(--fm-ink);
+  font-size: .95rem; line-height: 1.5; max-width: 62ch;
+}
+:root .fr-note i { color: var(--fm-primary); margin-top: .2rem; }
+:root .fr-note-phone { margin: 0 0 var(--space-3); display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-3); row-gap: var(--space-3); }
+:root .fr-note-phone .btn { grid-column: 2; justify-self: start; }
+:root .fr-bank-body { padding-bottom: var(--space-2); }
+:root .fr-how summary { font-weight: 600; }
+:root .fr-banks { display: flex; flex-wrap: wrap; gap: 8px; padding: var(--space-1) 0 var(--space-3); }
+:root .fr-bank {
+  font: inherit; font-size: .9rem; font-weight: 500; cursor: pointer;
+  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--fresh-soft-rule, var(--fm-contour));
+  background: var(--fresh-plate, var(--fm-surface)); color: var(--fm-ink);
+  transition: background-color 160ms var(--fresh-ease), border-color 160ms var(--fresh-ease), transform 160ms var(--fresh-ease);
+}
+:root .fr-bank:hover { border-color: var(--fm-primary); }
+:root .fr-bank:active { transform: scale(.97); }
+:root .fr-bank[aria-pressed="true"] { background: var(--fm-primary); border-color: var(--fm-primary); color: var(--fm-primary-contrast); }
+:root .fr-bank:focus-visible { outline: 2px solid var(--fm-primary); outline-offset: 2px; }
+:root .fr-bank-steps { margin: 0 0 var(--space-3); padding-left: 1.25rem; line-height: 1.6; color: var(--fm-ink); }
+:root .fr-bank-steps li { padding: 2px 0; }
+:root .fr-bank-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin: 0 0 var(--space-4); font-size: .92rem; }
+:root .fr-bank-links a { color: var(--fm-primary-strong); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }

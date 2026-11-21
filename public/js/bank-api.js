@@ -224,7 +224,11 @@ async function previewStatementFile(file, options = {}) {
     throw new Error('Session expired. Sign in again.');
   }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Could not read this file');
+  if (!response.ok) {
+    const err = new Error(data.message || 'Could not read this file');
+    err.code = data.code || null;
+    throw err;
+  }
   return data;
 }
 

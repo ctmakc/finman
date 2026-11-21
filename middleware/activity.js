@@ -58,6 +58,7 @@ function activity(req, res, next) {
       if (!event) return;
       const props = { status: res.statusCode };
       if (event === 'ai_used') props.feature = path.split('/')[3] || null;
+      if (!ok && res.locals && res.locals.failCode) props.code = String(res.locals.failCode).slice(0, 40);
       if (req.query && req.query.source) props.source = String(req.query.source).slice(0, 40);
       tracker.track(event, { userId: user.id, props, path, req, test: tracker.isTestEmail(user.email) });
       if (ok) require('../services/journey').touch(user.id);
