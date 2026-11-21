@@ -26,6 +26,7 @@ const RULES = [
   [/^\/api\/billing\/checkout$/, 'POST', 'checkout_started'],
   [/^\/api\/receipts/, 'POST', 'receipt_scanned'],
   [/^\/api\/invoices\/preview$/, 'POST', () => null],
+  [/^\/api\/feedback(\/|$)/, '*', () => null], // routes/feedback.js tracks feedback_sent itself
   [/^\/api\/invoices\/profiles\/\d+\/share$/, 'POST', 'invoice_template_shared'],
   [/^\/api\/invoices\/profiles\/?$/, 'POST', 'invoice_template_created'],
   [/^\/api\/invoices\/profiles\/\d+$/, 'PUT', 'invoice_template_updated'],
