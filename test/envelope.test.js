@@ -378,3 +378,32 @@ describe('envelope/rollover: HTTP /api/budgets', () => {
     expect(res.body.error).toBe(true);
   });
 });
+
+describe('GET /api/budgets recalculates spending before it answers', () => {
+  let ctx, db;
+  beforeAll(async () => {
+    ctx = await makeApp();
+    db = getDb();
+  });
+  afterAll(async () => {
+    if (ctx) await ctx.close();
+  });
+
+  test('a transaction added after the last visit shows up in the list on the first load', async () => {
+    const acc = await db.run(
+      `INSERT INTO accounts (user_id, name, currency, balance, is_active) VALUES (?, 'Card', 'UAH', 0, 1)`,
+      [ctx.userId]
+    );
+    const today = new Date().toISOString().split('T')[0];
+    await seedBudget(db, ctx.userId, { name: 'Groceries', amount: 500, spent: 0, category: 'Groceries' });
+    await db.run(
+      `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
+       VALUES (?, ?, ?, 'shop', 'Groceries', -120, 'expense')`,
+      [acc.id, ctx.userId, today]
+    );
+    const res = await ctx.request.get('/api/budgets').set(AUTH(ctx.token));
+    expect(res.status).toBe(200);
+    const b = res.body.find((x) => x.name === 'Groceries');
+    expect(b.spent).toBe(120);
+  });
+});

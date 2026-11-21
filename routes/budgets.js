@@ -13,6 +13,9 @@ const authenticate = passport.authenticate('jwt', { session: false });
 router.get('/', authenticate, async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
+    // The page asks for the list and /stats at the same time; only /stats used to
+    // recalculate, so the cards showed last visit's spending next to fresh totals.
+    await Budget.recalculateSpent(req.user.id, null, dates.todayISO(dates.userTz(req.user)));
     const budgets = await Budget.findByUserId(req.user.id, includeInactive);
 
     // Конверт-бюджеты: отдаём rollover (bool), carryover и effectiveLimit (amount+carryover).
