@@ -509,7 +509,7 @@ describe('HTTP /api/bank-api', () => {
     expect(none.status).toBe(400);
     const pdf = await ctx.request.post('/api/bank-api/import/preview').set(auth).attach('file', Buffer.from('%PDF-1.4'), 'statement.pdf');
     expect(pdf.status).toBe(400);
-    expect(pdf.body.message).toMatch(/Unsupported file type/);
+    expect(pdf.body.code).toBe('FILE_PDF');
     const foreign = await ctx.request
       .post('/api/bank-api/import/preview')
       .set({ Authorization: `Bearer ${otherToken}` })
