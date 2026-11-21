@@ -8,7 +8,9 @@
 const tracker = require('../services/tracker');
 
 const VERB = { POST: 'created', PUT: 'updated', PATCH: 'updated', DELETE: 'deleted' };
-const SKIP = /^\/api\/(auth|t|billing\/webhook|health|sync\/run|engagement)(\/|$)/;
+const SKIP = /^\/api\/(auth|t|billing\/webhook|health|sync\/run|engagement|vault)(\/|$)/;
+// /api/vault: PUT /blob fires after every write (debounced 1.5 s) — routes/vault.js
+// records one vault_sync per user per day instead.
 
 // [regex on path (no query), method or '*', event name or fn(match, ok)]
 const RULES = [

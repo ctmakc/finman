@@ -48,3 +48,5 @@ ios/App/Pods/
 
 # Local UI screenshot sweeps (fe-shell / fe-logic verification)
 .shots/
+# Finman Vault: the engine bundle is committed (Docker installs without esbuild).
+!engine/dist/

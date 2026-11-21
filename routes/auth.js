@@ -10,6 +10,7 @@ const tracker = require('../services/tracker');
 const appHandoff = require('../services/appHandoff');
 const appleAuth = require('../services/appleAuth');
 const { deleteUserData } = require('../services/accountDeletion');
+const vault = require('../services/vault');
 
 const router = express.Router();
 
@@ -24,6 +25,29 @@ function signToken(user) {
 // Валидация токена (для frontend)
 router.get('/validate', passport.authenticate('jwt', { session: false }), (req, res) => {
   res.json({ valid: true, user: { id: req.user.id, username: req.user.username } });
+});
+
+// Finman Vault: how this login derives its password before sending it.
+// Body { email } or { username } (the login field takes either, like the local strategy).
+// Unknown login -> 'fm1' with a stable fake salt, so the answer does not reveal whether
+// the account exists (beyond legacy/fm1 for real ones).
+router.post('/prelogin', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const login = String(b.email || b.username || '').trim();
+    if (!login || login.length > 320) return res.status(400).json({ error: true, message: 'Email or username is required' });
+    const user = login.includes('@') ? await User.findByEmail(login) : await User.findByUsername(login);
+    if (user && user.kdf === 'fm1' && user.kdf_salt) {
+      let params = vault.DEFAULT_PARAMS;
+      try { params = JSON.parse(user.kdf_params) || params; } catch (_) { /* default */ }
+      return res.json({ kdf: 'fm1', salt: user.kdf_salt, params });
+    }
+    if (user) return res.json({ kdf: 'legacy', salt: null, params: null });
+    return res.json({ kdf: 'fm1', salt: vault.fakeSalt(login), params: vault.DEFAULT_PARAMS });
+  } catch (error) {
+    console.error('Prelogin error:', error.message);
+    return res.status(500).json({ error: true, message: 'Prelogin failed' });
+  }
 });
 
 // --- Вход через Google (портировано из прод-линейки) -----------------------
@@ -216,8 +240,22 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    // Finman Vault: with kdf_salt the browser derived the key, `password` is the authToken.
+    let kdfSalt = null;
+    let kdfParams = null;
+    if (req.body.kdf_salt != null || req.body.kdf_params != null) {
+      kdfSalt = req.body.kdf_salt;
+      kdfParams = vault.normalizeParams(req.body.kdf_params);
+      if (!vault.isSalt(kdfSalt) || !kdfParams) {
+        return res.status(400).json({ error: true, code: 'BAD_KDF', message: 'kdf_salt or kdf_params are invalid' });
+      }
+      if (!vault.isAuthToken(password)) {
+        return res.status(400).json({ error: true, code: 'BAD_AUTH_TOKEN', message: 'password must be the derived auth token' });
+      }
+    }
+
     // Валидация пароля (минимум 6 символов)
-    if (password.length < 6) {
+    if (typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({
         error: true,
         message: 'Password must be at least 6 characters'
@@ -247,7 +285,9 @@ router.post('/register', async (req, res) => {
       username,
       email,
       password,
-      fullName
+      fullName,
+      kdfSalt,
+      kdfParams
     });
     
     // Создание токена JWT
@@ -269,7 +309,8 @@ router.post('/register', async (req, res) => {
         id: newUser.id,
         username: newUser.username,
         email: newUser.email,
-        fullName: newUser.fullName
+        fullName: newUser.fullName,
+        kdf: newUser.kdf
       }
     });
   } catch (error) {
@@ -318,6 +359,10 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
     const user = await User.findById(req.user.id);
     if (user) { tracker.appOpen(user, req); require('../services/journey').touch(user.id); }
     const methods = await User.authMethods(req.user.id);
+    const vaultInfo = (await require('../db/database').get(
+      `SELECT u.kdf, u.vault_state, v.version FROM users u LEFT JOIN user_vaults v ON v.user_id = u.id WHERE u.id = ?`,
+      [req.user.id]
+    ).catch(() => null)) || {};
 
     if (!user) {
       return res.status(404).json({ 
@@ -335,7 +380,11 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
       emailVerified: Boolean(user.email_verified_at),
       google: Boolean(user.google_id),
       apple: methods.apple,
-      hasPassword: methods.password
+      hasPassword: methods.password,
+      // Finman Vault: vault_state 'none' | 'active'; vault_version null = no vault uploaded yet.
+      kdf: vaultInfo.kdf || 'legacy',
+      vault_state: vaultInfo.vault_state || 'none',
+      vault_version: vaultInfo.version == null ? null : vaultInfo.version
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -380,6 +429,7 @@ router.post('/verify-email/send', passport.authenticate('jwt', { session: false 
 router.put('/me', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const { email, fullName, password, currentPassword } = req.body;
+    const wrappedPw = req.body.wrapped_pw;
     
     // Пароль и email меняются только с текущим паролем: иначе украденный JWT
     // (24 ч) превращается в постоянный доступ (смена email -> сброс/вход Google).
@@ -410,6 +460,27 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
       }
     }
     
+    // Finman Vault: for an fm1 account password/currentPassword are authTokens, and the
+    // vault key wrap must change in the same write, or the vault could not be opened.
+    let vaultRewrap = false;
+    if (password) {
+      const acc = await require('../db/database').get(
+        'SELECT u.kdf, v.user_id AS has_vault FROM users u LEFT JOIN user_vaults v ON v.user_id = u.id WHERE u.id = ?',
+        [req.user.id]
+      );
+      if (acc && acc.kdf === 'fm1') {
+        if (!vault.isAuthToken(String(password))) {
+          return res.status(400).json({ error: true, code: 'BAD_AUTH_TOKEN', message: 'password must be the derived auth token' });
+        }
+        if (acc.has_vault) {
+          if (!vault.isWrap(wrappedPw)) {
+            return res.status(400).json({ error: true, code: 'VAULT_REWRAP_REQUIRED', message: 'wrapped_pw is required to change the password' });
+          }
+          vaultRewrap = true;
+        }
+      }
+    }
+
     // Email уникален (UNIQUE в users): проверяем заранее -> 409, иначе был 500.
     if (email) {
       const taken = await User.findByEmail(email);
@@ -422,11 +493,23 @@ router.put('/me', passport.authenticate('jwt', { session: false }), async (req, 
     }
 
     // Обновление данных пользователя
-    const success = await User.update(req.user.id, {
-      email,
-      fullName,
-      password
-    });
+    let success;
+    if (vaultRewrap) {
+      const passwordHash = await User.hashPassword(String(password));
+      const db = require('../db/database');
+      success = await db.transaction(async () => {
+        const okUser = await User.update(req.user.id, { email, fullName, passwordHash });
+        const r = await db.run('UPDATE user_vaults SET wrapped_pw = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [wrappedPw, req.user.id]);
+        if (!r.changes) throw new Error('vault row vanished during password change');
+        return okUser;
+      });
+    } else {
+      success = await User.update(req.user.id, {
+        email,
+        fullName,
+        password
+      });
+    }
     
     if (success) {
       if (emailChanging) {

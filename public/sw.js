@@ -18,7 +18,7 @@
 // precache); activate удаляет все НЕ-текущие кэши, включая старый finman-v3-api
 // с ответами API.
 
-const CACHE_VERSION = 'finman-v12';
+const CACHE_VERSION = 'finman-v13';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 
 const STATIC_ASSETS = [
@@ -89,6 +89,9 @@ const STATIC_ASSETS = [
   '/js/billing.js',
   '/js/invoices.js',
   '/js/native.js',
+  '/js/vault/crypto.js',
+  '/js/vault/vault.js',
+  '/vendor/hash-wasm/argon2.umd.min.js',
 ];
 
 // Install — precache app shell. Используем addAll по одному с защитой, чтобы

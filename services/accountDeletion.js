@@ -110,6 +110,11 @@ async function deleteUserData(userId) {
       [uid]
     );
 
+    // ---- Finman Vault: ciphertext, key wraps, consent-MCP grants -------------
+    // (the sweep below would catch them too; explicit so the vault never outlives the user)
+    await run('DELETE FROM vault_grants WHERE user_id = ?', [uid]);
+    await run('DELETE FROM user_vaults WHERE user_id = ?', [uid]);
+
     // ---- sweep every table with an owner column ----------------------------
     const tables = await query(
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`

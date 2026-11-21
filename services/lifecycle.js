@@ -9,6 +9,8 @@
 //    accounts created before this feature (backfilled acquisition rows).
 //      nudge_not_activated     24–72 h after sign-up, < 3 transactions, no import
 //      nudge_import_abandoned  an import failed or stopped at preview, no import since
+//    Finman Vault users (services/vault.isVaultUser) never get nudge_not_activated:
+//    their transactions are encrypted. Their activity = events (vault_sync, app_open, login).
 //    Sender: LIFECYCLE_FROM (a verified Resend domain). Each email carries a
 //    one-click unsubscribe link (routes/track.js).
 'use strict';
@@ -49,6 +51,8 @@ async function activitySummary(userId) {
       WHERE t.user_id = ? AND NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = t.account_id AND a.is_demo = 1)`, [userId],
   ).catch(() => ({ n: 0 }));
   const accounts = await get('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ? AND is_demo = 0', [userId]).catch(() => ({ n: 0 }));
+  // Finman Vault: the server holds only ciphertext, so its transaction count says nothing.
+  const vaultUser = await require('./vault').isVaultUser(userId);
   const events = await query(
     `SELECT event, COUNT(*) AS n, MAX(created_at) AS last FROM analytics_events
       WHERE user_id = ? GROUP BY event ORDER BY n DESC`, [userId],
@@ -59,12 +63,15 @@ async function activitySummary(userId) {
     by[e.event] = e.n;
     if (!lastSeen || e.last > lastSeen) lastSeen = e.last;
   }
-  return { transactions: tx ? tx.n : 0, accounts: accounts ? accounts.n : 0, events: by, lastSeen };
+  return { transactions: tx ? tx.n : 0, accounts: accounts ? accounts.n : 0, events: by, lastSeen, vault: vaultUser };
 }
 
 function describe(s) {
-  const parts = [`${s.transactions} transactions`, `${s.accounts} accounts`];
   const ev = s.events;
+  // Vault users: data counts live in the encrypted vault; syncs and opens are what we see.
+  const parts = s.vault
+    ? [`encrypted vault · syncs ${ev.vault_sync || 0} days`]
+    : [`${s.transactions} transactions`, `${s.accounts} accounts`];
   if (ev.import_done) parts.push(`imports ${ev.import_done}`);
   if (ev.import_failed) parts.push(`failed imports ${ev.import_failed}`);
   if (ev.ai_used) parts.push(`AI ${ev.ai_used}`);
@@ -173,6 +180,8 @@ async function runNudges() {
   for (const u of await dueUsers('nudge_not_activated', 24, 72)) {
     if (!(await eligible(u))) continue;
     const s = await activitySummary(u.id);
+    // Vault users: no transaction count on the server — the nudge would be a guess.
+    if (s.vault) continue;
     if (s.transactions >= 3 || s.events.import_done) continue;
     const r = await sendNudge('nudge_not_activated', u);
     if (r && r.sent) sent++;

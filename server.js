@@ -81,7 +81,13 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       // Шрифты self-hosted (public/) или data:-URI — Google Fonts не подключаем.
       styleSrc: ["'self'", "'unsafe-inline'", "data:", "https://cdnjs.cloudflare.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      // 'wasm-unsafe-eval': Finman Vault runs Argon2id (hash-wasm) and SQLite (sql.js) as
+      // WebAssembly in the browser. It allows compiling wasm only, not eval() of JS.
+      scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://cdn.jsdelivr.net"],
+      // Your AI in vault mode: the browser calls the user's own AI provider directly
+      // (OpenAI, Anthropic, Gemini, OpenRouter, DeepSeek, Mistral, Groq, xAI or a custom
+      // OpenAI-compatible https address), so any https origin. img-src already allows https:.
+      connectSrc: ["'self'", "https:"],
       // UI wave2 держит ~169 inline-обработчиков (onclick=/onchange=). helmet 8
       // по умолчанию ставит script-src-attr 'none' и Chrome их молча блокирует —
       // supertest этого не видит, ломается только браузер.
@@ -157,6 +163,16 @@ app.use('/api/billing/webhook', express.raw({ type: '*/*' }));
 // Relay to the self-hosted OpenPanel: raw body, so ДО json-парсера.
 const trackRoutes = require('./routes/track');
 app.use('/op', trackRoutes.opRelay);
+// Finman Vault: the encrypted file (raw, PUT /blob) and the first upload (JSON with
+// blob_b64, /setup) may exceed the 10 MB default — own parsers, ДО общего json-парсера.
+app.put('/api/vault/blob', express.raw({ type: () => true, limit: '25mb' }));
+app.post('/api/vault/setup', express.json({ limit: '35mb' }));
+app.use('/api/vault', (err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: true, code: 'TOO_LARGE', message: 'Vault is too large' });
+  }
+  return next(err);
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
@@ -184,6 +200,16 @@ app.use(session({
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+// prelogin precedes every password sign-in: its own budget (same window), otherwise it
+// would eat half of the 5 login attempts.
+const preloginLimiter = rateLimit({
+  windowMs: config.authRateLimits.windowMs,
+  max: config.authRateLimits.max * 6,
+  message: { error: true, message: 'Слишком много попыток входа, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/prelogin', preloginLimiter);
 app.use('/api/auth/app/claim', appAuthLimiter);
 app.use('/api/auth/apple', appAuthLimiter);
 app.use('/api/auth/me', (req, res, next) => (req.method === 'DELETE' ? appAuthLimiter(req, res, next) : next()));
@@ -247,6 +273,8 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/widgets', widgetsRoutes);
 app.use('/api/forecast', forecastRoutes);
+// Finman Vault (E2E encryption): JWT inside the router.
+app.use('/api/vault', require('./routes/vault'));
 
 // Middleware для проверки аутентификации API
 function apiAuthMiddleware(req, res, next) {

@@ -6,7 +6,10 @@
 //   - never test accounts (.test / +smoke), never users who unsubscribed
 //     (users.lifecycle_opt_out, same one-click link as the lifecycle emails),
 //     never users who switched weekly_summary off in notification settings;
-//   - once per period: lifecycle_emails kind `week:<monday>` / `month:<YYYY-MM>`.
+//   - once per period: lifecycle_emails kind `week:<monday>` / `month:<YYYY-MM>`;
+//   - never Finman Vault users (setup done or purged): the server has no numbers for
+//     them (stale rows until the purge, nothing after), and their weekly_summary switch
+//     lives inside the vault. A no-numbers version is stage 2 (docs/E2E-ENCRYPTION.md §7).
 // Sender LIFECYCLE_FROM (Resend, finman.money). List-Unsubscribe headers are set.
 'use strict';
 
@@ -20,6 +23,7 @@ const cfoTips = require('./cfoTips');
 const journey = require('./journey');
 const push = require('./push');
 const lifecycle = require('./lifecycle');
+const { VAULT_USER_SQL } = require('./vault');
 
 const TZ = 'America/Toronto';
 const esc = (s) => String(s == null ? '' : s)
@@ -172,6 +176,7 @@ async function candidates() {
         AND NOT EXISTS (SELECT 1 FROM notification_settings ns WHERE ns.user_id = u.id AND ns.weekly_summary = 0)
         AND EXISTS (SELECT 1 FROM transactions t JOIN accounts a ON a.id = t.account_id
                      WHERE t.user_id = u.id AND COALESCE(a.is_demo, 0) = 0)
+        AND NOT ${VAULT_USER_SQL('u')}
       ORDER BY u.id`,
   );
 }

@@ -81,6 +81,13 @@
           <li>delete invoices that are still drafts</li>
         </ul>
         <p class="oauth-note">Bank logins, passwords and your plan settings stay out of reach. After you allow, you return to <span id="oa-host"></span>.</p>
+        <div class="oauth-note" id="oa-vault-note" hidden>
+          <p><strong>Your data is end-to-end encrypted.</strong> Allowing gives this app its own key. While it is connected, Finman's server decrypts your data in memory only at the moment the app calls a Finman tool, and keeps nothing readable afterwards. Disconnect the app in Finman → Settings → API tokens to take the key back.</p>
+          <div id="oa-vault-box" hidden>
+            <label class="form-label" for="oa-vault-pw">Finman password (or vault password)</label>
+            <input type="password" id="oa-vault-pw" class="form-control" autocomplete="current-password">
+          </div>
+        </div>
         <div id="oa-consent-error" class="auth-error" role="alert"></div>
         <div class="oauth-actions">
           <button type="button" class="btn btn-primary" id="oa-allow">Allow</button>
@@ -91,6 +98,8 @@
       <p class="auth-footer oauth-foot"><a href="/">app.finman.money</a></p>
     </div>
   </main>
+  <script src="/vendor/hash-wasm/argon2.umd.min.js"></script>
+  <script src="/js/vault/crypto.js"></script>
   <script src="/js/oauth-authorize.js"></script>
 </body>
 </html>

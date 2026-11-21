@@ -56,8 +56,10 @@ router.put('/settings', authenticate, async (req, res) => {
 router.get('/rates', authenticate, async (req, res) => {
   try {
     const { base } = req.query;
-    const settings = await Currency.getUserSettings(req.user.id);
-    const baseCurrency = base || settings.base_currency;
+    // With ?base= nothing per-user is needed: getUserSettings() would create a default
+    // settings row, and for a Finman Vault user (the browser engine asks for rates this
+    // way) that row would be plaintext on the server.
+    const baseCurrency = base || (await Currency.getUserSettings(req.user.id)).base_currency;
 
     const rates = await Currency.getRatesForCurrency(baseCurrency);
     res.json({ base: baseCurrency, rates });

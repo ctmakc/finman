@@ -229,6 +229,18 @@ async function initApp() {
     return;
   }
 
+  // Finman Vault: open (or create) the encrypted vault before any data request.
+  if (window.FMVault) {
+    try {
+      const ready = await window.FMVault.ensureReady(appState.user);
+      if (!ready) return;
+    } catch (error) {
+      console.error('Could not open the encrypted vault:', error);
+      renderConnectionError(error && error.message);
+      return;
+    }
+  }
+
   renderAuthenticatedUI();
   replayOfflineQueue();
 
@@ -1006,7 +1018,10 @@ async function handleLogin(e) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({
+        username,
+        password: window.FMVault ? (await window.FMVault.prepareLogin(username, password)).password : password,
+      })
     });
 
     let data = null;
@@ -1058,7 +1073,8 @@ async function handleRegister(e) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        email, password,
+        email,
+        ...(window.FMVault ? await window.FMVault.prepareRegister(email, password) : { password }),
         ...(fullName ? { fullName } : {}),
         website: (document.getElementById('register-website') || {}).value || '',
         attribution: window.FMTrack ? window.FMTrack.attribution() : null,
@@ -1666,6 +1682,20 @@ function renderSettingsPage() {
         </form>
       </div>
 
+      ${window.FMVault && window.FMVault.status().mode === 'vault' ? `
+      <div class="card" id="vault-card">
+        <h2 class="card-title">${escapeHtmlShell(trShell('vault.title', 'Encryption'))}</h2>
+        <div class="fmv-status">
+          <div class="fmv-lock" aria-hidden="true"><i class="fas fa-lock"></i></div>
+          <p>${escapeHtmlShell(trShell('vault.on', 'Your data is end-to-end encrypted. It is encrypted on this device before it reaches our server, and only you hold the key. Finman staff cannot read it.'))}
+          <a href="https://finman.money/security" target="_blank" rel="noopener">${escapeHtmlShell(trShell('vault.how', 'How it works'))}</a></p>
+        </div>
+        <div class="fm-link-grid">
+          <button class="btn btn-outline" type="button" id="vault-new-rk"><i class="fas fa-key" aria-hidden="true"></i> ${escapeHtmlShell(trShell('vault.newRk', 'New recovery key'))}</button>
+          <button class="btn btn-outline" type="button" id="vault-lock"><i class="fas fa-lock" aria-hidden="true"></i> ${escapeHtmlShell(trShell('vault.lock', 'Lock on this device'))}</button>
+        </div>
+      </div>` : ''}
+
       <div class="card">
         <h2 class="card-title">Export transactions</h2>
 
@@ -1721,6 +1751,10 @@ function renderSettingsPage() {
 
   document.getElementById('profile-form').addEventListener('submit', withBusyForm(handleProfileUpdate));
   document.getElementById('password-form').addEventListener('submit', withBusyForm(handlePasswordUpdate));
+  const vaultRk = document.getElementById('vault-new-rk');
+  if (vaultRk) vaultRk.addEventListener('click', () => window.FMVault.newRecoveryKey().catch((e) => showNotification(e.message, 'error')));
+  const vaultLock = document.getElementById('vault-lock');
+  if (vaultLock) vaultLock.addEventListener('click', () => window.FMVault.lock());
   document.getElementById('export-btn').addEventListener('click', handleDataExport);
 
   const exportPeriod = document.getElementById('export-period');
@@ -1826,7 +1860,11 @@ async function handleDeleteAccount(event) {
   let response;
   try {
     const payload = { confirm: 'DELETE' };
-    if (pwInput) payload.password = password;
+    if (pwInput) {
+      payload.password = window.FMVault
+        ? (await window.FMVault.passwordFields(password, null)).currentPassword
+        : password;
+    }
     response = await fetchWithAuth('/api/auth/me', { method: 'DELETE', body: JSON.stringify(payload) });
   } catch (e) {
     showError(trShell('account.delete.failed', 'Could not delete the account. Try again.'));
@@ -1961,6 +1999,7 @@ function clearApiCaches() {
 }
 
 function logout() {
+  if (window.FMVault) { try { window.FMVault.onLogout(); } catch (e) { /* ignore */ } }
   localStorage.removeItem('token');
   if (window.FMTrack) window.FMTrack.reset();
 

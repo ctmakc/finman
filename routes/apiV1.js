@@ -94,6 +94,17 @@ router.delete(
 // объявлены и не затрагиваются.
 router.use(patAuth);
 
+// Finman Vault: an encrypted account keeps its data only as ciphertext, so the
+// read API has nothing to serve. Say so plainly instead of returning empty lists.
+router.use(wrap(async (req, res, next) => {
+  const { isVaultUser } = require('../services/vault');
+  if (req.user && await isVaultUser(req.user.id)) {
+    return res.status(409).json({ error: true, code: 'VAULT_ENCRYPTED',
+      message: 'This Finman account is end-to-end encrypted, so its data cannot be read with an API token. Connect your AI app through Settings → Connect to AI and press Allow to give it its own key.' });
+  }
+  return next();
+}));
+
 // GET /api/v1/accounts — счета пользователя.
 router.get(
   '/accounts',

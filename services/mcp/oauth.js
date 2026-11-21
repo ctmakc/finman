@@ -8,6 +8,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const vaultGrant = require('./vaultGrant');
 const { query, get, run } = require('../../db/database');
 
 const ACCESS_TTL = 60 * 60; // seconds
@@ -205,11 +206,12 @@ async function userTv(userId) {
   return u ? Number(u.token_version || 0) : null;
 }
 
-async function issueTokens(client, userId, scope, resource, family) {
+async function issueTokens(client, userId, scope, resource, family, vaultSecret) {
   const tv = await userTv(userId);
   if (tv === null) throw new OAuthError('invalid_grant', 'User not found');
-  const access = ACCESS_PREFIX + rand(32);
-  const refresh = REFRESH_PREFIX + rand(32);
+  // Finman Vault: the grant secret rides inside the tokens; only their hashes are stored.
+  const access = vaultGrant.withSecret(ACCESS_PREFIX + rand(32), vaultSecret);
+  const refresh = vaultGrant.withSecret(REFRESH_PREFIX + rand(32), vaultSecret);
   const fam = family || rand(12);
   const ins = 'INSERT INTO oauth_tokens (token_hash, kind, client_id, user_id, scope, resource, tv, family, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
   await run(ins, [sha(access), 'access', client.client_id, userId, scope, resource, tv, fam, now() + ACCESS_TTL]);
@@ -235,7 +237,11 @@ async function exchange(req) {
     if (!row || row.expires_at < now() || row.client_id !== client.client_id) throw new OAuthError('invalid_grant', 'Invalid or expired authorization code');
     if (b.redirect_uri !== undefined && b.redirect_uri !== row.redirect_uri) throw new OAuthError('invalid_grant', 'redirect_uri does not match');
     if (!pkceOk(b.code_verifier, row.code_challenge)) throw new OAuthError('invalid_grant', 'PKCE verification failed');
-    return issueTokens(client, row.user_id, row.scope, row.resource);
+    const vg = vaultGrant.takeForCode(row.code_hash);
+    if (!vg) return issueTokens(client, row.user_id, row.scope, row.resource);
+    const fam = rand(12);
+    await vaultGrant.saveGrant(row.user_id, fam, vg.wrapped, clientLabel(client));
+    return issueTokens(client, row.user_id, row.scope, row.resource, fam, vg.secret);
   }
   if (b.grant_type === 'refresh_token') {
     const token = String(b.refresh_token || '');
@@ -243,11 +249,12 @@ async function exchange(req) {
     if (!row || row.expires_at < now() || row.client_id !== client.client_id) throw new OAuthError('invalid_grant', 'Invalid or expired refresh token');
     if ((await userTv(row.user_id)) !== Number(row.tv)) {
       await run('DELETE FROM oauth_tokens WHERE family = ?', [row.family]);
+      await vaultGrant.revokeFamily(row.family);
       throw new OAuthError('invalid_grant', 'Sign in again');
     }
     // Rotation: the used refresh token and the old access token of this grant go away.
     await run('DELETE FROM oauth_tokens WHERE family = ?', [row.family]);
-    return issueTokens(client, row.user_id, row.scope, row.resource, row.family);
+    return issueTokens(client, row.user_id, row.scope, row.resource, row.family, vaultGrant.secretOf(token));
   }
   throw new OAuthError('unsupported_grant_type', 'Use authorization_code or refresh_token');
 }
@@ -260,6 +267,7 @@ async function revoke(req) {
   const { id } = clientCredentials(req);
   if (id && id !== row.client_id) return;
   await run('DELETE FROM oauth_tokens WHERE family = ?', [row.family]);
+  await vaultGrant.revokeFamily(row.family);
 }
 
 // Bearer access token -> { userId, clientId } or null.
@@ -269,7 +277,7 @@ async function verifyAccess(token) {
   if (!row || row.expires_at < now()) return null;
   if ((await userTv(row.user_id)) !== Number(row.tv)) return null;
   run('UPDATE oauth_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?', [row.id]).catch(() => {});
-  return { userId: row.user_id, clientId: row.client_id };
+  return { userId: row.user_id, clientId: row.client_id, family: row.family, vaultSecret: vaultGrant.secretOf(token) };
 }
 
 // Apps connected to an account (one row per grant), for the settings page.
@@ -287,6 +295,7 @@ async function listGrants(userId) {
 
 async function revokeGrant(userId, family) {
   const r = await run('DELETE FROM oauth_tokens WHERE user_id = ? AND family = ?', [userId, String(family)]);
+  await vaultGrant.revokeFamily(family);
   return r.changes > 0;
 }
 

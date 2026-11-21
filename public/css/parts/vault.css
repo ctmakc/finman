@@ -1,0 +1,55 @@
+/* Finman Vault: unlock / encrypting / recovery key screens (public/js/vault/vault.js). */
+.fmv-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
+  background: color-mix(in srgb, var(--bg-color, #f4f6f3) 88%, transparent);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+}
+.fmv-card {
+  width: min(460px, 100%);
+  background: var(--fresh-plate, #fff);
+  border-radius: var(--fresh-plate-r, 24px);
+  box-shadow: var(--shadow-lg, 0 20px 60px rgba(0,0,0,.12));
+  padding: 28px 24px 22px;
+}
+.fmv-card h2 { margin: 6px 0 8px; font-size: 1.35rem; line-height: 1.25; }
+.fmv-card p { margin: 0 0 14px; line-height: 1.5; color: var(--text-secondary, inherit); }
+.fmv-lock {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--primary-color, #1f7a4d) 14%, transparent);
+  color: var(--primary-color, #1f7a4d);
+  font-size: 1.1rem;
+}
+.fmv-form { display: grid; gap: 10px; }
+.fmv-form .form-label { margin-bottom: 2px; }
+.fmv-pw, .fmv-rk { display: grid; gap: 6px; }
+.fmv-check { display: flex; gap: 8px; align-items: center; font-size: .92rem; margin: 6px 0 4px; cursor: pointer; }
+.fmv-wide { width: 100%; justify-content: center; min-height: 46px; }
+.fmv-form .btn-link { background: none; border: 0; padding: 4px; text-decoration: underline; color: var(--text-secondary, inherit); cursor: pointer; }
+.fmv-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em; }
+.fmv-rkbox {
+  padding: 14px; border-radius: var(--fresh-ctl-r, 14px);
+  background: color-mix(in srgb, var(--primary-color, #1f7a4d) 8%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--primary-color, #1f7a4d) 45%, transparent);
+  font-size: .95rem; word-break: break-all; user-select: all; margin-bottom: 10px;
+}
+.fmv-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.fmv-row .btn { flex: 1 1 140px; justify-content: center; }
+.fmv-steps { list-style: none; padding: 0; margin: 10px 0 4px; display: grid; gap: 8px; }
+.fmv-steps li { position: relative; padding-left: 28px; opacity: .55; }
+.fmv-steps li::before {
+  content: ''; position: absolute; left: 4px; top: .35em; width: 12px; height: 12px;
+  border-radius: 50%; border: 2px solid currentColor;
+}
+.fmv-steps li.is-active { opacity: 1; font-weight: 600; }
+.fmv-steps li.is-active::before { border-right-color: transparent; animation: fmv-spin .9s linear infinite; }
+.fmv-steps li.is-done { opacity: 1; }
+.fmv-steps li.is-done::before { background: var(--primary-color, #1f7a4d); border-color: var(--primary-color, #1f7a4d); }
+.fmv-small { font-size: .82rem; opacity: .7; }
+.fmv-status { display: flex; gap: 10px; align-items: flex-start; }
+.fmv-status .fmv-lock { flex: 0 0 auto; }
+@keyframes fmv-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fmv-steps li.is-active::before { animation: none; } }

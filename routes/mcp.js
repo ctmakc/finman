@@ -14,6 +14,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const oauth = require('../services/mcp/oauth');
 const tools = require('../services/mcp/tools');
+const vaultGrant = require('../services/mcp/vaultGrant');
 const patService = require('../services/patService');
 const svc = require('../services/invoice/service');
 const pkg = require('../package.json');
@@ -48,13 +49,30 @@ async function bearerUser(req) {
     return { token: true, userId, via: 'pat' };
   }
   const a = await oauth.verifyAccess(t);
-  return { token: true, userId: a ? a.userId : null, via: 'oauth' };
+  return { token: true, userId: a ? a.userId : null, via: 'oauth', family: a && a.family, vaultSecret: a && a.vaultSecret };
 }
 
 const ok = (id, result) => ({ jsonrpc: '2.0', id, result });
 const err = (id, code, message) => ({ jsonrpc: '2.0', id: id === undefined ? null : id, error: { code, message } });
 
-async function handle(msg, userId) {
+// Finman Vault: for an encrypted account the tool runs on the decrypted vault in memory,
+// with the key this app received at consent (services/mcp/vaultGrant.js).
+async function callTool(auth, name, args) {
+  if (!(await vaultGrant.vaultActive(auth.userId))) return tools.callTool(auth.userId, name, args);
+  const isLocal = (n) => { try { return vaultGrant.isLocalTool(n); } catch (_) { return true; } };
+  if (!isLocal(name)) return tools.callTool(auth.userId, name, args);
+  try {
+    return await vaultGrant.withVault(auth.userId, auth.family, auth.vaultSecret, (eng) => eng.mcpCallTool(name, args || {}));
+  } catch (e) {
+    if (e.code === 'VAULT_LOCKED' || e.code === 'BAD_KEY') {
+      return { isError: true, content: [{ type: 'text', text: e.code === 'BAD_KEY' ? 'This connection cannot open your encrypted Finman data. Connect Finman again.' : e.message }] };
+    }
+    throw e;
+  }
+}
+
+async function handle(msg, auth) {
+  const userId = auth.userId;
   if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
     return err(msg && msg.id, -32600, 'Invalid Request');
   }
@@ -77,7 +95,7 @@ async function handle(msg, userId) {
       return ok(msg.id, { tools: tools.listTools() });
     case 'tools/call': {
       if (typeof p.name !== 'string') return err(msg.id, -32602, 'Tool name is required');
-      const r = await tools.callTool(userId, p.name, p.arguments);
+      const r = await callTool(auth, p.name, p.arguments);
       if (!r) return err(msg.id, -32602, `Unknown tool: ${p.name}`);
       return ok(msg.id, r);
     }
@@ -102,10 +120,10 @@ router.post('/mcp', mcpLimiter, async (req, res, next) => {
     if (Array.isArray(body)) {
       if (!body.length || body.length > 20) return res.status(400).json(err(null, -32600, 'Invalid batch'));
       const out = [];
-      for (const m of body) { const r = await handle(m, auth.userId); if (r) out.push(r); }
+      for (const m of body) { const r = await handle(m, auth); if (r) out.push(r); }
       return out.length ? res.json(out) : res.status(202).end();
     }
-    const r = await handle(body, auth.userId);
+    const r = await handle(body, auth);
     return r ? res.json(r) : res.status(202).end();
   } catch (e) {
     return next(e);

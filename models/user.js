@@ -15,13 +15,22 @@ class User {
       // Хеширование пароля
       const hashedPassword = await bcrypt.hash(userData.password, bcryptRounds());
       
-      const result = await run(
-        `INSERT INTO users (username, email, password, full_name) 
-         VALUES (?, ?, ?, ?)`,
-        [userData.username, userData.email, hashedPassword, userData.fullName || '']
-      );
+      // Finman Vault (028): kdfSalt/kdfParams = the browser derives the key itself and
+      // `password` is already the authToken (fm1$…), never the raw password.
+      const fm1 = Boolean(userData.kdfSalt && userData.kdfParams);
+      const result = fm1
+        ? await run(
+          `INSERT INTO users (username, email, password, full_name, kdf, kdf_salt, kdf_params)
+           VALUES (?, ?, ?, ?, 'fm1', ?, ?)`,
+          [userData.username, userData.email, hashedPassword, userData.fullName || '', userData.kdfSalt, userData.kdfParams]
+        )
+        : await run(
+          `INSERT INTO users (username, email, password, full_name) 
+           VALUES (?, ?, ?, ?)`,
+          [userData.username, userData.email, hashedPassword, userData.fullName || '']
+        );
       
-      return { id: result.id, ...userData, password: undefined };
+      return { id: result.id, ...userData, password: undefined, kdf: fm1 ? 'fm1' : 'legacy' };
     } catch (error) {
       throw error;
     }
@@ -171,8 +180,8 @@ class User {
         params.push(userData.fullName);
       }
       
-      if (userData.password) {
-        const hashedPassword = await bcrypt.hash(userData.password, bcryptRounds());
+      if (userData.password || userData.passwordHash) {
+        const hashedPassword = userData.passwordHash || await bcrypt.hash(userData.password, bcryptRounds());
         updateFields.push('password = ?');
         params.push(hashedPassword);
         // Every token issued before the password change stops working.
@@ -208,6 +217,10 @@ class User {
     const value = enabled ? 1 : 0;
     const result = await run(`UPDATE users SET ai_opt_in = ? WHERE id = ? AND ai_opt_in IS NOT ?`, [value, id, value]);
     return result.changes > 0;
+  }
+
+  static async hashPassword(password) {
+    return bcrypt.hash(password, bcryptRounds());
   }
 
   // Проверка пароля

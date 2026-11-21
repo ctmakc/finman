@@ -49,12 +49,12 @@ async function handleProfileUpdate(e) {
     }
     
     try {
+      const fields = window.FMVault
+        ? await window.FMVault.passwordFields(currentPassword, newPassword)
+        : { currentPassword, password: newPassword };
       const response = await fetchWithAuth('/api/auth/me', {
         method: 'PUT',
-        body: JSON.stringify({
-          currentPassword,
-          password: newPassword
-        })
+        body: JSON.stringify(fields)
       });
       
       if (!response.ok) {
@@ -66,6 +66,7 @@ async function handleProfileUpdate(e) {
       // Сервер отзывает старые токены при смене пароля и отдаёт новый.
       const updated = await response.json().catch(() => ({}));
       if (updated && updated.token) localStorage.setItem('token', updated.token);
+      if (window.FMVault && fields.wrapped_pw) window.FMVault.afterPasswordChange(fields.wrapped_pw);
 
       // Очистка полей формы
       document.getElementById('settings-current-password').value = '';

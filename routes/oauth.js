@@ -16,6 +16,7 @@ const passport = require('passport');
 const rateLimit = require('express-rate-limit');
 const oauth = require('../services/mcp/oauth');
 const tracker = require('../services/tracker');
+const vaultGrant = require('../services/mcp/vaultGrant');
 
 const router = express.Router();
 const limiter = (max) => rateLimit({ windowMs: 15 * 60 * 1000, max, standardHeaders: true, legacyHeaders: false,
@@ -83,6 +84,12 @@ router.post('/api/oauth/authorize/decision', limiter(60), noStore, jwtAuth, asyn
     if (!c.ok) return res.json({ redirect: oauth.withParams(c.redirect_uri, { error: c.error, error_description: c.error_description, state: c.state, iss }) });
     if (b.approve !== true) return res.json({ redirect: oauth.withParams(c.redirect_uri, { error: 'access_denied', state: c.state, iss }) });
     const code = await oauth.issueCode(req.user.id, c);
+    // Finman Vault: the browser wrapped the vault key for this app (consent, §6.3).
+    if (b.vault && typeof b.vault === 'object') {
+      const crypto = require('crypto');
+      const ok = vaultGrant.stashForCode(crypto.createHash('sha256').update(code).digest('hex'), b.vault.wrapped_vk, b.vault.secret);
+      if (!ok) return res.status(400).json({ error: 'invalid_request', error_description: 'Bad vault grant' });
+    }
     tracker.track('mcp_connect', { userId: req.user.id, props: { app: oauth.clientLabel(c.client) }, req, test: tracker.isTestEmail(req.user.email) });
     return res.json({ redirect: oauth.withParams(c.redirect_uri, { code, state: c.state, iss }) });
   } catch (e) { return sendOAuthError(res, e); }

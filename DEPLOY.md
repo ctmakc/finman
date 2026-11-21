@@ -130,3 +130,15 @@ Pre-flight on the workstation: full Jest suite green, `docker build .` passes,
 - browser: open the app, confirm inline buttons work (CSP `script-src-attr`)
   and no CSP errors in the console
 - `docker logs finman` shows no `Bearer` tokens (pino redaction)
+
+## Finman Vault: rebuild the browser engine (since 21.11.2026)
+
+User data lives in an encrypted vault and the app logic runs in the browser
+(docs/E2E-ENCRYPTION.md). `routes/`, `models/`, `services/`, `lib/`, `middleware/`
+and `config/` are bundled into `public/js/vault/engine.js` and `engine/dist/engine.node.cjs`.
+The Docker image installs without devDependencies, so the bundle is committed:
+
+    npm run build:engine     # after ANY change in those folders, before commit
+    npx jest test/engine.test.js test/vault*.test.js --forceExit
+
+A change that is not rebuilt works on the server but not for encrypted accounts.
