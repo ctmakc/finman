@@ -239,6 +239,7 @@ async function commitStatementImport(accountId, rows, options = {}) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || 'Import failed');
+  if (data && data.inserted > 0 && window.FMFeedback) window.FMFeedback.afterImport();
   return data;
 }
 

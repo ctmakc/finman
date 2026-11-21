@@ -90,6 +90,9 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       // Invoice editor shows the PDF preview from a blob: URL in an iframe.
       frameSrc: ["'self'", "blob:"],
+      // MMIX Review Kit (bug reports with screenshots/voice) posts to review.mmix.biz.
+      connectSrc: ["'self'", "https://review.mmix.biz"],
+      mediaSrc: ["'self'", "blob:", "https://review.mmix.biz"],
     },
   },
 }));
@@ -288,6 +291,8 @@ app.use('/api/rules', rulesRoutes);
 app.use('/api/reconcile', reconcileRoutes);
 app.use('/api/v1', apiV1Routes);
 app.use('/api/invoices', invoicesRoutes);
+// In-app feedback (rating, surveys, bug reports, exit survey) + the team's admin list.
+app.use('/api/feedback', require('./routes/feedback'));
 // MCP connector: OAuth 2.1 (discovery, registration, consent, tokens) and the /mcp endpoint.
 app.use('/', require('./routes/oauth'));
 app.use('/', require('./routes/mcp'));

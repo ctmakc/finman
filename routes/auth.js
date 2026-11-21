@@ -335,7 +335,8 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
       emailVerified: Boolean(user.email_verified_at),
       google: Boolean(user.google_id),
       apple: methods.apple,
-      hasPassword: methods.password
+      hasPassword: methods.password,
+      isAdmin: require('./feedback').isAdmin(user)
     });
   } catch (error) {
     console.error('Error fetching user:', error);
