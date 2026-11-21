@@ -384,7 +384,8 @@ router.get('/me', passport.authenticate('jwt', { session: false }), async (req, 
       // Finman Vault: vault_state 'none' | 'active'; vault_version null = no vault uploaded yet.
       kdf: vaultInfo.kdf || 'legacy',
       vault_state: vaultInfo.vault_state || 'none',
-      vault_version: vaultInfo.version == null ? null : vaultInfo.version
+      vault_version: vaultInfo.version == null ? null : vaultInfo.version,
+      isAdmin: require('./feedback').isAdmin(user)
     });
   } catch (error) {
     console.error('Error fetching user:', error);

@@ -19,7 +19,8 @@ const { query, get, run, transaction } = require('../db/database');
 
 const OWNER_COLUMNS = ['user_id', 'owner_id', 'created_by'];
 // Global reference data or tables handled explicitly above the sweep.
-const SKIP_SWEEP = new Set(['users', 'schema_migrations', 'currency_rates', 'investment_prices', 'organizations', 'invites']);
+// feedback: kept for the team, anonymised below (the exit survey explains why people leave).
+const SKIP_SWEEP = new Set(['users', 'schema_migrations', 'currency_rates', 'investment_prices', 'organizations', 'invites', 'feedback']);
 
 async function tableColumns(table) {
   return (await query(`PRAGMA table_info(${JSON.stringify(table)})`)).map((c) => c.name);
@@ -114,6 +115,10 @@ async function deleteUserData(userId) {
     // (the sweep below would catch them too; explicit so the vault never outlives the user)
     await run('DELETE FROM vault_grants WHERE user_id = ?', [uid]);
     await run('DELETE FROM user_vaults WHERE user_id = ?', [uid]);
+
+    // ---- feedback stays, without the person -------------------------------
+    const hasFeedback = await get(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'feedback'`);
+    if (hasFeedback) await run('UPDATE feedback SET user_id = NULL WHERE user_id = ?', [uid]);
 
     // ---- sweep every table with an owner column ----------------------------
     const tables = await query(

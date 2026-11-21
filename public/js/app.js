@@ -95,7 +95,8 @@ const NAV_GROUPS = [
       { page: 'connect-ai', label: 'Connect to AI', icon: 'fa-plug' },
       { page: 'api-tokens', label: 'API tokens', icon: 'fa-key' },
       { page: 'billing', label: 'Billing', icon: 'fa-credit-card' },
-      { page: 'settings', label: 'Settings', icon: 'fa-cog' }
+      { page: 'settings', label: 'Settings', icon: 'fa-cog' },
+      { page: 'feedback', label: 'Feedback', icon: 'fa-comment-dots' }
     ]
   }
 ];
@@ -188,6 +189,13 @@ const PAGE_RENDERERS = {
     return window.DataExportModule.render(document.getElementById('data-export-panel'));
   },
   onboarding: () => renderOnboardingPage(),
+  // Feedback dialog opens over the current page (see navigateTo); /feedback as a URL shows the dashboard + dialog.
+  feedback: () => { renderDashboard(); if (window.FMFeedback) window.FMFeedback.open('rate', 'menu'); },
+  // Team-only list of feedback (server answers 404 to everyone outside ADMIN_EMAILS).
+  admin: () => {
+    if (!window.FMFeedback) throw new Error('The Feedback module is not loaded');
+    return window.FMFeedback.renderAdmin();
+  },
   week: () => callGlobal('renderWeekPage')
 };
 
@@ -504,6 +512,12 @@ function detectIconFont() {
 // Routing
 // ---------------------------------------------------------------------------
 function navigateTo(page, options = {}) {
+  if (page === 'feedback' && appState.isAuthenticated && document.getElementById('main-content') && window.FMFeedback) {
+    if (typeof closeDrawer === 'function' && isDrawerOpen()) closeDrawer();
+    if (typeof setMoreMenu === 'function') setMoreMenu(false);
+    window.FMFeedback.open('rate', 'menu');
+    return;
+  }
   if (!Object.prototype.hasOwnProperty.call(PAGE_RENDERERS, page)) page = 'dashboard';
   appState.currentPage = page;
 
@@ -657,6 +671,7 @@ async function fetchCurrentUser() {
     appState.isAuthenticated = true;
     appState.user = data;
     if (window.FMTrack) window.FMTrack.identify(data);
+    if (window.FMFeedback) window.FMFeedback.maybeDay7(data);
 
     return data;
   } catch (error) {
@@ -1741,6 +1756,17 @@ function renderSettingsPage() {
         </div>
       </div>
 
+      <div class="card fm-feedback-card">
+        <h2 class="card-title">${escapeHtmlShell(trShell('fb.settings.title', 'Feedback'))}</h2>
+        <p class="fm-feedback-text">${escapeHtmlShell(trShell('fb.settings.text', 'Found a bug or miss something? Tell us. The people who build Finman read every message.'))}</p>
+        <div class="fm-link-grid">
+          <button class="btn btn-outline" type="button" data-fb-open="rate"><i class="fas fa-star" aria-hidden="true"></i> ${escapeHtmlShell(trShell('fb.tab.rate', 'Rate Finman'))}</button>
+          <button class="btn btn-outline" type="button" data-fb-open="bug"><i class="fas fa-bug" aria-hidden="true"></i> ${escapeHtmlShell(trShell('fb.tab.bug', 'Report a bug'))}</button>
+          <button class="btn btn-outline" type="button" data-fb-open="idea"><i class="fas fa-lightbulb" aria-hidden="true"></i> ${escapeHtmlShell(trShell('fb.settings.idea', 'Suggest an idea'))}</button>
+          ${appState.user && appState.user.isAdmin ? '<button class="btn btn-outline" type="button" data-settings-page="admin"><i class="fas fa-inbox" aria-hidden="true"></i> Feedback inbox (team)</button>' : ''}
+        </div>
+      </div>
+
       <div class="card fm-danger-zone">
         <h2 class="card-title">${escapeHtmlShell(trShell('account.danger.title', 'Danger zone'))}</h2>
         <p class="fm-danger-text">${escapeHtmlShell(trShell('account.danger.text', 'Delete your Finman account and all of its data. This cannot be undone.'))}</p>
@@ -1770,6 +1796,9 @@ function renderSettingsPage() {
 
   document.querySelectorAll('[data-settings-page]').forEach((btn) => {
     btn.addEventListener('click', () => navigateTo(btn.dataset.settingsPage));
+  });
+  document.querySelectorAll('[data-fb-open]').forEach((btn) => {
+    btn.addEventListener('click', () => { if (window.FMFeedback) window.FMFeedback.open(btn.dataset.fbOpen, 'settings'); });
   });
   document.getElementById('delete-account-btn').addEventListener('click', openDeleteAccountModal);
 }
@@ -1816,6 +1845,7 @@ async function openDeleteAccountModal() {
       <form id="delete-account-form" class="fm-delete-form" novalidate>
         <p>${escapeHtmlShell(trShell('account.delete.body', 'Everything in your Finman account is erased for good.'))}</p>
         <p class="fm-delete-export">${escapeHtmlShell(trShell('account.delete.export', 'Want a copy first? Download a backup in Backups and data export.'))}</p>
+        ${window.FMFeedback ? window.FMFeedback.exitHtml() : ''}
         <div class="form-group">
           <label class="form-label" for="delete-account-confirm">${escapeHtmlShell(trShell('account.delete.typeLabel', 'Type DELETE to confirm'))}</label>
           <input type="text" id="delete-account-confirm" class="form-control" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
@@ -1856,6 +1886,9 @@ async function handleDeleteAccount(event) {
     showError(trShell('account.delete.passwordError', 'Enter your password.'));
     return;
   }
+
+  // Exit survey (optional): sent while the account still exists, gives up after 3 s.
+  if (window.FMFeedback) { try { await window.FMFeedback.sendExit(); } catch (e) { /* never blocks */ } }
 
   let response;
   try {

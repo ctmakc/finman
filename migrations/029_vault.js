@@ -11,7 +11,7 @@
 //                    token given to the AI app; the server keeps the wrap and the token hash.
 // Both tables have user_id, so services/accountDeletion.js sweeps them with the account.
 module.exports = {
-  name: '028_vault',
+  name: '029_vault',
   async up(db, { columnExists }) {
     if (!(await columnExists(db, 'users', 'kdf'))) {
       await db.run(`ALTER TABLE users ADD COLUMN kdf TEXT NOT NULL DEFAULT 'legacy'`);

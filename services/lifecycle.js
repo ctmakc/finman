@@ -182,7 +182,10 @@ async function runNudges() {
     const s = await activitySummary(u.id);
     // Vault users: no transaction count on the server — the nudge would be a guess.
     if (s.vault) continue;
-    if (s.transactions >= 3 || s.events.import_done) continue;
+    // Encrypted (vault) users keep no transaction rows on the server, so the
+    // event journal decides too: an import, an activation or 3 own entries.
+    if (s.transactions >= 3 || s.events.import_done || s.events.activated || s.events.vault_import_done ||
+        (s.events.transaction_added || 0) + (s.events.vault_transaction_added || 0) >= 3) continue;
     const r = await sendNudge('nudge_not_activated', u);
     if (r && r.sent) sent++;
   }

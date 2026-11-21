@@ -92,7 +92,7 @@ describe('schema: lib/vaultTables.js matches the real database', () => {
   beforeAll(boot);
   afterAll(() => ctx.close());
 
-  test('migration 028 columns and tables', async () => {
+  test('migration 029 columns and tables', async () => {
     const cols = (await db.query('PRAGMA table_info(users)')).map((c) => c.name);
     expect(cols).toEqual(expect.arrayContaining(['kdf', 'kdf_salt', 'kdf_params', 'vault_state']));
     const u = await db.get('SELECT kdf, vault_state FROM users WHERE id = ?', [ctx.userId]);
@@ -103,7 +103,7 @@ describe('schema: lib/vaultTables.js matches the real database', () => {
     expect(gcols).toEqual(['id', 'user_id', 'token_hash', 'wrapped_vk', 'label', 'created_at', 'last_used_at', 'revoked_at']);
     // idempotent: running it again changes nothing
     const { columnExists } = require('../lib/migrate');
-    await require('../migrations/028_vault').up(db, { columnExists });
+    await require('../migrations/029_vault').up(db, { columnExists });
   });
 
   test('every table and every column in the where clauses exists', async () => {

@@ -59,6 +59,9 @@
   <link rel="stylesheet" href="/css/parts/invoices.css">
   <link rel="stylesheet" href="/css/parts/my-ai.css">
   <link rel="stylesheet" href="/css/parts/vault.css">
+  <link rel="stylesheet" href="/css/parts/feedback.css">
+  <!-- MMIX Review Kit: bug reports pinned to the screen go straight to the review inbox -->
+  <meta name="mmix-review-endpoint" content="https://review.mmix.biz/api/review">
 </head>
 <body>
   <div id="app">
@@ -120,6 +123,8 @@
   <script src="/js/connect-ai.js"></script>
   <script src="/js/billing.js"></script>
   <script src="/js/invoices.js"></script>
+  <script src="/js/feedback.js"></script>
+  <script type="module" src="/vendor/review-kit/launcher.js"></script>
   <!-- iOS / Android app shell only; a no-op on the website -->
   <script src="/js/native.js"></script>
 

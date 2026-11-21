@@ -44,12 +44,38 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     if (IMPORT_EXTS.has(ext)) return cb(null, true);
-    cb(new Error('Unsupported file type. Upload a CSV, OFX, QFX or QBO statement.'));
+    const code = fileKindCode(ext, null);
+    const err = new Error(FILE_KIND_MESSAGES[code]);
+    err.code = code;
+    cb(err);
   }
 });
 
-function fail(res, status, message) {
-  return res.status(status).json({ error: true, message });
+// People most often drop a PDF statement, a screenshot or an Excel file.
+// Each gets its own code (kept in the activity journal, never the file) and a
+// message that says what to do next.
+const FILE_KIND_MESSAGES = {
+  FILE_PDF: 'This is a PDF statement. Finman reads the transaction file your bank offers next to it: CSV, OFX or QFX. In online banking look for Download transactions.',
+  FILE_IMAGE: 'This is a photo or a screenshot. For a statement, download a CSV, OFX or QFX file from online banking. To add one purchase from a receipt photo, use Receipts.',
+  FILE_SPREADSHEET: 'This is an Excel or Numbers file. Save it as CSV (File, then Save as or Export, then CSV) and drop it here again.',
+  FILE_TYPE: 'Finman reads CSV, OFX, QFX and QBO files. In online banking look for Download transactions and pick one of these formats.'
+};
+
+function fileKindCode(ext, buf) {
+  const head = buf ? buf.subarray(0, 8) : null;
+  const starts = (bytes) => head && bytes.every((b, i) => head[i] === b);
+  if (ext === '.pdf' || starts([0x25, 0x50, 0x44, 0x46])) return 'FILE_PDF';
+  if (['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.gif'].includes(ext) ||
+      starts([0xff, 0xd8, 0xff]) || starts([0x89, 0x50, 0x4e, 0x47]) ||
+      (head && head.length >= 8 && head.subarray(4, 8).toString('latin1') === 'ftyp')) return 'FILE_IMAGE';
+  if (['.xlsx', '.xls', '.numbers', '.ods'].includes(ext) || starts([0x50, 0x4b, 0x03, 0x04]) ||
+      starts([0xd0, 0xcf, 0x11, 0xe0])) return 'FILE_SPREADSHEET';
+  return buf ? null : 'FILE_TYPE';
+}
+
+function fail(res, status, message, code) {
+  if (code) res.locals.failCode = code;
+  return res.status(status).json(code ? { error: true, code, message } : { error: true, message });
 }
 
 function bankSummary(bankId) {
@@ -361,8 +387,13 @@ function parseBoolean(v) {
 // ofxAccountId (ACCTID of the statement to take from a multi-statement OFX file)
 router.post('/import/preview', authenticate, (req, res) => {
   upload.single('file')(req, res, async (uploadError) => {
-    if (uploadError) return fail(res, 400, uploadError.message || 'Upload failed');
-    if (!req.file) return fail(res, 400, 'No file uploaded');
+    if (uploadError) {
+      const code = FILE_KIND_MESSAGES[uploadError.code] ? uploadError.code : (uploadError.code === 'LIMIT_FILE_SIZE' ? 'FILE_TOO_BIG' : 'UPLOAD');
+      return fail(res, 400, uploadError.message || 'Upload failed', code);
+    }
+    if (!req.file) return fail(res, 400, 'No file uploaded', 'NO_FILE');
+    const sniffed = fileKindCode('', req.file.buffer);
+    if (sniffed) return fail(res, 400, FILE_KIND_MESSAGES[sniffed], sniffed);
     try {
       const body = req.body || {};
       let account = null;
@@ -414,7 +445,7 @@ router.post('/import/preview', authenticate, (req, res) => {
       if (error.code === 'OFX_MULTIPLE_STATEMENTS') {
         return res.status(400).json({ error: true, code: error.code, message: error.message, statements: error.statements || null });
       }
-      fail(res, 400, error.message || 'Could not parse this file');
+      fail(res, 400, error.message || 'Could not parse this file', 'PARSE');
     }
   });
 });

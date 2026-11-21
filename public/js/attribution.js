@@ -206,6 +206,9 @@
     beacon: beacon,
     identify: identify,
     reset: reset,
+    firstSource: function () {
+      try { var f = load().first || {}; return f.utm_source || hostOf(f.site_referrer || f.referrer || '') || 'direct'; } catch (e) { return ''; }
+    },
     formStart: function () { if (!formStartedAt) formStartedAt = Date.now(); },
   };
 })();

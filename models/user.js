@@ -15,7 +15,7 @@ class User {
       // Хеширование пароля
       const hashedPassword = await bcrypt.hash(userData.password, bcryptRounds());
       
-      // Finman Vault (028): kdfSalt/kdfParams = the browser derives the key itself and
+      // Finman Vault (029): kdfSalt/kdfParams = the browser derives the key itself and
       // `password` is already the authToken (fm1$…), never the raw password.
       const fm1 = Boolean(userData.kdfSalt && userData.kdfParams);
       const result = fm1
