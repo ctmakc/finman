@@ -142,6 +142,18 @@ router.get('/mine', authenticate, async (req, res) => {
   res.json({ answered: Boolean(row) });
 });
 
+// Team: the path of new users and returns, aggregates only (services/growthMetrics.js).
+router.get('/admin/metrics', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const gm = require('../services/growthMetrics');
+    const since = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.since || '')) ? req.query.since : '2026-11-03';
+    const m = await gm.load({ query, since });
+    res.json({ metrics: m, lines: gm.describe(m) });
+  } catch (e) {
+    res.status(500).json({ error: true, message: 'Could not count' });
+  }
+});
+
 router.get('/admin', authenticate, requireAdmin, async (req, res) => {
   const where = [];
   const params = [];

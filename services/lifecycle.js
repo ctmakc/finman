@@ -218,6 +218,8 @@ function start() {
     try { await runNudges(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] nudges failed'); }
     // Journey sweep + "Your week/month in money" (ENGAGEMENT_EMAILS=1) + push.
     try { await require('./engagementMail').runDaily(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] engagement failed'); }
+    // Mondays: the team's week in numbers (aggregates only, services/growthMetrics.js).
+    try { await require('./growthMetrics').runWeekly(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] weekly metrics failed'); }
   }, { timezone: 'UTC' });
   return task;
 }

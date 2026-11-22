@@ -151,3 +151,16 @@
   :root .fb-admin-table tr.st-new { box-shadow: inset 3px 0 0 var(--fm-primary); }
   :root .fba-msg { min-width: 0; }
 }
+
+/* /admin: new users' path and returns (22.11) */
+:root .fba-h { font-size: 1.15rem; margin: var(--space-5) 0 var(--space-3); }
+:root .fba-h small { font-weight: 400; font-size: .8rem; color: var(--fm-ink-3); margin-left: .4rem; }
+:root .fba-metrics { margin-bottom: var(--space-5); }
+:root .fba-funnel { list-style: none; padding: 0; margin: var(--space-4) 0; display: grid; gap: .5rem; }
+:root .fba-funnel li { display: grid; grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr) 2.5rem; gap: var(--space-3); align-items: center; }
+:root .fba-step { font-size: .92rem; }
+:root .fba-bar { height: 10px; border-radius: 999px; background: var(--fm-surface-2); overflow: hidden; }
+:root .fba-bar i { display: block; height: 100%; background: var(--fm-primary); border-radius: inherit; }
+:root .fba-funnel b { text-align: right; font-variant-numeric: tabular-nums; }
+:root .fba-weeks td:not(:first-child), :root .fba-weeks th:not(:first-child) { text-align: right; }
+@media (max-width: 560px) { :root .fba-funnel li { grid-template-columns: minmax(0, 1fr) 2.5rem; } :root .fba-bar { grid-column: 1 / -1; grid-row: 2; } }

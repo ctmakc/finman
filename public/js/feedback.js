@@ -325,7 +325,9 @@
     var filters = { kind: '', trigger: '', status: '', tests: '' };
     main.innerHTML =
       '<div class="fb-admin">' +
-        '<div class="page-header"><h1 class="page-title">Feedback</h1></div>' +
+        '<div class="page-header"><h1 class="page-title">Team</h1></div>' +
+        '<section id="fba-metrics" class="fba-metrics" aria-labelledby="fba-m-h"><h2 id="fba-m-h" class="fba-h">New users: path and returns</h2><div class="loading"><div class="spinner"></div></div></section>' +
+        '<h2 class="fba-h">Feedback</h2>' +
         '<div class="fb-admin-bar">' +
           '<select id="fba-kind" class="form-control"><option value="">All kinds</option>' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_LABEL[k] + '</option>'; }).join('') + '</select>' +
           '<select id="fba-trigger" class="form-control"><option value="">All moments</option>' + ['menu', 'settings', 'import_done', 'day7', 'account_delete'].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join('') + '</select>' +
@@ -380,6 +382,37 @@
       fetchWithAuth('/api/feedback/admin/' + b.closest('tr').dataset.id, { method: 'DELETE' }).then(load);
     });
     load();
+    loadMetrics();
+  }
+
+  // Aggregates only (GET /api/feedback/admin/metrics, services/growthMetrics.js).
+  var STEP_LABEL = { signed_up: 'Signed up', vault_ready: 'Saved the recovery key', first_screen: 'Saw the first screen', picked_a_path: 'Picked a way in',
+    first_account: 'First account', own_data_in: 'Own data in', first_report: 'Saw a report' };
+  function loadMetrics() {
+    var box = document.getElementById('fba-metrics');
+    fetchWithAuth('/api/feedback/admin/metrics')
+      .then(function (r) { if (!r.ok) throw new Error('Could not count'); return r.json(); })
+      .then(function (d) {
+        var m = d.metrics, f = m.funnel, top = f.signed_up || 1;
+        var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+        var steps = Object.keys(STEP_LABEL).map(function (k) {
+          return '<li><span class="fba-step">' + STEP_LABEL[k] + '</span><span class="fba-bar"><i style="width:' + Math.max(2, Math.round((f[k] || 0) / top * 100)) + '%"></i></span><b>' + (f[k] || 0) + '</b></li>';
+        }).join('');
+        var weeks = Object.keys(m.by_week).sort().slice(-6).reverse().map(function (w) {
+          var x = m.by_week[w];
+          return '<tr><td>' + esc(w) + '</td><td>' + x.signups + '</td><td>' + x.activated + '</td><td>' + (x.week1_eligible ? x.week1_returned + ' of ' + x.week1_eligible : 'too early') + '</td><td>' + (x.week4_eligible ? x.week4_returned + ' of ' + x.week4_eligible : 'too early') + '</td></tr>';
+        }).join('');
+        box.innerHTML = '<h2 id="fba-m-h" class="fba-h">New users: path and returns <small>since ' + esc(m.since) + ', test and team accounts left out</small></h2>' +
+          '<div class="fb-admin-stats">' +
+            '<div><b>' + m.users_alive + '</b><span>live accounts</span></div>' +
+            '<div><b>' + pct(m.activated, m.users_alive) + '</b><span>put their own data in (' + m.activated + ')</span></div>' +
+            '<div><b>' + pct(m.week1.returned, m.week1.eligible) + '</b><span>came back in week 1 (' + m.week1.returned + ' of ' + m.week1.eligible + ')</span></div>' +
+            '<div><b>' + pct(m.week4.returned, m.week4.eligible) + '</b><span>came back in week 4 (' + m.week4.returned + ' of ' + m.week4.eligible + ')</span></div>' +
+          '</div>' +
+          '<ol class="fba-funnel">' + steps + '</ol>' +
+          '<table class="fb-admin-table fba-weeks"><thead><tr><th>Sign-up week</th><th>Sign-ups</th><th>Own data</th><th>Back in week 1</th><th>Back in week 4</th></tr></thead><tbody>' + weeks + '</tbody></table>';
+      })
+      .catch(function (e) { box.innerHTML = '<p class="fb-admin-empty">' + esc(e.message) + '</p>'; });
   }
 
   window.FMFeedback = {
