@@ -358,12 +358,15 @@ describe('dashboard statistics', () => {
     expect(s.transactionsByCategory.Food.expense).toBe(25);
   });
 
+  // Rows of the current local month: the dashboard figures count this month only
+  // (the chart gets 6 months from the same request).
+  const THIS_MONTH = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
   test('fetchTransactionStats pages with limit 500 and uses the converted balance', async () => {
     const { w, calls } = await boot({
       routes: {
         '/api/transactions': (u) => (u.searchParams.get('page') === '1'
-          ? Array.from({ length: 500 }, () => ({ account_id: 1, type: 'expense', amount: -1, date: '2026-10-02' }))
-          : [{ account_id: 1, type: 'expense', amount: -1, date: '2026-10-03' }]),
+          ? Array.from({ length: 500 }, () => ({ account_id: 1, type: 'expense', amount: -1, date: THIS_MONTH + '-01' }))
+          : [{ account_id: 1, type: 'expense', amount: -1, date: THIS_MONTH + '-01' }]),
         '/api/accounts': [{ id: 1, currency: 'CAD', balance: 10 }, { id: 2, currency: 'EUR', balance: 10 }],
         '/api/analytics/overview': { totalBalance: 24.7, baseCurrency: 'CAD' },
       },
@@ -374,6 +377,28 @@ describe('dashboard statistics', () => {
     expect(s.monthlyExpense).toBe(501);
     expect(s.totalBalance).toBe(24.7);
     expect(s.balanceCurrency).toBe('CAD');
+  });
+
+  test('the income/expense chart gets earlier months; the figures stay on this month', async () => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2);
+    const EARLIER = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const { w, calls } = await boot({
+      routes: {
+        '/api/transactions': [
+          { account_id: 1, type: 'expense', amount: -40, date: THIS_MONTH + '-01' },
+          { account_id: 1, type: 'expense', amount: -100, date: EARLIER + '-10' },
+          { account_id: 1, type: 'income', amount: 900, date: EARLIER + '-12' },
+        ],
+        '/api/accounts': [{ id: 1, currency: 'CAD', balance: 10 }],
+        '/api/analytics/overview': { totalBalance: 10, baseCurrency: 'CAD' },
+      },
+    });
+    const s = await w.eval('fetchTransactionStats()');
+    expect(s.monthlyExpense).toBe(40);
+    expect(s.monthlyIncome).toBe(0);
+    expect(Object.keys(s.transactionsByMonth).sort()).toEqual([EARLIER, THIS_MONTH]);
+    const start = new URLSearchParams(calls.find((c) => c.path === '/api/transactions').search).get('startDate');
+    expect(start <= EARLIER + '-01').toBe(true);
   });
 });
 
