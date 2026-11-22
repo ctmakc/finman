@@ -656,3 +656,8 @@
   .dashboard-summary .summary-card:hover,
   .dashboard-grid .dashboard-widget:hover { transform: none; }
 }
+
+/* ---- dashboard charts: the title sat inside the fixed 300px box and pushed the
+   canvas ~39px past the clipped bottom edge. The canvas now has its own box. ---- */
+:root .dashboard-charts .chart-container { height: auto; }
+:root .fm-chart-canvas { position: relative; height: 260px; width: 100%; }

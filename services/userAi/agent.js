@@ -31,6 +31,7 @@ function systemPrompt(locale, tz) {
     `Today is ${today}. Reply in ${lang} unless the person writes in another language; then use theirs.`,
     'Use the tools to read the person\'s real accounts, transactions, invoices and clients. Never invent numbers, names or balances: if a tool did not return it, say you do not have it.',
     'For totals and "how much did I spend" questions use get_spending_summary; call list_accounts first when you need an account_id.',
+    'For "how much does my business earn", profit, owner pay or business vs personal money use get_business_and_personal.',
     'Tools that change data (adding, editing or deleting transactions, invoices, clients) are shown to the person as a card with Confirm and Decline; they run only after Confirm. Ask for such a tool directly, without asking for permission in text first.',
     'Amounts in add_transaction are positive; the type says income or expense. Dates are YYYY-MM-DD.',
     'Keep answers short and concrete. Format money with its currency.',

@@ -335,7 +335,8 @@
         <label class="fmv-check"><input type="checkbox" id="fmv-saved"> ${esc(t('rkSaved'))}</label>
         <button type="button" class="btn btn-primary fmv-wide fmv-go" disabled>${esc(t('rkContinue'))}</button>`);
       host.querySelector('.fmv-copy').onclick = async (e) => {
-        try { await navigator.clipboard.writeText(text); e.currentTarget.textContent = t('rkCopied'); } catch (_) { /* select manually */ }
+        const btn = e.currentTarget; // currentTarget is null after the await
+        try { await navigator.clipboard.writeText(text); btn.textContent = t('rkCopied'); } catch (_) { /* select manually */ }
       };
       host.querySelector('.fmv-dl').onclick = () => {
         const a = document.createElement('a');
@@ -348,7 +349,13 @@
       };
       const cb = host.querySelector('#fmv-saved');
       const go = host.querySelector('.fmv-go');
-      cb.onchange = () => { go.disabled = !cb.checked; };
+      const sync = () => { go.disabled = !cb.checked; };
+      cb.onchange = sync;
+      cb.oninput = sync;
+      // Copying or downloading the key is saving it: tick the box so Continue opens.
+      const saved = () => { cb.checked = true; sync(); };
+      host.querySelector('.fmv-copy').addEventListener('click', saved);
+      host.querySelector('.fmv-dl').addEventListener('click', saved);
       go.onclick = () => resolve();
     });
   }

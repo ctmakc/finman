@@ -18,7 +18,7 @@
 // precache); activate удаляет все НЕ-текущие кэши, включая старый finman-v3-api
 // с ответами API.
 
-const CACHE_VERSION = 'finman-v13';
+const CACHE_VERSION = 'finman-v14';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 
 const STATIC_ASSETS = [
@@ -35,6 +35,7 @@ const STATIC_ASSETS = [
   '/css/parts/ai.css',
   '/css/parts/firstrun.css',
   '/css/parts/engage.css',
+  '/css/parts/money-map.css',
   '/css/fresh.css',
   '/css/native.css',
   '/vendor/fonts/rubik-latin-wght-normal.woff2',
@@ -64,6 +65,7 @@ const STATIC_ASSETS = [
   '/js/split.js',
   '/js/investments.js',
   '/js/analytics.js',
+  '/js/money-map.js',
   '/js/subscriptions.js',
   '/js/networth.js',
   '/js/receipts.js',

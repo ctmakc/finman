@@ -65,6 +65,7 @@ const TX_TOOLS = [
       return {
         accounts: acc.all.map((a) => ({
           id: a.id, name: a.name, type: a.type, currency: a.currency, balance: r2(a.balance || 0),
+          scope: a.scope === 'business' ? 'business' : 'personal', business_name: a.business_name || undefined,
           shared_by: a.is_owner ? undefined : (a.owner_username || 'another user'),
           can_add_transactions: !!a.can_add_transactions,
         })),
@@ -153,6 +154,47 @@ const TX_TOOLS = [
       return {
         start_date: start, end_date: end, currency,
         by_month: [...months.values()].map((m) => ({ month: m.month, income: r2(m.income), expenses: r2(m.expenses), net: r2(m.income - m.expenses) })),
+      };
+    },
+  },
+  {
+    name: 'get_business_and_personal',
+    title: 'Business profit and personal money',
+    description: 'Management view for people who run a business: for each business (accounts marked Business in Finman) income, running costs, profit and margin, owner pay taken home, what stayed in the business and where the business money goes; for personal money: what came in (and how much of it from the business), spending by category and what was left; plus month-by-month totals. Owner pay (transfers business -> personal, or the category "Owner pay") is not a business cost. Default period: this month. If has_business is false, ask the person to mark their business accounts in Finman (Business and personal page).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        start_date: dateProp('From YYYY-MM-DD, default first day of this month'),
+        end_date: dateProp('To YYYY-MM-DD, default today'),
+        months: { type: 'integer', minimum: 0, maximum: 24, description: 'Month-by-month history length, default 6' },
+      },
+    },
+    annotations: { readOnlyHint: true },
+    async run(userId, a) {
+      const u = await get('SELECT id, timezone FROM users WHERE id = ?', [userId]);
+      const start = optDate(a.start_date, 'start_date');
+      const end = optDate(a.end_date, 'end_date');
+      if (start && end && start > end) throw new TxToolError('start_date must not be after end_date');
+      const months = a.months === undefined || a.months === null ? 6 : Math.max(0, Math.min(24, parseInt(a.months, 10) || 0));
+      const m = await require('../moneyMapService').moneyMap(u || { id: userId }, { startDate: start, endDate: end, months });
+      return {
+        start_date: m.period.start, end_date: m.period.end, currency: m.currency,
+        has_business: m.hasBusiness,
+        businesses: m.businesses.map((b) => ({
+          name: b.name, income: b.income, expenses: b.expenses, profit: b.profit, margin_percent: b.margin,
+          owner_pay: b.ownerPay, owner_money_in: b.ownerIn, stayed_in_business: b.kept,
+          uncategorised_spending: b.uncategorisedExpense,
+          top_expenses: b.expenseCategories, top_income: b.incomeCategories,
+        })),
+        business_total: m.businessTotal,
+        personal: {
+          income: m.personal.income, from_business: m.personal.fromBusiness, other_income: m.personal.otherIncome,
+          expenses: m.personal.expenses, put_into_business: m.personal.putIntoBusiness, left: m.personal.left,
+          uncategorised_spending: m.personal.uncategorisedExpense,
+          top_expenses: m.personal.expenseCategories, top_income: m.personal.incomeCategories,
+        },
+        by_month: m.series,
+        missing_rates: m.missingRates.length ? m.missingRates : undefined,
       };
     },
   },

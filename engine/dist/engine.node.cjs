@@ -870,13 +870,20 @@ var require_account = __commonJS({
     var { OPENING_TYPE, OPENING_CATEGORY, OPENING_DESCRIPTION } = require_txFilter();
     var dates = require_dates();
     var Account = class _Account {
+      // Whose money the account holds: 'personal' (default) or 'business' (migration 031).
+      static normalizeScope(scope) {
+        return String(scope || "").toLowerCase() === "business" ? "business" : "personal";
+      }
+      static normalizeBusinessName(name) {
+        return String(name == null ? "" : name).replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 80);
+      }
       // Создание счета
       static async create(accountData) {
         try {
           const result = await run(
             `INSERT INTO accounts 
-         (user_id, name, account_number, bank_name, currency, balance, account_type) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, name, account_number, bank_name, currency, balance, account_type, scope, business_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               accountData.userId,
               accountData.name,
@@ -884,7 +891,9 @@ var require_account = __commonJS({
               accountData.bankName || "",
               accountData.currency || DEFAULT_CURRENCY,
               accountData.balance || 0,
-              accountData.accountType || "checking"
+              accountData.accountType || "checking",
+              _Account.normalizeScope(accountData.scope),
+              _Account.normalizeBusinessName(accountData.businessName)
             ]
           );
           return { id: result.id, ...accountData, currency: accountData.currency || DEFAULT_CURRENCY };
@@ -914,8 +923,8 @@ var require_account = __commonJS({
         return transaction(async () => {
           const result = await run(
             `INSERT INTO accounts
-         (user_id, name, account_number, bank_name, currency, balance, account_type)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, name, account_number, bank_name, currency, balance, account_type, scope, business_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               accountData.userId,
               accountData.name,
@@ -923,7 +932,9 @@ var require_account = __commonJS({
               accountData.bankName || "",
               accountData.currency || DEFAULT_CURRENCY,
               balance,
-              accountData.accountType || "checking"
+              accountData.accountType || "checking",
+              _Account.normalizeScope(accountData.scope),
+              _Account.normalizeBusinessName(accountData.businessName)
             ]
           );
           if (balance !== 0) {
@@ -1003,6 +1014,14 @@ var require_account = __commonJS({
           if (accountData.accountType) {
             updateFields.push("account_type = ?");
             params.push(accountData.accountType);
+          }
+          if (accountData.scope !== void 0) {
+            updateFields.push("scope = ?");
+            params.push(_Account.normalizeScope(accountData.scope));
+          }
+          if (accountData.businessName !== void 0) {
+            updateFields.push("business_name = ?");
+            params.push(_Account.normalizeBusinessName(accountData.businessName));
           }
           if (accountData.isActive !== void 0) {
             updateFields.push("is_active = ?");
@@ -3366,7 +3385,9 @@ var require_accounts = __commonJS({
           bankName,
           currency,
           balance,
-          accountType
+          accountType,
+          scope,
+          businessName
         } = req.body;
         if (!name) {
           return res.status(400).json({
@@ -3384,7 +3405,9 @@ var require_accounts = __commonJS({
           bankName,
           currency: currency ? String(currency).toUpperCase() : currency,
           balance: Number(balance) || 0,
-          accountType
+          accountType,
+          scope,
+          businessName
         });
         res.status(201).json(newAccount);
       } catch (error) {
@@ -3444,8 +3467,13 @@ var require_accounts = __commonJS({
           accountNumber,
           bankName,
           currency,
-          accountType
+          accountType,
+          scope,
+          businessName
         } = req.body;
+        if (scope !== void 0 && scope !== null && !["personal", "business"].includes(String(scope).toLowerCase())) {
+          return res.status(400).json({ error: true, message: "scope must be 'personal' or 'business'" });
+        }
         if (currency !== void 0 && currency !== null && currency !== "" && !CURRENCY_CODE.test(String(currency))) {
           return res.status(400).json({ error: true, message: "Currency must be a 3-5 letter code, e.g. CAD" });
         }
@@ -3462,7 +3490,9 @@ var require_accounts = __commonJS({
           accountNumber,
           bankName,
           currency: currency ? String(currency).toUpperCase() : currency,
-          accountType
+          accountType,
+          scope: scope == null ? void 0 : scope,
+          businessName: businessName == null ? void 0 : businessName
         });
         if (success) {
           const updatedAccount = await Account.findById(req.params.id, account.user_id);
@@ -12905,6 +12935,276 @@ var require_investments = __commonJS({
   }
 });
 
+// services/moneyMapService.js
+var require_moneyMapService = __commonJS({
+  "services/moneyMapService.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var { query } = require_database();
+    var money = require_money();
+    var dates = require_dates();
+    var fx = require_fx();
+    var { cashflowOnly } = require_txFilter();
+    var CFT = cashflowOnly("t");
+    var OWNER_PAY_CATEGORIES = /* @__PURE__ */ new Set([
+      "owner pay",
+      "owner's pay",
+      "owner draw",
+      "owner's draw",
+      "owner draws",
+      "owner salary",
+      "salary to owner",
+      "dividends",
+      "dividend",
+      "draw",
+      "\u0437\u0430\u0440\u043F\u043B\u0430\u0442\u0430 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A\u0443",
+      "\u0432\u044B\u043F\u043B\u0430\u0442\u0430 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A\u0443",
+      "\u0432\u044B\u0432\u043E\u0434 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A\u0443",
+      "\u0434\u0438\u0432\u0438\u0434\u0435\u043D\u0434\u044B",
+      "\u0432\u0438\u043F\u043B\u0430\u0442\u0430 \u0432\u043B\u0430\u0441\u043D\u0438\u043A\u0443",
+      "\u0437\u0430\u0440\u043F\u043B\u0430\u0442\u0430 \u0432\u043B\u0430\u0441\u043D\u0438\u043A\u0443",
+      "\u0434\u0438\u0432\u0456\u0434\u0435\u043D\u0434\u0438"
+    ]);
+    var UNCATEGORISED = /* @__PURE__ */ new Set(["", "other", "uncategorized", "uncategorised", "\u043F\u0440\u043E\u0447\u0435\u0435", "\u0456\u043D\u0448\u0435", "\u0431\u0435\u0437 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438", "\u0431\u0435\u0437 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0456\u0457"]);
+    var DEFAULT_BUSINESS_NAME = "My business";
+    var TOP_N = 8;
+    function isOwnerPay(category) {
+      return OWNER_PAY_CATEGORIES.has(String(category || "").trim().toLowerCase());
+    }
+    function isUncategorised(category) {
+      return UNCATEGORISED.has(String(category || "").trim().toLowerCase());
+    }
+    function businessKey(name) {
+      const n = String(name || "").trim();
+      return n || DEFAULT_BUSINESS_NAME;
+    }
+    function emptyBusiness(name) {
+      return {
+        name,
+        income: 0,
+        expenses: 0,
+        profit: 0,
+        ownerPay: 0,
+        ownerIn: 0,
+        kept: 0,
+        margin: null,
+        accounts: [],
+        expenseCategories: /* @__PURE__ */ new Map(),
+        incomeCategories: /* @__PURE__ */ new Map(),
+        uncategorisedExpense: 0
+      };
+    }
+    function addTo(map, key, amount) {
+      map.set(key, money.add(map.get(key) || 0, amount));
+    }
+    function topList(map, total) {
+      return Array.from(map.entries()).map(([category, amount]) => ({
+        category,
+        amount: money.round(amount),
+        share: total > 0 ? Math.round(amount / total * 1e3) / 10 : 0
+      })).sort((a, b) => b.amount - a.amount).slice(0, TOP_N);
+    }
+    async function computePeriod(userId, start, end, conv) {
+      const accounts = await query(
+        `SELECT id, name, bank_name, currency, is_active,
+            COALESCE(scope, 'personal') AS scope, COALESCE(business_name, '') AS business_name
+       FROM accounts WHERE user_id = ?`,
+        [userId]
+      );
+      const byId = new Map(accounts.map((a) => [a.id, a]));
+      const businesses = /* @__PURE__ */ new Map();
+      const business = (name) => {
+        const key = businessKey(name);
+        if (!businesses.has(key)) businesses.set(key, emptyBusiness(key));
+        return businesses.get(key);
+      };
+      for (const a of accounts) {
+        if (a.scope === "business" && a.is_active) business(a.business_name).accounts.push(a.id);
+      }
+      const personal = {
+        income: 0,
+        fromBusiness: 0,
+        otherIncome: 0,
+        expenses: 0,
+        putIntoBusiness: 0,
+        left: 0,
+        expenseCategories: /* @__PURE__ */ new Map(),
+        incomeCategories: /* @__PURE__ */ new Map(),
+        uncategorisedExpense: 0
+      };
+      const rows = await query(
+        `SELECT t.account_id AS account_id, t.type AS type, t.category AS category,
+            COALESCE(a.currency, '') AS currency, SUM(ABS(t.amount)) AS total
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.date BETWEEN ? AND ?${CFT.sql}
+      GROUP BY t.account_id, t.type, t.category, a.currency`,
+        [userId, start, end, ...CFT.params]
+      );
+      for (const r of rows) {
+        const amount = await conv.convert(r.total, r.currency || null);
+        if (!amount) continue;
+        const acct = byId.get(r.account_id);
+        const category = String(r.category || "").trim() || "Uncategorised";
+        if (acct && acct.scope === "business") {
+          const b = business(acct.business_name);
+          if (r.type === "income") {
+            b.income = money.add(b.income, amount);
+            addTo(b.incomeCategories, category, amount);
+          } else if (isOwnerPay(category)) {
+            b.ownerPay = money.add(b.ownerPay, amount);
+          } else {
+            b.expenses = money.add(b.expenses, amount);
+            addTo(b.expenseCategories, category, amount);
+            if (isUncategorised(r.category)) b.uncategorisedExpense = money.add(b.uncategorisedExpense, amount);
+          }
+        } else if (r.type === "income") {
+          personal.income = money.add(personal.income, amount);
+          if (isOwnerPay(category)) personal.fromBusiness = money.add(personal.fromBusiness, amount);
+          addTo(personal.incomeCategories, category, amount);
+        } else {
+          personal.expenses = money.add(personal.expenses, amount);
+          addTo(personal.expenseCategories, category, amount);
+          if (isUncategorised(r.category)) personal.uncategorisedExpense = money.add(personal.uncategorisedExpense, amount);
+        }
+      }
+      const legs = await query(
+        `SELECT t.transfer_id AS transfer_id, t.account_id AS account_id, t.amount AS amount,
+            COALESCE(a.currency, '') AS currency
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+      WHERE t.user_id = ? AND t.type = 'transfer' AND t.transfer_id IS NOT NULL
+        AND t.date BETWEEN ? AND ?`,
+        [userId, start, end]
+      );
+      const pairs = /* @__PURE__ */ new Map();
+      for (const l of legs) {
+        const p = pairs.get(l.transfer_id) || {};
+        if (Number(l.amount) < 0) p.from = l;
+        else p.to = l;
+        pairs.set(l.transfer_id, p);
+      }
+      for (const { from, to } of pairs.values()) {
+        if (!from || !to) continue;
+        const fa = byId.get(from.account_id);
+        const ta = byId.get(to.account_id);
+        if (!fa || !ta) continue;
+        const fromBiz = fa.scope === "business";
+        const toBiz = ta.scope === "business";
+        if (fromBiz && !toBiz) {
+          const amount = await conv.convert(Math.abs(from.amount), from.currency || null);
+          const b = business(fa.business_name);
+          b.ownerPay = money.add(b.ownerPay, amount);
+          personal.income = money.add(personal.income, amount);
+          personal.fromBusiness = money.add(personal.fromBusiness, amount);
+          addTo(personal.incomeCategories, `Owner pay \xB7 ${b.name}`, amount);
+        } else if (!fromBiz && toBiz) {
+          const amount = await conv.convert(Math.abs(to.amount), to.currency || null);
+          const b = business(ta.business_name);
+          b.ownerIn = money.add(b.ownerIn, amount);
+          personal.putIntoBusiness = money.add(personal.putIntoBusiness, amount);
+        }
+      }
+      const list = [];
+      const total = { income: 0, expenses: 0, profit: 0, ownerPay: 0, ownerIn: 0, kept: 0 };
+      for (const b of businesses.values()) {
+        b.profit = money.sub(b.income, b.expenses);
+        b.kept = money.sub(money.add(b.profit, b.ownerIn), b.ownerPay);
+        b.margin = b.income > 0 ? Math.round(b.profit / b.income * 1e3) / 10 : null;
+        for (const f of Object.keys(total)) total[f] = money.add(total[f], b[f]);
+        list.push({
+          name: b.name,
+          accounts: b.accounts,
+          income: b.income,
+          expenses: b.expenses,
+          profit: b.profit,
+          margin: b.margin,
+          ownerPay: b.ownerPay,
+          ownerIn: b.ownerIn,
+          kept: b.kept,
+          uncategorisedExpense: b.uncategorisedExpense,
+          expenseCategories: topList(b.expenseCategories, b.expenses),
+          incomeCategories: topList(b.incomeCategories, b.income)
+        });
+      }
+      list.sort((a, b) => b.income - a.income || a.name.localeCompare(b.name));
+      total.margin = total.income > 0 ? Math.round(total.profit / total.income * 1e3) / 10 : null;
+      personal.otherIncome = money.sub(personal.income, personal.fromBusiness);
+      personal.left = money.sub(money.sub(personal.income, personal.expenses), personal.putIntoBusiness);
+      return {
+        accounts,
+        businesses: list,
+        businessTotal: total,
+        personal: {
+          income: personal.income,
+          fromBusiness: personal.fromBusiness,
+          otherIncome: personal.otherIncome,
+          expenses: personal.expenses,
+          putIntoBusiness: personal.putIntoBusiness,
+          left: personal.left,
+          uncategorisedExpense: personal.uncategorisedExpense,
+          expenseCategories: topList(personal.expenseCategories, personal.expenses),
+          incomeCategories: topList(personal.incomeCategories, personal.income)
+        }
+      };
+    }
+    async function moneyMap(user, { startDate, endDate, months = 6 } = {}) {
+      const userId = user.id;
+      const today = dates.todayISO(dates.userTz(user));
+      const start = dates.isValidYMD(startDate) ? startDate : dates.startOfMonthISO(today);
+      const end = dates.isValidYMD(endDate) ? endDate : today;
+      if (start > end) {
+        const err = new Error("startDate must not be after endDate");
+        err.status = 400;
+        throw err;
+      }
+      const n = Math.max(0, Math.min(24, parseInt(months, 10) || 0));
+      const conv = await fx.converterForUser(userId);
+      const period = await computePeriod(userId, start, end, conv);
+      const series = [];
+      if (n > 0) {
+        const thisMonth = dates.startOfMonthISO(today);
+        for (let i = n - 1; i >= 0; i -= 1) {
+          const mStart = dates.addMonthsISO(thisMonth, -i);
+          const mEnd = i === 0 ? today : dates.endOfMonthISO(mStart);
+          const p = await computePeriod(userId, mStart, mEnd, conv);
+          series.push({
+            month: mStart.slice(0, 7),
+            businessIncome: p.businessTotal.income,
+            businessExpenses: p.businessTotal.expenses,
+            businessProfit: p.businessTotal.profit,
+            ownerPay: p.businessTotal.ownerPay,
+            personalIncome: p.personal.income,
+            personalExpenses: p.personal.expenses,
+            personalLeft: p.personal.left
+          });
+        }
+      }
+      const accounts = period.accounts.filter((a) => a.is_active).map((a) => ({
+        id: a.id,
+        name: a.name,
+        bankName: a.bank_name || "",
+        currency: a.currency,
+        scope: a.scope === "business" ? "business" : "personal",
+        businessName: a.business_name || ""
+      }));
+      return {
+        period: { start, end },
+        currency: conv.baseCurrency,
+        missingRates: conv.missingRates,
+        hasBusiness: accounts.some((a) => a.scope === "business"),
+        accounts,
+        businesses: period.businesses,
+        businessTotal: period.businessTotal,
+        personal: period.personal,
+        series,
+        ownerPayCategories: Array.from(OWNER_PAY_CATEGORIES).slice(0, 6)
+      };
+    }
+    module2.exports = { moneyMap, computePeriod, isOwnerPay, isUncategorised, OWNER_PAY_CATEGORIES, DEFAULT_BUSINESS_NAME };
+  }
+});
+
 // routes/analytics.js
 var require_analytics = __commonJS({
   "routes/analytics.js"(exports2, module2) {
@@ -13006,6 +13306,21 @@ var require_analytics = __commonJS({
         });
       } catch (error) {
         console.error("Analytics error:", error);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+    router.get("/money-map", async (req, res) => {
+      try {
+        const moneyMapService = require_moneyMapService();
+        const data = await moneyMapService.moneyMap(req.user, {
+          startDate: req.query.startDate,
+          endDate: req.query.endDate,
+          months: req.query.months === void 0 ? 6 : req.query.months
+        });
+        res.json(data);
+      } catch (error) {
+        if (error && error.status === 400) return res.status(400).json({ message: error.message });
+        console.error("Money map error:", error);
         res.status(500).json({ message: "Server error" });
       }
     });
@@ -16713,8 +17028,9 @@ var require_reports = __commonJS({
         { id: "category", name: "By category", description: "Expenses by category" },
         { id: "networth", name: "Net Worth", description: "Net worth over time" },
         { id: "budget", name: "Budgets", description: "Budget performance" },
-        { id: "investments", name: "Investments", description: "Portfolio and returns" },
-        { id: "tax", name: "Tax", description: "Data for tax filing" }
+        { id: "investments", name: "Investments", description: "Portfolio and returns" }
+        // 'tax' is not offered: its estimate used Ukrainian sole-proprietor rates (5 %, 18 %, ESV)
+        // in a Canadian product. POST /generate still accepts it for old API clients.
       ]);
     });
     router.post("/generate", async (req, res, next) => {
@@ -20634,6 +20950,8 @@ var require_txTools = __commonJS({
               type: a.type,
               currency: a.currency,
               balance: r2(a.balance || 0),
+              scope: a.scope === "business" ? "business" : "personal",
+              business_name: a.business_name || void 0,
               shared_by: a.is_owner ? void 0 : a.owner_username || "another user",
               can_add_transactions: !!a.can_add_transactions
             }))
@@ -20735,6 +21053,61 @@ var require_txTools = __commonJS({
             end_date: end,
             currency,
             by_month: [...months.values()].map((m) => ({ month: m.month, income: r2(m.income), expenses: r2(m.expenses), net: r2(m.income - m.expenses) }))
+          };
+        }
+      },
+      {
+        name: "get_business_and_personal",
+        title: "Business profit and personal money",
+        description: 'Management view for people who run a business: for each business (accounts marked Business in Finman) income, running costs, profit and margin, owner pay taken home, what stayed in the business and where the business money goes; for personal money: what came in (and how much of it from the business), spending by category and what was left; plus month-by-month totals. Owner pay (transfers business -> personal, or the category "Owner pay") is not a business cost. Default period: this month. If has_business is false, ask the person to mark their business accounts in Finman (Business and personal page).',
+        inputSchema: {
+          type: "object",
+          properties: {
+            start_date: dateProp("From YYYY-MM-DD, default first day of this month"),
+            end_date: dateProp("To YYYY-MM-DD, default today"),
+            months: { type: "integer", minimum: 0, maximum: 24, description: "Month-by-month history length, default 6" }
+          }
+        },
+        annotations: { readOnlyHint: true },
+        async run(userId, a) {
+          const u = await get("SELECT id, timezone FROM users WHERE id = ?", [userId]);
+          const start = optDate(a.start_date, "start_date");
+          const end = optDate(a.end_date, "end_date");
+          if (start && end && start > end) throw new TxToolError("start_date must not be after end_date");
+          const months = a.months === void 0 || a.months === null ? 6 : Math.max(0, Math.min(24, parseInt(a.months, 10) || 0));
+          const m = await require_moneyMapService().moneyMap(u || { id: userId }, { startDate: start, endDate: end, months });
+          return {
+            start_date: m.period.start,
+            end_date: m.period.end,
+            currency: m.currency,
+            has_business: m.hasBusiness,
+            businesses: m.businesses.map((b) => ({
+              name: b.name,
+              income: b.income,
+              expenses: b.expenses,
+              profit: b.profit,
+              margin_percent: b.margin,
+              owner_pay: b.ownerPay,
+              owner_money_in: b.ownerIn,
+              stayed_in_business: b.kept,
+              uncategorised_spending: b.uncategorisedExpense,
+              top_expenses: b.expenseCategories,
+              top_income: b.incomeCategories
+            })),
+            business_total: m.businessTotal,
+            personal: {
+              income: m.personal.income,
+              from_business: m.personal.fromBusiness,
+              other_income: m.personal.otherIncome,
+              expenses: m.personal.expenses,
+              put_into_business: m.personal.putIntoBusiness,
+              left: m.personal.left,
+              uncategorised_spending: m.personal.uncategorisedExpense,
+              top_expenses: m.personal.expenseCategories,
+              top_income: m.personal.incomeCategories
+            },
+            by_month: m.series,
+            missing_rates: m.missingRates.length ? m.missingRates : void 0
           };
         }
       },
@@ -21231,6 +21604,7 @@ var require_agent = __commonJS({
         `Today is ${today}. Reply in ${lang} unless the person writes in another language; then use theirs.`,
         "Use the tools to read the person's real accounts, transactions, invoices and clients. Never invent numbers, names or balances: if a tool did not return it, say you do not have it.",
         'For totals and "how much did I spend" questions use get_spending_summary; call list_accounts first when you need an account_id.',
+        'For "how much does my business earn", profit, owner pay or business vs personal money use get_business_and_personal.',
         "Tools that change data (adding, editing or deleting transactions, invoices, clients) are shown to the person as a card with Confirm and Decline; they run only after Confirm. Ask for such a tool directly, without asking for permission in text first.",
         "Amounts in add_transaction are positive; the type says income or expense. Dates are YYYY-MM-DD.",
         "Keep answers short and concrete. Format money with its currency."
@@ -26333,7 +26707,7 @@ var require_routes = __commonJS({
 var require_schema = __commonJS({
   "engine/schema.sql"(exports2, module2) {
     module2.exports = `-- engine/schema.sql \u2014 GENERATED by engine/build.js from db/database.js initDatabase() + migrations/.
--- Do not edit. 71 tables, 27 migrations.
+-- Do not edit. 71 tables, 28 migrations.
 CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
@@ -26355,7 +26729,7 @@ CREATE TABLE IF NOT EXISTS accounts (
           account_type TEXT,
           is_active BOOLEAN DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, is_demo INTEGER NOT NULL DEFAULT 0,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, is_demo INTEGER NOT NULL DEFAULT 0, scope TEXT NOT NULL DEFAULT 'personal', business_name TEXT NOT NULL DEFAULT '',
           FOREIGN KEY (user_id) REFERENCES users (id)
         );
 ;;
@@ -27447,6 +27821,8 @@ INSERT OR IGNORE INTO schema_migrations (name) VALUES ('027_user_ai');
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_vault');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('030_feedback');
+;;
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('031_account_scope');
 `;
   }
 });
@@ -28397,6 +28773,24 @@ var require_feedback = __commonJS({
   }
 });
 
+// migrations/031_account_scope.js
+var require_account_scope = __commonJS({
+  "migrations/031_account_scope.js"(exports2, module2) {
+    init_globals();
+    module2.exports = {
+      name: "031_account_scope",
+      async up(db2, { columnExists }) {
+        if (!await columnExists(db2, "accounts", "scope")) {
+          await db2.run(`ALTER TABLE accounts ADD COLUMN scope TEXT NOT NULL DEFAULT 'personal'`);
+        }
+        if (!await columnExists(db2, "accounts", "business_name")) {
+          await db2.run(`ALTER TABLE accounts ADD COLUMN business_name TEXT NOT NULL DEFAULT ''`);
+        }
+      }
+    };
+  }
+});
+
 // finman-virtual:migrations
 var require_migrations = __commonJS({
   "finman-virtual:migrations"(exports2, module2) {
@@ -28428,7 +28822,8 @@ var require_migrations = __commonJS({
       { file: "026_mcp_oauth.js", mod: require_mcp_oauth() },
       { file: "027_user_ai.js", mod: require_user_ai() },
       { file: "029_vault.js", mod: require_vault2() },
-      { file: "030_feedback.js", mod: require_feedback() }
+      { file: "030_feedback.js", mod: require_feedback() },
+      { file: "031_account_scope.js", mod: require_account_scope() }
     ];
   }
 });

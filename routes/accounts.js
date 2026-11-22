@@ -40,7 +40,9 @@ router.post('/', authenticate, async (req, res) => {
       bankName, 
       currency, 
       balance,
-      accountType
+      accountType,
+      scope,
+      businessName
     } = req.body;
     
     // Проверка обязательных полей
@@ -65,7 +67,9 @@ router.post('/', authenticate, async (req, res) => {
       bankName,
       currency: currency ? String(currency).toUpperCase() : currency,
       balance: Number(balance) || 0,
-      accountType
+      accountType,
+      scope,
+      businessName
     });
     
     res.status(201).json(newAccount);
@@ -139,8 +143,13 @@ router.put('/:id', authenticate, async (req, res) => {
       accountNumber,
       bankName,
       currency,
-      accountType
+      accountType,
+      scope,
+      businessName
     } = req.body;
+    if (scope !== undefined && scope !== null && !['personal', 'business'].includes(String(scope).toLowerCase())) {
+      return res.status(400).json({ error: true, message: "scope must be 'personal' or 'business'" });
+    }
     if (currency !== undefined && currency !== null && currency !== '' && !CURRENCY_CODE.test(String(currency))) {
       return res.status(400).json({ error: true, message: 'Currency must be a 3-5 letter code, e.g. CAD' });
     }
@@ -162,7 +171,9 @@ router.put('/:id', authenticate, async (req, res) => {
       accountNumber,
       bankName,
       currency: currency ? String(currency).toUpperCase() : currency,
-      accountType
+      accountType,
+      scope: scope == null ? undefined : scope,
+      businessName: businessName == null ? undefined : businessName
     });
 
     if (success) {

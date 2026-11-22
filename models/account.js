@@ -5,13 +5,22 @@ const { OPENING_TYPE, OPENING_CATEGORY, OPENING_DESCRIPTION } = require('../lib/
 const dates = require('../lib/dates');
 
 class Account {
+  // Whose money the account holds: 'personal' (default) or 'business' (migration 031).
+  static normalizeScope(scope) {
+    return String(scope || '').toLowerCase() === 'business' ? 'business' : 'personal';
+  }
+
+  static normalizeBusinessName(name) {
+    return String(name == null ? '' : name).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 80);
+  }
+
   // Создание счета
   static async create(accountData) {
     try {
       const result = await run(
         `INSERT INTO accounts 
-         (user_id, name, account_number, bank_name, currency, balance, account_type) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, name, account_number, bank_name, currency, balance, account_type, scope, business_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           accountData.userId,
           accountData.name,
@@ -19,7 +28,9 @@ class Account {
           accountData.bankName || '',
           accountData.currency || DEFAULT_CURRENCY,
           accountData.balance || 0,
-          accountData.accountType || 'checking'
+          accountData.accountType || 'checking',
+          Account.normalizeScope(accountData.scope),
+          Account.normalizeBusinessName(accountData.businessName)
         ]
       );
       
@@ -55,8 +66,8 @@ class Account {
     return transaction(async () => {
       const result = await run(
         `INSERT INTO accounts
-         (user_id, name, account_number, bank_name, currency, balance, account_type)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, name, account_number, bank_name, currency, balance, account_type, scope, business_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           accountData.userId,
           accountData.name,
@@ -64,7 +75,9 @@ class Account {
           accountData.bankName || '',
           accountData.currency || DEFAULT_CURRENCY,
           balance,
-          accountData.accountType || 'checking'
+          accountData.accountType || 'checking',
+          Account.normalizeScope(accountData.scope),
+          Account.normalizeBusinessName(accountData.businessName)
         ]
       );
       if (balance !== 0) {
@@ -157,6 +170,16 @@ class Account {
         params.push(accountData.accountType);
       }
       
+      if (accountData.scope !== undefined) {
+        updateFields.push('scope = ?');
+        params.push(Account.normalizeScope(accountData.scope));
+      }
+
+      if (accountData.businessName !== undefined) {
+        updateFields.push('business_name = ?');
+        params.push(Account.normalizeBusinessName(accountData.businessName));
+      }
+
       if (accountData.isActive !== undefined) {
         updateFields.push('is_active = ?');
         params.push(accountData.isActive ? 1 : 0);

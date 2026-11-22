@@ -73,6 +73,7 @@ const NAV_GROUPS = [
   {
     title: 'Wealth',
     items: [
+      { page: 'money-map', label: 'Business and personal', icon: 'fa-briefcase' },
       { page: 'investments', label: 'Investments', icon: 'fa-chart-pie' },
       { page: 'networth', label: 'Net Worth', icon: 'fa-gem' },
       { page: 'analytics', label: 'Analytics', icon: 'fa-chart-bar' },
@@ -145,6 +146,7 @@ const PAGE_RENDERERS = {
   split: () => callGlobal('renderSplitPage'),
   investments: () => callGlobal('renderInvestmentsPage'),
   analytics: () => callGlobal('renderAnalyticsPage'),
+  'money-map': () => callGlobal('renderMoneyMapPage'),
   subscriptions: () => renderSubscriptionsPage(),
   networth: () => renderNetWorthPage(),
   receipts: () => renderReceiptsPage(),
@@ -1231,6 +1233,9 @@ async function renderDashboard() {
               <span class="fm-cashflow-value out">${escapeHtmlShell(expenseText)}</span>
             </div>
           </div>
+          <a class="fm-hero-mm" href="/money-map" data-page="money-map">
+            <i class="fas fa-briefcase" aria-hidden="true"></i><span>Business and personal: profit, your pay, where the money goes</span><i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </a>
         </div>
         <aside class="fm-insight-card" aria-label="AI insight">
           <span class="fm-insight-label"><span class="fm-insight-dot"></span> AI CFO</span>
@@ -1315,12 +1320,12 @@ async function renderDashboard() {
     <div class="dashboard-charts">
       <div class="chart-container">
         <h2>Income and expenses</h2>
-        <canvas id="income-expense-chart"></canvas>
+        <div class="fm-chart-canvas"><canvas id="income-expense-chart"></canvas></div>
       </div>
 
       <div class="chart-container">
         <h2>Expenses by category</h2>
-        <canvas id="expense-categories-chart"></canvas>
+        <div class="fm-chart-canvas"><canvas id="expense-categories-chart"></canvas></div>
       </div>
     </div>
   `;
@@ -1340,6 +1345,8 @@ async function renderDashboard() {
     try { window.Engage.afterDashboard(mainContent); } catch (error) { console.error('Engagement panel failed:', error); }
   }
 
+  const heroMm = mainContent.querySelector('.fm-hero-mm');
+  if (heroMm) heroMm.addEventListener('click', (e) => { e.preventDefault(); navigateTo('money-map'); });
   const heroAiBtn = document.getElementById('hero-ai-more');
   if (heroAiBtn) {
     heroAiBtn.addEventListener('click', () => {
@@ -1607,7 +1614,7 @@ async function renderTransactionsPage() {
       </div>
 
       <div class="pagination-container" id="pagination-container">
-        ${renderPagination(appState.filters.page)}
+        ${renderPagination(appState.filters.page, transactions.length >= 50)}
       </div>
     </div>
   `;

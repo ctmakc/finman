@@ -26,7 +26,8 @@ const INSTRUCTIONS = 'Finman money data of the signed-in account: invoices, clie
   + 'Invoices: start with list_invoice_templates, then create_invoice. Invoice numbers are assigned by Finman; never invent one. '
   + 'Tax comes from the template. Amounts are in the template currency; percent in record_payment is of the invoice total. '
   + 'Transactions: list_accounts gives account_id; add_transaction takes a positive amount and type income or expense. '
-  + 'Use get_spending_summary for totals instead of adding up list_transactions yourself.';
+  + 'Use get_spending_summary for totals instead of adding up list_transactions yourself. '
+  + 'For business profit, owner pay and business vs personal money use get_business_and_personal.';
 
 const mcpLimiter = rateLimit({
   windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false,

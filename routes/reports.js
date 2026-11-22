@@ -44,8 +44,9 @@ router.get('/types', (req, res) => {
     { id: 'category', name: 'By category', description: 'Expenses by category' },
     { id: 'networth', name: 'Net Worth', description: 'Net worth over time' },
     { id: 'budget', name: 'Budgets', description: 'Budget performance' },
-    { id: 'investments', name: 'Investments', description: 'Portfolio and returns' },
-    { id: 'tax', name: 'Tax', description: 'Data for tax filing' }
+    { id: 'investments', name: 'Investments', description: 'Portfolio and returns' }
+    // 'tax' is not offered: its estimate used Ukrainian sole-proprietor rates (5 %, 18 %, ESV)
+    // in a Canadian product. POST /generate still accepts it for old API clients.
   ]);
 });
 

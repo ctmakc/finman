@@ -17,6 +17,12 @@ const ReportsModule = {
   },
 
   // Money formatter: report totals are in the report's currency (server lib/fx).
+  // PDF is built on the server; for encrypted (vault) accounts the server has no data and the
+  // in-browser engine has no PDF library (engine/build.js), so the button is not offered.
+  pdfOk() {
+    try { return !(window.FMVault && window.FMVault.status().mode === 'vault'); } catch (e) { return true; }
+  },
+
   fmt(n) {
     return UI.esc(UI.convertedMoney(n || 0, this.reportCurrency));
   },
@@ -98,7 +104,7 @@ const ReportsModule = {
             <td>${new Date(r.created_at).toLocaleDateString(i18n.getLanguage())}</td>
             <td>
               <button type="button" class="btn btn-sm" data-action="reports:view" data-id="${r.id}" aria-label="${t('reports.open')}" title="${t('reports.open')}"><i class="fas fa-eye"></i></button>
-              <button type="button" class="btn btn-sm" data-action="reports:pdf" data-id="${r.id}" title="${t('reports.downloadPdf')}"><i class="fas fa-download"></i> PDF</button>
+              ${this.pdfOk() ? `<button type="button" class="btn btn-sm" data-action="reports:pdf" data-id="${r.id}" title="${t('reports.downloadPdf')}"><i class="fas fa-download"></i> PDF</button>` : ''}
               <button type="button" class="btn btn-sm btn-danger" data-action="reports:delete" data-id="${r.id}" aria-label="${t('reports.deleteReport')}" title="${t('btn.delete')}"><i class="fas fa-trash"></i></button>
             </td>
           </tr>
@@ -226,53 +232,78 @@ const ReportsModule = {
     this.reportCurrency = data.currency || data.baseCurrency || null;
     let html = '<div class="report-content">' + UI.missingRatesNote(data.missingRates);
 
-    if (type === 'monthly' || type === 'yearly') {
-      const s = data.summary || {};
-      html += `
+    // Field names follow routes/reports.js exactly (monthly: summary.income/expenses/savings +
+    // expensesByCategory{}; yearly: summary.totalIncome/... + monthlyData[]; category:
+    // categories[]; networth: currentNetWorth/totalAssets/totalLiabilities; budget: budgets[]).
+    const statCards = (income, expenses, left) => `
         <div class="report-summary">
           <h3>${t('reports.summary')}</h3>
           <div class="stats-grid">
-            <div class="stat-card positive"><div class="stat-value">${this.fmt(s.income)}</div><div class="stat-label">${t('common.income')}</div></div>
-            <div class="stat-card negative"><div class="stat-value">${this.fmt(s.expenses)}</div><div class="stat-label">${t('reports.expenses')}</div></div>
-            <div class="stat-card"><div class="stat-value">${this.fmt(s.balance != null ? s.balance : s.savings)}</div><div class="stat-label">${t('common.balance')}</div></div>
+            <div class="stat-card positive"><div class="stat-value">${this.fmt(income)}</div><div class="stat-label">${t('common.income')}</div></div>
+            <div class="stat-card negative"><div class="stat-value">${this.fmt(expenses)}</div><div class="stat-label">${t('reports.expenses')}</div></div>
+            <div class="stat-card"><div class="stat-value">${this.fmt(left)}</div><div class="stat-label">${esc('Left (income − expenses)')}</div></div>
           </div>
-        </div>
-      `;
-      if (data.byCategory) {
-        html += `<h3>${t('reports.byCategory')}</h3><div class="categories-list">`;
-        data.byCategory.forEach(c => {
-          html += `<div class="category-row"><span>${esc(c.category || t('reports.noCategory'))}</span><span>${this.fmt(c.total)}</span></div>`;
-        });
-        html += '</div>';
-      }
-      if (data.monthly) {
-        html += `<h3>${t('reports.byMonth')}</h3><table class="table"><thead><tr><th>${t('reports.month')}</th><th>${t('common.income')}</th><th>${t('reports.expenses')}</th></tr></thead><tbody>`;
-        data.monthly.forEach(m => {
-          html += `<tr><td>${esc(m.month)}</td><td class="positive">${this.fmt(m.income)}</td><td class="negative">${this.fmt(m.expenses)}</td></tr>`;
+        </div>`;
+    const catList = (rows) => {
+      if (!rows.length) return `<p class="text-muted">${esc('No spending in this period.')}</p>`;
+      const total = rows.reduce((a, c) => a + (Number(c.total) || 0), 0);
+      return '<div class="categories-list">' + rows.map((c) => {
+        const pct = c.percent != null ? c.percent : (total > 0 ? ((Number(c.total) || 0) / total * 100).toFixed(1) : 0);
+        return `<div class="category-row"><span>${esc(c.category || t('reports.noCategory'))}</span><span>${this.fmt(c.total)}</span><span>${esc(pct)}%</span></div>`;
+      }).join('') + '</div>';
+    };
+
+    if (type === 'monthly') {
+      const s = data.summary || {};
+      html += statCards(s.income, s.expenses, s.savings != null ? s.savings : s.balance);
+      const byCat = data.expensesByCategory || {};
+      const rows = Array.isArray(data.byCategory) ? data.byCategory
+        : Object.keys(byCat).map((k) => ({ category: k, total: byCat[k] })).sort((a, b) => b.total - a.total);
+      html += `<h3>${t('reports.byCategory')}</h3>` + catList(rows);
+    } else if (type === 'yearly') {
+      const s = data.summary || {};
+      html += statCards(s.totalIncome, s.totalExpenses, s.totalSavings);
+      const months = data.monthlyData || data.monthly || [];
+      if (months.length) {
+        const label = (m) => {
+          const n = Number(m);
+          if (!Number.isFinite(n) || !data.year) return String(m);
+          try { return new Date(Date.UTC(Number(data.year), n - 1, 15)).toLocaleDateString(i18n.getLanguage(), { month: 'long', timeZone: 'UTC' }); } catch (e) { return String(m); }
+        };
+        html += `<h3>${t('reports.byMonth')}</h3><table class="table"><thead><tr><th>${t('reports.month')}</th><th>${t('common.income')}</th><th>${t('reports.expenses')}</th><th>${esc('Left')}</th></tr></thead><tbody>`;
+        months.forEach((m) => {
+          const left = m.savings != null ? m.savings : (Number(m.income) || 0) - (Number(m.expenses) || 0);
+          html += `<tr><td>${esc(label(m.month))}</td><td class="positive">${this.fmt(m.income)}</td><td class="negative">${this.fmt(m.expenses)}</td><td class="${left >= 0 ? 'positive' : 'negative'}">${this.fmt(left)}</td></tr>`;
         });
         html += '</tbody></table>';
       }
     } else if (type === 'category') {
-      html += `<h3>${t('reports.byCategory')}</h3><div class="categories-list">`;
-      (data.expenses || []).forEach(c => {
-        html += `<div class="category-row"><span>${esc(c.category)}</span><span>${this.fmt(c.total)}</span><span>${esc(c.percent)}%</span></div>`;
-      });
-      html += '</div>';
+      html += `<h3>${t('reports.byCategory')}</h3>` + catList(data.categories || data.expenses || []);
+      if (data.totalExpenses != null) html += `<p>${t('reports.expenses')}: <strong>${this.fmt(data.totalExpenses)}</strong></p>`;
     } else if (type === 'networth') {
-      const base = (data.current && data.current.base_currency) || UI.baseCurrency();
-      html += `<h3>${t('reports.netWorth')}</h3><p>${t('reports.current')}: <strong>${esc(UI.money((data.current && data.current.net_worth) || 0, base))}</strong></p>`;
-      html += `<p>${t('reports.change')}: <strong class="${data.change >= 0 ? 'positive' : 'negative'}">${esc(UI.money(data.change || 0, base))} (${esc(data.changePercent || 0)}%)</strong></p>`;
-    } else if (type === 'tax') {
-      html += `
-        <h3>${t('reports.tax.title')}</h3>
-        <p>${t('reports.totalIncome')}: <strong>${this.fmt(data.totalIncome)}</strong></p>
-        <h4>${t('reports.tax.estimate')}</h4>
-        <ul>
-          <li>${t('reports.tax.group3')}: ${this.fmt(data.estimatedTax5)}</li>
-          <li>${t('reports.tax.pit')}: ${this.fmt(data.estimatedTax18)}</li>
-          <li>${t('reports.tax.ssc')}: ${this.fmt(data.estimatedESV)}</li>
-        </ul>
-      `;
+      const nw = data.currentNetWorth != null ? data.currentNetWorth : (data.current && data.current.net_worth) || 0;
+      html += `<h3>${t('reports.netWorth')}</h3><p>${t('reports.current')}: <strong>${this.fmt(nw)}</strong></p>`;
+      if (data.totalAssets != null) html += `<p>${esc('Assets')}: <strong>${this.fmt(data.totalAssets)}</strong></p>`;
+      if (data.totalLiabilities != null) html += `<p>${esc('Debts and liabilities')}: <strong>${this.fmt(data.totalLiabilities)}</strong></p>`;
+    } else if (type === 'budget') {
+      const list = data.budgets || [];
+      if (!list.length) {
+        html += `<p class="text-muted">${esc('No budgets yet.')}</p>`;
+      } else {
+        html += `<table class="table"><thead><tr><th>${t('common.name')}</th><th>${esc('Limit')}</th><th>${esc('Spent')}</th><th>%</th></tr></thead><tbody>`;
+        list.forEach((b) => {
+          const over = Number(b.spent) > Number(b.limit);
+          html += `<tr><td>${esc(b.name || b.category || '')}</td><td>${esc(UI.money(b.limit || 0, b.currency || this.reportCurrency || UI.baseCurrency()))}</td><td class="${over ? 'negative' : ''}">${esc(UI.money(b.spent || 0, b.currency || this.reportCurrency || UI.baseCurrency()))}</td><td>${esc(b.percentUsed || 0)}%</td></tr>`;
+        });
+        html += '</tbody></table>';
+      }
+    } else if (type === 'investments') {
+      const s = data.summary || {};
+      html += `<div class="report-summary"><div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">${this.fmt(s.totalValue)}</div><div class="stat-label">${esc('Value')}</div></div>
+        <div class="stat-card"><div class="stat-value">${this.fmt(s.totalCost)}</div><div class="stat-label">${esc('Cost')}</div></div>
+        <div class="stat-card ${Number(s.totalProfitLoss) >= 0 ? 'positive' : 'negative'}"><div class="stat-value">${this.fmt(s.totalProfitLoss)}</div><div class="stat-label">${esc('Gain / loss')} (${esc(s.totalProfitLossPercent || 0)}%)</div></div>
+      </div></div>`;
     } else {
       html += '<pre>' + esc(JSON.stringify(data, null, 2)) + '</pre>';
     }
@@ -311,7 +342,7 @@ const ReportsModule = {
               </div>
               <div class="form-actions">
                 <button type="button" class="btn btn-secondary" data-action="ui:close">${t('btn.cancel')}</button>
-                <button type="button" class="btn" data-action="reports:generate-pdf"><i class="fas fa-file-pdf"></i> PDF</button>
+                ${ReportsModule.pdfOk() ? `<button type="button" class="btn" data-action="reports:generate-pdf"><i class="fas fa-file-pdf"></i> PDF</button>` : ''}
                 <button type="submit" class="btn btn-primary">${t('reports.generate')}</button>
               </div>
             </form>

@@ -107,7 +107,7 @@ app.use(helmet({
 const generalLimiter = rateLimit({
   windowMs: config.apiRateLimits.windowMs,
   max: config.apiRateLimits.max,
-  message: { error: true, message: 'Слишком много запросов, попробуйте позже' },
+  message: { error: true, message: 'Too many requests. Please try again in a few minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
   // Docker HEALTHCHECK и мониторинг опрашивают /api/health каждые 30с — не считаем.
@@ -118,7 +118,7 @@ const generalLimiter = rateLimit({
 const aiLimiter = rateLimit({
   windowMs: config.aiRateLimits.windowMs,
   max: config.aiRateLimits.max,
-  message: { error: true, message: 'Слишком много AI-запросов, подождите минуту' },
+  message: { error: true, message: 'Too many AI requests. Please wait a minute.' },
   standardHeaders: true,
   legacyHeaders: false,
   // Детерминированные GET без LLM (дашборд дёргает их на каждом показе) не
@@ -131,7 +131,7 @@ const aiLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: config.authRateLimits.windowMs,
   max: config.authRateLimits.max,
-  message: { error: true, message: 'Слишком много попыток входа, попробуйте позже' },
+  message: { error: true, message: 'Too many sign-in attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -208,7 +208,7 @@ app.use('/api/auth/register', authLimiter);
 const preloginLimiter = rateLimit({
   windowMs: config.authRateLimits.windowMs,
   max: config.authRateLimits.max * 6,
-  message: { error: true, message: 'Слишком много попыток входа, попробуйте позже' },
+  message: { error: true, message: 'Too many sign-in attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true,
   legacyHeaders: false,
 });

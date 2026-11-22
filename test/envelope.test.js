@@ -32,7 +32,8 @@ const AUTH = (token) => ({ Authorization: `Bearer ${token}` });
 
 // Хелпер: создать бюджет напрямую и проставить spent сырым SQL.
 async function seedBudget(db, userId, { name, amount, spent = 0, rollover = 0, carryover = 0, period = 'monthly', category = null }) {
-  const today = new Date().toISOString().split('T')[0];
+  // The user's day (Toronto by default), as the app computes it; the UTC date is tomorrow after 19:00.
+  const today = require('../lib/dates').todayISO();
   const res = await db.run(
     `INSERT INTO budgets
        (user_id, name, category, amount, spent, period, start_date, currency, notify_at_percent, rollover, carryover, is_active)
@@ -394,7 +395,9 @@ describe('GET /api/budgets recalculates spending before it answers', () => {
       `INSERT INTO accounts (user_id, name, currency, balance, is_active) VALUES (?, 'Card', 'UAH', 0, 1)`,
       [ctx.userId]
     );
-    const today = new Date().toISOString().split('T')[0];
+    // «Today» in the user's zone (Toronto by default), like the route: after 19:00 Toronto
+    // the UTC date is already tomorrow and the row would land outside the budget period.
+    const today = require('../lib/dates').todayISO();
     await seedBudget(db, ctx.userId, { name: 'Groceries', amount: 500, spent: 0, category: 'Groceries' });
     await db.run(
       `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)

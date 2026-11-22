@@ -897,50 +897,37 @@ async function fetchTransactions(filters = {}) {
   }
   
   // Рендеринг пагинации
-  function renderPagination(currentPage) {
-    const totalPages = 5; // Упрощенный вариант, в реальности нужно получать из API
-    
-    if (totalPages <= 1) {
-      return '';
-    }
-    
-    // Формирование списка страниц
-    let paginationHtml = '<ul class="pagination">';
-    
-    // Кнопка "Предыдущая"
-    paginationHtml += `
+  // Pagination: the API pages by 50 (routes/transactions.js) and does not return a total,
+  // so show the pages we know exist: 1..current, plus «next» while a page comes back full.
+  // (It used to draw 5 pages always; page 3 said «No transactions yet» for a user with 16.)
+  function renderPagination(currentPage, hasMore) {
+    currentPage = Math.max(1, Number(currentPage) || 1);
+    const totalPages = currentPage + (hasMore ? 1 : 0);
+    if (totalPages <= 1) return '';
+    const first = Math.max(1, totalPages - 4);
+    let html = '<ul class="pagination">';
+    html += `
       <li class="pagination-item">
         <a href="#" class="pagination-link ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}" aria-label="${t('transactions.pagination.prev')}">
           <i class="fas fa-chevron-left"></i>
         </a>
-      </li>
-    `;
-    
-    // Страницы
-    for (let i = 1; i <= totalPages; i++) {
-      paginationHtml += `
-        <li class="pagination-item">
-          <a href="#" class="pagination-link ${i === currentPage ? 'active' : ''}" data-page="${i}">
-            ${i}
-          </a>
-        </li>
-      `;
-    }
-    
-    // Кнопка "Следующая"
-    paginationHtml += `
+      </li>`;
+    for (let i = first; i <= totalPages; i++) {
+      html += `
       <li class="pagination-item">
-        <a href="#" class="pagination-link ${currentPage >= totalPages ? 'disabled' : ''}" data-page="${currentPage + 1}" aria-label="${t('transactions.pagination.next')}">
+        <a href="#" class="pagination-link ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</a>
+      </li>`;
+    }
+    html += `
+      <li class="pagination-item">
+        <a href="#" class="pagination-link ${hasMore ? '' : 'disabled'}" data-page="${currentPage + 1}" aria-label="${t('transactions.pagination.next')}">
           <i class="fas fa-chevron-right"></i>
         </a>
-      </li>
-    `;
-    
-    paginationHtml += '</ul>';
-    
-    return paginationHtml;
+      </li>`;
+    html += '</ul>';
+    return html;
   }
-  
+
   // Обработка действий с транзакциями
   async function handleTransactionAction(e) {
     const button = e.currentTarget;

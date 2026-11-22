@@ -132,6 +132,19 @@ async function fetchAccount(accountId) {
             </div>
             
             <div class="form-group">
+              <label for="${modalId}-scope" class="form-label">Whose money</label>
+              <select id="${modalId}-scope" class="form-control">
+                <option value="personal" ${isEditing && accountData.scope === 'business' ? '' : 'selected'}>Personal</option>
+                <option value="business" ${isEditing && accountData.scope === 'business' ? 'selected' : ''}>Business</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="${modalId}-bizname-group" ${isEditing && accountData.scope === 'business' ? '' : 'hidden'}>
+              <label for="${modalId}-bizname" class="form-label">Business name</label>
+              <input type="text" id="${modalId}-bizname" class="form-control" maxlength="80" placeholder="e.g. Studio" value="${isEditing ? escapeHtml(accountData.business_name || '') : ''}">
+            </div>
+
+            <div class="form-group">
               <label for="${modalId}-bank" class="form-label">${t('accounts.field.bank')}</label>
               <input type="text" id="${modalId}-bank" class="form-control" value="${isEditing ? escapeHtml(accountData.bank_name || '') : ''}">
             </div>
@@ -193,6 +206,10 @@ async function fetchAccount(accountId) {
       }
     });
     
+    const scopeSelect = document.getElementById(`${modalId}-scope`);
+    const bizGroup = document.getElementById(`${modalId}-bizname-group`);
+    scopeSelect.addEventListener('change', () => { bizGroup.hidden = scopeSelect.value !== 'business'; });
+
     // Обработчик отправки формы (кнопка заблокирована, пока запрос в пути)
     modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -205,7 +222,9 @@ async function fetchAccount(accountId) {
         accountType: document.getElementById(`${modalId}-type`).value,
         bankName: document.getElementById(`${modalId}-bank`).value,
         accountNumber: document.getElementById(`${modalId}-number`).value,
-        currency: document.getElementById(`${modalId}-currency`).value
+        currency: document.getElementById(`${modalId}-currency`).value,
+        scope: scopeSelect.value,
+        businessName: scopeSelect.value === 'business' ? document.getElementById(`${modalId}-bizname`).value.trim() : ''
       };
       
       if (!isEditing) {

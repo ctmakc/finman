@@ -128,6 +128,24 @@ router.get('/overview', async (req, res) => {
   }
 });
 
+// Business & personal (management accounting): profit per business, owner pay,
+// personal income/expenses, where the money goes, monthly series. services/moneyMapService.js
+router.get('/money-map', async (req, res) => {
+  try {
+    const moneyMapService = require('../services/moneyMapService');
+    const data = await moneyMapService.moneyMap(req.user, {
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      months: req.query.months === undefined ? 6 : req.query.months
+    });
+    res.json(data);
+  } catch (error) {
+    if (error && error.status === 400) return res.status(400).json({ message: error.message });
+    console.error('Money map error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Расходы по категориям
 router.get('/expenses-by-category', async (req, res) => {
   try {
