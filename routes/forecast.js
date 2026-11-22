@@ -487,24 +487,41 @@ router.get('/trends', async (req, res) => {
       });
     }
 
-    // Тренды
-    const incomesTrend = calculateTrend(months.map(m => m.income));
-    const expensesTrend = calculateTrend(months.map(m => m.expense));
-    const savingsTrend = calculateTrend(months.map(m => m.savings));
-
-    // Прогноз на следующий месяц
-    const nextMonthIncome = predictNext(months.map(m => m.income));
-    const nextMonthExpense = predictNext(months.map(m => m.expense));
+    // Trends and the next-month prediction use FULL months only: months before the
+    // first cash flow, the first month when history starts after its 3rd day (a
+    // statement from mid-August made August look tiny: "expenses ↑999%"), and the
+    // current, unfinished month are left out. Fewer than 2 full months -> no trend.
+    const first = await query(
+      `SELECT MIN(t.date) AS d FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.user_id = ?${CFT.sql}`, [userId, ...CFT.params]);
+    const firstDay = first && first[0] && first[0].d ? String(first[0].d).slice(0, 10) : null;
+    const full = months.filter((m) => {
+      if (m.month >= thisMonthStart.slice(0, 7)) return false;
+      if (!firstDay || m.month < firstDay.slice(0, 7)) return false;
+      if (m.month === firstDay.slice(0, 7) && Number(firstDay.slice(8, 10)) > 3) return false;
+      return true;
+    });
+    const enough = full.length >= 2;
+    const trendOf = (key) => (enough ? calculateTrend(full.map((m) => m[key])) : null);
+    const incomesTrend = trendOf('income');
+    const expensesTrend = trendOf('expense');
+    const savingsTrend = trendOf('savings');
+    const basis = full.length ? full : months.filter((m) => m.income || m.expense);
+    const nextMonthIncome = predictNext(basis.map(m => m.income));
+    const nextMonthExpense = predictNext(basis.map(m => m.expense));
+    const dir = (v) => (v > 0 ? 'up' : 'down');
+    const pct = (v) => (v === null ? null : String(capPercent(Math.abs(v)) ?? 0));
 
     res.json({
       currency: conv.baseCurrency,
       baseCurrency: conv.baseCurrency,
       missingRates: conv.missingRates,
       months,
+      fullMonths: full.length,
       trends: {
-        income: { direction: incomesTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(incomesTrend)) ?? 0) },
-        expense: { direction: expensesTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(expensesTrend)) ?? 0) },
-        savings: { direction: savingsTrend > 0 ? 'up' : 'down', percent: String(capPercent(Math.abs(savingsTrend)) ?? 0) }
+        income: { direction: dir(incomesTrend), percent: pct(incomesTrend) },
+        expense: { direction: dir(expensesTrend), percent: pct(expensesTrend) },
+        savings: { direction: dir(savingsTrend), percent: pct(savingsTrend) }
       },
       prediction: {
         nextMonthIncome: Math.round(nextMonthIncome),

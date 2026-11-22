@@ -34,7 +34,7 @@
   padding: 14px; border-radius: var(--fresh-ctl-r, 14px);
   background: color-mix(in srgb, var(--primary-color, #1f7a4d) 8%, transparent);
   border: 1px dashed color-mix(in srgb, var(--primary-color, #1f7a4d) 45%, transparent);
-  font-size: .95rem; word-break: break-all; user-select: all; margin-bottom: 10px;
+  font-size: .95rem; word-break: normal; overflow-wrap: anywhere; hyphens: none; user-select: all; margin-bottom: 10px;
 }
 .fmv-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .fmv-row .btn { flex: 1 1 140px; justify-content: center; }

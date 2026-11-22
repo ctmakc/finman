@@ -888,6 +888,7 @@
     'analytics.totalBalance': 'Total balance',
     'analytics.byCategory': 'Expenses by category',
     'analytics.txCount': '{n} transactions',
+    'analytics.txCount1': '1 transaction',
     'analytics.compare': 'Compared with last month',
     'analytics.thisMonth': 'This month: income {income}, expenses {expense}',
     'analytics.lastMonth': 'Last month: income {income}, expenses {expense}',

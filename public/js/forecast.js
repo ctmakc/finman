@@ -251,6 +251,15 @@ const ForecastModule = {
     `).join('');
   },
 
+  // "↓ 0%" read as a fall: no change shows as a flat "0%" without colour.
+  trendBadge(tr, good) {
+    if (!tr || tr.percent === null || tr.percent === undefined) return '<span class="trend-flat" title="A trend needs two full months of history">needs 2 full months</span>';
+    const pct = Number(tr && tr.percent) || 0;
+    if (!pct || Math.abs(pct) < 0.5) return '<span class="trend-flat">→ 0%</span>';
+    const up = tr.direction === 'up';
+    return `<span class="${(up ? 'up' : 'down') === good ? 'positive' : 'negative'}">${up ? '↑' : '↓'} ${Math.abs(pct)}%</span>`;
+  },
+
   renderTrends() {
     const container = document.getElementById('trends-summary');
     if (!container || !this.trends) return;
@@ -261,15 +270,15 @@ const ForecastModule = {
     container.innerHTML = `
       <div class="trends-grid">
         <div class="trend-card">
-          <div class="trend-header"><span>${t('forecast.trend.income')}</span><span class="${tr.income.direction === 'up' ? 'positive' : 'negative'}">${tr.income.direction === 'up' ? '↑' : '↓'} ${tr.income.percent}%</span></div>
+          <div class="trend-header"><span>${t('forecast.trend.income')}</span>${this.trendBadge(tr.income, 'up')}</div>
           <div class="trend-prediction">${t('forecast.prediction')}: <strong>${this.fmt(p.nextMonthIncome)}</strong></div>
         </div>
         <div class="trend-card">
-          <div class="trend-header"><span>${t('forecast.trend.expense')}</span><span class="${tr.expense.direction === 'down' ? 'positive' : 'negative'}">${tr.expense.direction === 'up' ? '↑' : '↓'} ${tr.expense.percent}%</span></div>
+          <div class="trend-header"><span>${t('forecast.trend.expense')}</span>${this.trendBadge(tr.expense, 'down')}</div>
           <div class="trend-prediction">${t('forecast.prediction')}: <strong>${this.fmt(p.nextMonthExpense)}</strong></div>
         </div>
         <div class="trend-card">
-          <div class="trend-header"><span>${t('forecast.trend.savings')}</span><span class="${tr.savings.direction === 'up' ? 'positive' : 'negative'}">${tr.savings.direction === 'up' ? '↑' : '↓'} ${tr.savings.percent}%</span></div>
+          <div class="trend-header"><span>${t('forecast.trend.savings')}</span>${this.trendBadge(tr.savings, 'up')}</div>
           <div class="trend-prediction">${t('forecast.prediction')}: <strong class="${p.nextMonthSavings >= 0 ? 'positive' : 'negative'}">${this.fmt(p.nextMonthSavings)}</strong></div>
         </div>
       </div>

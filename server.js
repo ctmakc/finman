@@ -127,11 +127,22 @@ const aiLimiter = rateLimit({
   skip: (req) => /^\/my(\/|$)/.test(req.path) || (req.method === 'GET' && /^\/(alerts|digest|opt-in)(\/|$)/.test(req.path)),
 });
 
-// Rate limiting - для аутентификации (более строгий)
+// Rate limiting for sign-in and sign-up: separate counters; sign-in counts only FAILED
+// attempts. One shared counter that also counted successes locked out a real person who
+// signed up, signed out and signed in again from the same network (audit B3).
 const authLimiter = rateLimit({
   windowMs: config.authRateLimits.windowMs,
   max: config.authRateLimits.max,
+  skipSuccessfulRequests: true,
   message: { error: true, message: 'Too many sign-in attempts. Please wait 15 minutes and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+// Sign-up keeps counting successes too (5 new accounts per network per 15 min stops bots).
+const registerLimiter = rateLimit({
+  windowMs: config.authRateLimits.windowMs,
+  max: config.authRateLimits.max,
+  message: { error: true, message: 'Too many sign-up attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -202,7 +213,7 @@ app.use(session({
 // Применение rate limiting
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/register', registerLimiter);
 // prelogin precedes every password sign-in: its own budget (same window), otherwise it
 // would eat half of the 5 login attempts.
 const preloginLimiter = rateLimit({

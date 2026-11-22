@@ -170,17 +170,24 @@ async function fetchTransactions(filters = {}) {
     };
   }
 
-  // Dashboard statistics for the current (local) month.
+  // Dashboard statistics: figures for the current (local) month; the income /
+  // expense chart gets the last 6 months (it used to get one bar pair only, audit B5,
+  // and read empty right after importing last month's statement).
   async function fetchTransactionStats() {
     const base = (typeof appState !== 'undefined' && appState.baseCurrency) || 'CAD';
     try {
-      const { start } = UI.monthRange(new Date());
-      const [monthlyTransactions, accounts, converted] = await Promise.all([
-        fetchAllTransactions({ startDate: start }),
+      const now = new Date();
+      const { start } = UI.monthRange(now);
+      const sixStart = UI.monthRange(new Date(now.getFullYear(), now.getMonth() - 5, 1)).start;
+      const [recentTransactions, accounts, converted] = await Promise.all([
+        fetchAllTransactions({ startDate: sixStart }),
         fetchAccounts(),
         fetchConvertedBalance()
       ]);
+      const monthlyTransactions = (recentTransactions || []).filter((tx) => String(tx && tx.date || '').slice(0, 10) >= start);
       const stats = computeTransactionStats(monthlyTransactions, accounts, base);
+      const chartStats = computeTransactionStats(recentTransactions, accounts, stats.currency);
+      stats.transactionsByMonth = chartStats.transactionsByMonth;
       if (converted) {
         stats.totalBalance = converted.total;
         stats.balanceCurrency = converted.currency || base;

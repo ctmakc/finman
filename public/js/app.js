@@ -894,9 +894,9 @@ function renderLoginPage() {
             </div>
 
             <div class="form-group">
-              <label for="register-password" class="form-label">Password <span class="auth-hint">at least 6 characters</span></label>
+              <label for="register-password" class="form-label">Password <span class="auth-hint">at least 8 characters</span></label>
               <div class="auth-pass">
-                <input type="password" id="register-password" class="form-control" autocomplete="new-password" minlength="6" required>
+                <input type="password" id="register-password" class="form-control" autocomplete="new-password" minlength="8" required>
                 <button type="button" class="auth-pass-toggle" data-for="register-password" aria-label="Show password" aria-pressed="false">Show</button>
               </div>
             </div>
@@ -921,7 +921,7 @@ function renderLoginPage() {
 
         <p class="auth-footer">
           <i class="fas fa-lock" aria-hidden="true"></i>
-          <span>Bank connections are encrypted · your data is never sold</span>
+          <span>End-to-end encrypted · only you can read it</span>
         </p>
       </div>
     </div>
@@ -1082,8 +1082,8 @@ async function handleRegister(e) {
     return;
   }
 
-  if (password.length < 6) {
-    errorElement.textContent = 'The password needs at least 6 characters';
+  if (password.length < 8) {
+    errorElement.textContent = 'The password needs at least 8 characters: it also locks your encrypted data';
     document.getElementById('register-password').focus();
     return;
   }

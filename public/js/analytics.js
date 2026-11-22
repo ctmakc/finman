@@ -47,7 +47,7 @@ async function renderAnalyticsPage() {
       </div>
       <div class="card-grid">
         <div class="card"><h3><i class="fas fa-list"></i> ${t('analytics.byCategory')}</h3>
-          <div class="list-group">${byCategory.map(c => `<div class="list-item"><div class="list-item-content"><div class="list-item-title">${esc(c.category || t('common.noCategory'))}</div><div class="list-item-subtitle">${t('analytics.txCount', { n: esc(c.count) })}</div></div><div class="list-item-actions"><strong>${money(c.total)}</strong></div></div>`).join('') || (window.FMEmpty ? FMEmpty.html({ icon: 'fa-list', compact: true, title: t('empty.analytics.catTitle'), body: t('empty.analytics.catBody') }) : `<p class="text-secondary">${t('common.empty')}</p>`)}</div>
+          <div class="list-group">${byCategory.map(c => `<div class="list-item"><div class="list-item-content"><div class="list-item-title">${esc(c.category || t('common.noCategory'))}</div><div class="list-item-subtitle">${(Number(c.count) === 1 ? t('analytics.txCount1') : t('analytics.txCount', { n: esc(c.count) }))}</div></div><div class="list-item-actions"><strong>${money(c.total)}</strong></div></div>`).join('') || (window.FMEmpty ? FMEmpty.html({ icon: 'fa-list', compact: true, title: t('empty.analytics.catTitle'), body: t('empty.analytics.catBody') }) : `<p class="text-secondary">${t('common.empty')}</p>`)}</div>
         </div>
         <div class="card"><h3><i class="fas fa-exchange-alt"></i> ${t('analytics.compare')}</h3>
           <div class="compare-stats">

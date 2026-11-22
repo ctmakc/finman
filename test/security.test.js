@@ -262,6 +262,34 @@ describe('security: rate-limiter возвращает 429 после порог�
   });
 });
 
+describe('security: a real person is not locked out by their own successful sign-ins', () => {
+  // Fresh app: own limiter state. Sign-up and sign-in have separate counters, and
+  // successful sign-ins do not count (audit B3: 2 sign-ups + 3 typos locked the 4th login).
+  let ctx;
+  let config;
+  beforeAll(async () => { ctx = await makeApp(); config = getConfig(); });
+  afterAll(async () => { if (ctx) await ctx.close(); });
+
+  test('sign-ups and good sign-ins leave the login budget for typos', async () => {
+    const max = config.authRateLimits.max;
+    const pw = 'Good-pass-123';
+    for (let i = 0; i < 2; i++) {
+      const r = await ctx.request.post('/api/auth/register').send({ username: `real${i}`, email: `real${i}@example.com`, password: pw });
+      expect([200, 201]).toContain(r.status);
+    }
+    for (let i = 0; i < max + 2; i++) {
+      const ok = await ctx.request.post('/api/auth/login').send({ username: 'real0', password: pw });
+      expect(ok.status).toBe(200);
+    }
+    for (let i = 0; i < max - 1; i++) {
+      const bad = await ctx.request.post('/api/auth/login').send({ username: 'real0', password: 'typo' });
+      expect(bad.status).not.toBe(429);
+    }
+    const ok = await ctx.request.post('/api/auth/login').send({ username: 'real0', password: pw });
+    expect(ok.status).toBe(200);
+  });
+});
+
 describe('security: неизвестный /api роут -> 404-конверт', () => {
   let ctx;
 

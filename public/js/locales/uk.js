@@ -886,6 +886,7 @@
     'analytics.totalBalance': 'Загальний баланс',
     'analytics.byCategory': 'Витрати за категоріями',
     'analytics.txCount': '{n} транзакцій',
+    'analytics.txCount1': '1 операція',
     'analytics.compare': 'Порівняно з минулим місяцем',
     'analytics.thisMonth': 'Цей місяць: доходи {income}, витрати {expense}',
     'analytics.lastMonth': 'Минулий місяць: доходи {income}, витрати {expense}',

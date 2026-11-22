@@ -886,6 +886,7 @@
     'analytics.totalBalance': 'Общий баланс',
     'analytics.byCategory': 'Расходы по категориям',
     'analytics.txCount': '{n} транзакций',
+    'analytics.txCount1': '1 операция',
     'analytics.compare': 'Сравнение с прошлым месяцем',
     'analytics.thisMonth': 'Этот месяц: доходы {income}, расходы {expense}',
     'analytics.lastMonth': 'Прошлый месяц: доходы {income}, расходы {expense}',

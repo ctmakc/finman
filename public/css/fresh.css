@@ -848,3 +848,12 @@
 :root .fm-switch-row input { width: 1.15rem; height: 1.15rem; margin-top: .2rem; accent-color: var(--fm-primary); }
 :root .fm-switch-row strong { display: block; font-weight: 600; }
 :root .fm-switch-row small { display: block; color: var(--fm-ink-2); font-size: .86rem; line-height: 1.45; margin-top: .15rem; }
+
+:root .trend-flat { color: var(--fm-ink-2); font-weight: 600; }
+
+/* Auth screen at desktop widths: the summary shot is shown whole. "cover" in a tall
+   column cut its right side (KPI card 4, the "monthly" column), audit B11. */
+@media (min-width: 1000px) {
+  :root .auth-split .auth-visual-shot { flex: 0 0 auto; min-height: 0; align-self: stretch; }
+  :root .auth-split .auth-visual-shot img { height: auto; object-fit: contain; }
+}
