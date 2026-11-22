@@ -26987,6 +26987,153 @@ Stop these emails: ${unsub}`
   }
 });
 
+// services/weeklyNote.js
+var require_weeklyNote = __commonJS({
+  "services/weeklyNote.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var { query, get, run } = require_database();
+    var dates = require_dates();
+    var emailService = require_emailService();
+    var tracker = require_tracker();
+    var logger = require_logger();
+    var push = require_push();
+    var lifecycle = require_lifecycle();
+    var { VAULT_USER_SQL } = require_vault();
+    var TZ = "America/Toronto";
+    var ACTIVATE = ["import_done", "transaction_added", "transfer_added", "receipt_scanned", "activated", "onboarding_import_done"];
+    var VISIT = ["app_open", "login"];
+    var MAX_UNANSWERED = 3;
+    var APP_URL = () => (proc.env.APP_PUBLIC_URL || "https://app.finman.money").replace(/\/+$/, "");
+    var esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    var inList = (a) => a.map((x) => `'${x}'`).join(",");
+    function lastWeek(today) {
+      const d = /* @__PURE__ */ new Date(`${today}T00:00:00Z`);
+      const dow = (d.getUTCDay() + 6) % 7;
+      const thisMonday = new Date(d);
+      thisMonday.setUTCDate(d.getUTCDate() - dow);
+      const start = new Date(thisMonday);
+      start.setUTCDate(thisMonday.getUTCDate() - 7);
+      const end = new Date(thisMonday);
+      end.setUTCDate(thisMonday.getUTCDate() - 1);
+      const mon = (x) => x.toLocaleDateString("en-CA", { month: "short", timeZone: "UTC" });
+      const label = mon(start) === mon(end) ? `${mon(start)} ${start.getUTCDate()}\u2013${end.getUTCDate()}` : `${mon(start)} ${start.getUTCDate()} \u2013 ${mon(end)} ${end.getUTCDate()}`;
+      return { key: thisMonday.toISOString().slice(0, 10), label };
+    }
+    async function candidates() {
+      return query(
+        `SELECT u.id, u.email, u.full_name
+       FROM users u
+      WHERE ${VAULT_USER_SQL("u")}
+        AND COALESCE(u.lifecycle_opt_out, 0) = 0
+        AND COALESCE(u.weekly_note_opt_out, 0) = 0
+        AND u.email IS NOT NULL AND u.email <> ''
+        AND EXISTS (SELECT 1 FROM analytics_events e WHERE e.user_id = u.id AND e.event IN (${inList(ACTIVATE)}))
+        AND NOT EXISTS (SELECT 1 FROM analytics_events e WHERE e.user_id = u.id AND e.event IN (${inList(VISIT)})
+                         AND e.created_at >= datetime('now', '-6 days'))
+      ORDER BY u.id`
+      );
+    }
+    async function unanswered(userId) {
+      const last = await get(
+        `SELECT MAX(created_at) AS at FROM analytics_events WHERE user_id = ? AND event IN (${inList(VISIT)})`,
+        [userId]
+      ).catch(() => null);
+      const r = await get(
+        `SELECT COUNT(*) AS n FROM lifecycle_emails WHERE user_id = ? AND kind LIKE 'weeknote:%' AND sent_at > COALESCE(?, '1970-01-01')`,
+        [userId, last && last.at]
+      ).catch(() => ({ n: 0 }));
+      return Number(r && r.n) || 0;
+    }
+    function render(u, week, unsubUrl) {
+      const first = String(u.full_name || "").trim().split(/\s+/)[0];
+      const url = `${APP_URL()}/week?fm_src=email&fm_kind=week&utm_source=finman&utm_medium=email&utm_campaign=weeknote`;
+      const settingsUrl = `${APP_URL()}/settings?fm_src=email#emails`;
+      const subject = `Your week in money is ready (${week.label})`;
+      const text = [
+        `${first ? `Hi ${first},` : "Hi,"}`,
+        "",
+        `Your Finman summary for ${week.label} is ready: what came in, where it went and what changed from the week before.`,
+        "Your data is encrypted, so the numbers are only in the app, on your device. This email has none.",
+        "",
+        `Open my week: ${url}`,
+        "",
+        `You get this on Mondays when you have not opened Finman for a while. Switch it off in Settings, Emails: ${settingsUrl}`,
+        `Unsubscribe from all Finman tips and reminders: ${unsubUrl}`
+      ].join("\n");
+      const html = `<!doctype html><html><body style="margin:0;background:#f3f5fb;font-family:Arial,Helvetica,sans-serif;color:#121a2e">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px">
+<tr><td style="padding:28px 28px 8px;font-size:13px;color:#2b4bf2;font-weight:bold">Finman \xB7 ${esc(week.label)}</td></tr>
+<tr><td style="padding:0 28px;font-size:24px;line-height:1.25;font-weight:bold">Your week in money is ready</td></tr>
+<tr><td style="padding:14px 28px 0;font-size:15px;line-height:1.55">${first ? `Hi ${esc(first)}, y` : "Y"}our summary for ${esc(week.label)} is ready: what came in, where it went and what changed from the week before.</td></tr>
+<tr><td style="padding:10px 28px 0;font-size:15px;line-height:1.55;color:#4a5370">Your data is encrypted, so the numbers are only in the app, on your device. This email has none.</td></tr>
+<tr><td style="padding:22px 28px 26px"><a href="${esc(url)}" style="display:inline-block;background:#2b4bf2;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 22px;border-radius:999px">Open my week</a></td></tr>
+<tr><td style="padding:0 28px 26px;font-size:12px;line-height:1.5;color:#6b7390">You get this on Mondays when you have not opened Finman for a while.
+<a href="${esc(settingsUrl)}" style="color:#6b7390">Switch it off in Settings</a> \xB7 <a href="${esc(unsubUrl)}" style="color:#6b7390">Unsubscribe from all tips and reminders</a></td></tr>
+</table></td></tr></table></body></html>`;
+      return { subject, text, html };
+    }
+    async function run_({ now = /* @__PURE__ */ new Date(), dryRun = false } = {}) {
+      const emailsOn = proc.env.ENGAGEMENT_EMAILS === "1";
+      const from = proc.env.LIFECYCLE_FROM;
+      const week = lastWeek(dates.todayISO(TZ, now));
+      const kind = `weeknote:${week.key}`;
+      const out = { kind, users: 0, emailed: 0, pushed: 0, skipped: 0, quiet: 0 };
+      for (const u of await candidates()) {
+        if (tracker.isTestEmail(u.email)) {
+          out.skipped += 1;
+          continue;
+        }
+        if (await get("SELECT 1 AS x FROM lifecycle_emails WHERE user_id = ? AND kind = ?", [u.id, kind]).catch(() => null)) {
+          out.skipped += 1;
+          continue;
+        }
+        if (await unanswered(u.id) >= MAX_UNANSWERED) {
+          out.quiet += 1;
+          continue;
+        }
+        out.users += 1;
+        if (dryRun) continue;
+        try {
+          const unsub = lifecycle.unsubscribeUrl(u.id);
+          const m = render(u, week, unsub);
+          let emailed = false;
+          if (emailsOn && from) {
+            const r = await emailService.sendEmail({
+              to: [u.email],
+              from,
+              subject: m.subject,
+              text: m.text,
+              html: m.html,
+              replyTo: proc.env.LIFECYCLE_REPLY_TO || void 0,
+              headers: { "List-Unsubscribe": `<${unsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
+            });
+            emailed = Boolean(r && r.sent);
+          }
+          const p = await push.sendToUser(u.id, {
+            kind: "week_note",
+            title: "Your week in money is ready",
+            body: `${week.label}: what came in, where it went. Two minutes.`,
+            url: "/week?fm_kind=week&fm_src=push&fm_push=week_note",
+            tag: "week-note"
+          }, { email: u.email }).catch(() => ({ sent: false }));
+          if (emailed || p.sent) await run("INSERT OR IGNORE INTO lifecycle_emails (user_id, kind) VALUES (?, ?)", [u.id, kind]);
+          if (emailed) {
+            out.emailed += 1;
+            tracker.track("weekly_note_sent", { userId: u.id, props: { week: week.key } });
+          }
+          if (p.sent) out.pushed += 1;
+        } catch (e) {
+          logger.error({ err: e.message, userId: u.id }, "[weeklyNote] failed");
+        }
+      }
+      return out;
+    }
+    module2.exports = { run: run_, candidates, unanswered, render, lastWeek, MAX_UNANSWERED };
+  }
+});
+
 // services/engagementMail.js
 var require_engagementMail = __commonJS({
   "services/engagementMail.js"(exports2, module2) {
@@ -27135,6 +27282,7 @@ var require_engagementMail = __commonJS({
        FROM users u
       WHERE COALESCE(u.lifecycle_opt_out, 0) = 0
         AND u.email IS NOT NULL AND u.email <> ''
+        AND COALESCE(u.weekly_note_opt_out, 0) = 0
         AND NOT EXISTS (SELECT 1 FROM notification_settings ns WHERE ns.user_id = u.id AND ns.weekly_summary = 0)
         AND EXISTS (SELECT 1 FROM transactions t JOIN accounts a ON a.id = t.account_id
                      WHERE t.user_id = u.id AND COALESCE(a.is_demo, 0) = 0)
@@ -27230,6 +27378,7 @@ var require_engagementMail = __commonJS({
       const dom = Number(today.slice(8));
       const res = { sweep: await journey.sweep({ now }) };
       if (dow === 1) res.week = await runRecap("week", { now });
+      if (dow === 1) res.weekNote = await require_weeklyNote().run({ now }).catch((e) => ({ error: e.message }));
       if (dom <= 3) res.month = await runRecap("month", { now });
       if (dow === 0) res.streak = await runStreakSaver({ now });
       logger.info(res, "[engagement] daily run");
@@ -28213,7 +28362,7 @@ var require_routes = __commonJS({
 var require_schema = __commonJS({
   "engine/schema.sql"(exports2, module2) {
     module2.exports = `-- engine/schema.sql \u2014 GENERATED by engine/build.js from db/database.js initDatabase() + migrations/.
--- Do not edit. 72 tables, 29 migrations.
+-- Do not edit. 72 tables, 30 migrations.
 CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
@@ -28222,7 +28371,7 @@ CREATE TABLE IF NOT EXISTS users (
           full_name TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        , subscription_tier TEXT DEFAULT 'free', stripe_customer_id TEXT, stripe_subscription_id TEXT, google_id TEXT, avatar_url TEXT, org_id INTEGER REFERENCES organizations(id), timezone TEXT DEFAULT 'America/Toronto', ai_opt_in INTEGER NOT NULL DEFAULT 0, token_version INTEGER NOT NULL DEFAULT 0, lifecycle_opt_out INTEGER NOT NULL DEFAULT 0, email_verified_at DATETIME, email_verify_hash TEXT, email_verify_sent_at DATETIME, ref_code TEXT, referred_by INTEGER, apple_id TEXT, apple_refresh_token_enc TEXT, kdf TEXT NOT NULL DEFAULT 'legacy', kdf_salt TEXT, kdf_params TEXT, vault_state TEXT NOT NULL DEFAULT 'none');
+        , subscription_tier TEXT DEFAULT 'free', stripe_customer_id TEXT, stripe_subscription_id TEXT, google_id TEXT, avatar_url TEXT, org_id INTEGER REFERENCES organizations(id), timezone TEXT DEFAULT 'America/Toronto', ai_opt_in INTEGER NOT NULL DEFAULT 0, token_version INTEGER NOT NULL DEFAULT 0, lifecycle_opt_out INTEGER NOT NULL DEFAULT 0, email_verified_at DATETIME, email_verify_hash TEXT, email_verify_sent_at DATETIME, ref_code TEXT, referred_by INTEGER, apple_id TEXT, apple_refresh_token_enc TEXT, kdf TEXT NOT NULL DEFAULT 'legacy', kdf_salt TEXT, kdf_params TEXT, vault_state TEXT NOT NULL DEFAULT 'none', weekly_note_opt_out INTEGER NOT NULL DEFAULT 0);
 ;;
 CREATE TABLE IF NOT EXISTS accounts (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29369,6 +29518,8 @@ INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_vault');
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('030_feedback');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('031_account_scope');
+;;
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('032_weekly_note');
 `;
   }
 });
@@ -30387,6 +30538,21 @@ var require_account_scope = __commonJS({
   }
 });
 
+// migrations/032_weekly_note.js
+var require_weekly_note = __commonJS({
+  "migrations/032_weekly_note.js"(exports2, module2) {
+    init_globals();
+    module2.exports = {
+      name: "032_weekly_note",
+      async up(db2, { columnExists }) {
+        if (!await columnExists(db2, "users", "weekly_note_opt_out")) {
+          await db2.run("ALTER TABLE users ADD COLUMN weekly_note_opt_out INTEGER NOT NULL DEFAULT 0");
+        }
+      }
+    };
+  }
+});
+
 // finman-virtual:migrations
 var require_migrations = __commonJS({
   "finman-virtual:migrations"(exports2, module2) {
@@ -30420,7 +30586,8 @@ var require_migrations = __commonJS({
       { file: "028_statement_tasks.js", mod: require_statement_tasks() },
       { file: "029_vault.js", mod: require_vault2() },
       { file: "030_feedback.js", mod: require_feedback() },
-      { file: "031_account_scope.js", mod: require_account_scope() }
+      { file: "031_account_scope.js", mod: require_account_scope() },
+      { file: "032_weekly_note.js", mod: require_weekly_note() }
     ];
   }
 });

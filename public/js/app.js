@@ -1724,6 +1724,17 @@ function renderSettingsPage() {
         </div>
       </div>` : ''}
 
+      <div class="card" id="emails">
+        <h2 class="card-title">Emails</h2>
+        <div class="settings-section fm-email-prefs">
+          <label class="fm-switch-row"><input type="checkbox" id="pref-weekly" disabled>
+            <span><strong>Weekly email</strong><small>On Mondays, when your week in money is ready. Encrypted accounts get a reminder without amounts; the numbers stay in the app.</small></span></label>
+          <label class="fm-switch-row"><input type="checkbox" id="pref-tips" disabled>
+            <span><strong>Tips and reminders</strong><small>A few emails in your first weeks: how to import a statement, what to try next.</small></span></label>
+          <p class="form-hint" id="pref-status" role="status"></p>
+        </div>
+      </div>
+
       <div class="card">
         <h2 class="card-title">Export transactions</h2>
 
@@ -1795,6 +1806,7 @@ function renderSettingsPage() {
   const vaultLock = document.getElementById('vault-lock');
   if (vaultLock) vaultLock.addEventListener('click', () => window.FMVault.lock());
   document.getElementById('export-btn').addEventListener('click', handleDataExport);
+  bindEmailPrefs();
 
   const exportPeriod = document.getElementById('export-period');
   const customPeriod = document.getElementById('custom-period');
@@ -1820,6 +1832,33 @@ function renderSettingsPage() {
 // Account deletion (Settings -> Danger zone). Required by the App Store
 // (5.1.1(v)) and Google Play; the same flow runs on the website.
 // ---------------------------------------------------------------------------
+// Settings -> Emails: server-side switches (GET/PUT /api/auth/email-prefs).
+async function bindEmailPrefs() {
+  const weekly = document.getElementById('pref-weekly');
+  const tips = document.getElementById('pref-tips');
+  const status = document.getElementById('pref-status');
+  if (!weekly || !tips) return;
+  try {
+    const res = await fetchWithAuth('/api/auth/email-prefs');
+    const p = await res.json();
+    weekly.checked = p.weekly !== false; tips.checked = p.tips !== false;
+    weekly.disabled = false; tips.disabled = false;
+  } catch (_) { if (status) status.textContent = 'Could not load email settings.'; return; }
+  const save = async () => {
+    weekly.disabled = true; tips.disabled = true;
+    try {
+      const res = await fetchWithAuth('/api/auth/email-prefs', { method: 'PUT', body: JSON.stringify({ weekly: weekly.checked, tips: tips.checked }) });
+      if (!res.ok) throw new Error();
+      if (status) status.textContent = 'Saved.';
+    } catch (_) {
+      if (status) status.textContent = 'Could not save. Try again.';
+    } finally { weekly.disabled = false; tips.disabled = false; }
+  };
+  weekly.addEventListener('change', save);
+  tips.addEventListener('change', save);
+  if (location.hash === '#emails') document.getElementById('emails').scrollIntoView({ block: 'start' });
+}
+
 function trShell(key, fallback) {
   try {
     if (window.i18n && typeof window.i18n.t === 'function') {

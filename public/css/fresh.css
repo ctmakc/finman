@@ -841,3 +841,10 @@
   :root .fr-ex-bars li { grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr) auto; font-size: .85rem; }
 }
 @media (prefers-reduced-motion: reduce) { :root .fr-ex-bars li { animation: none; } }
+
+/* ---- 13. Settings: email switches (22.11) ---------------------------------- */
+:root .fm-email-prefs { display: grid; gap: var(--space-3); }
+:root .fm-switch-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; cursor: pointer; }
+:root .fm-switch-row input { width: 1.15rem; height: 1.15rem; margin-top: .2rem; accent-color: var(--fm-primary); }
+:root .fm-switch-row strong { display: block; font-weight: 600; }
+:root .fm-switch-row small { display: block; color: var(--fm-ink-2); font-size: .86rem; line-height: 1.45; margin-top: .15rem; }

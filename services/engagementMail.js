@@ -9,7 +9,8 @@
 //   - once per period: lifecycle_emails kind `week:<monday>` / `month:<YYYY-MM>`;
 //   - never Finman Vault users (setup done or purged): the server has no numbers for
 //     them (stale rows until the purge, nothing after), and their weekly_summary switch
-//     lives inside the vault. A no-numbers version is stage 2 (docs/E2E-ENCRYPTION.md §7).
+//     lives inside the vault. They get the no-numbers reminder instead (services/weeklyNote.js);
+//     users.weekly_note_opt_out (Settings -> Emails) stops both.
 // Sender LIFECYCLE_FROM (Resend, finman.money). List-Unsubscribe headers are set.
 'use strict';
 
@@ -173,6 +174,7 @@ async function candidates() {
        FROM users u
       WHERE COALESCE(u.lifecycle_opt_out, 0) = 0
         AND u.email IS NOT NULL AND u.email <> ''
+        AND COALESCE(u.weekly_note_opt_out, 0) = 0
         AND NOT EXISTS (SELECT 1 FROM notification_settings ns WHERE ns.user_id = u.id AND ns.weekly_summary = 0)
         AND EXISTS (SELECT 1 FROM transactions t JOIN accounts a ON a.id = t.account_id
                      WHERE t.user_id = u.id AND COALESCE(a.is_demo, 0) = 0)
@@ -262,6 +264,8 @@ async function runDaily({ now = new Date() } = {}) {
   const dom = Number(today.slice(8));
   const res = { sweep: await journey.sweep({ now }) };
   if (dow === 1) res.week = await runRecap('week', { now });
+  // Vault users: the no-numbers reminder (services/weeklyNote.js).
+  if (dow === 1) res.weekNote = await require('./weeklyNote').run({ now }).catch((e) => ({ error: e.message }));
   if (dom <= 3) res.month = await runRecap('month', { now }); // catch-up if the 1st was missed
   if (dow === 0) res.streak = await runStreakSaver({ now });
   logger.info(res, '[engagement] daily run');

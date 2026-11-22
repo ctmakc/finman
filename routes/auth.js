@@ -426,6 +426,37 @@ router.post('/verify-email/send', passport.authenticate('jwt', { session: false 
   }
 });
 
+// Emails the person gets (Settings -> Emails). Kept on the server: the vault's own
+// notification settings are encrypted, and the server sends the emails.
+//   weekly — "Your week in money" (numbers for open-data users, a no-numbers reminder
+//            for Finman Vault users); tips — sign-up tips and reminders (lifecycle).
+router.get('/email-prefs', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const r = await require('../db/database').get(
+      'SELECT COALESCE(weekly_note_opt_out, 0) AS w, COALESCE(lifecycle_opt_out, 0) AS l FROM users WHERE id = ?', [req.user.id]);
+    res.json({ weekly: !(r && r.w), tips: !(r && r.l) });
+  } catch (e) {
+    res.status(500).json({ error: true, message: 'Could not load email settings' });
+  }
+});
+
+router.put('/email-prefs', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const b = req.body || {};
+    const sets = []; const params = [];
+    if (typeof b.weekly === 'boolean') { sets.push('weekly_note_opt_out = ?'); params.push(b.weekly ? 0 : 1); }
+    if (typeof b.tips === 'boolean') { sets.push('lifecycle_opt_out = ?'); params.push(b.tips ? 0 : 1); }
+    if (!sets.length) return res.status(400).json({ error: true, message: 'Nothing to change' });
+    const db = require('../db/database');
+    await db.run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, [...params, req.user.id]);
+    const r = await db.get('SELECT COALESCE(weekly_note_opt_out, 0) AS w, COALESCE(lifecycle_opt_out, 0) AS l FROM users WHERE id = ?', [req.user.id]);
+    require('../services/tracker').track('email_prefs_changed', { userId: req.user.id, props: { weekly: !r.w, tips: !r.l } });
+    res.json({ weekly: !r.w, tips: !r.l });
+  } catch (e) {
+    res.status(500).json({ error: true, message: 'Could not save email settings' });
+  }
+});
+
 // Обновление данных пользователя
 router.put('/me', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
