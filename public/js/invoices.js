@@ -1059,6 +1059,76 @@
     } catch (e) { toast(e.message, 'error'); return null; }
   }
 
+  // ---------- paid invoice -> income in the ledger ----------
+  // Invoices live on the server; the ledger may be the encrypted vault in the browser.
+  // So the browser records the income itself, after the person agrees, on an account in
+  // the invoice currency (business accounts first). Never twice for one invoice number.
+  function centsToAmount(cents) { return Math.round(Number(cents) || 0) / 100; }
+
+  async function apiApp(url, opts) {
+    var o = opts || {};
+    var res = await root.fetchWithAuth(url, { method: o.method || 'GET', body: o.body ? JSON.stringify(o.body) : undefined });
+    var b = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error((b && (b.message || (b.error && b.error.message))) || 'Request failed');
+    return b && Object.prototype.hasOwnProperty.call(b, 'data') ? b.data : b;
+  }
+
+  function incomeLabel(inv) {
+    var client = inv.client_name ? String(inv.client_name).split('\n')[0].slice(0, 60) : '';
+    return tx('income.desc', { number: inv.number }) + (client ? ' · ' + client : '');
+  }
+
+  async function offerIncome(inv) {
+    if (!inv || inv.status !== 'paid' || !(Number(inv.total_cents) > 0) || !root.UI || typeof root.UI.modal !== 'function') return;
+    var accounts;
+    try { accounts = await apiApp('/api/accounts'); } catch (_) { return; }
+    accounts = (Array.isArray(accounts) ? accounts : (accounts && (accounts.own || accounts.accounts)) || []).filter(function (a) {
+      return !a.is_demo && String(a.currency || '').toUpperCase() === String(inv.currency || '').toUpperCase();
+    });
+    if (!accounts.length) { toast(tx('income.noAccount', { currency: inv.currency }), 'info'); return; }
+    accounts.sort(function (a, b) { return (b.scope === 'business') - (a.scope === 'business'); });
+    var label = tx('income.desc', { number: inv.number });
+    try {
+      var found = await apiApp('/api/transactions?search=' + encodeURIComponent(label) + '&limit=20');
+      var list = Array.isArray(found) ? found : (found && (found.transactions || found.items)) || [];
+      var again = list.some(function (t) {
+        var d = String(t.description || '');
+        return t.type === 'income' && (d === label || d.indexOf(label + ' ·') === 0);
+      });
+      if (again) return;
+    } catch (_) { /* the person still decides */ }
+    var host = root.UI.modal({
+      title: tx('income.title'),
+      body: '<p class="inv-confirm-text">' + esc(tx('income.text', { amount: money(inv.total_cents, inv.currency), number: inv.number })) + '</p>' +
+        '<label class="form-label" for="inv-inc-acc">' + esc(tx('income.account')) + '</label>' +
+        '<select id="inv-inc-acc" class="form-control">' + accounts.map(function (a) {
+          var biz = a.scope === 'business' ? ' · ' + (a.business_name || a.businessName || tx('income.business')) : '';
+          return '<option value="' + esc(a.id) + '">' + esc(a.name + biz) + '</option>';
+        }).join('') + '</select>' +
+        '<label class="form-label inv-inc-date-l" for="inv-inc-date">' + esc(tx('income.date')) + '</label>' +
+        '<input id="inv-inc-date" type="date" class="form-control" value="' + esc(today()) + '">',
+      footer: '<button type="button" class="btn" data-inv-inc="0">' + esc(tx('income.skip')) + '</button>' +
+        '<button type="button" class="btn btn-primary" data-inv-inc="1">' + esc(tx('income.ok')) + '</button>'
+    });
+    if (!host) return;
+    host.addEventListener('click', async function (e) {
+      var b = e.target.closest('[data-inv-inc]');
+      if (!b) return;
+      if (b.getAttribute('data-inv-inc') !== '1') { root.UI.closeModal(host); return; }
+      b.disabled = true;
+      try {
+        await apiApp('/api/transactions', { method: 'POST', body: {
+          accountId: host.querySelector('#inv-inc-acc').value,
+          date: host.querySelector('#inv-inc-date').value || today(),
+          description: incomeLabel(inv), category: 'Business income',
+          amount: centsToAmount(inv.total_cents), type: 'income'
+        } });
+        root.UI.closeModal(host);
+        toast(tx('income.done'), 'success');
+      } catch (err) { b.disabled = false; toast(err.message, 'error'); }
+    });
+  }
+
   function registerActions() {
     if (!root.UI || typeof root.UI.actions !== 'function') return;
     root.UI.actions({
@@ -1090,7 +1160,8 @@
         } catch (e) { toast(e.message, 'error'); }
       },
       'inv:mark': async function (el) {
-        if (await setStatus(el.dataset.id, el.dataset.status)) await refreshList();
+        var inv = await setStatus(el.dataset.id, el.dataset.status);
+        if (inv) { await refreshList(); if (el.dataset.status === 'paid') offerIncome(inv); }
       },
       'inv:void': async function (el) {
         var inv = S.invoices.find(function (x) { return String(x.id) === String(el.dataset.id); }) || {};
@@ -1108,7 +1179,7 @@
       },
       'inv:ed-mark': async function (el) {
         var inv = await setStatus(S.ed.id, el.dataset.status);
-        if (inv) { S.ed = stateFromInvoice(inv); renderEditor(); }
+        if (inv) { S.ed = stateFromInvoice(inv); renderEditor(); if (el.dataset.status === 'paid') offerIncome(inv); }
       },
       'inv:preview': function () { return previewEditor(); },
       'inv:item-add': function () {

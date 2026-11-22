@@ -345,3 +345,6 @@
   :root .inv-menu-pop, :root .inv-tpl.is-new { animation: none; }
   :root .inv-preset:hover { transform: none; }
 }
+
+/* paid invoice -> income dialog (22.11) */
+:root .inv-inc-date-l { display: block; margin-top: .7rem; }
