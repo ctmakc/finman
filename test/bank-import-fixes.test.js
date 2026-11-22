@@ -451,3 +451,14 @@ describe('categorizer: whole-word keyword matching', () => {
     expect(cat('APPLE.COM/BILL')).toBe('Subscriptions');
   });
 });
+
+describe('rent paid by Interac e-Transfer is housing', () => {
+  const { categorizeByDescription } = require('../services/importCategorizer');
+  test('rent and mortgage win over the transfer keyword; other e-transfers stay transfers', () => {
+    expect(categorizeByDescription('RENT E-TRANSFER SENT')).toBe('Housing');
+    expect(categorizeByDescription('MORTGAGE PAYMENT')).toBe('Housing');
+    expect(categorizeByDescription('E-TRANSFER TO JOHN')).toBe('Transfer');
+    expect(categorizeByDescription('PARENT E-TRANSFER')).toBe('Transfer');
+  });
+});
+

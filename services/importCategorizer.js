@@ -76,6 +76,8 @@ const KEYWORD_RULES = [
   ['investments', ['dividend', 'interest paid', 'interest earned', 'wealthsimple invest', 'questrade', 'tfsa', 'rrsp', 'дивіденд', 'дивиденд', 'відсотки', 'проценты']],
   ['taxes', ['canada revenue', 'cra ', 'revenu quebec', 'service canada', 'gst/hst', 'податк', 'налог', 'дія', 'tax']],
   ['cash', ['atm', 'abm ', 'cash withdrawal', 'withdrawal', 'банкомат', 'зняття', 'снятие']],
+  // Rent and mortgage before transfers: in Canada rent is often paid by Interac e-Transfer.
+  ['housing', ['rent', 'mortgage', 'landlord', 'condo fee', 'property tax', 'оренда', 'аренда', 'квартплат', 'іпотек', 'ипотек']],
   ['transfer', ['e-transfer', 'etransfer', 'e-tfr', 'interac', 'transfer', 'переказ', 'перевод', 'wire', 'payment to', 'на картку', 'на карту']],
   ['fees', ['service charge', 'monthly fee', 'plan fee', 'account fee', 'nsf', 'overdraft', 'bank fee', 'комісі', 'комисси', 'плата за обслуговування', 'плата за обслуживание']],
   ['subscriptions', ['netflix', 'spotify', 'youtube', 'apple.com/bill', 'icloud', 'google storage', 'google one', 'disney', 'crave', 'prime video', 'amazon prime', 'subscription', 'підписк', 'подписк', 'patreon', 'adobe', 'microsoft 365', 'chatgpt', 'openai']],
@@ -86,7 +88,6 @@ const KEYWORD_RULES = [
   ['health', ['pharmacy', 'shoppers drug', 'rexall', 'jean coutu', 'dental', 'dentist', 'clinic', 'physio', 'optical', 'hospital', 'аптек', 'клінік', 'клиник', 'лікар', 'врач', 'стоматолог']],
   ['telecom', ['rogers', 'bell canada', 'bell mobility', 'telus', 'fido', 'koodo', 'freedom mobile', 'videotron', 'kyivstar', 'київстар', 'vodafone', 'lifecell', 'internet', 'mobile']],
   ['utilities', ['hydro', 'enbridge', 'ontario energy', 'utilities', 'water bill', 'electricity', 'електро', 'комунал', 'коммунал', 'газ', 'yasno', 'київенерго']],
-  ['housing', ['rent', 'mortgage', 'landlord', 'condo fee', 'property tax', 'оренда', 'аренда', 'квартплат', 'іпотек', 'ипотек']],
   ['entertainment', ['cinema', 'cineplex', 'theatre', 'theater', 'concert', 'ticketmaster', 'steam', 'playstation', 'xbox', 'nintendo', 'кіно', 'кино', 'театр', 'концерт']],
   ['education', ['university', 'college', 'tuition', 'udemy', 'coursera', 'school', 'університет', 'школа', 'курс']],
   ['travel', ['air canada', 'westjet', 'porter', 'airbnb', 'booking.com', 'expedia', 'hotel', 'marriott', 'hilton', 'ryanair', 'wizz', 'мау', 'готель', 'отель']],
