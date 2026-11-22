@@ -28,10 +28,14 @@ deploy. Two env flags turn that into a feature instead of a blank screen:
 
 | Env | Value | Effect |
 |---|---|---|
-| `DEMO_SEED_ON_EMPTY` | `1` | After migrations, if `users` is empty, seed the demo household (`lib/demoSeed.js`): user `demo`, 3 accounts, ~190 transactions over 6 months, budgets, goals, car loan, TFSA portfolio, subscriptions, rules, family with `demo-partner`. A DB with any user is never touched. |
+| `DEMO_SEED_ON_EMPTY` | `1` | After migrations, if `users` is empty, seed the demo household (`lib/demoSeed.js`): user `demo`, 3 accounts, ~190 transactions over 6 months, budgets, goals, car loan, TFSA portfolio, subscriptions, rules, family with `demo-partner`; plus `judge` (judge@finman.test), an empty ledger with one empty account per sample currency (CAD, CAD card, USD, AED, EUR) for the Statement Agent samples at `/samples/index.html`. A DB with any user is never touched. |
 | `DEMO_SEED_ALLOW_PRODUCTION` | `1` | Required together with `DEMO_SEED_ON_EMPTY` when the container runs with `NODE_ENV=production` (the image default). Without it the seed refuses: the demo account has a public password. Set it only on staging. |
 | `DEMO_MODE` | `1` | `/api/health` and `/api/health/demo` report `demo:true`; billing/AI answers carry `_meta.demo`. The frontend uses `GET /api/health/demo` for the "Demo instance — data resets on every deploy" banner. |
-| `DEMO_PASSWORD` | optional | Password for `demo` / `demo-partner` (default `finman-demo-2026`). |
+| `DEMO_PASSWORD` | optional | Password for `demo` / `demo-partner` / `judge` (default `finman-demo-2026`). |
+| `STATEMENT_AI_PROVIDER` | `google` | Statement Agent on the instance AI for people without their own key (judges' sandbox). `google` = Gemini API key in `GEMINI_API_KEY`. People with a key on My AI always use their own. |
+| `STATEMENT_AI_MODEL` | `gemini-3.5-flash-lite` | Model for statements with a text layer (fast, cheap). |
+| `STATEMENT_AI_VISION_MODEL` | `gemini-3.8-flash` | Model for scans and photos (on tilted photos the light model paired dates with the row below; see `docs/statement-agent.md`). Hands over to `STATEMENT_AI_MODEL` when busy. |
+| `STATEMENT_PLATFORM_DAILY` | optional, default `15` | Statements per person per day on the instance AI. |
 
 Required secrets in the env file (names only, values live in
 `~/.config/vps-migration/env/finman.env` on the workstation and are shipped as

@@ -360,6 +360,76 @@ async function complete({ provider, key, model, baseUrl, system, messages, tools
   };
 }
 
+// ---------- structured extraction (Statement Agent) ----------
+// generate({ provider, key, model, baseUrl, system, parts: [{ text } | { mime, data }], maxTokens, json })
+//   -> { text, usage }. Images go to every vision model; a PDF without a text layer goes to
+//   Gemini, Claude and OpenAI (others get AI_NO_PDF and the agent asks for a photo instead).
+async function generate({ provider, key, model, baseUrl, system, parts, maxTokens = 16000, json = true }) {
+  if (!key) throw new UserAiError('AI_NO_KEY', 'API key is required');
+  if (!model) throw new UserAiError('AI_NO_MODEL', 'Choose a model');
+  const base = baseFor(provider, baseUrl);
+  const k = kind(provider);
+  const list = parts || [];
+  const isPdf = (p) => p.mime === 'application/pdf';
+
+  if (k === 'anthropic') {
+    const content = list.map((p) => {
+      if (p.text !== undefined) return { type: 'text', text: String(p.text) };
+      if (isPdf(p)) return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: p.data } };
+      return { type: 'image', source: { type: 'base64', media_type: p.mime, data: p.data } };
+    });
+    const body = { model, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: 'user', content }] };
+    const d = await send({ method: 'POST', url: `${base}/v1/messages`, data: body, timeout: 180000, headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }, key);
+    return {
+      text: (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim(),
+      usage: d.usage ? { input: d.usage.input_tokens, output: d.usage.output_tokens } : null,
+    };
+  }
+
+  if (k === 'google') {
+    const generationConfig = { maxOutputTokens: maxTokens * 2 };
+    if (json) generationConfig.responseMimeType = 'application/json';
+    if (/2\.5/.test(model)) { generationConfig.temperature = 0; if (/flash/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 }; }
+    const body = {
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: list.map((p) => (p.text !== undefined ? { text: String(p.text) } : { inline_data: { mime_type: p.mime, data: p.data } })) }],
+      generationConfig,
+    };
+    const call = (m) => send({ method: 'POST', url: `${base}/v1beta/models/${encodeURIComponent(m)}:generateContent`, data: body, timeout: 180000, headers: { 'x-goog-api-key': key, 'content-type': 'application/json' } }, key);
+    let d;
+    try { d = await call(model); } catch (e) {
+      if (model === GEMINI_SPARE || !(e instanceof UserAiError) || !['AI_BUSY', 'AI_TIMEOUT', 'AI_RATE_LIMIT'].includes(e.code)) throw e;
+      try { d = await call(GEMINI_SPARE); } catch (_) { throw e; }
+    }
+    const cand = (d.candidates || [])[0];
+    if (!cand) throw new UserAiError('AI_PROVIDER_ERROR', 'Gemini returned no answer', 502);
+    const u = d.usageMetadata;
+    return {
+      text: ((cand.content && cand.content.parts) || []).filter((p) => typeof p.text === 'string' && !p.thought).map((p) => p.text).join('').trim(),
+      usage: u ? { input: u.promptTokenCount || 0, output: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0) } : null,
+    };
+  }
+
+  if (list.some(isPdf) && provider !== 'openai' && provider !== 'openrouter') {
+    throw new UserAiError('AI_NO_PDF', 'This AI cannot read a scanned PDF. Upload a photo of each page, or use Gemini, Claude or ChatGPT.');
+  }
+  const content = list.map((p) => {
+    if (p.text !== undefined) return { type: 'text', text: String(p.text) };
+    if (isPdf(p)) return { type: 'file', file: { filename: 'statement.pdf', file_data: `data:application/pdf;base64,${p.data}` } };
+    return { type: 'image_url', image_url: { url: `data:${p.mime};base64,${p.data}` } };
+  });
+  const body = { model, messages: [{ role: 'system', content: system }, { role: 'user', content }] };
+  if (provider === 'openai') body.max_completion_tokens = maxTokens * 2; else body.max_tokens = maxTokens;
+  if (json && (provider === 'openai' || provider === 'openrouter' || provider === 'mistral' || provider === 'deepseek')) body.response_format = { type: 'json_object' };
+  const headers = { Authorization: `Bearer ${key}`, 'content-type': 'application/json' };
+  if (provider === 'openrouter') { headers['HTTP-Referer'] = 'https://app.finman.money'; headers['X-Title'] = 'Finman'; }
+  const d = await send({ method: 'POST', url: `${base}/chat/completions`, data: body, headers, timeout: 180000 }, key);
+  const msg = ((d.choices || [])[0] || {}).message || {};
+  let text = msg.content;
+  if (Array.isArray(text)) text = text.map((p) => p.text || '').join('');
+  return { text: String(text || '').trim(), usage: d.usage ? { input: d.usage.prompt_tokens, output: d.usage.completion_tokens } : null };
+}
+
 // What the "Your AI" screen shows on each tile. `free` = the provider offers a free tier
 // (Gemini API in AI Studio, OpenRouter :free models, Groq free plan).
 const CARD = {
@@ -381,4 +451,4 @@ function publicProviders() {
   }));
 }
 
-module.exports = { PROVIDERS, publicProviders, listModels, complete, checkBaseUrl, privateIp, UserAiError, scrub, cleanSchema, _setHttp };
+module.exports = { PROVIDERS, publicProviders, listModels, complete, generate, checkBaseUrl, privateIp, UserAiError, scrub, cleanSchema, _setHttp };

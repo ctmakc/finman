@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sample statements · Finman Statement Agent</title>
+<style>
+  :root { color-scheme: light; --ink:#14212b; --muted:#5b6b78; --line:#e3e8ec; --ok:#0f7b4f; --bad:#b42335; --bg:#f6f8f9; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 20px 56px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 8px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  .stamp { display:inline-block; font-weight:700; letter-spacing:.06em; color:var(--bad); border:2px solid var(--bad); padding:2px 8px; border-radius:6px; font-size:13px; margin-bottom:16px; }
+  table { width:100%; border-collapse: collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-top:16px; }
+  th, td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--line); vertical-align: top; font-size:15px; }
+  th { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); background:#fbfcfd; }
+  tr:last-child td { border-bottom:0; }
+  a { color:#0b5cad; font-weight:600; }
+  .exp { white-space:nowrap; font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .ask { color:#8a5a00; }
+  ol { padding-left: 20px; color: var(--muted); }
+  @media (max-width: 560px) { th:nth-child(3), td:nth-child(3) { display:none; } h1 { font-size:24px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="stamp">SAMPLE DATA · FICTIONAL BANKS AND PEOPLE</div>
+  <h1>Sample statements for the Finman Statement Agent</h1>
+  <p>Download a file and upload it in Finman: More → Banks &amp; imports → Import a statement. The agent reads the PDF or photo, then Finman checks that the opening balance plus every row equals the closing balance, to the cent. Nothing is written until that check passes and you press Import.</p>
+  <ol>
+    <li>Sign in at <a href="/">this sandbox</a> with the judge account from the submission form.</li>
+    <li>Pick the account in the statement's currency (CAD, USD, AED or EUR are already there).</li>
+    <li>Read the balance proof line, then press Import, or see where the gap is.</li>
+  </ol>
+  <table>
+    <thead><tr><th>File</th><th>What it tests</th><th>Kind</th><th>Expected result</th></tr></thead>
+    <tbody>
+      <tr><td><a href="sample-chequing-oct-2026.pdf" download>sample-chequing-oct-2026.pdf</a></td><td>2-page chequing statement, 45 rows, CAD</td><td>PDF</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="t01-nhb-chequing-cad-2026-10.pdf" download>t01-nhb-chequing-cad-2026-10.pdf</a></td><td>Withdrawals / deposits columns, balance carried forward, CAD</td><td>PDF</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="t02-lnb-checking-usd-2026-09.pdf" download>t02-lnb-checking-usd-2026-09.pdf</a></td><td>Checking account in USD</td><td>PDF</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="t03-dwb-current-aed-2026-08.pdf" download>t03-dwb-current-aed-2026-08.pdf</a></td><td>Current account in AED, 62 rows</td><td>PDF</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="t04-vmb-giro-eur-2026-10.pdf" download>t04-vmb-giro-eur-2026-10.pdf</a></td><td>EUR with decimal commas (1.234,56)</td><td>PDF</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="t07-hvb-rewards-card-cad-2026-10.pdf" download>t07-hvb-rewards-card-cad-2026-10.pdf</a></td><td>Credit card: previous balance, purchases, payment, new balance</td><td>PDF</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="s01-nhb-chequing-cad-2026-09-scan.pdf" download>s01-nhb-chequing-cad-2026-09-scan.pdf</a></td><td>Scanned page, no text layer</td><td>Scan</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="p01-nhb-chequing-cad-2026-08-photo.jpg" download>p01-nhb-chequing-cad-2026-08-photo.jpg</a></td><td>Phone photo of a printed statement</td><td>Photo</td><td class="exp ok">Proven</td></tr>
+      <tr><td><a href="sample-chequing-oct-2026-p2-photo.jpg" download>sample-chequing-oct-2026-p2-photo.jpg</a></td><td>Photo of page 2 with one smudged amount</td><td>Photo</td><td class="exp ok">Proven: the smudged amount is derived from the printed balances, never guessed</td></tr>
+      <tr><td><a href="t05-qcu-chequing-cad-2026-07.pdf" download>t05-qcu-chequing-cad-2026-07.pdf</a></td><td>Planted error: one row is missing from the table</td><td>PDF</td><td class="exp bad">Gap shown, import blocked</td></tr>
+      <tr><td><a href="t15-hvb-card-activity-cad-no-closing.pdf" download>t15-hvb-card-activity-cad-no-closing.pdf</a></td><td>Card activity page without balances</td><td>PDF</td><td class="exp ask">Asks you to type the balances</td></tr>
+      <tr><td><a href="sample-card-no-closing.pdf" download>sample-card-no-closing.pdf</a></td><td>Card page "continued on next page"</td><td>PDF</td><td class="exp ask">Asks you to type the balances</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:16px">All files are generated; the banks, people and accounts do not exist.</p>
+</main>
+</body>
+</html>

@@ -258,6 +258,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/bank-api', bankApiRoutes);
+// Statement Agent: each upload is one or more AI calls -> its own small limit.
+app.use('/api/statements', rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: parseInt(process.env.STATEMENT_RATE_MAX, 10) || 20,
+  skip: (req) => req.method !== 'POST' || /\/(balances|commit)$/.test(req.path),
+  message: { error: true, code: 'STATEMENT_RATE', message: 'Too many statements at once, try again in a few minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+}), require('./routes/statements'));
 app.use('/api/budgets', budgetsRoutes);
 app.use('/api/family', familyRoutes);
 app.use('/api/recurring', recurringRoutes);

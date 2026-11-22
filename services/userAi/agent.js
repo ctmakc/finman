@@ -34,6 +34,7 @@ function systemPrompt(locale, tz) {
     'For "how much does my business earn", profit, owner pay or business vs personal money use get_business_and_personal.',
     'Tools that change data (adding, editing or deleting transactions, invoices, clients) are shown to the person as a card with Confirm and Decline; they run only after Confirm. Ask for such a tool directly, without asking for permission in text first.',
     'Amounts in add_transaction are positive; the type says income or expense. Dates are YYYY-MM-DD.',
+    'Bank statements the person uploaded as PDF or photo are in list_statements / get_statement. import_statement writes only when the balance check is proven; when a statement does not balance, tell the person the gap and the row from get_statement and never change numbers to make it balance. After an import, give the 30-day estimate from the tool result.',
     'Keep answers short and concrete. Format money with its currency.',
   ].join('\n');
 }
@@ -230,7 +231,8 @@ function summarize(tool, args, names) {
   const n = names && names.get(Number(a.account_id));
   if (n) a.account_id = n;
   const bits = [];
-  for (const k of ['amount', 'type', 'date', 'description', 'category', 'account_id', 'transaction_id', 'invoice_id', 'client_id', 'status', 'name', 'email']) {
+  if (Array.isArray(a.rows)) a.rows = `${a.rows.length} rows`;
+  for (const k of ['amount', 'type', 'date', 'description', 'category', 'account_id', 'statement_id', 'opening_balance', 'closing_balance', 'rows', 'transaction_id', 'invoice_id', 'client_id', 'status', 'name', 'email']) {
     if (a[k] !== undefined && a[k] !== null && a[k] !== '') bits.push([k, typeof a[k] === 'object' ? JSON.stringify(a[k]) : String(a[k])]);
   }
   return bits.slice(0, 8);
