@@ -233,7 +233,7 @@
         '<div class="fr-grid">' +
           (isPhone() ? exampleHtml() : '') +
           '<div class="fr-import">' +
-            (isPhone() ? '<p class="fr-note fr-note-phone"><i class="fas fa-mobile-screen" aria-hidden="true"></i> <span>On a phone? Bank apps rarely export a file. Open the example now and import from your bank’s website on a computer: your account will be waiting.</span></p>' : '') +
+            (isPhone() ? '<p class="fr-note fr-note-phone"><i class="fas fa-mobile-screen" aria-hidden="true"></i> <span>On a phone? Save the PDF statement from your bank app and choose it below: Finman AI reads it and checks the balance to the cent.</span></p>' : '') +
             '<label class="fr-drop" id="fr-drop" for="fr-file">' +
               '<input type="file" id="fr-file" class="fr-file" accept=".csv,.ofx,.qfx,.qbo,.txt,text/csv,.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">' +
               '<span class="fr-drop-mark" aria-hidden="true"><i class="fas fa-file-arrow-up"></i></span>' +

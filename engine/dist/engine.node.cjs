@@ -6538,6 +6538,88 @@ var require_ofxImportService = __commonJS({
   }
 });
 
+// services/importCommit.js
+var require_importCommit = __commonJS({
+  "services/importCommit.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var Transaction = require_transaction();
+    var csvImportService = require_csvImportService();
+    var { query, run, transaction } = require_database();
+    var money = require_money();
+    var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    function isCalendarDate(iso) {
+      const d = /* @__PURE__ */ new Date(`${iso}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
+    }
+    async function loadExistingFingerprints(accountId, userId) {
+      const rows = await query(
+        `SELECT date, amount, description FROM transactions WHERE account_id = ? AND user_id = ?`,
+        [accountId, userId]
+      );
+      return csvImportService.fingerprintCounts(rows.map((r) => csvImportService.fingerprintOf(r.date, r.amount, r.description)));
+    }
+    function consumeExisting(counts, fp) {
+      const left = counts.get(fp) || 0;
+      if (left <= 0) return false;
+      counts.set(fp, left - 1);
+      return true;
+    }
+    function prepareRows(rows) {
+      const prepared = [];
+      const errors = [];
+      rows.forEach((r, i) => {
+        const date = String(r.date || "").trim();
+        const amount = Number(r.amount);
+        if (!ISO_DATE.test(date) || !isCalendarDate(date)) {
+          errors.push({ index: i, message: `Row ${i + 1}: invalid date "${r.date}"` });
+          return;
+        }
+        if (!Number.isFinite(amount)) {
+          errors.push({ index: i, message: `Row ${i + 1}: invalid amount "${r.amount}"` });
+          return;
+        }
+        const description = String(r.description || "Transaction").replace(/\s+/g, " ").trim().slice(0, 500);
+        const category = String(r.category || "Other").trim().slice(0, 100) || "Other";
+        const rounded = money.round(amount);
+        const type = r.type === "income" || r.type === "expense" ? r.type : rounded >= 0 ? "income" : "expense";
+        const signed = Transaction.signedAmount(rounded, type) || 0;
+        prepared.push({ date, description, category, amount: signed, type, fingerprint: csvImportService.fingerprintOf(date, signed, description) });
+      });
+      return { prepared, errors };
+    }
+    async function commitPrepared(account, userId, prepared, { skipDuplicates = true, updateBalance = true } = {}) {
+      const existing = await loadExistingFingerprints(account.id, userId);
+      let inserted = 0;
+      let skipped = 0;
+      let delta = 0;
+      await transaction(async () => {
+        for (const tx of prepared) {
+          if (skipDuplicates && consumeExisting(existing, tx.fingerprint)) {
+            skipped++;
+            continue;
+          }
+          await run(
+            `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [account.id, userId, tx.date, tx.description, tx.category, tx.amount, tx.type]
+          );
+          inserted++;
+          delta = money.add(delta, tx.amount);
+        }
+        if (updateBalance && inserted > 0 && delta !== 0) {
+          await run(
+            `UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
+            [delta, account.id, userId]
+          );
+        }
+      });
+      return { inserted, skipped, delta: updateBalance ? delta : 0 };
+    }
+    module2.exports = { loadExistingFingerprints, consumeExisting, prepareRows, commitPrepared, isCalendarDate, ISO_DATE };
+  }
+});
+
 // routes/bank-api.js
 var require_bank_api = __commonJS({
   "routes/bank-api.js"(exports2, module2) {
@@ -6555,6 +6637,7 @@ var require_bank_api = __commonJS({
     var csvImportService = require_csvImportService();
     var ofxImportService = require_ofxImportService();
     var { query, run, transaction } = require_database();
+    var importCommit = require_importCommit();
     var money = require_money();
     var router = express.Router();
     var authenticate = passport.authenticate("jwt", { session: false });
@@ -6593,19 +6676,7 @@ var require_bank_api = __commonJS({
     function bankSummary(bankId) {
       return bankApiConfig.listBanks().find((b) => b.id === bankId) || null;
     }
-    async function loadExistingFingerprints(accountId, userId) {
-      const rows = await query(
-        `SELECT date, amount, description FROM transactions WHERE account_id = ? AND user_id = ?`,
-        [accountId, userId]
-      );
-      return csvImportService.fingerprintCounts(rows.map((r) => csvImportService.fingerprintOf(r.date, r.amount, r.description)));
-    }
-    function consumeExisting(counts, fp) {
-      const left = counts.get(fp) || 0;
-      if (left <= 0) return false;
-      counts.set(fp, left - 1);
-      return true;
-    }
+    var { loadExistingFingerprints, consumeExisting } = require_importCommit();
     router.get("/banks", authenticate, (req, res) => {
       const { region, type } = req.query;
       res.json(bankApiConfig.listBanks({ region, type }));
@@ -6917,11 +6988,6 @@ var require_bank_api = __commonJS({
         }
       });
     });
-    var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-    function isCalendarDate(iso) {
-      const d = /* @__PURE__ */ new Date(`${iso}T00:00:00Z`);
-      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
-    }
     router.post("/import/commit", authenticate, async (req, res) => {
       try {
         const body = req.body || {};
@@ -6934,52 +7000,9 @@ var require_bank_api = __commonJS({
         if (rows.length > MAX_COMMIT_ROWS) return fail(res, 400, `At most ${MAX_COMMIT_ROWS} rows per import`);
         const account = await Account.findById(accountId, req.user.id);
         if (!account) return fail(res, 404, "Account not found");
-        const prepared = [];
-        const errors = [];
-        rows.forEach((r, i) => {
-          const date = String(r.date || "").trim();
-          const amount = Number(r.amount);
-          if (!ISO_DATE.test(date) || !isCalendarDate(date)) {
-            errors.push({ index: i, message: `Row ${i + 1}: invalid date "${r.date}"` });
-            return;
-          }
-          if (!Number.isFinite(amount)) {
-            errors.push({ index: i, message: `Row ${i + 1}: invalid amount "${r.amount}"` });
-            return;
-          }
-          const description = String(r.description || "Transaction").replace(/\s+/g, " ").trim().slice(0, 500);
-          const category = String(r.category || "Other").trim().slice(0, 100) || "Other";
-          const rounded = money.round(amount);
-          const type = r.type === "income" || r.type === "expense" ? r.type : rounded >= 0 ? "income" : "expense";
-          const signed = Transaction.signedAmount(rounded, type) || 0;
-          prepared.push({ date, description, category, amount: signed, type, fingerprint: csvImportService.fingerprintOf(date, signed, description) });
-        });
+        const { prepared, errors } = importCommit.prepareRows(rows);
         if (errors.length && prepared.length === 0) return res.status(400).json({ error: true, message: errors[0].message, errors });
-        const existing = await loadExistingFingerprints(account.id, req.user.id);
-        let inserted = 0;
-        let skipped = 0;
-        let delta = 0;
-        await transaction(async () => {
-          for (const tx of prepared) {
-            if (skipDuplicates && consumeExisting(existing, tx.fingerprint)) {
-              skipped++;
-              continue;
-            }
-            await run(
-              `INSERT INTO transactions (account_id, user_id, date, description, category, amount, type)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [account.id, req.user.id, tx.date, tx.description, tx.category, tx.amount, tx.type]
-            );
-            inserted++;
-            delta = money.add(delta, tx.amount);
-          }
-          if (updateBalance && inserted > 0 && delta !== 0) {
-            await run(
-              `UPDATE accounts SET balance = ROUND(balance + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
-              [delta, account.id, req.user.id]
-            );
-          }
-        });
+        const { inserted, skipped, delta } = await importCommit.commitPrepared(account, req.user.id, prepared, { skipDuplicates, updateBalance });
         const refreshed = await Account.findById(account.id, req.user.id);
         res.json({
           success: true,
@@ -6988,7 +7011,7 @@ var require_bank_api = __commonJS({
           skipped,
           rejected: errors.length,
           errors,
-          balanceDelta: updateBalance ? delta : 0,
+          balanceDelta: delta,
           newBalance: refreshed ? refreshed.balance : null
         });
       } catch (error) {
@@ -15133,6 +15156,81 @@ var require_providers = __commonJS({
         usage: d.usage ? { input: d.usage.prompt_tokens, output: d.usage.completion_tokens } : void 0
       };
     }
+    async function generate({ provider, key, model, baseUrl, system, parts, maxTokens = 16e3, json = true }) {
+      if (!key) throw new UserAiError("AI_NO_KEY", "API key is required");
+      if (!model) throw new UserAiError("AI_NO_MODEL", "Choose a model");
+      const base = baseFor(provider, baseUrl);
+      const k = kind(provider);
+      const list = parts || [];
+      const isPdf = (p) => p.mime === "application/pdf";
+      if (k === "anthropic") {
+        const content2 = list.map((p) => {
+          if (p.text !== void 0) return { type: "text", text: String(p.text) };
+          if (isPdf(p)) return { type: "document", source: { type: "base64", media_type: "application/pdf", data: p.data } };
+          return { type: "image", source: { type: "base64", media_type: p.mime, data: p.data } };
+        });
+        const body2 = { model, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: "user", content: content2 }] };
+        const d2 = await send({ method: "POST", url: `${base}/v1/messages`, data: body2, timeout: 18e4, headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" } }, key);
+        return {
+          text: (d2.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim(),
+          usage: d2.usage ? { input: d2.usage.input_tokens, output: d2.usage.output_tokens } : null
+        };
+      }
+      if (k === "google") {
+        const generationConfig = { maxOutputTokens: maxTokens * 2 };
+        if (json) generationConfig.responseMimeType = "application/json";
+        if (/2\.5/.test(model)) {
+          generationConfig.temperature = 0;
+          if (/flash/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
+        const body2 = {
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: list.map((p) => p.text !== void 0 ? { text: String(p.text) } : { inline_data: { mime_type: p.mime, data: p.data } }) }],
+          generationConfig
+        };
+        const call = (m) => send({ method: "POST", url: `${base}/v1beta/models/${encodeURIComponent(m)}:generateContent`, data: body2, timeout: 18e4, headers: { "x-goog-api-key": key, "content-type": "application/json" } }, key);
+        let d2;
+        try {
+          d2 = await call(model);
+        } catch (e) {
+          if (model === GEMINI_SPARE || !(e instanceof UserAiError) || !["AI_BUSY", "AI_TIMEOUT", "AI_RATE_LIMIT"].includes(e.code)) throw e;
+          try {
+            d2 = await call(GEMINI_SPARE);
+          } catch (_) {
+            throw e;
+          }
+        }
+        const cand = (d2.candidates || [])[0];
+        if (!cand) throw new UserAiError("AI_PROVIDER_ERROR", "Gemini returned no answer", 502);
+        const u = d2.usageMetadata;
+        return {
+          text: (cand.content && cand.content.parts || []).filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("").trim(),
+          usage: u ? { input: u.promptTokenCount || 0, output: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0) } : null
+        };
+      }
+      if (list.some(isPdf) && provider !== "openai" && provider !== "openrouter") {
+        throw new UserAiError("AI_NO_PDF", "This AI cannot read a scanned PDF. Upload a photo of each page, or use Gemini, Claude or ChatGPT.");
+      }
+      const content = list.map((p) => {
+        if (p.text !== void 0) return { type: "text", text: String(p.text) };
+        if (isPdf(p)) return { type: "file", file: { filename: "statement.pdf", file_data: `data:application/pdf;base64,${p.data}` } };
+        return { type: "image_url", image_url: { url: `data:${p.mime};base64,${p.data}` } };
+      });
+      const body = { model, messages: [{ role: "system", content: system }, { role: "user", content }] };
+      if (provider === "openai") body.max_completion_tokens = maxTokens * 2;
+      else body.max_tokens = maxTokens;
+      if (json && (provider === "openai" || provider === "openrouter" || provider === "mistral" || provider === "deepseek")) body.response_format = { type: "json_object" };
+      const headers = { Authorization: `Bearer ${key}`, "content-type": "application/json" };
+      if (provider === "openrouter") {
+        headers["HTTP-Referer"] = "https://app.finman.money";
+        headers["X-Title"] = "Finman";
+      }
+      const d = await send({ method: "POST", url: `${base}/chat/completions`, data: body, headers, timeout: 18e4 }, key);
+      const msg = ((d.choices || [])[0] || {}).message || {};
+      let text = msg.content;
+      if (Array.isArray(text)) text = text.map((p) => p.text || "").join("");
+      return { text: String(text || "").trim(), usage: d.usage ? { input: d.usage.prompt_tokens, output: d.usage.completion_tokens } : null };
+    }
     var CARD = {
       openai: { brand: "ChatGPT", vendor: "OpenAI", short: "Ch", keyPlaceholder: "sk-\u2026" },
       anthropic: { brand: "Claude", vendor: "Anthropic", short: "Cl", keyPlaceholder: "sk-ant-\u2026" },
@@ -15157,7 +15255,7 @@ var require_providers = __commonJS({
         free: !!(CARD[id] || {}).free
       }));
     }
-    module2.exports = { PROVIDERS, publicProviders, listModels, complete, checkBaseUrl, privateIp, UserAiError, scrub, cleanSchema, _setHttp };
+    module2.exports = { PROVIDERS, publicProviders, listModels, complete, generate, checkBaseUrl, privateIp, UserAiError, scrub, cleanSchema, _setHttp };
   }
 });
 
@@ -16125,6 +16223,11 @@ var require_demoFlag = __commonJS({
       email: "demo-partner@finman.money",
       fullName: "Sam Demo"
     });
+    var DEMO_JUDGE = Object.freeze({
+      username: "judge",
+      email: "judge@finman.test",
+      fullName: "Judge Sandbox"
+    });
     function annotate(data, meta = {}) {
       const base = {
         demo: isDemo(),
@@ -16157,6 +16260,7 @@ var require_demoFlag = __commonJS({
       DEFAULT_DEMO_PASSWORD,
       DEMO_USER,
       DEMO_PARTNER,
+      DEMO_JUDGE,
       annotate,
       demoNotice
     };
@@ -21238,6 +21342,1172 @@ var require_txTools = __commonJS({
   }
 });
 
+// services/statement/proof.js
+var require_proof = __commonJS({
+  "services/statement/proof.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var CURRENCY_JUNK = /[^\d.,()\-+−–]/g;
+    function toCents(v) {
+      if (v === null || v === void 0 || v === "") return null;
+      if (typeof v === "number") {
+        if (!Number.isFinite(v)) return null;
+        return Math.round(v * 100);
+      }
+      let s = String(v).trim();
+      if (!s) return null;
+      let neg = false;
+      if (/\bDR\b|\bDB\b/i.test(s)) neg = true;
+      const cr = /\bCR\b/i.test(s);
+      s = s.replace(CURRENCY_JUNK, "");
+      if (/^\(.*\)$/.test(s)) {
+        neg = true;
+        s = s.slice(1, -1);
+      }
+      if (/^[-−–]/.test(s)) {
+        neg = true;
+        s = s.slice(1);
+      }
+      if (/[-−–]$/.test(s)) {
+        neg = true;
+        s = s.slice(0, -1);
+      }
+      if (s.startsWith("+")) s = s.slice(1);
+      if (!/^[\d.,]+$/.test(s) || !/\d/.test(s)) return null;
+      const lastDot = s.lastIndexOf(".");
+      const lastComma = s.lastIndexOf(",");
+      let intPart;
+      let frac = "";
+      if (lastDot >= 0 && lastComma >= 0) {
+        const dec = Math.max(lastDot, lastComma);
+        intPart = s.slice(0, dec).replace(/[.,]/g, "");
+        frac = s.slice(dec + 1);
+      } else if (lastComma >= 0 || lastDot >= 0) {
+        const sep = lastComma >= 0 ? "," : ".";
+        const at = sep === "," ? lastComma : lastDot;
+        const tail = s.slice(at + 1);
+        const count = s.split(sep).length - 1;
+        if (count === 1 && tail.length >= 1 && tail.length <= 2) {
+          intPart = s.slice(0, at);
+          frac = tail;
+        } else {
+          intPart = s.split(sep).join("");
+        }
+      } else intPart = s;
+      if (frac.length > 2 || !/^\d*$/.test(intPart) || !/^\d*$/.test(frac)) return null;
+      const cents = Number(intPart || "0") * 100 + Number((frac + "00").slice(0, 2));
+      if (!Number.isSafeInteger(cents)) return null;
+      return (neg && !cr ? -1 : 1) * cents;
+    }
+    var fmt = (c) => {
+      if (c === null || c === void 0) return "\u2014";
+      const s = (Math.abs(c) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return (c < 0 ? "-" : "") + s;
+    };
+    function prove({ opening_cents: opening, closing_cents: closing, rows, kind = "bank" }) {
+      const sign = kind === "card" ? -1 : 1;
+      const list = Array.isArray(rows) ? rows : [];
+      const unclear = [];
+      let sum = 0;
+      list.forEach((r, i) => {
+        if (r.unclear || r.cents === null || r.cents === void 0 || !Number.isInteger(r.cents)) unclear.push(i);
+        else sum += r.cents;
+      });
+      let openingInferred = false;
+      let open2 = Number.isInteger(opening) ? opening : null;
+      if (open2 === null && list.length && Number.isInteger(list[0].balance_cents) && Number.isInteger(list[0].cents)) {
+        open2 = list[0].balance_cents - sign * list[0].cents;
+        openingInferred = true;
+      }
+      const breaks = [];
+      let runningChecked = 0;
+      let prev = open2;
+      list.forEach((r, i) => {
+        const amt = Number.isInteger(r.cents) && !r.unclear ? r.cents : null;
+        const expected = prev !== null && amt !== null ? prev + sign * amt : null;
+        if (Number.isInteger(r.balance_cents)) {
+          if (expected !== null && !(openingInferred && i === 0)) {
+            runningChecked += 1;
+            if (expected !== r.balance_cents) {
+              breaks.push({ index: i, page: r.page || null, expected_balance_cents: expected, printed_balance_cents: r.balance_cents, diff_cents: r.balance_cents - expected });
+            }
+          }
+          prev = r.balance_cents;
+        } else prev = expected;
+      });
+      const out = {
+        kind,
+        opening_cents: open2,
+        opening_inferred: openingInferred,
+        closing_cents: Number.isInteger(closing) ? closing : null,
+        sum_cents: sum,
+        rows_checked: list.length - unclear.length,
+        running_checked: runningChecked,
+        breaks,
+        first_break: breaks[0] || null,
+        unclear_rows: unclear,
+        computed_closing_cents: null,
+        gap_cents: null
+      };
+      if (open2 === null) {
+        out.status = "needs_opening";
+      } else {
+        out.computed_closing_cents = open2 + sign * sum;
+        if (unclear.length) out.status = "unclear";
+        else if (out.closing_cents === null) out.status = "needs_closing";
+        else {
+          out.gap_cents = out.closing_cents - out.computed_closing_cents;
+          out.status = out.gap_cents === 0 && breaks.length === 0 ? "proven" : "gap";
+        }
+      }
+      out.line = proofLine(out, list.length);
+      return out;
+    }
+    function proofLine(p, n) {
+      const op = p.kind === "card" ? "\u2212" : "+";
+      const head = `${fmt(p.opening_cents)} ${op} ${n} rows (${fmt(p.sum_cents)}) = ${fmt(p.computed_closing_cents)}`;
+      switch (p.status) {
+        case "proven":
+          return `${head} \u2014 matches the printed closing ${fmt(p.closing_cents)} to the cent`;
+        case "gap": {
+          const b = p.first_break;
+          const where = b ? `; the balance chain first breaks at row ${b.index + 1}${b.page ? ` (page ${b.page})` : ""}` : "";
+          return `${head} \u2014 printed closing is ${fmt(p.closing_cents)}, gap ${fmt(p.gap_cents)}${where}`;
+        }
+        case "needs_closing":
+          return `${head} \u2014 no closing balance on the statement; type it to finish the check`;
+        case "needs_opening":
+          return "No opening balance on the statement and no running balance to infer it; type the opening balance";
+        case "unclear":
+          return `${p.unclear_rows.length} row amount(s) could not be read; nothing is guessed`;
+        default:
+          return head;
+      }
+    }
+    function deriveUnclear(rows, opening, kind = "bank") {
+      const sign = kind === "card" ? -1 : 1;
+      const out = rows.map((r) => ({ ...r }));
+      const derived = [];
+      out.forEach((r, i) => {
+        if (!(r.unclear || !Number.isInteger(r.cents))) return;
+        if (!Number.isInteger(r.balance_cents)) return;
+        let prevBal = null;
+        if (i === 0) prevBal = Number.isInteger(opening) ? opening : null;
+        else if (Number.isInteger(out[i - 1].balance_cents)) prevBal = out[i - 1].balance_cents;
+        if (prevBal === null) return;
+        const cents = sign * (r.balance_cents - prevBal);
+        out[i] = { ...r, cents, unclear: false, derived: true };
+        derived.push(i);
+      });
+      return { rows: out, derived };
+    }
+    module2.exports = { toCents, prove, proofLine, deriveUnclear, fmt };
+  }
+});
+
+// finman-stub:child_process
+var require_child_process = __commonJS({
+  "finman-stub:child_process"(exports2, module2) {
+    init_globals();
+    module2.exports = require_stub()("child_process");
+  }
+});
+
+// services/statement/pdfText.js
+var require_pdfText = __commonJS({
+  "services/statement/pdfText.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var MIN_TEXT_CHARS = 60;
+    var MAX_PAGES = 30;
+    var path = require_path();
+    var { spawn } = require_child_process();
+    var WORKER = path.join("/vault", "pdfWorker.mjs");
+    var TIMEOUT_MS = 2e4;
+    function extractItems(buffer) {
+      return new Promise((resolve, reject) => {
+        const child = spawn(proc.execPath, [WORKER, String(MAX_PAGES)], { stdio: ["pipe", "pipe", "ignore"] });
+        const out = [];
+        const timer = setTimeout(() => {
+          child.kill("SIGKILL");
+          reject(new Error("PDF_TIMEOUT"));
+        }, TIMEOUT_MS);
+        child.stdout.on("data", (c) => out.push(c));
+        child.on("error", (e) => {
+          clearTimeout(timer);
+          reject(e);
+        });
+        child.on("close", () => {
+          clearTimeout(timer);
+          let j = null;
+          try {
+            j = JSON.parse(import_buffer.Buffer.concat(out).toString("utf8"));
+          } catch (_) {
+          }
+          if (!j || !j.ok) return reject(new Error(`PDF_UNREADABLE${j && j.error ? `: ${j.error}` : ""}`));
+          resolve(j);
+        });
+        child.stdin.on("error", () => {
+        });
+        child.stdin.end(buffer);
+      });
+    }
+    function linesOf(items) {
+      const rows = [];
+      let widthSum = 0;
+      let charSum = 0;
+      for (const it of items) {
+        const str = it && typeof it.str === "string" ? it.str : "";
+        if (!str.trim()) continue;
+        const [, , , , x, y] = it.transform || [0, 0, 0, 0, 0, 0];
+        const h = Math.abs(it.transform && it.transform[3] || it.height || 10) || 10;
+        const w = it.width || str.length * h * 0.5;
+        widthSum += w;
+        charSum += str.length;
+        let row = rows.find((r) => Math.abs(r.y - y) <= Math.max(2, h * 0.45));
+        if (!row) {
+          row = { y, parts: [] };
+          rows.push(row);
+        }
+        row.parts.push({ x, w, str });
+      }
+      const charW = charSum ? Math.max(1, widthSum / charSum) : 5;
+      const minX = rows.length ? Math.min(...rows.flatMap((r) => r.parts.map((p) => p.x))) : 0;
+      rows.sort((a, b) => b.y - a.y);
+      return rows.map((r) => {
+        r.parts.sort((a, b) => a.x - b.x);
+        let line = "";
+        for (const p of r.parts) {
+          const col = Math.round((p.x - minX) / charW);
+          if (line.length < col) line += " ".repeat(col - line.length);
+          else if (line && !line.endsWith(" ") && !p.str.startsWith(" ")) line += " ";
+          line += p.str;
+        }
+        return line.replace(/\s+$/, "");
+      });
+    }
+    async function readPdf(buffer) {
+      const j = await extractItems(buffer);
+      const pages = j.pages.map((items, i) => {
+        const text = linesOf(items || []).join("\n");
+        const chars = text.replace(/\s/g, "").length;
+        return { page: i + 1, text, chars, hasText: chars >= MIN_TEXT_CHARS };
+      });
+      return { pageCount: j.pageCount, pages, truncated: j.pageCount > MAX_PAGES };
+    }
+    function amountsOnPage(text, toCents) {
+      const set = /* @__PURE__ */ new Set();
+      const re = /\(?[-−–]?\s?[$€£]?\s?\d{1,3}(?:[ ,. ]\d{3})*(?:[.,]\d{1,2})?\)?|\d+[.,]\d{1,2}/g;
+      for (const m of String(text || "").matchAll(re)) {
+        const c = toCents(m[0].replace(/ /g, " "));
+        if (c !== null) set.add(Math.abs(c));
+      }
+      return set;
+    }
+    module2.exports = { readPdf, linesOf, amountsOnPage, MIN_TEXT_CHARS, MAX_PAGES };
+  }
+});
+
+// services/statement/agent.js
+var require_agent = __commonJS({
+  "services/statement/agent.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var crypto = require_crypto();
+    var proof = require_proof();
+    var pdfText = require_pdfText();
+    var userProviders = require_providers();
+    var platform = require_aiProvider();
+    var MAX_REREADS = 2;
+    var IMAGE_MIMES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
+    var StatementError = class extends Error {
+      constructor(code, message, status = 400) {
+        super(message);
+        this.code = code;
+        this.status = status;
+      }
+    };
+    var SYSTEM = [
+      "You read bank and credit card statements for Finman, a personal finance app. You return JSON only.",
+      'Shape: {"statement_type":"bank"|"card","institution":string|null,"account_ref":string|null,"currency":"ISO 4217 code"|null,',
+      '"period_start":"YYYY-MM-DD"|null,"period_end":"YYYY-MM-DD"|null,"opening_balance":string|null,"closing_balance":string|null,',
+      '"rows":[{"date":"YYYY-MM-DD","description":string,"amount":string|null,"balance":string|null,"page":integer,"unclear":boolean}],"notes":string|null}',
+      "Rules:",
+      '- Copy every transaction row exactly as printed, in printed order, page by page. Never skip, merge, split, reorder or invent rows. Opening, closing, subtotal and "balance forward" lines are not rows.',
+      `- amount: signed decimal with a dot and no thousands separators, e.g. "-1650.00", from the account holder's view: money out (withdrawal, debit, purchase, fee, payment sent) is negative; money in (deposit, credit, refund, payment received) is positive. Decide by the column the number is printed in (Withdrawals/Debits vs Deposits/Credits), by CR/DR marks, minus signs or parentheses.`,
+      "- Credit card statements: a purchase or fee is negative, a payment to the card or a refund is positive; opening_balance = previous balance and closing_balance = new balance, as printed (amount owed, positive).",
+      "- balance: the running balance printed on that row in the same format, or null when the row has none.",
+      "- Never correct, round or recompute any number so that totals match. If a digit cannot be read, set amount to null and unclear to true. Do not guess.",
+      "- opening_balance and closing_balance: only as printed; null when the statement does not print them. Never compute them.",
+      "- date: YYYY-MM-DD; when a row shows only day and month, take the year from the statement period.",
+      "- description: the description text of the row; join a description that wraps onto a second line.",
+      "- page: the 1-based page where the row is printed.",
+      "- A photo may be tilted or curved: follow each printed line across the page so the date, description, amount and balance of a row come from the same line.",
+      "- account_ref: the account or card number as printed (masked is fine)."
+    ].join("\n");
+    function detectKind(buffer, mime, fileName) {
+      const head = buffer.subarray(0, 8);
+      if (head.subarray(0, 4).toString("latin1") === "%PDF") return { kind: "pdf", mime: "application/pdf" };
+      if (head[0] === 255 && head[1] === 216) return { kind: "image", mime: "image/jpeg" };
+      if (head[0] === 137 && head.subarray(1, 4).toString("latin1") === "PNG") return { kind: "image", mime: "image/png" };
+      if (head.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP") return { kind: "image", mime: "image/webp" };
+      if (IMAGE_MIMES.has(mime)) return { kind: "image", mime };
+      throw new StatementError("STATEMENT_TYPE", `Upload a PDF, JPG, PNG or WEBP statement${fileName ? ` ("${String(fileName).slice(0, 80)}" is not one)` : ""}`);
+    }
+    function parseJson(text) {
+      let s = String(text || "").trim();
+      s = s.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+      const a = s.indexOf("{");
+      const b = s.lastIndexOf("}");
+      if (a < 0 || b <= a) return null;
+      try {
+        return JSON.parse(s.slice(a, b + 1));
+      } catch (_) {
+        return null;
+      }
+    }
+    var ISO = /^\d{4}-\d{2}-\d{2}$/;
+    function calendarDate(s) {
+      if (!ISO.test(String(s || ""))) return null;
+      const d = /* @__PURE__ */ new Date(`${s}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : null;
+    }
+    function normalizeRows(raw, defaultPage) {
+      return (Array.isArray(raw) ? raw : []).slice(0, 2e3).map((r) => {
+        const cents = r && r.amount !== null && r.amount !== void 0 ? proof.toCents(r.amount) : null;
+        const date = calendarDate(r && r.date);
+        return {
+          date,
+          date_raw: date ? void 0 : r && r.date ? String(r.date).slice(0, 20) : null,
+          description: String(r && r.description || "").replace(/\s+/g, " ").trim().slice(0, 500) || "Transaction",
+          cents,
+          balance_cents: r && r.balance !== null && r.balance !== void 0 && r.balance !== "" ? proof.toCents(r.balance) : null,
+          page: Number.isInteger(r && r.page) && r.page > 0 ? r.page : parseInt(r && r.page, 10) || defaultPage || 1,
+          unclear: !!(r && r.unclear) || cents === null
+        };
+      });
+    }
+    function meta(json) {
+      const j = json || {};
+      const cur = typeof j.currency === "string" && /^[A-Za-z]{3}$/.test(j.currency.trim()) ? j.currency.trim().toUpperCase() : null;
+      const ref = j.account_ref || j.account_last4;
+      const last4 = ref ? String(ref).replace(/\D/g, "").slice(-4) || null : null;
+      return {
+        statement_type: j.statement_type === "card" ? "card" : "bank",
+        institution: j.institution ? String(j.institution).slice(0, 120) : null,
+        account_last4: last4,
+        currency: cur,
+        period_start: calendarDate(j.period_start),
+        period_end: calendarDate(j.period_end),
+        opening_cents: j.opening_balance === null || j.opening_balance === void 0 ? null : proof.toCents(j.opening_balance),
+        closing_cents: j.closing_balance === null || j.closing_balance === void 0 ? null : proof.toCents(j.closing_balance),
+        notes: j.notes ? String(j.notes).slice(0, 500) : null
+      };
+    }
+    var retryDelayMs = 3e3;
+    var busy = (e) => !!e && (["AI_BUSY", "AI_RATE_LIMIT", "AI_TIMEOUT"].includes(e.code) || /HTTP (429|500|502|503|504)\b/.test(String(e.message || "")) || e.code === "AI_REQUEST_FAILED" && !/HTTP \d/.test(String(e.message || "")));
+    function platformModels(vision) {
+      const text = proc.env.STATEMENT_AI_MODEL || void 0;
+      const vis = proc.env.STATEMENT_AI_VISION_MODEL || text;
+      return vision && vis !== text ? [vis, text] : [text];
+    }
+    async function callModel(ai, parts, { vision = false } = {}) {
+      const models = ai.source === "user" ? [ai.model] : platformModels(vision);
+      for (let attempt = 0; ; attempt += 1) {
+        const model = models[Math.min(attempt, models.length - 1)];
+        try {
+          return await callModelOnce(ai, parts, model);
+        } catch (e) {
+          if (!busy(e) || attempt >= 2) throw e;
+          await new Promise((ok) => setTimeout(ok, retryDelayMs * (attempt + 1)));
+        }
+      }
+    }
+    function _setRetryDelay(ms) {
+      retryDelayMs = ms;
+    }
+    async function callModelOnce(ai, parts, model) {
+      if (ai.source === "user") {
+        return userProviders.generate({ provider: ai.provider, key: ai.key, model: ai.model, baseUrl: ai.baseUrl, system: SYSTEM, parts, json: true });
+      }
+      return platform.generate({
+        system: SYSTEM,
+        parts,
+        json: true,
+        maxTokens: 32768,
+        provider: proc.env.STATEMENT_AI_PROVIDER || void 0,
+        model
+      });
+    }
+    async function readOnce(ai, parts, usage, opts) {
+      for (let i = 0; i < 2; i += 1) {
+        const r = await callModel(ai, parts, opts);
+        usage.calls += 1;
+        if (r.usage) {
+          usage.input += r.usage.input || 0;
+          usage.output += r.usage.output || 0;
+        }
+        if (r.model) usage.model = r.model;
+        if (r.provider) usage.provider = r.provider;
+        const j = parseJson(r.text);
+        if (j && Array.isArray(j.rows)) return j;
+      }
+      throw new StatementError("STATEMENT_UNREADABLE", "The AI did not return the statement rows. Try again, or upload a clearer file.", 502);
+    }
+    function ground(rows, pageAmounts) {
+      if (!pageAmounts) return [];
+      const bad = [];
+      rows.forEach((r, i) => {
+        if (!Number.isInteger(r.cents)) return;
+        const set = pageAmounts.get(r.page);
+        if (set && !set.has(Math.abs(r.cents))) {
+          r.ungrounded = true;
+          bad.push(i);
+        }
+      });
+      return bad;
+    }
+    function dateIssues(m, rows) {
+      const bad = /* @__PURE__ */ new Set();
+      const lo = m.period_start ? new Date(Date.parse(`${m.period_start}T00:00:00Z`) - 3 * 864e5).toISOString().slice(0, 10) : null;
+      const hi = m.period_end ? new Date(Date.parse(`${m.period_end}T00:00:00Z`) + 3 * 864e5).toISOString().slice(0, 10) : null;
+      const dated = rows.map((r, i) => [i, r.date]).filter(([, d]) => d);
+      let up = 0;
+      let down = 0;
+      for (let k = 1; k < dated.length; k += 1) {
+        if (dated[k][1] > dated[k - 1][1]) up += 1;
+        else if (dated[k][1] < dated[k - 1][1]) down += 1;
+      }
+      const ascending = up >= down;
+      rows.forEach((r, i) => {
+        if (!r.date) {
+          bad.add(i);
+          return;
+        }
+        if (lo && r.date < lo || hi && r.date > hi) bad.add(i);
+      });
+      for (let k = 1; k < dated.length - 1; k += 1) {
+        const [i, d] = dated[k];
+        const prev = dated[k - 1][1];
+        const next = dated[k + 1][1];
+        if (ascending ? d < prev && prev <= next || d > next && prev <= next : d > prev && prev >= next || d < next && prev >= next) bad.add(i);
+      }
+      return [...bad].sort((a, b) => a - b);
+    }
+    function check(m, rows, pageAmounts) {
+      const d = proof.deriveUnclear(rows, m.opening_cents, m.statement_type);
+      const phantom = d.rows.filter((r) => r.derived && r.cents === 0).length;
+      if (phantom) {
+        d.rows = d.rows.filter((r) => !(r.derived && r.cents === 0));
+        d.derived = d.rows.map((r, i) => r.derived ? i : -1).filter((i) => i >= 0);
+      }
+      const ungrounded = ground(d.rows.map((r) => r.derived ? { ...r, cents: null } : r), pageAmounts);
+      d.rows.forEach((r, i) => {
+        if (ungrounded.includes(i)) r.ungrounded = true;
+      });
+      const badDates = dateIssues(m, d.rows);
+      const p = proof.prove({ opening_cents: m.opening_cents, closing_cents: m.closing_cents, rows: d.rows, kind: m.statement_type });
+      p.derived_rows = d.derived;
+      p.ungrounded_rows = ungrounded;
+      if (ungrounded.length && p.status === "proven") {
+        p.status = "gap";
+        p.line = `${ungrounded.length} amount(s) are not printed on their page; nothing is written`;
+      }
+      p.date_issue_rows = badDates;
+      if (badDates.length && p.status === "proven") {
+        p.status = "unclear";
+        p.line = `Amounts balance, but ${badDates.length} date(s) fall outside the statement period or out of order; nothing is written`;
+      }
+      const notes = [];
+      if (p.opening_inferred) notes.push("opening taken from the first row's printed balance");
+      if (d.derived.length) notes.push(`${d.derived.length} unreadable amount(s) derived from the printed balances around them, not guessed`);
+      if (phantom) notes.push(`${phantom} line(s) without an amount and with an unchanged balance left out`);
+      p.notes = notes;
+      if (notes.length && p.status === "proven") p.line += ` (${notes.join("; ")})`;
+      p.phantom_rows = phantom;
+      return { rows: d.rows, proof: p };
+    }
+    function score(c) {
+      const p = c.proof;
+      if (p.status === "proven") return 0;
+      return 1 + p.breaks.length * 1e3 + p.unclear_rows.length * 1e3 + (p.ungrounded_rows || []).length * 1e3 + (p.date_issue_rows || []).length * 1e3 + Math.min(999, Math.abs(p.gap_cents || 0) / 100);
+    }
+    function pageToReread(c) {
+      const p = c.proof;
+      if (p.first_break && p.first_break.page) return p.first_break.page;
+      const i = [...p.unclear_rows, ...p.ungrounded_rows || [], ...p.date_issue_rows || []][0];
+      if (i !== void 0 && c.rows[i]) return c.rows[i].page;
+      return null;
+    }
+    async function read({ buffer, mime, fileName, ai }) {
+      if (!buffer || !buffer.length) throw new StatementError("STATEMENT_EMPTY", "The file is empty");
+      const t0 = Date.now();
+      const k = detectKind(buffer, mime, fileName);
+      const usage = { input: 0, output: 0, calls: 0, provider: ai.provider || null, model: ai.model || null };
+      const b64 = buffer.toString("base64");
+      let mode;
+      let pages = 1;
+      let textPages = null;
+      let pageAmounts = null;
+      if (k.kind === "pdf") {
+        let pdf;
+        try {
+          pdf = await pdfText.readPdf(buffer);
+        } catch (e) {
+          throw new StatementError("STATEMENT_BAD_PDF", "This PDF cannot be opened (damaged or password-protected)");
+        }
+        pages = pdf.pageCount;
+        if (pdf.truncated) throw new StatementError("STATEMENT_TOO_LONG", `Statements up to ${pdfText.MAX_PAGES} pages`);
+        if (pdf.pages.every((pg) => pg.hasText)) {
+          mode = "text";
+          textPages = pdf.pages;
+          pageAmounts = new Map(pdf.pages.map((pg) => [pg.page, pdfText.amountsOnPage(pg.text, proof.toCents)]));
+        } else mode = "pdf-vision";
+      } else mode = "photo";
+      const wholeParts = (extra) => {
+        if (mode === "text") {
+          const body = textPages.map((pg) => `=== Page ${pg.page} of ${pages} ===
+${pg.text}`).join("\n\n");
+          return [{ text: `${extra ? `${extra}
+
+` : ""}Statement text layer (columns kept by spacing):
+
+${body}` }];
+        }
+        return [{ mime: k.mime, data: b64 }, { text: extra || "Read this statement." }];
+      };
+      const vision = { vision: mode !== "text" };
+      const first = await readOnce(ai, wholeParts(), usage, vision);
+      const m = meta(first);
+      let best = check(m, normalizeRows(first.rows), pageAmounts);
+      const attempts = [{ attempt: 1, scope: "all pages", status: best.proof.status, gap_cents: best.proof.gap_cents, breaks: best.proof.breaks.length }];
+      for (let n = 0; n < MAX_REREADS && best.proof.status !== "proven" && best.proof.status !== "needs_closing" && best.proof.status !== "needs_opening"; n += 1) {
+        const page = pageToReread(best);
+        const ask = page ? `Read ONLY page ${page} again, very carefully, digit by digit. A row on this page may have been skipped, read in the wrong column, or an amount or a date misread. Return the same JSON shape with the rows of page ${page} only (page = ${page}), plus opening_balance and closing_balance if they are printed on this page.` : "Read the whole statement again, very carefully, digit by digit. A row may have been skipped, read in the wrong column, or an amount or a date misread.";
+        let parts;
+        if (page && mode === "text") {
+          const pg = textPages.find((x) => x.page === page);
+          parts = [{ text: `${ask}
+
+=== Page ${page} of ${pages} ===
+${pg ? pg.text : ""}` }];
+        } else parts = wholeParts(ask);
+        let again;
+        try {
+          again = await readOnce(ai, parts, usage, vision);
+        } catch (e) {
+          break;
+        }
+        const am = meta(again);
+        let rows;
+        const m2 = { ...m };
+        if (page) {
+          const fresh = normalizeRows(again.rows, page).map((r) => ({ ...r, page }));
+          rows = [];
+          let placed = false;
+          for (const r of best.rows) {
+            if (r.page === page) {
+              if (!placed) {
+                rows.push(...fresh);
+                placed = true;
+              }
+            } else rows.push({ ...r, ungrounded: void 0 });
+          }
+          if (!placed) rows.push(...fresh);
+          if (page === 1 && am.opening_cents !== null) m2.opening_cents = am.opening_cents;
+          if (page === pages && am.closing_cents !== null) m2.closing_cents = am.closing_cents;
+        } else {
+          rows = normalizeRows(again.rows);
+          Object.assign(m2, { opening_cents: am.opening_cents, closing_cents: am.closing_cents });
+        }
+        const c = check(m2, rows, pageAmounts);
+        attempts.push({ attempt: attempts.length + 1, scope: page ? `page ${page}` : "all pages", status: c.proof.status, gap_cents: c.proof.gap_cents, breaks: c.proof.breaks.length });
+        if (score(c) < score(best)) {
+          best = c;
+          Object.assign(m, m2);
+        }
+      }
+      return {
+        meta: m,
+        rows: best.rows,
+        proof: best.proof,
+        attempts,
+        usage,
+        ms: Date.now() - t0,
+        mode,
+        pages,
+        sha256: crypto.createHash("sha256").update(buffer).digest("hex")
+      };
+    }
+    function reprove({ meta: m, rows, opening_cents: o, closing_cents: c }) {
+      const m2 = { ...m };
+      if (Number.isInteger(o)) m2.opening_cents = o;
+      if (Number.isInteger(c)) m2.closing_cents = c;
+      const p = proof.prove({ opening_cents: m2.opening_cents, closing_cents: m2.closing_cents, rows, kind: m2.statement_type });
+      return { meta: m2, proof: p };
+    }
+    module2.exports = { _setRetryDelay, read, reprove, detectKind, parseJson, normalizeRows, meta, check, dateIssues, SYSTEM, StatementError, MAX_REREADS };
+  }
+});
+
+// services/statement/plan.js
+var require_plan = __commonJS({
+  "services/statement/plan.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var BILL_WORDS = /\b(rent|mortgage|hydro|electric|utility|utilities|water|gas bill|insurance|rogers|bell|telus|fido|koodo|freedom|virgin|internet|wireless|mobile|phone|netflix|spotify|disney|apple\.com|icloud|google \*|youtube|amazon prime|prime video|crave|gym|fitness|membership|subscription|loan|lease|tuition|daycare|pad|pre-?authorized|monthly (account )?fee|account fee|plan fee)\b/i;
+    var payee = (d) => String(d || "").toLowerCase().replace(/[#*]?\d[\d\-/.]*/g, " ").replace(/[^a-z&' ]+/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 3).join(" ");
+    function days(start, end, rows) {
+      const ds = rows.map((r) => r.date).filter(Boolean).sort();
+      const a = start || ds[0];
+      const b = end || ds[ds.length - 1];
+      if (!a || !b) return 30;
+      const n = Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5) + 1;
+      return Number.isFinite(n) && n >= 7 ? n : 30;
+    }
+    function plan30(rows, { closing_cents: closing, period_start: ps, period_end: pe, statement_type: st, currency }) {
+      const list = rows.filter((r) => Number.isInteger(r.cents));
+      const span = days(ps, pe, list);
+      const scale = (c) => Math.round(c * 30 / span);
+      let income = 0;
+      let spend = 0;
+      const byCat = /* @__PURE__ */ new Map();
+      const groups = /* @__PURE__ */ new Map();
+      for (const r of list) {
+        if (r.cents > 0) income += r.cents;
+        else {
+          spend += -r.cents;
+          const c = r.category || "Other";
+          byCat.set(c, (byCat.get(c) || 0) - r.cents);
+        }
+        if (r.cents < 0) {
+          const k = payee(r.description);
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k).push(r);
+        }
+      }
+      const bills = [];
+      for (const [k, g] of groups) {
+        const word = g.some((r) => BILL_WORDS.test(r.description));
+        const amounts = g.map((r) => -r.cents);
+        const min = Math.min(...amounts);
+        const max = Math.max(...amounts);
+        const steady = g.length >= 2 && max - min <= Math.max(100, Math.round(max * 0.05));
+        if (!word && !steady) continue;
+        if (!word && /uber|tim hortons|starbucks|coffee|grocery|metro|loblaws|walmart|costco|amazon|dollarama|petro|shell|esso/i.test(k)) continue;
+        const monthly = scale(amounts.reduce((a, b) => a + b, 0));
+        bills.push({ payee: g[0].description, times: g.length, cents_30d: monthly });
+      }
+      bills.sort((a, b) => b.cents_30d - a.cents_30d);
+      const bills30 = bills.reduce((a, b) => a + b.cents_30d, 0);
+      const income30 = scale(income);
+      const spend30 = scale(spend);
+      const top = [...byCat.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([category, c]) => ({ category, cents_30d: scale(c), share: spend ? Math.round(c * 100 / spend) : 0 }));
+      const out = {
+        estimate: true,
+        basis_days: span,
+        currency: currency || null,
+        income_30d_cents: income30,
+        spending_30d_cents: spend30,
+        net_30d_cents: income30 - spend30,
+        bills: bills.slice(0, 8),
+        bills_30d_cents: bills30,
+        top_categories: top
+      };
+      if (st !== "card" && Number.isInteger(closing)) {
+        out.start_balance_cents = closing;
+        out.projected_balance_cents = closing + income30 - spend30;
+        out.flexible_per_day_cents = Math.max(0, Math.floor((income30 - bills30) / 30));
+      }
+      return out;
+    }
+    module2.exports = { plan30, payee };
+  }
+});
+
+// services/statement/service.js
+var require_service2 = __commonJS({
+  "services/statement/service.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var { get, query, run } = require_database();
+    var Account = require_account();
+    var keys = require_keys();
+    var platform = require_aiProvider();
+    var csvImportService = require_csvImportService();
+    var { categorizeByDescription } = require_importCategorizer();
+    var importCommit = require_importCommit();
+    var agent = require_agent();
+    var proof = require_proof();
+    var { plan30 } = require_plan();
+    var { StatementError } = agent;
+    var PLATFORM_DAILY = () => parseInt(proc.env.STATEMENT_PLATFORM_DAILY, 10) || 15;
+    var OK = /* @__PURE__ */ new Set(["proven"]);
+    var parse = (s, d) => {
+      try {
+        return JSON.parse(s);
+      } catch (_) {
+        return d;
+      }
+    };
+    function platformReady() {
+      try {
+        return platform.isConfigured(proc.env.STATEMENT_AI_PROVIDER || void 0) && ["google", "gemini-oauth"].includes(platform.describe(proc.env.STATEMENT_AI_PROVIDER || void 0).provider);
+      } catch (_) {
+        return false;
+      }
+    }
+    async function aiFor(userId) {
+      try {
+        const { row, secret } = await keys.resolve(userId, null);
+        return { source: "user", provider: row.provider, key: secret, model: row.model, baseUrl: row.base_url, keyId: row.id };
+      } catch (e) {
+        if (e.code !== "AI_NO_KEY") throw e;
+      }
+      if (!platformReady()) {
+        throw new StatementError("STATEMENT_NO_AI", "Connect your AI on the My AI page to read PDF and photo statements. CSV, OFX and QFX files import without AI.", 400);
+      }
+      const used = await get(
+        "SELECT COUNT(*) AS n FROM statement_tasks WHERE user_id = ? AND ai_source = 'platform' AND created_at >= datetime('now', '-1 day')",
+        [userId]
+      );
+      if (used && used.n >= PLATFORM_DAILY()) {
+        throw new StatementError("STATEMENT_DAILY_LIMIT", `The shared AI reads ${PLATFORM_DAILY()} statements a day per person. Add your own AI key on the My AI page to read more.`, 429);
+      }
+      return { source: "platform" };
+    }
+    async function readForVault(userId, { buffer, mime, fileName }) {
+      if (!platformReady()) {
+        throw new StatementError("STATEMENT_NO_AI", "Reading PDF and photo statements is not available right now. CSV, OFX and QFX files import without AI.", 503);
+      }
+      const used = await get(
+        "SELECT COUNT(*) AS n FROM analytics_events WHERE user_id = ? AND event = 'statement_read' AND created_at >= datetime('now', '-1 day')",
+        [userId]
+      );
+      if (used && used.n >= PLATFORM_DAILY()) {
+        throw new StatementError("STATEMENT_DAILY_LIMIT", `Finman AI reads ${PLATFORM_DAILY()} statements a day per person. Try again tomorrow.`, 429);
+      }
+      const r = await agent.read({ buffer, mime, fileName, ai: { source: "platform" } });
+      return {
+        file_name: String(fileName || "").slice(0, 200),
+        meta: r.meta,
+        rows: r.rows,
+        proof: r.proof,
+        attempts: r.attempts,
+        mode: r.mode,
+        pages: r.pages,
+        sha256: r.sha256,
+        ms: r.ms,
+        usage: { calls: r.usage.calls, input: r.usage.input, output: r.usage.output, provider: r.usage.provider || null, model: r.usage.model || null }
+      };
+    }
+    async function createFromReading(userId, reading) {
+      const rd = reading && typeof reading === "object" ? reading : null;
+      if (!rd || !Array.isArray(rd.rows) || !rd.rows.length || !rd.meta || !rd.proof) {
+        throw new StatementError("STATEMENT_NO_ROWS", "The reading has no rows");
+      }
+      if (rd.rows.length > 2e3) throw new StatementError("STATEMENT_TOO_MANY", "At most 2000 rows per statement");
+      const m = agent.meta({
+        statement_type: rd.meta.statement_type,
+        institution: rd.meta.institution,
+        account_last4: rd.meta.account_last4,
+        currency: rd.meta.currency,
+        period_start: rd.meta.period_start,
+        period_end: rd.meta.period_end,
+        opening_balance: Number.isInteger(rd.meta.opening_cents) ? rd.meta.opening_cents / 100 : null,
+        closing_balance: Number.isInteger(rd.meta.closing_cents) ? rd.meta.closing_cents / 100 : null
+      });
+      const rows = rd.rows.map((r) => ({ ...r }));
+      const local = proof.prove({ opening_cents: m.opening_cents, closing_cents: m.closing_cents, rows, kind: m.statement_type });
+      const serverProof = rd.proof;
+      const p = serverProof.status === "proven" && local.status === "proven" ? { ...serverProof, ...local, notes: serverProof.notes || [] } : serverProof.status === "proven" ? local : serverProof;
+      const ins = await run(
+        `INSERT INTO statement_tasks (user_id, source, file_name, file_sha256, file_kind, mode, pages, ai_source, ai_provider, ai_model,
+       status, statement_type, institution, account_last4, currency, period_start, period_end, opening_cents, closing_cents,
+       rows_json, proof_json, attempts_json, model_calls, tokens_in, tokens_out, ms)
+     VALUES (?, 'upload', ?, ?, ?, ?, ?, 'platform', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          String(rd.file_name || "").slice(0, 200),
+          /^[a-f0-9]{64}$/.test(String(rd.sha256 || "")) ? rd.sha256 : null,
+          rd.mode === "photo" ? "image" : "pdf",
+          ["text", "pdf-vision", "photo"].includes(rd.mode) ? rd.mode : "text",
+          parseInt(rd.pages, 10) || 1,
+          rd.usage && rd.usage.provider ? String(rd.usage.provider).slice(0, 40) : null,
+          rd.usage && rd.usage.model ? String(rd.usage.model).slice(0, 80) : null,
+          p.status,
+          m.statement_type,
+          m.institution,
+          m.account_last4,
+          m.currency,
+          m.period_start,
+          m.period_end,
+          Number.isInteger(p.opening_cents) ? p.opening_cents : m.opening_cents,
+          m.closing_cents,
+          JSON.stringify(rows),
+          JSON.stringify(p),
+          JSON.stringify(Array.isArray(rd.attempts) ? rd.attempts.slice(0, 5) : []),
+          rd.usage ? parseInt(rd.usage.calls, 10) || 0 : 0,
+          rd.usage ? parseInt(rd.usage.input, 10) || 0 : 0,
+          rd.usage ? parseInt(rd.usage.output, 10) || 0 : 0,
+          parseInt(rd.ms, 10) || 0
+        ]
+      );
+      return ins.id;
+    }
+    async function create(userId, { buffer, mime, fileName }) {
+      const ai = await aiFor(userId);
+      let r;
+      try {
+        r = await agent.read({ buffer, mime, fileName, ai });
+        if (ai.keyId) await keys.markUsed(ai.keyId, null);
+      } catch (e) {
+        if (ai.keyId) await keys.markUsed(ai.keyId, e.message || "error");
+        throw e;
+      }
+      const m = r.meta;
+      const ins = await run(
+        `INSERT INTO statement_tasks (user_id, source, file_name, file_sha256, file_kind, mode, pages, ai_source, ai_provider, ai_model,
+       status, statement_type, institution, account_last4, currency, period_start, period_end, opening_cents, closing_cents,
+       rows_json, proof_json, attempts_json, model_calls, tokens_in, tokens_out, ms)
+     VALUES (?, 'upload', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          String(fileName || "").slice(0, 200),
+          r.sha256,
+          r.mode === "photo" ? "image" : "pdf",
+          r.mode,
+          r.pages,
+          ai.source,
+          r.usage.provider || ai.provider || null,
+          r.usage.model || ai.model || null,
+          r.proof.status,
+          m.statement_type,
+          m.institution,
+          m.account_last4,
+          m.currency,
+          m.period_start,
+          m.period_end,
+          r.proof.opening_cents,
+          m.closing_cents,
+          JSON.stringify(r.rows),
+          JSON.stringify(r.proof),
+          JSON.stringify(r.attempts),
+          r.usage.calls,
+          r.usage.input,
+          r.usage.output,
+          r.ms
+        ]
+      );
+      return ins.id;
+    }
+    async function createFromRows(userId, { statement_type: st, opening_balance: o, closing_balance: c, currency, rows, period_start: ps, period_end: pe, label }) {
+      if (!Array.isArray(rows) || !rows.length) throw new StatementError("STATEMENT_NO_ROWS", "rows must be a non-empty array");
+      if (rows.length > 2e3) throw new StatementError("STATEMENT_TOO_MANY", "At most 2000 rows per statement");
+      const norm = agent.normalizeRows(rows.map((r, i) => ({ ...r, page: r.page || 1, _i: i })));
+      const kind = st === "card" ? "card" : "bank";
+      const m = { statement_type: kind, opening_cents: proof.toCents(o), closing_cents: proof.toCents(c) };
+      const checked = agent.check(m, norm, null);
+      const t0 = Date.now();
+      const ins = await run(
+        `INSERT INTO statement_tasks (user_id, source, file_name, mode, pages, ai_source, status, statement_type, currency, period_start, period_end,
+       opening_cents, closing_cents, rows_json, proof_json, attempts_json, ms)
+     VALUES (?, 'mcp', ?, 'rows', 1, 'outside', ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?)`,
+        [
+          userId,
+          label ? String(label).slice(0, 200) : "Rows from the assistant",
+          checked.proof.status,
+          kind,
+          currency && /^[A-Za-z]{3}$/.test(String(currency)) ? String(currency).toUpperCase() : null,
+          agent.normalizeRows([{ date: ps }])[0].date,
+          agent.normalizeRows([{ date: pe }])[0].date,
+          checked.proof.opening_cents,
+          m.closing_cents,
+          JSON.stringify(checked.rows),
+          JSON.stringify(checked.proof),
+          Date.now() - t0
+        ]
+      );
+      return ins.id;
+    }
+    async function taskFor(userId, id) {
+      const t = await get("SELECT * FROM statement_tasks WHERE id = ? AND user_id = ?", [parseInt(id, 10) || 0, userId]);
+      if (!t) throw new StatementError("STATEMENT_NOT_FOUND", "Statement not found", 404);
+      return t;
+    }
+    function rowsOf(t) {
+      return parse(t.rows_json, []).map((r, i) => ({
+        index: i,
+        date: r.date,
+        date_raw: r.date_raw || null,
+        description: r.description,
+        cents: r.cents,
+        amount: Number.isInteger(r.cents) ? r.cents / 100 : null,
+        balance_cents: r.balance_cents,
+        page: r.page,
+        unclear: !!r.unclear,
+        derived: !!r.derived,
+        ungrounded: !!r.ungrounded,
+        category: Number.isInteger(r.cents) ? categorizeByDescription(r.description) || "Other" : null
+      }));
+    }
+    async function view(userId, id, { accountId } = {}) {
+      const t = await taskFor(userId, id);
+      const rows = rowsOf(t);
+      const p = parse(t.proof_json, {});
+      let account = null;
+      if (accountId) {
+        account = await Account.findById(accountId, userId);
+        if (!account) throw new StatementError("ACCOUNT_NOT_FOUND", "Account not found", 404);
+        const existing = await importCommit.loadExistingFingerprints(account.id, userId);
+        for (const r of rows) {
+          if (!r.date || !Number.isInteger(r.cents)) continue;
+          const fp = csvImportService.fingerprintOf(r.date, r.cents / 100, r.description);
+          if (importCommit.consumeExisting(existing, fp)) r.duplicate = "existing";
+        }
+      }
+      const badDates = rows.filter((r) => !r.date).length;
+      const dup = rows.filter((r) => r.duplicate).length;
+      const currencyMismatch = !!(account && t.currency && account.currency && account.currency !== t.currency);
+      return {
+        id: t.id,
+        source: t.source,
+        file_name: t.file_name,
+        mode: t.mode,
+        pages: t.pages,
+        status: t.status,
+        statement_type: t.statement_type,
+        institution: t.institution,
+        account_last4: t.account_last4,
+        currency: t.currency,
+        period: { start: t.period_start, end: t.period_end },
+        opening_cents: t.opening_cents,
+        closing_cents: t.closing_cents,
+        balances_typed: !!t.balances_typed,
+        proof: p,
+        attempts: parse(t.attempts_json, []),
+        rows,
+        counts: { rows: rows.length, duplicates: dup, new: rows.length - dup, bad_dates: badDates },
+        usage: { ai: t.ai_source, provider: t.ai_provider, model: t.ai_model, calls: t.model_calls, tokens_in: t.tokens_in, tokens_out: t.tokens_out, ms: t.ms },
+        plan: OK.has(t.status) ? plan30(rows, { closing_cents: t.closing_cents, period_start: t.period_start, period_end: t.period_end, statement_type: t.statement_type, currency: t.currency }) : null,
+        account: account ? { id: account.id, name: account.name, currency: account.currency } : null,
+        currency_mismatch: currencyMismatch,
+        can_import: OK.has(t.status) && !t.committed_at && badDates === 0,
+        committed: t.committed_at ? { at: t.committed_at, account_id: t.account_id, inserted: t.inserted, skipped: t.skipped } : null,
+        created_at: t.created_at
+      };
+    }
+    async function list(userId) {
+      const rows = await query(
+        `SELECT id, source, file_name, status, statement_type, institution, account_last4, currency, period_start, period_end,
+            opening_cents, closing_cents, committed_at, inserted, created_at, proof_json
+       FROM statement_tasks WHERE user_id = ? ORDER BY id DESC LIMIT 30`,
+        [userId]
+      );
+      return rows.map((r) => {
+        const p = parse(r.proof_json, {});
+        return {
+          id: r.id,
+          source: r.source,
+          file_name: r.file_name,
+          status: r.status,
+          statement_type: r.statement_type,
+          institution: r.institution,
+          account_last4: r.account_last4,
+          currency: r.currency,
+          period: { start: r.period_start, end: r.period_end },
+          proof_line: p.line || null,
+          rows: (p.rows_checked || 0) + (p.unclear_rows || []).length,
+          committed: !!r.committed_at,
+          inserted: r.inserted,
+          created_at: r.created_at
+        };
+      });
+    }
+    async function setBalances(userId, id, { opening_balance: o, closing_balance: c }) {
+      const t = await taskFor(userId, id);
+      if (t.committed_at) throw new StatementError("STATEMENT_DONE", "This statement is already imported", 409);
+      const oc = o === void 0 || o === null || o === "" ? null : proof.toCents(o);
+      const cc = c === void 0 || c === null || c === "" ? null : proof.toCents(c);
+      if (o !== void 0 && o !== null && o !== "" && oc === null || c !== void 0 && c !== null && c !== "" && cc === null) {
+        throw new StatementError("STATEMENT_BAD_AMOUNT", "Type the balance as a number, e.g. 1234.56");
+      }
+      if (oc === null && cc === null) throw new StatementError("STATEMENT_BAD_AMOUNT", "Type the opening or the closing balance");
+      const rows = parse(t.rows_json, []);
+      const m = { statement_type: t.statement_type, opening_cents: t.opening_cents, closing_cents: t.closing_cents };
+      const r = agent.reprove({ meta: m, rows, opening_cents: oc, closing_cents: cc });
+      r.proof.typed = { opening: oc !== null, closing: cc !== null };
+      if (r.proof.status === "proven") r.proof.line += " (balance typed by you)";
+      await run(
+        "UPDATE statement_tasks SET status = ?, opening_cents = ?, closing_cents = ?, balances_typed = 1, proof_json = ? WHERE id = ?",
+        [r.proof.status, r.proof.opening_cents, r.meta.closing_cents, JSON.stringify(r.proof), t.id]
+      );
+      return t.id;
+    }
+    async function commit(userId, id, { accountId, categories, allowCurrencyMismatch } = {}) {
+      const t = await taskFor(userId, id);
+      if (t.committed_at) throw new StatementError("STATEMENT_DONE", "This statement is already imported", 409);
+      if (!OK.has(t.status)) {
+        const p = parse(t.proof_json, {});
+        throw new StatementError("STATEMENT_NOT_PROVEN", `Not imported: the balance check did not pass. ${p.line || ""}`.trim(), 409);
+      }
+      if (!accountId) throw new StatementError("ACCOUNT_REQUIRED", "Choose the account to import into");
+      const account = await Account.findById(accountId, userId);
+      if (!account) throw new StatementError("ACCOUNT_NOT_FOUND", "Account not found", 404);
+      if (t.currency && account.currency && t.currency !== account.currency && !allowCurrencyMismatch) {
+        throw new StatementError("STATEMENT_CURRENCY", `The statement is in ${t.currency} and the account "${account.name}" is in ${account.currency}. Choose a ${t.currency} account.`, 409);
+      }
+      const rows = rowsOf(t);
+      if (rows.some((r) => !r.date)) throw new StatementError("STATEMENT_BAD_DATES", "Some rows have no readable date; nothing is written", 409);
+      const cats = categories && typeof categories === "object" ? categories : {};
+      const { prepared, errors } = importCommit.prepareRows(rows.map((r) => ({
+        date: r.date,
+        description: r.description,
+        amount: r.cents / 100,
+        category: typeof cats[r.index] === "string" && cats[r.index].trim() ? cats[r.index] : r.category
+      })));
+      if (errors.length) throw new StatementError("STATEMENT_BAD_ROWS", errors[0].message, 409);
+      const claim = await run("UPDATE statement_tasks SET committed_at = CURRENT_TIMESTAMP, account_id = ? WHERE id = ? AND committed_at IS NULL", [account.id, t.id]);
+      if (!claim.changes) throw new StatementError("STATEMENT_DONE", "This statement is already imported", 409);
+      let out;
+      try {
+        out = await importCommit.commitPrepared(account, userId, prepared, { skipDuplicates: true, updateBalance: true });
+      } catch (e) {
+        await run("UPDATE statement_tasks SET committed_at = NULL, account_id = NULL WHERE id = ?", [t.id]);
+        throw e;
+      }
+      await run("UPDATE statement_tasks SET inserted = ?, skipped = ? WHERE id = ?", [out.inserted, out.skipped, t.id]);
+      const refreshed = await Account.findById(account.id, userId);
+      return { id: t.id, account_id: account.id, account: account.name, inserted: out.inserted, skipped: out.skipped, balance_delta: out.delta, new_balance: refreshed ? refreshed.balance : null };
+    }
+    async function remove(userId, id) {
+      const t = await taskFor(userId, id);
+      await run("DELETE FROM statement_tasks WHERE id = ?", [t.id]);
+      return { deleted: true };
+    }
+    module2.exports = { create, createFromRows, readForVault, createFromReading, view, list, setBalances, commit, remove, aiFor, platformReady, StatementError };
+  }
+});
+
+// services/mcp/statementTools.js
+var require_statementTools = __commonJS({
+  "services/mcp/statementTools.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var svc = require_service2();
+    var { fmt } = require_proof();
+    var StatementToolError = class extends Error {
+    };
+    var money = (c, cur) => c === null || c === void 0 ? null : `${fmt(c)}${cur ? ` ${cur}` : ""}`;
+    function brief(v) {
+      return {
+        statement_id: v.id,
+        file: v.file_name,
+        status: v.status,
+        check: v.proof && v.proof.line,
+        institution: v.institution,
+        account_last4: v.account_last4,
+        currency: v.currency,
+        period: v.period,
+        opening: money(v.opening_cents, v.currency),
+        closing: money(v.closing_cents, v.currency),
+        rows: v.counts.rows,
+        imported: v.committed ? { account_id: v.committed.account_id, inserted: v.committed.inserted, skipped: v.committed.skipped } : false
+      };
+    }
+    function planOut(p, cur) {
+      if (!p) return null;
+      return {
+        note: `Estimate for the next 30 days from this statement (${p.basis_days} days of rows)`,
+        income: money(p.income_30d_cents, cur),
+        spending: money(p.spending_30d_cents, cur),
+        net: money(p.net_30d_cents, cur),
+        repeating_bills: p.bills.map((b) => ({ payee: b.payee, per_30_days: money(b.cents_30d, cur), times_on_statement: b.times })),
+        top_categories: p.top_categories.map((c) => ({ category: c.category, per_30_days: money(c.cents_30d, cur), share_percent: c.share })),
+        projected_balance: money(p.projected_balance_cents, cur),
+        flexible_per_day: money(p.flexible_per_day_cents, cur)
+      };
+    }
+    var rowSchema = {
+      type: "object",
+      required: ["date", "amount"],
+      properties: {
+        date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "YYYY-MM-DD" },
+        description: { type: "string" },
+        amount: { type: "number", description: "Signed, as printed from the holder's view: money out negative, money in positive" },
+        balance: { type: "number", description: "Running balance printed on this row, if any" }
+      }
+    };
+    var STATEMENT_TOOLS = [
+      {
+        name: "list_statements",
+        title: "List read statements",
+        description: "Statements the Finman Statement Agent read from PDF or photo uploads, newest first, with the balance check result (proven or the gap) and whether they are imported.",
+        inputSchema: { type: "object", properties: {} },
+        annotations: { readOnlyHint: true },
+        async run(userId) {
+          const rows = await svc.list(userId);
+          return { statements: rows.map((r) => ({ statement_id: r.id, file: r.file_name, status: r.status, check: r.proof_line, currency: r.currency, period: r.period, imported: r.committed })) };
+        }
+      },
+      {
+        name: "get_statement",
+        title: "Get statement",
+        description: "One statement the agent read: the balance check line, the gap and the first row where the running balance breaks (if any), the first 60 rows, and a 30-day estimate (income, spending, repeating bills, projected balance) when the check is proven.",
+        inputSchema: { type: "object", required: ["statement_id"], properties: { statement_id: { type: "integer" } } },
+        annotations: { readOnlyHint: true },
+        async run(userId, a) {
+          const v = await svc.view(userId, a.statement_id);
+          const b = v.proof && v.proof.first_break;
+          return {
+            ...brief(v),
+            first_break: b ? { row: b.index + 1, page: b.page, printed_balance: money(b.printed_balance_cents, v.currency), balance_from_rows: money(b.expected_balance_cents, v.currency) } : null,
+            gap: money(v.proof && v.proof.gap_cents, v.currency),
+            reads: v.attempts,
+            rows_sample: v.rows.slice(0, 60).map((r) => ({ row: r.index + 1, date: r.date, description: r.description, amount: r.amount, page: r.page, unreadable: r.unclear || void 0, derived_from_balances: r.derived || void 0 })),
+            next_30_days: planOut(v.plan, v.currency)
+          };
+        }
+      },
+      {
+        name: "import_statement",
+        title: "Import statement",
+        description: "Imports a statement into an account, only if its balance check is proven (opening + rows = closing, to the cent); otherwise nothing is written and the gap is returned. Either pass statement_id (a PDF/photo the person uploaded to Finman), or pass the rows you read yourself with opening_balance and closing_balance as printed. Never change numbers to make a statement balance. Rows already in the account are skipped.",
+        inputSchema: {
+          type: "object",
+          required: ["account_id"],
+          properties: {
+            account_id: { type: "integer", description: "Target account (see list_accounts)" },
+            statement_id: { type: "integer", description: "A statement from list_statements" },
+            statement_type: { type: "string", enum: ["bank", "card"], description: "card = credit card statement (balances are amounts owed)" },
+            opening_balance: { type: "number", description: "As printed (previous balance on a card)" },
+            closing_balance: { type: "number", description: "As printed (new balance on a card)" },
+            currency: { type: "string", description: "ISO code, e.g. CAD" },
+            rows: { type: "array", maxItems: 2e3, items: rowSchema }
+          }
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+        async run(userId, a) {
+          const accountId = parseInt(a.account_id, 10);
+          if (!Number.isFinite(accountId) || accountId <= 0) throw new StatementToolError("account_id must be a positive number");
+          let id = parseInt(a.statement_id, 10);
+          if (!Number.isFinite(id) || id <= 0) {
+            if (!Array.isArray(a.rows) || !a.rows.length) throw new StatementToolError("Pass statement_id, or rows with opening_balance and closing_balance");
+            id = await svc.createFromRows(userId, a);
+          }
+          const v = await svc.view(userId, id, { accountId });
+          if (v.status !== "proven") {
+            throw new StatementToolError(`Nothing imported (statement_id ${id}): ${v.proof && v.proof.line}. Tell the person where the gap is; do not change numbers.`);
+          }
+          const out = await svc.commit(userId, id, { accountId });
+          return { imported: true, statement_id: id, check: v.proof.line, account: out.account, inserted: out.inserted, skipped_as_already_there: out.skipped, new_balance: out.new_balance, next_30_days: planOut(v.plan, v.currency) };
+        }
+      }
+    ];
+    module2.exports = { STATEMENT_TOOLS, StatementToolError };
+  }
+});
+
 // services/mcp/tools.js
 var require_tools = __commonJS({
   "services/mcp/tools.js"(exports2, module2) {
@@ -21248,6 +22518,8 @@ var require_tools = __commonJS({
     var core = require_core();
     var config2 = require_config();
     var { TX_TOOLS, TxToolError } = require_txTools();
+    var { STATEMENT_TOOLS, StatementToolError } = require_statementTools();
+    var { StatementError } = require_agent();
     var PDF_TTL = 7 * 24 * 60 * 60;
     var ToolError = class extends Error {
     };
@@ -21532,7 +22804,7 @@ var require_tools = __commonJS({
       if (!hit) throw new ToolError(`Invoice ${num} not found`);
       return svc.getInvoice(userId, hit.id);
     }
-    TOOLS.push(...TX_TOOLS);
+    TOOLS.push(...TX_TOOLS, ...STATEMENT_TOOLS);
     for (const t of TOOLS) {
       if (!t.annotations) t.annotations = { readOnlyHint: false, destructiveHint: false };
       else if (t.annotations.readOnlyHint === void 0) t.annotations = { readOnlyHint: false, ...t.annotations };
@@ -21561,7 +22833,7 @@ var require_tools = __commonJS({
         const data = await tool.run(userId, a);
         return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }], structuredContent: data, isError: false };
       } catch (e) {
-        if (e instanceof ToolError || e instanceof TxToolError || e instanceof svc.InvoiceError) {
+        if (e instanceof ToolError || e instanceof TxToolError || e instanceof StatementToolError || e instanceof StatementError || e instanceof svc.InvoiceError) {
           return { content: [{ type: "text", text: e.message }], isError: true };
         }
         throw e;
@@ -21572,7 +22844,7 @@ var require_tools = __commonJS({
 });
 
 // services/userAi/agent.js
-var require_agent = __commonJS({
+var require_agent2 = __commonJS({
   "services/userAi/agent.js"(exports2, module2) {
     "use strict";
     init_globals();
@@ -21607,6 +22879,7 @@ var require_agent = __commonJS({
         'For "how much does my business earn", profit, owner pay or business vs personal money use get_business_and_personal.',
         "Tools that change data (adding, editing or deleting transactions, invoices, clients) are shown to the person as a card with Confirm and Decline; they run only after Confirm. Ask for such a tool directly, without asking for permission in text first.",
         "Amounts in add_transaction are positive; the type says income or expense. Dates are YYYY-MM-DD.",
+        "Bank statements the person uploaded as PDF or photo are in list_statements / get_statement. import_statement writes only when the balance check is proven; when a statement does not balance, tell the person the gap and the row from get_statement and never change numbers to make it balance. After an import, give the 30-day estimate from the tool result.",
         "Keep answers short and concrete. Format money with its currency."
       ].join("\n");
     }
@@ -21788,7 +23061,8 @@ var require_agent = __commonJS({
       const n = names && names.get(Number(a.account_id));
       if (n) a.account_id = n;
       const bits = [];
-      for (const k of ["amount", "type", "date", "description", "category", "account_id", "transaction_id", "invoice_id", "client_id", "status", "name", "email"]) {
+      if (Array.isArray(a.rows)) a.rows = `${a.rows.length} rows`;
+      for (const k of ["amount", "type", "date", "description", "category", "account_id", "statement_id", "opening_balance", "closing_balance", "rows", "transaction_id", "invoice_id", "client_id", "status", "name", "email"]) {
         if (a[k] !== void 0 && a[k] !== null && a[k] !== "") bits.push([k, typeof a[k] === "object" ? JSON.stringify(a[k]) : String(a[k])]);
       }
       return bits.slice(0, 8);
@@ -21850,7 +23124,7 @@ var require_userAi = __commonJS({
     var express = require_express();
     var rateLimit = require_express_rate_limit();
     var keys = require_keys();
-    var agent = require_agent();
+    var agent = require_agent2();
     var providers = require_providers();
     var tracker = require_tracker();
     var logger = require_logger();
@@ -25124,6 +26398,8 @@ var require_vaultTables = __commonJS({
       { name: "ai_agent_threads", ...U() },
       { name: "ai_agent_messages", ...U() },
       { name: "ai_agent_actions", ...U() },
+      // Statement Agent: rows read from a PDF / photo statement (migration 028).
+      { name: "statement_tasks", ...U() },
       // Совместный доступ (на проде 21.11 — 0 строк). В сейф идут строки, где
       // пользователь владелец; строки «мне дали доступ» удаляются вместе с его данными.
       { name: "families", ...U("owner_id") },
@@ -26731,6 +28007,111 @@ var require_reconcile = __commonJS({
   }
 });
 
+// routes/statements.js
+var require_statements = __commonJS({
+  "routes/statements.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var express = require_express();
+    var passport = require_passport();
+    var multer = require_multer();
+    var svc = require_service2();
+    var logger = require_logger();
+    var tracker = require_tracker();
+    var router = express.Router();
+    var authenticate = passport.authenticate("jwt", { session: false });
+    var upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+    function fail(res, e) {
+      const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 500;
+      if (status >= 500 && !e.code) logger.error(`[statements] ${e && e.message}`);
+      const message = status >= 500 && !e.code ? "The statement could not be read; nothing was written" : e.message;
+      return res.status(status).json({ error: true, code: e.code || "STATEMENT_ERROR", message });
+    }
+    router.get("/", authenticate, async (req, res) => {
+      try {
+        res.json({ statements: await svc.list(req.user.id), ai: { shared: svc.platformReady() } });
+      } catch (e) {
+        fail(res, e);
+      }
+    });
+    router.post("/", authenticate, (req, res) => {
+      upload.single("file")(req, res, async (err) => {
+        if (err) return res.status(400).json({ error: true, code: "UPLOAD", message: err.code === "LIMIT_FILE_SIZE" ? "The file is larger than 15 MB" : err.message || "Upload failed" });
+        if (!req.file) return res.status(400).json({ error: true, code: "UPLOAD", message: "No file uploaded" });
+        try {
+          const id = await svc.create(req.user.id, { buffer: req.file.buffer, mime: req.file.mimetype, fileName: req.file.originalname });
+          res.status(201).json(await svc.view(req.user.id, id, { accountId: req.body && req.body.accountId ? req.body.accountId : void 0 }));
+        } catch (e) {
+          fail(res, e);
+        }
+      });
+    });
+    router.post("/read", authenticate, (req, res) => {
+      upload.single("file")(req, res, async (err) => {
+        if (err) return res.status(400).json({ error: true, code: "UPLOAD", message: err.code === "LIMIT_FILE_SIZE" ? "The file is larger than 15 MB" : err.message || "Upload failed" });
+        if (!req.file) return res.status(400).json({ error: true, code: "UPLOAD", message: "No file uploaded" });
+        if (String(req.body && req.body.consent || "") !== "1") {
+          return res.status(400).json({ error: true, code: "STATEMENT_CONSENT", message: "Reading a statement with Finman AI needs your consent for this file" });
+        }
+        const t0 = Date.now();
+        try {
+          const reading = await svc.readForVault(req.user.id, { buffer: req.file.buffer, mime: req.file.mimetype, fileName: req.file.originalname });
+          tracker.track("statement_read", {
+            userId: req.user.id,
+            req,
+            test: tracker.isTestEmail(req.user.email),
+            props: { mode: reading.mode, pages: reading.pages, status: reading.proof.status, ms: Date.now() - t0 }
+          });
+          res.json({ reading });
+        } catch (e) {
+          tracker.track("statement_read_failed", { userId: req.user.id, req, test: tracker.isTestEmail(req.user.email), props: { code: e.code || "ERROR" } });
+          fail(res, e);
+        }
+      });
+    });
+    router.post("/from-reading", authenticate, async (req, res) => {
+      try {
+        const b = req.body || {};
+        const id = await svc.createFromReading(req.user.id, b.reading);
+        res.status(201).json(await svc.view(req.user.id, id, { accountId: b.accountId || void 0 }));
+      } catch (e) {
+        fail(res, e);
+      }
+    });
+    router.get("/:id", authenticate, async (req, res) => {
+      try {
+        res.json(await svc.view(req.user.id, req.params.id, { accountId: req.query.accountId || void 0 }));
+      } catch (e) {
+        fail(res, e);
+      }
+    });
+    router.post("/:id/balances", authenticate, async (req, res) => {
+      try {
+        const id = await svc.setBalances(req.user.id, req.params.id, req.body || {});
+        res.json(await svc.view(req.user.id, id, { accountId: req.body && req.body.accountId || void 0 }));
+      } catch (e) {
+        fail(res, e);
+      }
+    });
+    router.post("/:id/commit", authenticate, async (req, res) => {
+      try {
+        const b = req.body || {};
+        res.json({ success: true, ...await svc.commit(req.user.id, req.params.id, { accountId: b.accountId, categories: b.categories, allowCurrencyMismatch: b.allowCurrencyMismatch === true }) });
+      } catch (e) {
+        fail(res, e);
+      }
+    });
+    router.delete("/:id", authenticate, async (req, res) => {
+      try {
+        res.json(await svc.remove(req.user.id, req.params.id));
+      } catch (e) {
+        fail(res, e);
+      }
+    });
+    module2.exports = router;
+  }
+});
+
 // engine/routes.js
 var require_routes = __commonJS({
   "engine/routes.js"(exports2, module2) {
@@ -26767,13 +28148,16 @@ var require_routes = __commonJS({
       ["/api/onboarding", () => require_onboarding()],
       ["/api/engagement", () => require_engagement()],
       ["/api/rules", () => require_rules()],
-      ["/api/reconcile", () => require_reconcile()]
+      ["/api/reconcile", () => require_reconcile()],
+      // Statement Agent tasks live in the vault; only POST /read (consent, nothing stored) goes out.
+      ["/api/statements", () => require_statements()]
     ];
     var LOCAL_PREFIXES = MOUNTS.map(([p]) => p);
     var REMOTE_RULES = [
       ["*", /^\/api\/currency\/(rates|rate\/[^/]+\/[^/]+|convert|history\/[^/]+\/[^/]+|fetch-nbu)\/?$/],
       ["POST", /^\/api\/currency\/rate\/?$/],
-      ["*", /^\/api\/engagement\/(push|referral|event)(\/|$)/]
+      ["*", /^\/api\/engagement\/(push|referral|event)(\/|$)/],
+      ["POST", /^\/api\/statements\/read\/?$/]
     ];
     var REMOTE_PREFIXES = [
       "/api/auth",
@@ -26828,7 +28212,7 @@ var require_routes = __commonJS({
 var require_schema = __commonJS({
   "engine/schema.sql"(exports2, module2) {
     module2.exports = `-- engine/schema.sql \u2014 GENERATED by engine/build.js from db/database.js initDatabase() + migrations/.
--- Do not edit. 71 tables, 28 migrations.
+-- Do not edit. 72 tables, 29 migrations.
 CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
@@ -27743,6 +29127,42 @@ CREATE TABLE IF NOT EXISTS ai_agent_actions (
         resolved_at DATETIME
       );
 ;;
+CREATE TABLE IF NOT EXISTS statement_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        source TEXT NOT NULL DEFAULT 'upload',
+        file_name TEXT,
+        file_sha256 TEXT,
+        file_kind TEXT,
+        mode TEXT,
+        pages INTEGER,
+        ai_source TEXT,
+        ai_provider TEXT,
+        ai_model TEXT,
+        status TEXT NOT NULL,
+        statement_type TEXT NOT NULL DEFAULT 'bank',
+        institution TEXT,
+        account_last4 TEXT,
+        currency TEXT,
+        period_start TEXT,
+        period_end TEXT,
+        opening_cents INTEGER,
+        closing_cents INTEGER,
+        balances_typed INTEGER NOT NULL DEFAULT 0,
+        rows_json TEXT NOT NULL DEFAULT '[]',
+        proof_json TEXT NOT NULL DEFAULT '{}',
+        attempts_json TEXT NOT NULL DEFAULT '[]',
+        model_calls INTEGER NOT NULL DEFAULT 0,
+        tokens_in INTEGER NOT NULL DEFAULT 0,
+        tokens_out INTEGER NOT NULL DEFAULT 0,
+        ms INTEGER NOT NULL DEFAULT 0,
+        account_id INTEGER,
+        inserted INTEGER,
+        skipped INTEGER,
+        committed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+;;
 CREATE TABLE IF NOT EXISTS user_vaults (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         version INTEGER NOT NULL,
@@ -27883,6 +29303,8 @@ CREATE INDEX IF NOT EXISTS idx_ai_agent_messages_thread ON ai_agent_messages (th
 ;;
 CREATE INDEX IF NOT EXISTS idx_ai_agent_actions_msg ON ai_agent_actions (message_id, seq);
 ;;
+CREATE INDEX IF NOT EXISTS idx_statement_tasks_user ON statement_tasks (user_id, created_at);
+;;
 CREATE INDEX IF NOT EXISTS idx_vault_grants_user ON vault_grants (user_id);
 ;;
 CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
@@ -27938,6 +29360,8 @@ INSERT OR IGNORE INTO schema_migrations (name) VALUES ('025_invoices');
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('026_mcp_oauth');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('027_user_ai');
+;;
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('028_statement_tasks');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_vault');
 ;;
@@ -28813,6 +30237,56 @@ var require_user_ai = __commonJS({
   }
 });
 
+// migrations/028_statement_tasks.js
+var require_statement_tasks = __commonJS({
+  "migrations/028_statement_tasks.js"(exports2, module2) {
+    init_globals();
+    module2.exports = {
+      name: "028_statement_tasks",
+      async up(db2) {
+        await db2.run(`
+      CREATE TABLE IF NOT EXISTS statement_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        source TEXT NOT NULL DEFAULT 'upload',
+        file_name TEXT,
+        file_sha256 TEXT,
+        file_kind TEXT,
+        mode TEXT,
+        pages INTEGER,
+        ai_source TEXT,
+        ai_provider TEXT,
+        ai_model TEXT,
+        status TEXT NOT NULL,
+        statement_type TEXT NOT NULL DEFAULT 'bank',
+        institution TEXT,
+        account_last4 TEXT,
+        currency TEXT,
+        period_start TEXT,
+        period_end TEXT,
+        opening_cents INTEGER,
+        closing_cents INTEGER,
+        balances_typed INTEGER NOT NULL DEFAULT 0,
+        rows_json TEXT NOT NULL DEFAULT '[]',
+        proof_json TEXT NOT NULL DEFAULT '{}',
+        attempts_json TEXT NOT NULL DEFAULT '[]',
+        model_calls INTEGER NOT NULL DEFAULT 0,
+        tokens_in INTEGER NOT NULL DEFAULT 0,
+        tokens_out INTEGER NOT NULL DEFAULT 0,
+        ms INTEGER NOT NULL DEFAULT 0,
+        account_id INTEGER,
+        inserted INTEGER,
+        skipped INTEGER,
+        committed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+        await db2.run("CREATE INDEX IF NOT EXISTS idx_statement_tasks_user ON statement_tasks (user_id, created_at)");
+      }
+    };
+  }
+});
+
 // migrations/029_vault.js
 var require_vault2 = __commonJS({
   "migrations/029_vault.js"(exports2, module2) {
@@ -28942,6 +30416,7 @@ var require_migrations = __commonJS({
       { file: "025_invoices.js", mod: require_invoices() },
       { file: "026_mcp_oauth.js", mod: require_mcp_oauth() },
       { file: "027_user_ai.js", mod: require_user_ai() },
+      { file: "028_statement_tasks.js", mod: require_statement_tasks() },
       { file: "029_vault.js", mod: require_vault2() },
       { file: "030_feedback.js", mod: require_feedback() },
       { file: "031_account_scope.js", mod: require_account_scope() }

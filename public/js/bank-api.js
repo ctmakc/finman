@@ -275,11 +275,36 @@ async function bankStatementCall(url, options = {}) {
   return data;
 }
 
-function uploadStatementFile(file, accountId) {
+function bankVaultMode() {
+  try { return !!(window.FMVault && window.FMVault.status().mode === 'vault'); } catch (_) { return false; }
+}
+
+// Encrypted (vault) users: the server cannot keep the task. The file goes once to
+// POST /api/statements/read with consent=1 (the wizard shows where it goes before the
+// button is pressed); the reading comes back and is stored inside the vault by
+// POST /api/statements/from-reading, which the in-browser engine serves.
+async function uploadStatementFile(file, accountId) {
+  if (bankVaultMode()) {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    form.append('consent', '1');
+    const r = await bankStatementCall('/api/statements/read', { method: 'POST', body: form });
+    return bankStatementCall('/api/statements/from-reading', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reading: r.reading, accountId: accountId || undefined }),
+    });
+  }
   const form = new FormData();
   form.append('file', file, file.name);
   if (accountId) form.append('accountId', String(accountId));
   return bankStatementCall('/api/statements', { method: 'POST', body: form });
+}
+
+function bankAgentHintHtml() {
+  return bankVaultMode()
+    ? '<i class="fas fa-shield-halved" aria-hidden="true"></i> Finman AI reads this file once: it goes to our server and to Google Gemini to find the rows, and is not stored there. The rows are saved only in your encrypted data, after Finman checks the balance to the cent. Pressing <b>Read statement</b> agrees to that for this file.'
+    : '<i class="fas fa-shield-halved" aria-hidden="true"></i> The AI reads it, then Finman checks the balance to the cent before anything is written.';
 }
 
 function bankCents(cents, currency) {
@@ -698,7 +723,7 @@ async function showImportWizard({ bank = null, presetId = null, file = null } = 
         <i class="fas fa-file-upload" aria-hidden="true"></i>
         <p><strong id="biw-file-name">${state.file ? bankEsc(state.file.name) : 'Drop a statement here or click to choose'}</strong></p>
         <p class="form-hint">CSV, OFX, QFX, QBO, or a PDF / photo of your statement</p>
-        <p class="form-hint bank-agent-hint" id="biw-agent-hint" ${bankIsAgentFile(state.file) ? '' : 'hidden'}><i class="fas fa-shield-halved" aria-hidden="true"></i> The AI reads it, then Finman checks the balance to the cent before anything is written.</p>
+        <p class="form-hint bank-agent-hint" id="biw-agent-hint" ${bankIsAgentFile(state.file) ? '' : 'hidden'}>${bankAgentHintHtml()}</p>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-outline" id="biw-cancel">Cancel</button>
@@ -1452,9 +1477,19 @@ async function showImportWizard({ bank = null, presetId = null, file = null } = 
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-outline" id="biw-another">Import another file</button>
-        <button type="button" class="btn btn-primary" id="biw-done">Done</button>
+        ${window.FirstRun && typeof window.FirstRun.showInsight === 'function'
+          ? '<button type="button" class="btn btn-primary" id="biw-picture">See where the money went</button>'
+          : '<button type="button" class="btn btn-primary" id="biw-done">Done</button>'}
       </div>`;
     bindErrorLinks();
+    // The statement is usually last month: "this month" on the dashboard would read $0.
+    // The insight screen shows the statement's own period: in, out, where it went.
+    const pic = document.getElementById('biw-picture');
+    if (pic) pic.addEventListener('click', () => {
+      m.close();
+      window.FirstRun.showInsight({ source: 'statement', imported: result.inserted, accountName, accountId: result.account_id })
+        .catch(() => { if (typeof navigateTo === 'function') navigateTo('dashboard'); });
+    });
     document.getElementById('biw-ask-ai').addEventListener('click', (e) => {
       e.preventDefault();
       const label = [t.institution, t.period && t.period.end ? bankPeriod(t.period) : ''].filter(Boolean).join(', ');
@@ -1471,7 +1506,8 @@ async function showImportWizard({ bank = null, presetId = null, file = null } = 
         if (++tries < 40) setTimeout(fill, 100);
       })();
     });
-    document.getElementById('biw-done').addEventListener('click', m.close);
+    const doneBtn = document.getElementById('biw-done');
+    if (doneBtn) doneBtn.addEventListener('click', m.close);
     document.getElementById('biw-another').addEventListener('click', () => {
       state.file = null;
       state.task = null;
@@ -1482,5 +1518,6 @@ async function showImportWizard({ bank = null, presetId = null, file = null } = 
   };
 
   renderStep1();
-  if (state.file && bankIsAgentFile(state.file)) runStatement();
+  // Vault users first see where the file goes (step 1 hint) and press Read statement themselves.
+  if (state.file && bankIsAgentFile(state.file) && !bankVaultMode()) runStatement();
 }

@@ -37,6 +37,8 @@ const MOUNTS = [
   ['/api/engagement', () => require('../routes/engagement')],
   ['/api/rules', () => require('../routes/rules')],
   ['/api/reconcile', () => require('../routes/reconcile')],
+  // Statement Agent tasks live in the vault; only POST /read (consent, nothing stored) goes out.
+  ['/api/statements', () => require('../routes/statements')],
 ];
 
 const LOCAL_PREFIXES = MOUNTS.map(([p]) => p);
@@ -48,6 +50,7 @@ const REMOTE_RULES = [
   ['*', /^\/api\/currency\/(rates|rate\/[^/]+\/[^/]+|convert|history\/[^/]+\/[^/]+|fetch-nbu)\/?$/],
   ['POST', /^\/api\/currency\/rate\/?$/],
   ['*', /^\/api\/engagement\/(push|referral|event)(\/|$)/],
+  ['POST', /^\/api\/statements\/read\/?$/],
 ];
 
 // Server-only prefixes (never local), listed for the record and for isLocal's fast path.

@@ -48,6 +48,69 @@ async function aiFor(userId) {
   return { source: 'platform' };
 }
 
+// ---------------------------------------------------------------- Finman Vault
+// An encrypted user's data never sits on the server, so the task cannot be stored here.
+// With the person's explicit consent for this one file, the server reads it with the
+// instance AI and returns the reading; nothing about the file or its rows is written on
+// the server (only a 'statement_read' journal event with mode, pages and status, for the
+// daily cap). The browser then stores the task inside the vault (createFromReading).
+async function readForVault(userId, { buffer, mime, fileName }) {
+  if (!platformReady()) {
+    throw new StatementError('STATEMENT_NO_AI', 'Reading PDF and photo statements is not available right now. CSV, OFX and QFX files import without AI.', 503);
+  }
+  const used = await get(
+    "SELECT COUNT(*) AS n FROM analytics_events WHERE user_id = ? AND event = 'statement_read' AND created_at >= datetime('now', '-1 day')",
+    [userId]
+  );
+  if (used && used.n >= PLATFORM_DAILY()) {
+    throw new StatementError('STATEMENT_DAILY_LIMIT', `Finman AI reads ${PLATFORM_DAILY()} statements a day per person. Try again tomorrow.`, 429);
+  }
+  const r = await agent.read({ buffer, mime, fileName, ai: { source: 'platform' } });
+  return {
+    file_name: String(fileName || '').slice(0, 200),
+    meta: r.meta, rows: r.rows, proof: r.proof, attempts: r.attempts,
+    mode: r.mode, pages: r.pages, sha256: r.sha256, ms: r.ms,
+    usage: { calls: r.usage.calls, input: r.usage.input, output: r.usage.output, provider: r.usage.provider || null, model: r.usage.model || null },
+  };
+}
+
+// Inside the vault engine: store a reading from readForVault as a task. The arithmetic is
+// proved again here; a reading the server did not prove stays unproven, so a doctored
+// reading can only make the result stricter, never pass a failed check.
+async function createFromReading(userId, reading) {
+  const rd = reading && typeof reading === 'object' ? reading : null;
+  if (!rd || !Array.isArray(rd.rows) || !rd.rows.length || !rd.meta || !rd.proof) {
+    throw new StatementError('STATEMENT_NO_ROWS', 'The reading has no rows');
+  }
+  if (rd.rows.length > 2000) throw new StatementError('STATEMENT_TOO_MANY', 'At most 2000 rows per statement');
+  const m = agent.meta({
+    statement_type: rd.meta.statement_type, institution: rd.meta.institution, account_last4: rd.meta.account_last4,
+    currency: rd.meta.currency, period_start: rd.meta.period_start, period_end: rd.meta.period_end,
+    opening_balance: Number.isInteger(rd.meta.opening_cents) ? rd.meta.opening_cents / 100 : null,
+    closing_balance: Number.isInteger(rd.meta.closing_cents) ? rd.meta.closing_cents / 100 : null,
+  });
+  const rows = rd.rows.map((r) => ({ ...r }));
+  const local = proof.prove({ opening_cents: m.opening_cents, closing_cents: m.closing_cents, rows, kind: m.statement_type });
+  const serverProof = rd.proof;
+  const p = serverProof.status === 'proven' && local.status === 'proven' ? { ...serverProof, ...local, notes: serverProof.notes || [] }
+    : (serverProof.status === 'proven' ? local : serverProof);
+  const ins = await run(
+    `INSERT INTO statement_tasks (user_id, source, file_name, file_sha256, file_kind, mode, pages, ai_source, ai_provider, ai_model,
+       status, statement_type, institution, account_last4, currency, period_start, period_end, opening_cents, closing_cents,
+       rows_json, proof_json, attempts_json, model_calls, tokens_in, tokens_out, ms)
+     VALUES (?, 'upload', ?, ?, ?, ?, ?, 'platform', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, String(rd.file_name || '').slice(0, 200), /^[a-f0-9]{64}$/.test(String(rd.sha256 || '')) ? rd.sha256 : null,
+      rd.mode === 'photo' ? 'image' : 'pdf', ['text', 'pdf-vision', 'photo'].includes(rd.mode) ? rd.mode : 'text', parseInt(rd.pages, 10) || 1,
+      rd.usage && rd.usage.provider ? String(rd.usage.provider).slice(0, 40) : null, rd.usage && rd.usage.model ? String(rd.usage.model).slice(0, 80) : null,
+      p.status, m.statement_type, m.institution, m.account_last4, m.currency, m.period_start, m.period_end,
+      Number.isInteger(p.opening_cents) ? p.opening_cents : m.opening_cents, m.closing_cents,
+      JSON.stringify(rows), JSON.stringify(p), JSON.stringify(Array.isArray(rd.attempts) ? rd.attempts.slice(0, 5) : []),
+      rd.usage ? parseInt(rd.usage.calls, 10) || 0 : 0, rd.usage ? parseInt(rd.usage.input, 10) || 0 : 0, rd.usage ? parseInt(rd.usage.output, 10) || 0 : 0,
+      parseInt(rd.ms, 10) || 0]
+  );
+  return ins.id;
+}
+
 async function create(userId, { buffer, mime, fileName }) {
   const ai = await aiFor(userId);
   let r;
@@ -247,4 +310,4 @@ async function remove(userId, id) {
   return { deleted: true };
 }
 
-module.exports = { create, createFromRows, view, list, setBalances, commit, remove, aiFor, platformReady, StatementError };
+module.exports = { create, createFromRows, readForVault, createFromReading, view, list, setBalances, commit, remove, aiFor, platformReady, StatementError };
