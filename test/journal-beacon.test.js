@@ -43,6 +43,10 @@ describe('activity rules', () => {
     expect(eventFor('POST', '/api/bank-api/import/preview', false)).toBe('import_failed');
     expect(eventFor('POST', '/api/accounts', true)).toBe('account_created');
     expect(eventFor('GET', '/api/accounts', true)).toBe(null);
+    expect(eventFor('POST', '/api/statements/12/commit', true)).toBe('import_done');
+    expect(eventFor('POST', '/api/statements/12/commit', false)).toBe('import_failed');
+    expect(eventFor('POST', '/api/statements/from-reading', true)).toBe(null);
+    expect(eventFor('POST', '/api/statements/12/balances', true)).toBe(null);
   });
   test('isActivityEvent accepts journal names only', () => {
     expect(isActivityEvent('transaction_added')).toBe(true);
