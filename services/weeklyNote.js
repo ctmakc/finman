@@ -89,7 +89,7 @@ function render(u, week, unsubUrl) {
   ].join('\n');
   const html = `<!doctype html><html><body style="margin:0;background:#f3f5fb;font-family:Arial,Helvetica,sans-serif;color:#121a2e">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:28px 12px">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px">
 <tr><td style="padding:28px 28px 8px;font-size:13px;color:#2b4bf2;font-weight:bold">Finman · ${esc(week.label)}</td></tr>
 <tr><td style="padding:0 28px;font-size:24px;line-height:1.25;font-weight:bold">Your week in money is ready</td></tr>
 <tr><td style="padding:14px 28px 0;font-size:15px;line-height:1.55">${first ? `Hi ${esc(first)}, y` : 'Y'}our summary for ${esc(week.label)} is ready: what came in, where it went and what changed from the week before.</td></tr>
