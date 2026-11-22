@@ -26,6 +26,9 @@
 .fmv-form { display: grid; gap: 10px; }
 .fmv-form .form-label { margin-bottom: 2px; }
 .fmv-pw, .fmv-rk { display: grid; gap: 6px; }
+/* display:grid above beat the hidden attribute: the recovery-key field showed on
+   "Create a vault password" and on every unlock screen. */
+.fmv-pw[hidden], .fmv-rk[hidden] { display: none; }
 .fmv-check { display: flex; gap: 8px; align-items: center; font-size: .92rem; margin: 6px 0 4px; cursor: pointer; }
 .fmv-wide { width: 100%; justify-content: center; min-height: 46px; }
 .fmv-form .btn-link { background: none; border: 0; padding: 4px; text-decoration: underline; color: var(--text-secondary, inherit); cursor: pointer; }

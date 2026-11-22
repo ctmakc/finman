@@ -200,10 +200,21 @@
     }
     return enginePromise;
   }
+  // The vault's own users row has no sign-in facts: the first-run screen read
+  // email_verified_at / google_id from it and told every verified Google user to
+  // "confirm your email". Carry the two facts from /api/auth/me (no Google id itself).
+  function engineUser(u) {
+    if (!u) return u;
+    const out = { ...u };
+    if (u.emailVerified !== undefined) out.email_verified_at = u.emailVerified ? (u.email_verified_at || new Date().toISOString().slice(0, 19).replace('T', ' ')) : null;
+    if (u.google !== undefined) out.google_id = u.google ? 'google' : null;
+    return out;
+  }
+
   async function openEngine(bytes) {
     const { SQL, FE } = await engineLib();
     if (st.engine) { try { st.engine.close(); } catch (_) { /* ignore */ } }
-    st.engine = await FE.open({ SQL, bytes, user: st.user, serverFetch: (u, i) => api(u, i) });
+    st.engine = await FE.open({ SQL, bytes, user: engineUser(st.user), serverFetch: (u, i) => api(u, i) });
     return st.engine;
   }
 
