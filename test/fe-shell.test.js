@@ -153,7 +153,7 @@ describe('app.js shell helpers (node)', () => {
 
   test('grouped navigation: primary + Plan/Wealth/Tools, every item routable', () => {
     expect(app.NAV_PRIMARY.map((i) => i.page)).toEqual([
-      'dashboard', 'transactions', 'accounts', 'budgets', 'ai',
+      'dashboard', 'money-map', 'transactions', 'accounts', 'budgets', 'ai',
     ]);
     expect(app.NAV_GROUPS.map((g) => g.title)).toEqual(['Plan', 'Wealth', 'Tools']);
     const all = [...app.NAV_PRIMARY, ...app.NAV_GROUPS.flatMap((g) => g.items)];
