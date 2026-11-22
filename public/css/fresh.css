@@ -784,3 +784,60 @@
 :root .fr-bank-steps li { padding: 2px 0; }
 :root .fr-bank-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin: 0 0 var(--space-4); font-size: .92rem; }
 :root .fr-bank-links a { color: var(--fm-primary-strong); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---- 12. First run: the example picture (22.11) ---------------------------
+   A fixed sample month next to the import box, so the result is visible
+   before any file. Same plate language as the insight screen. */
+:root .fr-ex {
+  border-radius: 22px;
+  background: var(--fresh-plate);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+}
+:root .fr-ex-tag {
+  margin: 0;
+  font-family: var(--fm-font-ui);
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--fm-warning);
+}
+:root .fr-ex-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
+:root .fr-ex-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+:root .fr-ex-figs > div { background: var(--fm-surface-2); border-radius: 16px; padding: var(--space-3); min-width: 0; }
+:root .fr-ex-figs dt { font-size: .78rem; color: var(--fm-ink-3); }
+:root .fr-ex-figs dd {
+  margin: .15rem 0 0;
+  font-family: var(--fm-font-ui);
+  font-weight: 600;
+  font-size: clamp(1.05rem, .9rem + .6vw, 1.35rem);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+:root .fr-ex-figs dd.pos { color: var(--fm-positive); }
+:root .fr-ex-figs dd.neg { color: var(--fm-negative); }
+:root .fr-ex-sub { margin: 0; font-size: .82rem; font-weight: 600; color: var(--fm-ink-2); }
+:root .fr-ex-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+:root .fr-ex-bars li {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 9rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: .9rem;
+  animation: freshRise 480ms var(--fresh-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+:root .fr-ex-bar { height: 8px; border-radius: var(--radius-pill); background: var(--fm-surface-2); overflow: hidden; }
+:root .fr-ex-bar > span { display: block; height: 100%; width: var(--w); border-radius: inherit; background: var(--fm-primary); }
+:root .fr-ex-bars li:not(:first-child) .fr-ex-bar > span { background: var(--fm-primary-tint-strong, var(--fm-primary)); opacity: .55; }
+:root .fr-ex-fig { font-family: var(--fm-font-ui); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root .fr-ex-fig small { font-weight: 500; color: var(--fm-ink-3); margin-left: .2rem; }
+:root .fr-ex-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+:root .fr-ex-note { font-size: .8rem; color: var(--fm-ink-3); }
+@media (max-width: 640px) {
+  :root .fr-grid > .fr-ex { margin-bottom: var(--space-4); }
+  :root .fr-ex-bars li { grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr) auto; font-size: .85rem; }
+}
+@media (prefers-reduced-motion: reduce) { :root .fr-ex-bars li { animation: none; } }

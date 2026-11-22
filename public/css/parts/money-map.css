@@ -183,3 +183,22 @@
 :root .fm-hero-mm:focus-visible { outline: 2px solid var(--fm-focus, var(--fm-primary)); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { :root .fm-hero-mm { transition: none; } :root .fm-hero-mm:hover { transform: none; } }
 
+
+/* Example for an empty account and the folded business question (22.11). */
+:root .mm-ex-tag { margin: 0 0 .35rem; font-size: .78rem; font-weight: 600; letter-spacing: .02em; color: var(--fm-warning); }
+:root .mm-example .mm-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+:root .mm-invite { padding: 0; }
+:root .mm-invite > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-4) var(--space-5);
+  font-weight: 600;
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+}
+:root .mm-invite > summary::-webkit-details-marker { display: none; }
+:root .mm-invite > summary::after { content: '+'; margin-left: auto; font-weight: 500; color: var(--fm-ink-3); }
+:root .mm-invite[open] > summary::after { content: '−'; }
+:root .mm-invite > summary i { color: var(--fm-primary); }
+:root .mm-invite > .mm-setup { box-shadow: none; margin: 0; padding-top: 0; }

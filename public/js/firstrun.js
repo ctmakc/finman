@@ -96,7 +96,9 @@
     var detail = Object.assign({ event: event }, props || {});
     try { window.dispatchEvent(new CustomEvent('fm:onboarding', { detail: detail })); } catch (_) {}
     try {
-      if (window.FMTrack && typeof window.FMTrack.beacon === 'function') {
+      if (window.FMTrack && typeof window.FMTrack.act === 'function') {
+        window.FMTrack.act('onboarding_' + event, props || {});
+      } else if (window.FMTrack && typeof window.FMTrack.beacon === 'function') {
         window.FMTrack.beacon('onboarding_' + event, props || {});
       }
     } catch (_) {}
@@ -189,6 +191,35 @@
 
   var BANKS = 'RBC, TD, CIBC, Scotiabank, BMO, Tangerine, Wealthsimple, EQ Bank, Revolut, Wise, Monobank';
 
+  // What one statement turns into: a fixed sample month (clearly labelled), so
+  // the picture is on screen before any file. "Open the full example" loads
+  // the demo household and shows the same screen with real sample data.
+  var EXAMPLE = {
+    figs: [['Came in', '$5,400', 'pos'], ['Went out', '$4,310', 'neg'], ['Left', '$1,090', '']],
+    cats: [['Housing', 1850, 43], ['Groceries', 690, 16], ['Transport', 410, 10], ['Dining out', 330, 8], ['Subscriptions', 120, 3]]
+  };
+
+  function exampleHtml() {
+    var max = EXAMPLE.cats[0][1];
+    return '<section class="fr-ex" aria-labelledby="fr-ex-h">' +
+        '<p class="fr-ex-tag">Example · a sample household, one month</p>' +
+        '<h2 id="fr-ex-h" class="fr-ex-title">What one statement turns into</h2>' +
+        '<dl class="fr-ex-figs">' + EXAMPLE.figs.map(function (f) {
+          return '<div><dt>' + f[0] + '</dt><dd class="' + f[2] + '">' + f[1] + '</dd></div>';
+        }).join('') + '</dl>' +
+        '<p class="fr-ex-sub">Where it went</p>' +
+        '<ol class="fr-ex-bars">' + EXAMPLE.cats.map(function (c, i) {
+          return '<li style="--i:' + i + '"><span class="fr-ex-name">' + c[0] + '</span>' +
+            '<span class="fr-ex-bar" aria-hidden="true"><span style="--w:' + Math.round(c[1] / max * 100) + '%"></span></span>' +
+            '<span class="fr-ex-fig">$' + c[1].toLocaleString('en-CA') + ' <small>' + c[2] + '%</small></span></li>';
+        }).join('') + '</ol>' +
+        '<div class="fr-ex-actions">' +
+          '<button type="button" class="btn btn-primary fr-btn" id="fr-demo">Open the full example</button>' +
+          '<span class="fr-ex-note">Sample data. One click removes it.</span>' +
+        '</div>' +
+      '</section>';
+  }
+
   function startHtml() {
     var name = firstName();
     return '' +
@@ -196,12 +227,13 @@
         '<header class="fr-head">' +
           '<p class="fr-eyebrow">' + (name ? 'Welcome, ' + esc(name) : 'Welcome to Finman') + ' · step 1 of 1</p>' +
           '<h1 id="fr-title" class="fr-title">See where your money went, in under a minute.</h1>' +
-          '<p class="fr-lede">Drop a statement you downloaded from online banking. Finman sorts every transaction into categories, finds your recurring charges and lets the AI CFO answer questions about your own numbers.</p>' +
+          '<p class="fr-lede">Drop a statement from online banking: Finman sorts every transaction, finds recurring charges and answers questions about your own numbers.</p>' +
           (fromChatGpt() ? '<p class="fr-note fr-note-ai"><i class="fas fa-comments" aria-hidden="true"></i> <span>Came from ChatGPT? Once your transactions are in, you can ask ChatGPT or Claude about them too: Finman connects to both under <b>More, Connect to AI</b>.</span></p>' : '') +
         '</header>' +
         '<div class="fr-grid">' +
+          (isPhone() ? exampleHtml() : '') +
           '<div class="fr-import">' +
-            (isPhone() ? '<p class="fr-note fr-note-phone"><i class="fas fa-mobile-screen" aria-hidden="true"></i> <span>On a phone? Most bank apps cannot export a file. Look around with sample data now, then import from your bank’s website on a computer: your account will be waiting.</span> <button type="button" class="btn btn-sm btn-primary fr-btn" id="fr-demo-phone">Try with sample data</button></p>' : '') +
+            (isPhone() ? '<p class="fr-note fr-note-phone"><i class="fas fa-mobile-screen" aria-hidden="true"></i> <span>On a phone? Bank apps rarely export a file. Open the example now and import from your bank’s website on a computer: your account will be waiting.</span></p>' : '') +
             '<label class="fr-drop" id="fr-drop" for="fr-file">' +
               '<input type="file" id="fr-file" class="fr-file" accept=".csv,.ofx,.qfx,.qbo,.txt,text/csv">' +
               '<span class="fr-drop-mark" aria-hidden="true"><i class="fas fa-file-arrow-up"></i></span>' +
@@ -222,11 +254,7 @@
             '<p class="fr-privacy"><i class="fas fa-lock" aria-hidden="true"></i> Nothing connects to your bank. The file is read once, only the transactions are kept, and they stay in your account.</p>' +
           '</div>' +
           '<aside class="fr-alt" aria-label="Other ways to start">' +
-            '<div class="fr-alt-row">' +
-              '<h2 class="fr-alt-title">No file at hand?</h2>' +
-              '<p class="fr-alt-text">Open a sample household with 90 days of everyday Canadian spending and see every screen working. One click removes it.</p>' +
-              '<button type="button" class="btn btn-outline fr-btn" id="fr-demo">Explore with demo data</button>' +
-            '</div>' +
+            (isPhone() ? '' : exampleHtml()) +
             '<div class="fr-alt-row">' +
               '<h2 class="fr-alt-title">Rather type it in?</h2>' +
               '<p class="fr-alt-text">Start with an empty account and add transactions by hand or from a receipt photo.</p>' +
@@ -260,8 +288,6 @@
     });
     bindBankPicker(main);
     document.getElementById('fr-demo').addEventListener('click', loadDemo);
-    var demoPhone = document.getElementById('fr-demo-phone');
-    if (demoPhone) demoPhone.addEventListener('click', loadDemo);
     document.getElementById('fr-scratch').addEventListener('click', startScratch);
   }
 
@@ -490,6 +516,7 @@
         '</section>' +
         '<div class="fri-actions">' +
           '<button type="button" class="btn btn-primary" id="fri-dash">Open my dashboard</button>' +
+          '<button type="button" class="btn btn-outline" id="fri-mm"><i class="fas fa-route" aria-hidden="true"></i> Money map: personal and business</button>' +
           (opts.source === 'demo'
             ? '<button type="button" class="btn btn-outline" id="fri-import">Import my own statement</button>' +
               '<button type="button" class="fri-link" id="fri-remove-demo">Remove demo data</button>'
@@ -524,6 +551,7 @@
     var sort = document.getElementById('fri-sort');
     if (sort) sort.addEventListener('click', function () { track('ai_question', { source: opts.source, q: 'categorize' }); navigateTo('ai'); });
     document.getElementById('fri-dash').addEventListener('click', function () { navigateTo('dashboard'); });
+    document.getElementById('fri-mm').addEventListener('click', function () { navigateTo('money-map'); });
     document.getElementById('fri-import').addEventListener('click', function () {
       if (opts.source === 'demo') {
         removeDemo().then(function () { navigateTo('dashboard', { replace: true }); });
@@ -676,6 +704,7 @@
     },
 
     showInsight: showInsight,
+    loadDemo: loadDemo,
     askAi: askAi
   };
 

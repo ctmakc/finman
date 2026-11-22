@@ -51,6 +51,7 @@ if (typeof window !== 'undefined') window.appState = appState;
 // ---------------------------------------------------------------------------
 const NAV_PRIMARY = [
   { page: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line' },
+  { page: 'money-map', label: 'Money map', icon: 'fa-route' },
   { page: 'transactions', label: 'Transactions', icon: 'fa-exchange-alt' },
   { page: 'accounts', label: 'Accounts', icon: 'fa-wallet' },
   { page: 'budgets', label: 'Budgets', icon: 'fa-piggy-bank' },
@@ -73,7 +74,6 @@ const NAV_GROUPS = [
   {
     title: 'Wealth',
     items: [
-      { page: 'money-map', label: 'Business and personal', icon: 'fa-briefcase' },
       { page: 'investments', label: 'Investments', icon: 'fa-chart-pie' },
       { page: 'networth', label: 'Net Worth', icon: 'fa-gem' },
       { page: 'analytics', label: 'Analytics', icon: 'fa-chart-bar' },
@@ -513,6 +513,8 @@ function detectIconFont() {
 // ---------------------------------------------------------------------------
 // Routing
 // ---------------------------------------------------------------------------
+const REPORT_PAGES = new Set(['reports', 'analytics', 'money-map', 'week', 'forecast', 'networth']);
+
 function navigateTo(page, options = {}) {
   if (page === 'feedback' && appState.isAuthenticated && document.getElementById('main-content') && window.FMFeedback) {
     if (typeof closeDrawer === 'function' && isDrawerOpen()) closeDrawer();
@@ -522,6 +524,10 @@ function navigateTo(page, options = {}) {
   }
   if (!Object.prototype.hasOwnProperty.call(PAGE_RENDERERS, page)) page = 'dashboard';
   appState.currentPage = page;
+  // Funnel milestone "first report": once per page and day (server dedups).
+  if (REPORT_PAGES.has(page) && appState.isAuthenticated && window.FMTrack && typeof window.FMTrack.act === 'function') {
+    window.FMTrack.act('report_viewed', { page });
+  }
 
   // The family page used to wipe #app; rebuild the shell if it is gone.
   if (!document.getElementById('main-content') && appState.isAuthenticated) {
@@ -1234,7 +1240,7 @@ async function renderDashboard() {
             </div>
           </div>
           <a class="fm-hero-mm" href="/money-map" data-page="money-map">
-            <i class="fas fa-briefcase" aria-hidden="true"></i><span>Business and personal: profit, your pay, where the money goes</span><i class="fas fa-arrow-right" aria-hidden="true"></i>
+            <i class="fas fa-route" aria-hidden="true"></i><span>Money map: what came in and where it went, personal and business</span><i class="fas fa-arrow-right" aria-hidden="true"></i>
           </a>
         </div>
         <aside class="fm-insight-card" aria-label="AI insight">

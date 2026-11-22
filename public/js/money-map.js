@@ -128,14 +128,15 @@
       warn + '</section>';
   }
 
-  function personalHtml(p) {
+  function personalHtml(p, hasBusiness) {
     var warn = p.uncategorisedExpense > 0
       ? '<p class="mm-warn"><i class="fas fa-tag" aria-hidden="true"></i> ' + fmt(p.uncategorisedExpense) + ' of spending has no category. <a href="/transactions" data-page="transactions">Sort it</a>.</p>'
       : '';
     return '<section class="mm-plate mm-personal">' +
       '<header class="mm-plate-head"><h2 class="mm-h2"><i class="fas fa-user" aria-hidden="true"></i> Personal</h2></header>' +
       '<div class="mm-figs">' +
-      figure('Came in', p.income) + figure('From your business', p.fromBusiness) + figure('Other income', p.otherIncome) +
+      figure('Came in', p.income) +
+      (hasBusiness || p.fromBusiness ? figure('From your business', p.fromBusiness) + figure('Other income', p.otherIncome) : '') +
       figure('Spent', p.expenses) + figure('Left', p.left, 'is-key ' + signCls(p.left)) +
       '</div>' +
       (p.putIntoBusiness > 0 ? '<p class="mm-note">You also put ' + fmt(p.putIntoBusiness) + ' into your business.</p>' : '') +
@@ -190,19 +191,60 @@
       '</section>';
   }
 
+  // Nothing to show yet: a labelled sample month, then the two ways in.
+  function emptyHtml() {
+    var ex = { income: 5400, expenses: 4310 };
+    var cats = [['Housing', 1850, 43], ['Groceries', 690, 16], ['Transport', 410, 10], ['Dining out', 330, 8], ['Subscriptions', 120, 3]];
+    var money = function (v) { return '$' + Number(v).toLocaleString('en-CA'); };
+    return '<section class="mm-plate mm-example" aria-labelledby="mm-ex-h">' +
+      '<p class="mm-ex-tag">Example · a sample household, one month</p>' +
+      '<h2 class="mm-h2" id="mm-ex-h">Your money map fills in from one bank statement</h2>' +
+      '<div class="mm-figs">' +
+      '<div class="mm-fig"><span class="mm-fig-label">Came in</span><span class="mm-fig-value is-pos">' + money(ex.income) + '</span></div>' +
+      '<div class="mm-fig"><span class="mm-fig-label">Spent</span><span class="mm-fig-value">' + money(ex.expenses) + '</span></div>' +
+      '<div class="mm-fig is-key is-pos"><span class="mm-fig-label">Left</span><span class="mm-fig-value">' + money(ex.income - ex.expenses) + '</span></div>' +
+      '</div>' +
+      '<h3 class="mm-h3">Where the money goes</h3>' +
+      '<ul class="mm-bars">' + cats.map(function (c, i) {
+        return '<li class="mm-bar' + (i === 0 ? ' is-first' : '') + '"><span class="mm-bar-name">' + c[0] + '</span>' +
+          '<span class="mm-bar-amt">' + money(c[1]) + ' <small>' + c[2] + '%</small></span>' +
+          '<span class="mm-bar-track" aria-hidden="true"><span style="width:' + c[2] + '%"></span></span></li>';
+      }).join('') + '</ul>' +
+      '<div class="mm-actions">' +
+      '<a class="btn btn-primary" href="/dashboard" data-mm-go="import">Import a bank statement</a>' +
+      '<button type="button" class="btn btn-outline" data-mm-go="demo">Open the full example</button>' +
+      '</div></section>';
+  }
+
+  function isEmpty(d) {
+    var p = d.personal || {};
+    return !d.hasBusiness && !(p.income > 0) && !(p.expenses > 0) &&
+      !(d.series || []).some(function (m) { return m.personalIncome || m.personalExpenses || m.businessIncome || m.businessExpenses; });
+  }
+
+  // Personal users: their own picture first, the business question folded below.
+  function businessInviteHtml(d) {
+    return '<details class="mm-plate mm-invite"' + ((d.accounts || []).length ? '' : ' hidden') + '>' +
+      '<summary><i class="fas fa-briefcase" aria-hidden="true"></i> Run a business or freelance too? Mark its accounts to see profit and your pay</summary>' +
+      setupHtml(d, true) + '</details>';
+  }
+
   function render() {
     var d = S.data;
     var el = main();
     if (!el || !d) return;
-    var head = (typeof root.pageHeaderHtml === 'function' ? root.pageHeaderHtml('Business and personal', periodTabs()) : '<h1>Business and personal</h1>' + periodTabs());
+    var title = d.hasBusiness ? 'Money map: business and personal' : 'Money map';
+    var head = (typeof root.pageHeaderHtml === 'function' ? root.pageHeaderHtml(title, periodTabs()) : '<h1>' + title + '</h1>' + periodTabs());
     var html = head;
     if (d.missingRates && d.missingRates.length) {
       html += '<p class="mm-note">No exchange rate yet for ' + esc(d.missingRates.join(', ')) + '; those amounts are counted 1:1.</p>';
     }
-    if (!d.hasBusiness) {
-      html += setupHtml(d, true) + personalHtml(d.personal) + seriesHtml(d.series, false);
+    if (isEmpty(d)) {
+      html += emptyHtml() + businessInviteHtml(d);
+    } else if (!d.hasBusiness) {
+      html += personalHtml(d.personal, false) + seriesHtml(d.series, false) + businessInviteHtml(d);
     } else {
-      html += flowHtml(d) + d.businesses.map(businessHtml).join('') + personalHtml(d.personal) +
+      html += flowHtml(d) + d.businesses.map(businessHtml).join('') + personalHtml(d.personal, true) +
         seriesHtml(d.series, true) + setupHtml(d, false);
     }
     el.innerHTML = '<div class="mm-page">' + html + '</div>';
@@ -224,6 +266,18 @@
           if (name) name.hidden = r.value !== 'business' || !r.checked;
           if (name && !name.hidden) name.focus();
         });
+      });
+    });
+    el.querySelectorAll('[data-mm-go]').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (b.dataset.mmGo === 'demo' && root.FirstRun && typeof root.FirstRun.loadDemo === 'function') {
+          if (typeof root.navigateTo === 'function') root.navigateTo('dashboard');
+          setTimeout(function () { root.FirstRun.loadDemo(); }, 300);
+          return;
+        }
+        try { Object.keys(localStorage).forEach(function (k) { if (/^fm_firstrun_skip/.test(k)) localStorage.removeItem(k); }); } catch (_) { /* ignore */ }
+        if (typeof root.navigateTo === 'function') root.navigateTo('dashboard');
       });
     });
     var save = el.querySelector('#mm-save');
