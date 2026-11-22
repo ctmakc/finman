@@ -2,6 +2,9 @@
 //
 //   GET  /api/t/config        client config for public/js/attribution.js
 //   POST /api/t               funnel beacon before login (register_view, ...)
+//   POST /api/t/me            signed-in journal beacon: actions done inside the
+//                             encrypted vault (the server never sees those
+//                             requests) and screen milestones — event name only
 //   GET  /api/t/unsubscribe   one-click opt-out from lifecycle emails
 //   *    /op/track            same-origin relay to the self-hosted OpenPanel
 //                             (no third-party domain in the browser, CSP
@@ -16,6 +19,8 @@ const tracker = require('../services/tracker');
 const { run } = require('../db/database');
 const config = require('../config/config');
 const logger = require('../lib/logger');
+const passport = require('passport');
+const { isActivityEvent } = require('../lib/activityRules');
 
 const router = express.Router();
 
@@ -54,6 +59,69 @@ router.post('/', beaconLimiter, (req, res) => {
     test: true,
   });
   res.status(204).end();
+});
+
+// ---------- signed-in journal beacon ----------
+// Encrypted (vault) users run the app's routes in their browser, so
+// middleware/activity.js never sees their writes. vault.js reports the same
+// event name eventFor() would have produced; screens report milestones.
+// Only a name and a few short flags are accepted — never amounts or text.
+const ME_EVENTS = new Set([
+  'vault_prompt_shown', 'vault_key_shown', 'vault_key_saved',
+  'report_viewed',
+  'onboarding_firstrun_shown', 'onboarding_bank_picked', 'onboarding_import_started', 'onboarding_import_done', 'onboarding_import_failed',
+  'onboarding_demo_loaded', 'onboarding_demo_removed', 'onboarding_scratch_started', 'onboarding_insight_shown',
+  'onboarding_example_opened', 'onboarding_ai_question', 'onboarding_verify_resent', 'onboarding_email_verified',
+  'summary_viewed', 'summary_shared_to_ai',
+]);
+const ME_PROPS = new Set(['code', 'ext', 'page', 'source', 'mode', 'bank', 'rows', 'local', 'kind', 'step', 'sinceStart', 'emailVerified', 'demo']);
+// Once per user, event and page per day: page views and summaries are
+// milestones for the funnel, not a clickstream.
+const DAILY = new Set(['report_viewed', 'summary_viewed', 'onboarding_firstrun_shown']);
+const meLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const jwtAuth = passport.authenticate('jwt', { session: false });
+
+function meEventAllowed(event) {
+  return ME_EVENTS.has(event) || isActivityEvent(event);
+}
+
+function cleanProps(raw) {
+  const props = {};
+  if (!raw || typeof raw !== 'object') return props;
+  for (const [k, v] of Object.entries(raw).slice(0, 12)) {
+    if (!ME_PROPS.has(k)) continue;
+    if (typeof v === 'number' && Number.isFinite(v)) props[k] = Math.round(v);
+    else if (typeof v === 'boolean') props[k] = v;
+    else if (typeof v === 'string' && /^[\w .:/-]{0,40}$/.test(v)) props[k] = v;
+  }
+  return props;
+}
+
+router.post('/me', meLimiter, jwtAuth, async (req, res) => {
+  const b = req.body || {};
+  const event = String(b.event || '');
+  if (!meEventAllowed(event)) return res.status(204).end();
+  const props = cleanProps(b.props);
+  try {
+    if (DAILY.has(event)) {
+      const { get } = require('../db/database');
+      const seen = await get(
+        `SELECT 1 AS x FROM analytics_events WHERE user_id = ? AND event = ? AND created_at >= date('now')
+           AND COALESCE(json_extract(props, '$.page'), '') = ? LIMIT 1`,
+        [req.user.id, event, props.page || ''],
+      );
+      if (seen) return res.status(204).end();
+    }
+    tracker.track(event, {
+      userId: req.user.id, props, req,
+      path: typeof b.path === 'string' ? b.path.slice(0, 120) : null,
+      test: tracker.isTestEmail(req.user.email),
+    });
+    if (isActivityEvent(event) && event !== 'import_failed') require('../services/journey').touch(req.user.id);
+  } catch (e) {
+    logger.warn({ err: e.message }, '[track] me beacon failed');
+  }
+  return res.status(204).end();
 });
 
 // ---------- unsubscribe (lifecycle emails) ----------
@@ -107,4 +175,4 @@ opRelay.post('/track', opLimiter, express.raw({ type: '*/*', limit: '256kb' }), 
   }
 });
 
-module.exports = { router, opRelay, unsubToken, PUBLIC_EVENTS };
+module.exports = { router, opRelay, unsubToken, PUBLIC_EVENTS, ME_EVENTS, meEventAllowed, cleanProps };

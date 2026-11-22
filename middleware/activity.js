@@ -7,46 +7,7 @@
 
 const tracker = require('../services/tracker');
 
-const VERB = { POST: 'created', PUT: 'updated', PATCH: 'updated', DELETE: 'deleted' };
-const SKIP = /^\/api\/(auth|t|billing\/webhook|health|sync\/run|engagement|vault)(\/|$)/;
-// /api/vault: PUT /blob fires after every write (debounced 1.5 s) — routes/vault.js
-// records one vault_sync per user per day instead.
-
-// [regex on path (no query), method or '*', event name or fn(match, ok)]
-const RULES = [
-  [/^\/api\/transactions\/?$/, 'POST', 'transaction_added'],
-  [/^\/api\/transactions\/transfer$/, 'POST', 'transfer_added'],
-  [/^\/api\/transactions\/import$/, 'POST', (ok) => (ok ? 'import_done' : 'import_failed')],
-  [/^\/api\/bank-api\/import\/preview$/, 'POST', (ok) => (ok ? 'import_preview' : 'import_failed')],
-  [/^\/api\/bank-api\/import\/commit$/, 'POST', (ok) => (ok ? 'import_done' : 'import_failed')],
-  [/^\/api\/bank-api\/connect/, 'POST', 'bank_connect'],
-  [/^\/api\/ai\//, 'POST', 'ai_used'],
-  [/^\/api\/onboarding\/quickstart$/, 'POST', 'onboarding_quickstart'],
-  [/^\/api\/onboarding\/complete-step$/, 'POST', 'onboarding_step'],
-  [/^\/api\/onboarding\/demo$/, 'POST', 'demo_loaded'],
-  [/^\/api\/onboarding\/demo$/, 'DELETE', 'demo_removed'],
-  [/^\/api\/billing\/checkout$/, 'POST', 'checkout_started'],
-  [/^\/api\/receipts/, 'POST', 'receipt_scanned'],
-  [/^\/api\/invoices\/preview$/, 'POST', () => null],
-  [/^\/api\/feedback(\/|$)/, '*', () => null], // routes/feedback.js tracks feedback_sent itself
-  [/^\/api\/invoices\/profiles\/\d+\/share$/, 'POST', 'invoice_template_shared'],
-  [/^\/api\/invoices\/profiles\/?$/, 'POST', 'invoice_template_created'],
-  [/^\/api\/invoices\/profiles\/\d+$/, 'PUT', 'invoice_template_updated'],
-  [/^\/api\/invoices\/profiles\/\d+$/, 'DELETE', 'invoice_template_deleted'],
-  [/^\/api\/invoices\/shared\/[^/]+\/import$/, 'POST', 'invoice_template_imported'],
-  [/^\/api\/invoices\/\d+\/status$/, 'POST', 'invoice_status_changed'],
-  [/^\/api\/invoices\/\d+\/duplicate$/, 'POST', 'invoice_duplicated'],
-];
-
-function eventFor(method, path, ok) {
-  for (const [re, m, ev] of RULES) {
-    if ((m === '*' || m === method) && re.test(path)) return typeof ev === 'function' ? ev(ok) : (ok ? ev : null);
-  }
-  if (!ok) return null;
-  const area = (path.split('/')[2] || '').replace(/[^a-z0-9]+/gi, '_').replace(/s$/, '');
-  if (!area) return null;
-  return `${area}_${VERB[method] || 'action'}`;
-}
+const { VERB, SKIP, eventFor } = require('../lib/activityRules');
 
 function activity(req, res, next) {
   if (!VERB[req.method]) return next();

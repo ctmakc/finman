@@ -105,6 +105,21 @@
     op('track', event, props || {});
   }
 
+  // Signed-in milestone (POST /api/t/me): our journal + OpenPanel from the
+  // server, so funnels count encrypted users too. No token -> plain beacon.
+  function act(event, props) {
+    var tk = null;
+    try { tk = localStorage.getItem('token'); } catch (e) { /* private mode */ }
+    if (!tk) { beacon(event, props); return; }
+    try {
+      fetch('/api/t/me', {
+        method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk },
+        body: JSON.stringify({ event: event, props: props || {}, path: window.location.pathname }),
+      }).catch(function () {});
+    } catch (e) { /* analytics never breaks the app */ }
+  }
+
   // ---- OpenPanel (self-hosted) ----
   window.op = window.op || (function () {
     var q = [];
@@ -204,6 +219,7 @@
       try { return encodeURIComponent(JSON.stringify(attribution())); } catch (e) { return ''; }
     },
     beacon: beacon,
+    act: act,
     identify: identify,
     reset: reset,
     firstSource: function () {

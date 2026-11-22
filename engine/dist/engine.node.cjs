@@ -25279,6 +25279,58 @@ var require_vault = __commonJS({
   }
 });
 
+// lib/activityRules.js
+var require_activityRules = __commonJS({
+  "lib/activityRules.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var VERB = { POST: "created", PUT: "updated", PATCH: "updated", DELETE: "deleted" };
+    var SKIP = /^\/api\/(auth|t|billing\/webhook|health|sync\/run|engagement|vault)(\/|$)/;
+    var RULES = [
+      [/^\/api\/transactions\/?$/, "POST", "transaction_added"],
+      [/^\/api\/transactions\/transfer$/, "POST", "transfer_added"],
+      [/^\/api\/transactions\/import$/, "POST", (ok) => ok ? "import_done" : "import_failed"],
+      [/^\/api\/bank-api\/import\/preview$/, "POST", (ok) => ok ? "import_preview" : "import_failed"],
+      [/^\/api\/bank-api\/import\/commit$/, "POST", (ok) => ok ? "import_done" : "import_failed"],
+      [/^\/api\/bank-api\/connect/, "POST", "bank_connect"],
+      [/^\/api\/ai\//, "POST", "ai_used"],
+      [/^\/api\/onboarding\/quickstart$/, "POST", "onboarding_quickstart"],
+      [/^\/api\/onboarding\/complete-step$/, "POST", "onboarding_step"],
+      [/^\/api\/onboarding\/demo$/, "POST", "demo_loaded"],
+      [/^\/api\/onboarding\/demo$/, "DELETE", "demo_removed"],
+      [/^\/api\/billing\/checkout$/, "POST", "checkout_started"],
+      [/^\/api\/receipts/, "POST", "receipt_scanned"],
+      [/^\/api\/invoices\/preview$/, "POST", () => null],
+      [/^\/api\/feedback(\/|$)/, "*", () => null],
+      // routes/feedback.js tracks feedback_sent itself
+      [/^\/api\/invoices\/profiles\/\d+\/share$/, "POST", "invoice_template_shared"],
+      [/^\/api\/invoices\/profiles\/?$/, "POST", "invoice_template_created"],
+      [/^\/api\/invoices\/profiles\/\d+$/, "PUT", "invoice_template_updated"],
+      [/^\/api\/invoices\/profiles\/\d+$/, "DELETE", "invoice_template_deleted"],
+      [/^\/api\/invoices\/shared\/[^/]+\/import$/, "POST", "invoice_template_imported"],
+      [/^\/api\/invoices\/\d+\/status$/, "POST", "invoice_status_changed"],
+      [/^\/api\/invoices\/\d+\/duplicate$/, "POST", "invoice_duplicated"]
+    ];
+    function eventFor(method, path, ok) {
+      if (!VERB[method]) return null;
+      for (const [re, m, ev] of RULES) {
+        if ((m === "*" || m === method) && re.test(path)) return typeof ev === "function" ? ev(ok) : ok ? ev : null;
+      }
+      if (!ok) return null;
+      const area = (path.split("/")[2] || "").replace(/[^a-z0-9]+/gi, "_").replace(/s$/, "");
+      if (!area) return null;
+      return `${area}_${VERB[method] || "action"}`;
+    }
+    var LITERAL_EVENTS = /* @__PURE__ */ new Set(["import_failed", "import_done", "import_preview"]);
+    for (const [, , ev] of RULES) if (typeof ev === "string") LITERAL_EVENTS.add(ev);
+    var GENERIC_EVENT = /^[a-z][a-z0-9_]{1,30}_(created|updated|deleted|action)$/;
+    function isActivityEvent(name) {
+      return LITERAL_EVENTS.has(name) || GENERIC_EVENT.test(String(name || ""));
+    }
+    module2.exports = { VERB, SKIP, RULES, eventFor, isActivityEvent };
+  }
+});
+
 // routes/track.js
 var require_track = __commonJS({
   "routes/track.js"(exports2, module2) {
@@ -25291,6 +25343,8 @@ var require_track = __commonJS({
     var { run } = require_database();
     var config2 = require_config();
     var logger = require_logger();
+    var passport = require_passport();
+    var { isActivityEvent } = require_activityRules();
     var router = express.Router();
     var beaconLimiter = rateLimit({ windowMs: 60 * 1e3, max: 60, standardHeaders: true, legacyHeaders: false });
     var PUBLIC_EVENTS = /* @__PURE__ */ new Set([
@@ -25333,6 +25387,73 @@ var require_track = __commonJS({
       });
       res.status(204).end();
     });
+    var ME_EVENTS = /* @__PURE__ */ new Set([
+      "vault_prompt_shown",
+      "vault_key_shown",
+      "vault_key_saved",
+      "report_viewed",
+      "onboarding_firstrun_shown",
+      "onboarding_bank_picked",
+      "onboarding_import_started",
+      "onboarding_import_done",
+      "onboarding_import_failed",
+      "onboarding_demo_loaded",
+      "onboarding_demo_removed",
+      "onboarding_scratch_started",
+      "onboarding_insight_shown",
+      "onboarding_example_opened",
+      "onboarding_ai_question",
+      "onboarding_verify_resent",
+      "onboarding_email_verified",
+      "summary_viewed",
+      "summary_shared_to_ai"
+    ]);
+    var ME_PROPS = /* @__PURE__ */ new Set(["code", "ext", "page", "source", "mode", "bank", "rows", "local", "kind", "step", "sinceStart", "emailVerified", "demo"]);
+    var DAILY = /* @__PURE__ */ new Set(["report_viewed", "summary_viewed", "onboarding_firstrun_shown"]);
+    var meLimiter = rateLimit({ windowMs: 60 * 1e3, max: 120, standardHeaders: true, legacyHeaders: false });
+    var jwtAuth = passport.authenticate("jwt", { session: false });
+    function meEventAllowed(event) {
+      return ME_EVENTS.has(event) || isActivityEvent(event);
+    }
+    function cleanProps(raw) {
+      const props = {};
+      if (!raw || typeof raw !== "object") return props;
+      for (const [k, v] of Object.entries(raw).slice(0, 12)) {
+        if (!ME_PROPS.has(k)) continue;
+        if (typeof v === "number" && Number.isFinite(v)) props[k] = Math.round(v);
+        else if (typeof v === "boolean") props[k] = v;
+        else if (typeof v === "string" && /^[\w .:/-]{0,40}$/.test(v)) props[k] = v;
+      }
+      return props;
+    }
+    router.post("/me", meLimiter, jwtAuth, async (req, res) => {
+      const b = req.body || {};
+      const event = String(b.event || "");
+      if (!meEventAllowed(event)) return res.status(204).end();
+      const props = cleanProps(b.props);
+      try {
+        if (DAILY.has(event)) {
+          const { get } = require_database();
+          const seen = await get(
+            `SELECT 1 AS x FROM analytics_events WHERE user_id = ? AND event = ? AND created_at >= date('now')
+           AND COALESCE(json_extract(props, '$.page'), '') = ? LIMIT 1`,
+            [req.user.id, event, props.page || ""]
+          );
+          if (seen) return res.status(204).end();
+        }
+        tracker.track(event, {
+          userId: req.user.id,
+          props,
+          req,
+          path: typeof b.path === "string" ? b.path.slice(0, 120) : null,
+          test: tracker.isTestEmail(req.user.email)
+        });
+        if (isActivityEvent(event) && event !== "import_failed") require_journey().touch(req.user.id);
+      } catch (e) {
+        logger.warn({ err: e.message }, "[track] me beacon failed");
+      }
+      return res.status(204).end();
+    });
     function unsubToken(userId) {
       return crypto.createHmac("sha256", String(config2.jwtSecret)).update("unsub:" + userId).digest("hex").slice(0, 32);
     }
@@ -25374,7 +25495,7 @@ var require_track = __commonJS({
         res.status(202).json({ queued: false });
       }
     });
-    module2.exports = { router, opRelay, unsubToken, PUBLIC_EVENTS };
+    module2.exports = { router, opRelay, unsubToken, PUBLIC_EVENTS, ME_EVENTS, meEventAllowed, cleanProps };
   }
 });
 
@@ -29727,6 +29848,8 @@ async function open({ SQL, bytes = null, user, serverFetch, debug } = {}) {
 }
 module.exports = {
   open,
+  // journal event name for a write handled locally (same rules as middleware/activity.js)
+  eventFor: require_activityRules().eventFor,
   isLocal: routes.isLocal,
   LOCAL_PREFIXES: routes.LOCAL_PREFIXES,
   REMOTE_PREFIXES: routes.REMOTE_PREFIXES,

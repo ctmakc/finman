@@ -105,6 +105,21 @@
     if (st.logoutToken) return st.logoutToken;
     try { return localStorage.getItem('token'); } catch (_) { return null; }
   }
+  // Journal beacon (POST /api/t/me): the event name and a few short flags,
+  // never request bodies. The server never sees vault writes, so this is the
+  // only way activation and returns of encrypted users reach the metrics.
+  function journal(event, props) {
+    const tk = token();
+    if (!tk || !event) return;
+    try {
+      origFetch('/api/t/me', {
+        method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk },
+        body: JSON.stringify({ event, props: props || {}, path: location.pathname }),
+      }).catch(() => {});
+    } catch (_) { /* analytics never breaks the app */ }
+  }
+
   async function api(path, init = {}) {
     const headers = Object.assign({ Authorization: 'Bearer ' + token() }, init.headers || {});
     if (init.json !== undefined) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(init.json); }
@@ -275,6 +290,7 @@
       const isSet = mode === 'set-safe';
       const label = mode === 'unlock-safe' || isSet ? t('vaultPw') : t('pw');
       const canRk = mode === 'unlock-pw' || mode === 'unlock-safe';
+      if (isSet || mode === 'mig-pw') journal('vault_prompt_shown', { mode });
       const host = overlay(`
         <h2>${esc(title)}</h2><p>${esc(lead)}</p>
         <form class="fmv-form" novalidate>
@@ -324,6 +340,7 @@
   }
 
   function showRecoveryKey(text) {
+    journal('vault_key_shown', {});
     return new Promise((resolve) => {
       const host = overlay(`
         <h2>${esc(t('rkTitle'))}</h2><p>${esc(t('rkLead'))}</p>
@@ -356,7 +373,7 @@
       const saved = () => { cb.checked = true; sync(); };
       host.querySelector('.fmv-copy').addEventListener('click', saved);
       host.querySelector('.fmv-dl').addEventListener('click', saved);
-      go.onclick = () => resolve();
+      go.onclick = () => { journal('vault_key_saved', {}); resolve(); };
     });
   }
 
@@ -653,6 +670,21 @@
     return { method, url: url.pathname + url.search, headers, body: body == null ? {} : body, files };
   }
 
+  function journalWrite(method, pathname, res) {
+    try {
+      const FE = window.FinmanEngine;
+      if (!FE || typeof FE.eventFor !== 'function') return;
+      const ok = res.status < 400;
+      const event = FE.eventFor(method, pathname, ok);
+      if (!event) return;
+      const props = { local: true };
+      if (!ok && typeof res.body === 'string') {
+        try { const b = JSON.parse(res.body); const c = b && (b.code || (b.error && b.error.code)); if (c) props.code = String(c).slice(0, 40); } catch (_) { /* not JSON */ }
+      }
+      journal(event, props);
+    } catch (_) { /* analytics never breaks the app */ }
+  }
+
   const SERVER_ONLY = /^\/api\/(auth|t|vault|health|ready|billing|invoices|v1|oauth|mcp)(\/|$)/;
 
   window.fetch = async function (input, init) {
@@ -671,6 +703,7 @@
     if (!st.engine.isLocal(method, path.pathname)) return origFetch(input, init);
     const op = await toEngineRequest(input, init);
     const res = await st.engine.handle(op);
+    if (method !== 'GET' && method !== 'HEAD') journalWrite(method, path.pathname, res);
     if (method !== 'GET' && method !== 'HEAD' && res.status < 400) {
       st.pending.push(op);
       st.engine.dirty = true;
@@ -770,6 +803,7 @@
     prepareLogin, prepareRegister, passwordFields, ensureReady, onLogout, syncNow, newRecoveryKey, status,
     afterPasswordChange(wrapped) { if (st.meta && wrapped) st.meta.wrapped_pw = wrapped; },
     lock: async () => { await onLogout(); location.reload(); },
+    journal,
     // для MCP по согласию (страница OAuth): ключ сейфа заворачивается секретом гранта
     async wrapForGrant(secretBytes) {
       if (!st.vaultKey) throw new Error('Vault is locked');

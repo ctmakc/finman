@@ -500,6 +500,8 @@ async function open({ SQL, bytes = null, user, serverFetch, debug } = {}) {
 
 module.exports = {
   open,
+  // journal event name for a write handled locally (same rules as middleware/activity.js)
+  eventFor: require('../../lib/activityRules').eventFor,
   isLocal: routes.isLocal,
   LOCAL_PREFIXES: routes.LOCAL_PREFIXES,
   REMOTE_PREFIXES: routes.REMOTE_PREFIXES,
