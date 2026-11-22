@@ -419,6 +419,13 @@
     if (!r.ok) throw new Error('Could not download the vault (HTTP ' + r.status + ')');
     const blob = new Uint8Array(await r.arrayBuffer());
     st.meta.version = Number(r.headers.get('X-Vault-Version')) || st.meta.version;
+    if (cached && cached.blob && cached.dirty && cached.inflight && cached.inflight.to === st.meta.version) {
+      // Our own upload reached the server, but the tab closed before it heard back.
+      // The local copy holds everything that was sent plus anything written after it:
+      // keep it on top of the new version and upload it again.
+      await idbSet('blob:' + uid, { version: st.meta.version, blob: cached.blob, dirty: true, inflight: null });
+      return { bytes: await C.decryptVault(vk, cached.blob, uid), dirty: true };
+    }
     if (cached && cached.dirty && cached.version < st.meta.version) {
       // Another device saved a newer version meanwhile; its copy wins (v1: no merge).
       console.warn('Finman Vault: a newer version from another device replaced unsent local changes');
@@ -539,10 +546,25 @@
     return j.version;
   }
 
-  async function saveLocal(dirty) {
-    const blob = await C.encryptVault(st.vaultKey, st.engine.export(), st.user.id);
-    await idbSet('blob:' + st.user.id, { version: st.version, blob, dirty, baseVersion: st.version });
-    return blob;
+  // Local encrypted copy in IndexedDB. Writes go through one queue and export the
+  // engine when they run, so an older snapshot never lands after a newer one.
+  // `inflight` marks an upload the server may already have taken (see loadBytes).
+  let localQueue = Promise.resolve();
+  function saveLocal(dirty) {
+    const job = async () => {
+      const blob = await C.encryptVault(st.vaultKey, st.engine.export(), st.user.id);
+      await idbSet('blob:' + st.user.id, { version: st.version, blob, dirty, inflight: st.inflight || null });
+      return blob;
+    };
+    const p = localQueue.then(job, job);
+    localQueue = p.catch(() => {});
+    return p;
+  }
+  function saveLocalBlob(blob, dirty) {
+    const job = () => idbSet('blob:' + st.user.id, { version: st.version, blob, dirty, inflight: null });
+    const p = localQueue.then(job, job);
+    localQueue = p.catch(() => {});
+    return p;
   }
 
   function scheduleSync() {
@@ -557,13 +579,23 @@
       for (let attempt = 0; attempt < 4; attempt++) {
         const sent = st.pending.length;
         st.engine.dirty = false;
+        st.inflight = { to: st.version + 1 };
         const blob = await saveLocal(true);
         try {
           st.version = await putBlob(blob, st.version);
+          st.inflight = null;
           st.pending.splice(0, sent);
-          await idbSet('blob:' + st.user.id, { version: st.version, blob, dirty: st.pending.length > 0 });
+          // Changes made while the upload was in flight are not in `blob`: store the
+          // current state on top of the new version and upload it next.
+          if (st.engine.dirty || st.pending.length) {
+            await saveLocal(true);
+            scheduleSync();
+          } else {
+            await saveLocalBlob(blob, false);
+          }
           return;
         } catch (e) {
+          st.inflight = null;
           if (e.code !== 'VERSION_CONFLICT') {
             st.engine.dirty = true;
             setTimeout(scheduleSync, 5000 * (attempt + 1));
