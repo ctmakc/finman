@@ -42,6 +42,16 @@ function checkPdfLink(invoiceId, q) {
   const got = Buffer.from(q.sig);
   return want.length === got.length && crypto.timingSafeEqual(want, got) ? u : null;
 }
+// Where a PDF link comes from. Plain accounts: a signed link the server answers from its own
+// tables. Vault accounts (tools running on the decrypted vault in memory, services/mcp/vaultGrant.js):
+// the provider renders the PDF during the call and stores it encrypted with a one-time key that
+// lives only in the link's #fragment (services/mcp/pdfDrop.js).
+let pdfLinkProvider = null;
+function setPdfLinkProvider(fn) { pdfLinkProvider = typeof fn === 'function' ? fn : null; }
+async function pdfLink(userId, invoiceId) {
+  if (pdfLinkProvider) return pdfLinkProvider(userId, invoiceId, () => svc.invoicePdf(userId, invoiceId));
+  return pdfUrl(userId, invoiceId);
+}
 function svc_base() { return (process.env.APP_PUBLIC_URL || 'https://app.finman.money').replace(/\/+$/, ''); }
 
 // ---------- shapes the model sees ----------
@@ -54,7 +64,7 @@ function brief(inv) {
   };
 }
 
-function full(userId, inv, payments) {
+async function full(userId, inv, payments) {
   return {
     ...brief(inv),
     template: inv.profile_name,
@@ -68,7 +78,7 @@ function full(userId, inv, payments) {
       : { label: inv.tax_label || 'Tax', rate_percent: inv.tax_rate, amount: money(inv.tax_cents, inv.currency) },
     terms: inv.terms, notes: inv.notes,
     pay_online_url: inv.pay_url,
-    pdf_url: pdfUrl(userId, inv.id),
+    pdf_url: await pdfLink(userId, inv.id),
     payments: payments ? payments.map((p) => ({ id: p.id, date: p.paid_on, amount: money(p.amount_cents, inv.currency), method: p.method, note: p.note })) : undefined,
   };
 }
@@ -164,7 +174,7 @@ const TOOLS = [
       for (const k of Object.keys(body)) if (body[k] === undefined) delete body[k];
       let inv = await svc.createInvoice(userId, body);
       if (a.status === 'sent') inv = await svc.setStatus(userId, inv.id, 'sent');
-      return { invoice: full(userId, inv, []) };
+      return { invoice: await full(userId, inv, []) };
     },
   },
   {
@@ -196,7 +206,7 @@ const TOOLS = [
     annotations: { readOnlyHint: true },
     async run(userId, a) {
       const inv = await findInvoice(userId, a);
-      return { invoice: full(userId, inv, await svc.listPayments(userId, inv.id)) };
+      return { invoice: await full(userId, inv, await svc.listPayments(userId, inv.id)) };
     },
   },
   {
@@ -207,7 +217,7 @@ const TOOLS = [
     annotations: { readOnlyHint: true },
     async run(userId, a) {
       const inv = await findInvoice(userId, a);
-      return { number: inv.number, pdf_url: pdfUrl(userId, inv.id), valid_days: 7 };
+      return { number: inv.number, pdf_url: await pdfLink(userId, inv.id), valid_days: 7 };
     },
   },
   {
@@ -229,7 +239,7 @@ const TOOLS = [
     async run(userId, a) {
       if (a.amount !== undefined && a.percent !== undefined) throw new ToolError('Give amount or percent, not both');
       const r = await svc.recordPayment(userId, id(a.invoice_id), { amount: a.amount, percent: a.percent, paid_on: a.paid_on, method: a.method, note: a.note });
-      return { invoice: full(userId, r.invoice, r.payments) };
+      return { invoice: await full(userId, r.invoice, r.payments) };
     },
   },
   {
@@ -324,4 +334,4 @@ async function callTool(userId, name, args) {
   }
 }
 
-module.exports = { listTools, callTool, isReadOnly, checkPdfLink, pdfUrl, ToolError };
+module.exports = { listTools, callTool, isReadOnly, checkPdfLink, pdfUrl, ToolError, setPdfLinkProvider };

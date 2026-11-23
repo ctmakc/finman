@@ -54,6 +54,11 @@ router.get('/profiles/:id/image/:kind', wrap(async (req, res) => {
   res.setHeader('Cache-Control', 'private, max-age=60');
   res.send(img.buffer);
 }));
+router.get('/profiles/:id/full', wrap(async (req, res) => res.json({ template: await svc.profileFull(req.user.id, id(req)) })));
+router.post('/profiles/import', wrap(async (req, res) => {
+  const r = await svc.importTemplate(req.user.id, req.body && req.body.template, req.body && req.body.code);
+  res.status(r.created ? 201 : 200).json({ profile: r.profile });
+}));
 router.post('/profiles/:id/share', wrap(async (req, res) => {
   res.json(await svc.shareProfile(req.user.id, id(req)));
 }));

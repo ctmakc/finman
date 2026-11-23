@@ -181,6 +181,30 @@ async function deleteProfile(userId, id) {
   return { ok: true };
 }
 
+// The whole template with its images, for sharing it by link (POST /api/invoice-shares).
+async function profileFull(userId, id) {
+  const row = await profileRow(userId, id);
+  return {
+    name: row.name, layout: row.layout, currency: row.currency, number_format: row.number_format,
+    due_days: row.due_days, data: parseJson(row.data, {}), logo: row.logo || null, signature: row.signature || null,
+  };
+}
+
+// A shared template copied into my templates (the browser fetched it from /api/invoice-shares/:code).
+// A second import of the same code returns the copy made the first time.
+async function importTemplate(userId, tpl, code) {
+  const c = String(code || '');
+  if (!/^[a-z0-9]{4,32}$/.test(c)) throw bad('Template code is invalid');
+  const existing = await get('SELECT id FROM invoice_profiles WHERE user_id = ? AND source_share = ?', [userId, c]);
+  if (existing) return { profile: await getProfile(userId, existing.id), created: false };
+  const t = isObj(tpl) ? tpl : {};
+  const profile = await createProfile(userId, {
+    name: t.name, layout: t.layout, currency: t.currency, number_format: t.number_format,
+    next_seq: 1, due_days: t.due_days, data: isObj(t.data) ? t.data : {}, logo: t.logo || null, signature: t.signature || null,
+  }, { source_share: c });
+  return { profile, created: true };
+}
+
 async function profileImage(userId, id, kind) {
   if (!['logo', 'signature'].includes(kind)) throw notFound();
   const row = await profileRow(userId, id);
@@ -839,5 +863,5 @@ module.exports = {
   listInvoices, getInvoice, invoicePdf, previewPdf,
   listPayments, recordPayment, deletePayment, listClients,
   publishSnapshot, viewOf, fileName, renderPdf, paidOf,
-  setRepeat, runRepeats, addMonth, exportCsv,
+  setRepeat, runRepeats, addMonth, exportCsv, profileFull, importTemplate, cleanProfileInput,
 };

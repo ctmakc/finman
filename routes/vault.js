@@ -197,8 +197,14 @@ router.post('/purge-legacy', wrap(async (req, res) => {
   if (!client) return bad(res, 400, 'COUNTS_REQUIRED', 'counts is required');
   if (!(await vault.vaultRow(uid))) return bad(res, 409, 'NO_VAULT', 'Upload the vault before purging');
 
+  // scope: only these tables (rows that joined the vault after the account's own migration,
+  // e.g. invoices on 23.11.2026). Without scope: every vault table, as at the first migration.
+  const known = new Set(VAULT_TABLES.map((t) => t.name));
+  const scope = Array.isArray(req.body && req.body.scope) ? req.body.scope.filter((n) => known.has(n)) : null;
+  if (scope && !scope.length) return bad(res, 400, 'SCOPE_EMPTY', 'scope names no vault table');
+  const inScope = (name) => !scope || scope.includes(name);
   const clientCounts = {};
-  for (const t of VAULT_TABLES) clientCounts[t.name] = Number(client[t.name] || 0);
+  for (const t of VAULT_TABLES) if (inScope(t.name)) clientCounts[t.name] = Number(client[t.name] || 0);
 
   let mismatch = null;
   const deleted = {};
@@ -208,15 +214,15 @@ router.post('/purge-legacy', wrap(async (req, res) => {
     await transaction(async () => {
       // Counted inside the transaction: no write can slip in between the check and the delete.
       const server = await vault.legacyCounts(uid);
-      if (Object.keys(server).some((name) => server[name] !== clientCounts[name])) {
+      if (Object.keys(server).filter(inScope).some((name) => server[name] !== clientCounts[name])) {
         mismatch = server;
         return;
       }
       await run('PRAGMA defer_foreign_keys = ON');
       const fkKey = (x) => `${x.table}:${x.rowid}:${x.parent}`;
       const fkBefore = new Set((await query('PRAGMA foreign_key_check')).map(fkKey));
-      for (const t of VAULT_TABLES) deleted[t.name] = 0;
-      for (const t of (await vault.presentTables()).slice().reverse()) {
+      for (const t of VAULT_TABLES) if (inScope(t.name)) deleted[t.name] = 0;
+      for (const t of (await vault.presentTables()).filter((x) => inScope(x.name)).slice().reverse()) {
         const r = await run(`DELETE FROM ${t.name} WHERE ${t.where}`, paramsFor(t, uid));
         deleted[t.name] = r.changes || 0;
       }

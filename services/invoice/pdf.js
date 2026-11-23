@@ -17,7 +17,18 @@ const MM = 72 / 25.4;
 
 const FOOTER_TEXT = 'Made with Finman Online — invoicing and money app. Sign up: app.finman.money';
 
+// In the browser (vault engine, public/js/vault/invoice-pdf.js) the font files arrive as bytes in
+// globalThis.__FM_INVOICE_FONTS (name -> ArrayBuffer); on the server they are read from assets/fonts.
+const FONT_FILES = {
+  Sans: 'LiberationSans-Regular.ttf', 'Sans-Bold': 'LiberationSans-Bold.ttf', 'Mono-Bold': 'LiberationMono-Bold.ttf',
+  Mono: 'LiberationMono-Regular.ttf', Mont: 'Montserrat-Regular.ttf', 'Mont-Medium': 'Montserrat-Medium.ttf', 'Mont-Semi': 'Montserrat-SemiBold.ttf',
+};
 function registerFonts(doc) {
+  const injected = typeof globalThis !== 'undefined' && globalThis.__FM_INVOICE_FONTS;
+  if (injected) {
+    for (const [name, file] of Object.entries(FONT_FILES)) doc.registerFont(name, injected[file]);
+    return;
+  }
   doc.registerFont('Sans', path.join(FONT_DIR, 'LiberationSans-Regular.ttf'));
   doc.registerFont('Sans-Bold', path.join(FONT_DIR, 'LiberationSans-Bold.ttf'));
   doc.registerFont('Mono-Bold', path.join(FONT_DIR, 'LiberationMono-Bold.ttf'));
@@ -152,7 +163,9 @@ function placeholders(view) {
 }
 
 async function qrPng(url) {
-  return QRCode.toBuffer(url, { errorCorrectionLevel: 'M', margin: 1, scale: 8, type: 'png' });
+  const opts = { errorCorrectionLevel: 'M', margin: 1, scale: 8, type: 'png' };
+  if (typeof QRCode.toBuffer === 'function') return QRCode.toBuffer(url, opts);
+  return QRCode.toDataURL(url, { ...opts, type: 'image/png' }); // browser build: pdfkit takes the data URL
 }
 
 function drawImage(doc, buf, x, y, opts) {
@@ -594,4 +607,4 @@ function renderInvoicePdf(view, footer) {
   });
 }
 
-module.exports = { renderInvoicePdf, dataUrlToBuffer, parseRich, FOOTER_TEXT };
+module.exports = { renderInvoicePdf, dataUrlToBuffer, parseRich, FOOTER_TEXT, FONT_FILES };

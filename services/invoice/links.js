@@ -109,6 +109,26 @@ async function revoke(userId, invoiceId) {
   return { ok: true };
 }
 
+async function rekey(userId, map) {
+  let moved = 0;
+  if (!isObj(map)) return { moved };
+  // { oldId: { to, number } }: a link moves only if its published snapshot is that invoice
+  // (the vault may already have its own invoice with the old id, with its own link).
+  const pairs = [];
+  for (const [a, v] of Object.entries(map).slice(0, 1000)) {
+    const from = parseInt(a, 10); const to = parseInt(v && v.to, 10);
+    if (!(from > 0 && to > 0 && from !== to) || !v || typeof v.number !== 'string') continue;
+    const row = await get('SELECT snapshot FROM invoice_links WHERE user_id = ? AND invoice_id = ?', [userId, from]);
+    let num = null;
+    try { num = JSON.parse(row.snapshot).view.number; } catch (_) { num = null; }
+    if (row && num === v.number) pairs.push([from, to]);
+  }
+  // Two passes through negative ids, so a chain (1 -> 2, 2 -> 3) never hits the unique index.
+  for (const [a] of pairs) moved += (await run('UPDATE invoice_links SET invoice_id = ? WHERE user_id = ? AND invoice_id = ?', [-a, userId, a])).changes || 0;
+  for (const [a, b] of pairs) await run('UPDATE invoice_links SET invoice_id = ? WHERE user_id = ? AND invoice_id = ?', [b, userId, -a]);
+  return { moved };
+}
+
 async function list(userId) {
   const rows = await query('SELECT token, invoice_id, created_at, updated_at, first_viewed_at, last_viewed_at, view_count FROM invoice_links WHERE user_id = ? AND revoked_at IS NULL', [userId]);
   return rows.map(stats);
@@ -171,4 +191,4 @@ async function pdf(token) {
   return { buffer: await require('./service').renderPdf(p.view, p.user_id), filename: p.filename };
 }
 
-module.exports = { LinkError, cleanSnapshot, publish, revoke, list, byToken, recordView, pdf, linkUrl };
+module.exports = { LinkError, cleanSnapshot, publish, revoke, list, rekey, byToken, recordView, pdf, linkUrl };

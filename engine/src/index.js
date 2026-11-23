@@ -35,7 +35,10 @@ function getMcp() {
   if (!mcp) mcp = { tools: require('../../services/mcp/tools'), tx: require('../../services/mcp/txTools') };
   return mcp;
 }
-const MCP_LOCAL_TOOLS = Object.freeze(require('../../services/mcp/txTools').TX_TOOLS.map((t) => t.name));
+// Invoice tools run on the vault too since the invoices moved into it (23.11.2026).
+const INVOICE_TOOLS = ['list_invoice_templates', 'create_invoice', 'list_invoices', 'get_invoice', 'get_invoice_pdf',
+  'record_payment', 'set_invoice_status', 'delete_draft_invoice', 'list_clients'];
+const MCP_LOCAL_TOOLS = Object.freeze([...require('../../services/mcp/txTools').TX_TOOLS.map((t) => t.name), ...INVOICE_TOOLS]);
 
 // ---------- helpers ----------
 const sync = db._sync;
@@ -428,7 +431,9 @@ class Engine {
     return getMcp().tools.listTools();
   }
 
-  async mcpCallTool(name, args) {
+  // opts.pdfLink(userId, invoiceId, render): where invoice PDF links come from (the server's
+  // encrypted one-time drop, services/mcp/pdfDrop.js); render() makes the PDF from the vault.
+  async mcpCallTool(name, args, opts = {}) {
     this._check();
     if (!MCP_LOCAL_TOOLS.includes(name)) {
       const e = new Error(`Tool ${name} does not work on vault data (it runs on the server database)`);
@@ -438,9 +443,12 @@ class Engine {
     await lock.acquire();
     activate(this);
     const before = this.writes;
+    const tools = getMcp().tools;
+    tools.setPdfLinkProvider(opts.pdfLink || null);
     try {
-      return await getMcp().tools.callTool(this.user.id, name, args);
+      return await tools.callTool(this.user.id, name, args);
     } finally {
+      tools.setPdfLinkProvider(null);
       if (this.writes > before) this.dirty = true;
       activate(null);
       lock.release();

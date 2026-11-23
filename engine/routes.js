@@ -39,6 +39,8 @@ const MOUNTS = [
   ['/api/reconcile', () => require('../routes/reconcile')],
   // Statement Agent tasks live in the vault; only POST /read (consent, nothing stored) goes out.
   ['/api/statements', () => require('../routes/statements')],
+  // Invoices live in the vault; the PDF is made in the browser (public/js/vault/invoice-pdf.js).
+  ['/api/invoices', () => require('../routes/invoices')],
 ];
 
 const LOCAL_PREFIXES = MOUNTS.map(([p]) => p);
@@ -51,12 +53,14 @@ const REMOTE_RULES = [
   ['POST', /^\/api\/currency\/rate\/?$/],
   ['*', /^\/api\/engagement\/(push|referral|event)(\/|$)/],
   ['POST', /^\/api\/statements\/read\/?$/],
+  // A shared template's public preview (the sign-up page of a ?tpl= link): server table.
+  ['GET', /^\/api\/invoices\/shared\/[^/]+\/?$/],
 ];
 
 // Server-only prefixes (never local), listed for the record and for isLocal's fast path.
 const REMOTE_PREFIXES = [
   '/api/auth', '/api/billing', '/api/t', '/api/health', '/api/ready', '/api/protected',
-  '/api/vault', '/api/v1', '/api/invoices', '/oauth', '/mcp', '/.well-known', '/op',
+  '/api/vault', '/api/v1', '/api/invoice-links', '/api/invoice-shares', '/oauth', '/mcp', '/.well-known', '/op',
 ];
 
 // Requests answered by the engine itself without running a router: live bank API

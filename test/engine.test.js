@@ -169,7 +169,9 @@ describe('FinmanEngine (Node build)', () => {
     const r = await eng.mcpCallTool('list_accounts', {});
     expect(r.isError).toBe(false);
     expect(r.content[0].text).toContain('Chequing');
-    await expect(eng.mcpCallTool('list_invoices', {})).rejects.toMatchObject({ code: 'NOT_LOCAL_TOOL' });
+    // Invoices live in the vault since 23.11.2026: their tools run locally too.
+    expect((await eng.mcpCallTool('list_invoices', {})).isError).toBeFalsy();
+    await expect(eng.mcpCallTool('no_such_tool', {})).rejects.toMatchObject({ code: 'NOT_LOCAL_TOOL' });
   });
 
   test('export -> reopen from bytes keeps the data', async () => {
@@ -193,7 +195,7 @@ describe('FinmanEngine (Node build)', () => {
 describe('isLocal', () => {
   test('server-only and local endpoints', () => {
     expect(FE.isLocal('GET', '/api/auth/me')).toBe(false);
-    for (const p of ['/api/billing/status', '/api/vault/meta', '/api/v1/transactions', '/api/invoices', '/api/health', '/api/t/event', '/api/engagement/push/subscribe', '/api/engagement/referral', '/api/currency/rates', '/api/currency/convert?amount=1&from=USD&to=CAD', '/oauth/token', '/mcp']) {
+    for (const p of ['/api/billing/status', '/api/vault/meta', '/api/v1/transactions', '/api/invoice-links', '/api/invoice-shares/abc', '/api/invoices/shared/abc', '/api/health', '/api/t/event', '/api/engagement/push/subscribe', '/api/engagement/referral', '/api/currency/rates', '/api/currency/convert?amount=1&from=USD&to=CAD', '/oauth/token', '/mcp']) {
       expect([p, FE.isLocal('GET', p)]).toEqual([p, false]);
     }
     for (const p of ['/api/accounts', '/api/transactions/5', '/api/bank-api/import/preview', '/api/currency/settings', '/api/currency/tags', '/api/engagement/journey', '/api/engagement/tips', '/api/ai/my/keys', '/api/ai/chat', '/api/reports/types', '/api/sync/status', '/api/accounts?x=1']) {

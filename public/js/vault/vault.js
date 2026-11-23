@@ -572,6 +572,75 @@
     await purge(counts);
   }
 
+  // Rows of tables that joined the vault after this account's own migration (the invoices,
+  // 23.11.2026) still sit on the server in the open. Bring them into the vault, store the vault,
+  // and only then let the server delete exactly those rows (it re-counts them first).
+  async function lateImport() {
+    const dump = await apiJson('/api/vault/legacy-export');
+    const tables = {};
+    const counts = {};
+    for (const [name, rows] of Object.entries((dump && dump.tables) || {})) {
+      if (Array.isArray(rows) && rows.length) { tables[name] = rows; counts[name] = rows.length; }
+    }
+    if (!Object.keys(tables).length) return;
+    showMigration(1, 3);
+    const moved = await makeRoom(tables);
+    const r = await st.engine.importLegacy({ tables });
+    for (const name of Object.keys(counts)) {
+      if (((r && r.counts && r.counts[name]) || 0) !== counts[name]) throw new Error('Import check failed: ' + name);
+    }
+    const blob = await C.encryptVault(st.vaultKey, st.engine.export(), st.user.id);
+    showMigration(2, 3);
+    st.version = await putBlob(blob, st.version);
+    st.engine.dirty = false;
+    await idbSet('blob:' + st.user.id, { version: st.version, blob, dirty: false });
+    await apiJson('/api/vault/purge-legacy', { method: 'POST', json: { counts, scope: Object.keys(counts) } });
+    if (moved.invoices && Object.keys(moved.invoices).length) {
+      await apiJson('/api/invoice-links/rekey', { method: 'POST', json: { map: moved.invoices } }).catch(() => {});
+    }
+    showMigration(3, 3);
+  }
+
+  // Incoming rows never overwrite what is already in the vault (importLegacy writes INSERT OR
+  // REPLACE): an id the vault already uses gets the next free one, references follow; an
+  // invoice number the vault already has gets a suffix. Returns { table: { oldId: newId } }.
+  const LATE_REFS = {
+    invoices: [['profile_id', 'invoice_profiles']],
+    invoice_payments: [['invoice_id', 'invoices']],
+    invoice_repeats: [['invoice_id', 'invoices'], ['last_invoice_id', 'invoices']],
+  };
+  async function makeRoom(tables) {
+    const maps = {};
+    for (const name of Object.keys(tables)) {
+      const rows = tables[name];
+      for (const [col, parent] of LATE_REFS[name] || []) {
+        const m = maps[parent];
+        if (m) for (const row of rows) if (row[col] != null && m[row[col]] != null) row[col] = typeof m[row[col]] === 'object' ? m[row[col]].to : m[row[col]];
+      }
+      let local = [];
+      try { local = await st.engine.query(`SELECT id${name === 'invoices' ? ', number' : ''} FROM "${name}"`); } catch (_) { local = []; }
+      const taken = new Set(local.map((x) => Number(x.id)));
+      let next = Math.max(0, ...local.map((x) => Number(x.id) || 0), ...rows.map((x) => Number(x.id) || 0)) + 1;
+      const m = {};
+      for (const row of rows) {
+        if (!taken.has(Number(row.id))) continue;
+        // invoices: the number goes along, so the server moves only the link published for THIS one
+        m[row.id] = name === 'invoices' ? { to: next, number: String(row.number) } : next;
+        row.id = next; next += 1;
+      }
+      if (Object.keys(m).length) maps[name] = m;
+      if (name === 'invoices') {
+        const numbers = new Set(local.map((x) => String(x.number)));
+        for (const row of rows) {
+          let n = String(row.number); let k = 2;
+          while (numbers.has(n)) { n = `${row.number}-${k}`; k += 1; }
+          row.number = n; numbers.add(n);
+        }
+      }
+    }
+    return maps;
+  }
+
   // ---------------------------------------------------------------- sync
   async function putBlob(blob, ifMatch) {
     const r = await api('/api/vault/blob', { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream', 'If-Match': String(ifMatch) }, body: blob });
@@ -696,7 +765,7 @@
     } catch (_) { /* analytics never breaks the app */ }
   }
 
-  const SERVER_ONLY = /^\/api\/(auth|t|vault|health|ready|billing|invoices|v1|oauth|mcp)(\/|$)/;
+  const SERVER_ONLY = /^\/api\/(auth|t|vault|health|ready|billing|invoice-links|invoice-shares|v1|oauth|mcp)(\/|$)/;
 
   window.fetch = async function (input, init) {
     let path;
@@ -776,6 +845,7 @@
           st.version = st.meta.version;
           await openEngine(loaded.bytes);
           if (loaded.dirty) { st.engine.dirty = true; scheduleSync(); }
+          else if (st.meta.legacyRows > 0) await lateImport();
         }
       }
       st.mode = 'vault';

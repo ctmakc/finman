@@ -63,7 +63,8 @@ async function callTool(auth, name, args) {
   const isLocal = (n) => { try { return vaultGrant.isLocalTool(n); } catch (_) { return true; } };
   if (!isLocal(name)) return tools.callTool(auth.userId, name, args);
   try {
-    return await vaultGrant.withVault(auth.userId, auth.family, auth.vaultSecret, (eng) => eng.mcpCallTool(name, args || {}));
+    const pdfLink = async (uid, invoiceId, render) => require('../services/mcp/pdfDrop').create(uid, await render());
+    return await vaultGrant.withVault(auth.userId, auth.family, auth.vaultSecret, (eng) => eng.mcpCallTool(name, args || {}, { pdfLink }));
   } catch (e) {
     if (e.code === 'VAULT_LOCKED' || e.code === 'BAD_KEY') {
       return { isError: true, content: [{ type: 'text', text: e.code === 'BAD_KEY' ? 'This connection cannot open your encrypted Finman data. Connect Finman again.' : e.message }] };

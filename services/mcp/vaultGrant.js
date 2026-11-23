@@ -11,6 +11,8 @@
 
 const { get, run } = require('../../db/database');
 const FMCrypto = require('../../public/js/vault/crypto');
+// The Node build of the engine makes invoice PDFs with the server's real pdfkit (engine/shims/invoicePdf.js).
+globalThis.__FM_NODE_INVOICE_PDF = require('../invoice/pdf');
 
 const SEP = '.v.';
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -107,7 +109,7 @@ async function withVault(userId, family, secret, fn) {
   throw new Error('The vault changed while the tool ran. Try again.');
 }
 
-// Инструменты над данными сейфа (счета, транзакции…) — в движке; инвойсы — на сервере.
+// Инструменты над данными сейфа (счета, транзакции, инвойсы с 23.11.2026) — в движке.
 let localTools = null;
 function isLocalTool(name) {
   if (!localTools) {

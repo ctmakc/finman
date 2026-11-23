@@ -341,7 +341,12 @@ app.use('/api/v1', apiV1Routes);
 app.use('/api/invoices', invoicesRoutes);
 // Public client page of a published invoice (no auth; one token = one invoice).
 app.use('/api/invoice-links', require('./routes/invoiceLinks'));
+app.use('/api/invoice-shares', require('./routes/invoiceShares'));
 app.use('/i', require('./routes/invoicePublic'));
+// Invoice PDFs from AI chats on vault accounts: ciphertext only, key in the link's #fragment.
+app.use('/p', require('./routes/pdfDrop'));
+// Fonts of the invoice PDF made in the browser for vault accounts (public/js/vault/invoice-pdf.js).
+app.use('/vendor/invoice-fonts', express.static(path.join(__dirname, 'assets', 'fonts'), { index: false, maxAge: '30d' }));
 // pdf.js for the PDF preview on that page (same origin: the worker must be same-origin).
 app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'build'), {
   index: false, maxAge: '7d', setHeaders: (res, f) => { if (f.endsWith('.mjs')) res.setHeader('Content-Type', 'text/javascript'); },

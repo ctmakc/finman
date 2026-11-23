@@ -1253,7 +1253,12 @@
 
   async function shareTemplate(id) {
     try {
-      var d = await api('/profiles/' + id + '/share', { method: 'POST' });
+      // The template lives where the account keeps its data (vault or server); sharing sends
+      // this one template to the server, which keeps it for the link.
+      var full = (await api('/profiles/' + id + '/full')).template;
+      var sr = await root.fetchWithAuth('/api/invoice-shares', { method: 'POST', body: JSON.stringify({ template: full }) });
+      if (!sr.ok) throw await root.readApiError(sr, tx('err.request'));
+      var d = await sr.json();
       var copied = false;
       try { if (navigator.clipboard) { await navigator.clipboard.writeText(d.url); copied = true; } } catch (e) { copied = false; }
       var host = root.UI.modal({
@@ -1290,7 +1295,11 @@
       tx('import.text', { name: tpl.name, seller: tpl.seller_name || '—' }), tx('import.ok'), false);
     if (!ok) return false;
     try {
-      var d = await api('/shared/' + encodeURIComponent(code) + '/import', { method: 'POST' });
+      var gr = await root.fetchWithAuth('/api/invoice-shares/' + encodeURIComponent(code));
+      if (!gr.ok) throw await root.readApiError(gr, tx('import.missing'));
+      var full = (await gr.json()).template;
+      var d = await api('/profiles/import', { method: 'POST', body: { template: full, code: code.toLowerCase() } });
+      root.fetchWithAuth('/api/invoice-shares/' + encodeURIComponent(code) + '/used', { method: 'POST' }).catch(function () {});
       await loadProfiles();
       S.highlight = d.profile.id;
       toast(tx('import.done', { name: d.profile.name }), 'success');

@@ -30,6 +30,8 @@ router.put('/:invoiceId', express.json({ limit: '6mb' }), wrap(async (req, res) 
   }
   res.status(r.created ? 201 : 200).json(r);
 }));
+// After invoices moved into the vault under new ids: { map: { oldId: newId } } (this user only).
+router.post('/rekey', wrap(async (req, res) => res.json(await links.rekey(req.user.id, req.body && req.body.map))));
 router.delete('/:invoiceId', wrap(async (req, res) => res.json(await links.revoke(req.user.id, req.params.invoiceId))));
 
 module.exports = router;
