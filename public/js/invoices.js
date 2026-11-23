@@ -277,6 +277,8 @@
     var s = statusLabel(inv);
     var menu = [];
     if (inv.status !== 'void') menu.push(['inv:link', 'fa-link', tx('act.link')]);
+    if ((inv.status === 'draft' || inv.status === 'sent') && inv.balance_cents > 0) menu.push(['inv:pay', 'fa-hand-holding-usd', tx('act.recordPayment')]);
+    if (inv.status === 'sent' && inv.balance_cents > 0) menu.push(['inv:remind', 'fa-bell', tx('act.remind')]);
     menu.push(['inv:duplicate', 'fa-copy', tx('act.duplicate')]);
     if (inv.status === 'draft') menu.push(['inv:mark', 'fa-paper-plane', tx('act.markSent'), 'sent']);
     if (inv.status === 'draft' || inv.status === 'sent') menu.push(['inv:mark', 'fa-check', tx('act.markPaid'), 'paid']);
@@ -291,6 +293,8 @@
         '<span class="inv-row-dates">' + esc(fmtDate(inv.issue_date)) +
           (inv.due_date ? '<span class="inv-row-due' + (s.key === 'overdue' ? ' is-late' : '') + '">' + esc(late ? tx('row.daysLate', { n: late }) : tx('row.due', { date: fmtDate(inv.due_date) })) + '</span>' : '') +
           viewedHtml(inv) +
+          (inv.paid_cents > 0 && inv.status !== 'paid' ? '<span class="inv-row-part">' + esc(tx('row.partPaid', { paid: money(inv.paid_cents, inv.currency) })) + '</span>' : '') +
+          (inv.repeat ? '<span class="inv-row-rep"><i class="fas fa-redo" aria-hidden="true"></i> ' + esc(tx('row.repeats', { date: fmtDate(inv.repeat.next_date) })) + '</span>' : '') +
         '</span>' +
         '<span class="inv-row-total fm-money">' + money(inv.total_cents, inv.currency) + '</span>' +
         '<span class="inv-row-status">' + chip(inv) + '</span>' +
@@ -350,6 +354,7 @@
             var on = S.status === st;
             return '<button type="button" role="tab" aria-selected="' + on + '" class="inv-seg-btn' + (on ? ' is-on' : '') + '" data-action="inv:status-filter" data-status="' + st + '">' + esc(tx('status.' + st)) + '</button>';
           }).join('') + '</div>' +
+          '<button type="button" class="btn btn-sm inv-export" data-action="inv:export"><i class="fas fa-file-csv" aria-hidden="true"></i> ' + esc(tx('act.exportCsv')) + '</button>' +
           '<label class="inv-search"><i class="fas fa-search" aria-hidden="true"></i><span class="sr-only">' + esc(tx('filter.search')) + '</span>' +
           '<input type="search" id="inv-search" value="' + esc(S.q) + '" placeholder="' + esc(tx('filter.search')) + '" autocomplete="off"></label>' +
         '</div>' +
@@ -510,6 +515,11 @@
             (saved ? '<button type="button" class="btn" data-action="inv:pdf" data-id="' + ed.id + '"><i class="fas fa-file-download" aria-hidden="true"></i> ' + esc(tx('act.download')) + '</button>' : '') +
             (saved && !ro ? '<button type="button" class="btn" data-action="inv:link" data-id="' + ed.id + '"><i class="fas fa-link" aria-hidden="true"></i> ' + esc(tx('act.link')) + '</button>' : '') +
             (saved && ed.invoice && ed.invoice.link ? '<p class="inv-hint inv-ed-seen">' + viewedHtml(ed.invoice) + '</p>' : '') +
+            (saved && !ro && ed.invoice && ed.invoice.balance_cents > 0 && ed.status !== 'paid' ? '<button type="button" class="btn" data-action="inv:pay" data-id="' + ed.id + '"><i class="fas fa-hand-holding-usd" aria-hidden="true"></i> ' + esc(tx('act.recordPayment')) + '</button>' : '') +
+            (saved && ed.status === 'sent' && ed.invoice && ed.invoice.balance_cents > 0 ? '<button type="button" class="btn" data-action="inv:remind" data-id="' + ed.id + '"><i class="fas fa-bell" aria-hidden="true"></i> ' + esc(tx('act.remind')) + '</button>' : '') +
+            (saved && !ro ? '<label class="inv-check inv-repeat"><input type="checkbox" data-inv-repeat="' + ed.id + '"' + (ed.invoice && ed.invoice.repeat ? ' checked' : '') + '> <span>' + esc(tx('repeat.label')) + '</span></label>' +
+              (ed.invoice && ed.invoice.repeat ? '<p class="inv-hint">' + esc(tx('repeat.next', { date: fmtDate(ed.invoice.repeat.next_date) })) + '</p>' : '<p class="inv-hint">' + esc(tx('repeat.hint')) + '</p>') : '') +
+            (saved && ed.invoice && ed.invoice.paid_cents > 0 && ed.status !== 'paid' ? '<p class="inv-hint">' + esc(tx('pay.partSummary', { paid: money(ed.invoice.paid_cents, ed.currency), balance: money(ed.invoice.balance_cents, ed.currency) })) + '</p>' : '') +
             statusBtns +
           '</div>' +
           '<p class="inv-footnote"><i class="fas fa-info-circle" aria-hidden="true"></i> ' + esc(tx('footerNote')) + '</p>' +
@@ -584,6 +594,7 @@
       readForm(ed); paintTotals(ed);
     });
     f.addEventListener('change', async function (e) {
+      if (e.target.hasAttribute && e.target.hasAttribute('data-inv-repeat')) { await setRepeat(e.target.getAttribute('data-inv-repeat'), e.target.checked); return; }
       var n = e.target.name;
       if (n === 'profile_id') { readForm(ed); await applyTemplate(ed); return; }
       if (n === 'issue_date') {
@@ -1028,6 +1039,110 @@
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // ---------- payments: full, part, deposit ----------
+  function findInv(id) {
+    return S.invoices.find(function (x) { return String(x.id) === String(id); }) || (S.ed && S.ed.invoice && String(S.ed.invoice.id) === String(id) ? S.ed.invoice : null);
+  }
+  async function paymentModal(id) {
+    var inv = findInv(id);
+    if (!inv) { try { inv = (await api('/' + id)).invoice; } catch (e) { toast(e.message, 'error'); return; } }
+    var host = root.UI.modal({
+      title: tx('pay.title', { number: inv.number }),
+      body: '<p class="inv-confirm-text">' + esc(tx('pay.text', { balance: money(inv.balance_cents, inv.currency) })) + '</p>' +
+        '<div class="inv-grid inv-grid-3">' +
+          field(tx('pay.amount'), '<input class="form-control" id="inv-pay-amt" inputmode="decimal" value="' + esc(centsToInput(inv.balance_cents)) + '">', 'inv-span-2') +
+          field(tx('pay.date'), '<input class="form-control" id="inv-pay-date" type="date" value="' + esc(today()) + '">') +
+        '</div>' +
+        '<div class="inv-link-btns">' + [30, 50].map(function (p) { return '<button type="button" class="btn btn-sm" data-inv-pct="' + p + '">' + esc(tx('pay.pct', { pct: p })) + '</button>'; }).join('') +
+          '<button type="button" class="btn btn-sm" data-inv-pct="100">' + esc(tx('pay.full')) + '</button></div>' +
+        field(tx('pay.method'), '<input class="form-control" id="inv-pay-method" placeholder="' + esc(tx('pay.methodPh')) + '">'),
+      footer: '<button type="button" class="btn" data-inv-pay="0">' + esc(tx('btn.cancel')) + '</button>' +
+        '<button type="button" class="btn btn-primary" data-inv-pay="1">' + esc(tx('pay.save')) + '</button>'
+    });
+    if (!host) return;
+    host.addEventListener('click', async function (e) {
+      var pb = e.target.closest('[data-inv-pct]');
+      if (pb) {
+        var pct = Number(pb.getAttribute('data-inv-pct'));
+        var c = pct === 100 ? inv.balance_cents : Math.min(inv.balance_cents, Math.round(inv.total_cents * pct / 100));
+        host.querySelector('#inv-pay-amt').value = centsToInput(c);
+        return;
+      }
+      var b = e.target.closest('[data-inv-pay]');
+      if (!b) return;
+      if (b.getAttribute('data-inv-pay') !== '1') { root.UI.closeModal(host); return; }
+      b.disabled = true;
+      try {
+        var r = await api('/' + id + '/payments', { method: 'POST', body: {
+          amount: host.querySelector('#inv-pay-amt').value, paid_on: host.querySelector('#inv-pay-date').value || today(),
+          method: host.querySelector('#inv-pay-method').value
+        } });
+        root.UI.closeModal(host);
+        toast(r.invoice.status === 'paid' ? tx('pay.doneFull') : tx('pay.donePart', { balance: money(r.invoice.balance_cents, r.invoice.currency) }), 'success');
+        if (S.view === 'list') await refreshList(); else if (S.ed && String(S.ed.id) === String(id)) { S.ed = stateFromInvoice(r.invoice); renderEditor(); }
+        if (r.invoice.status === 'paid') offerIncome(r.invoice);
+      } catch (err) { b.disabled = false; toast(err.message, 'error'); }
+    });
+  }
+
+  // ---------- payment reminder: text the user sends themselves ----------
+  function reminderText(inv) {
+    var p = profileById(inv.profile_id);
+    var seller = (p && p.data && p.data.seller && p.data.seller.name) || '';
+    var late = daysLate(inv);
+    var vars = { client: inv.client_name || '', number: inv.number, amount: money(inv.balance_cents, inv.currency), due: fmtDate(inv.due_date), days: late, link: inv.link ? inv.link.url : '', seller: seller };
+    var lines = [tx(inv.client_name ? 'remind.hi' : 'remind.hiAnon', vars), tx(late ? 'remind.late' : 'remind.soon', vars)];
+    lines.push(inv.link ? tx('remind.link', vars) : tx('remind.pdf', vars));
+    lines.push(tx('remind.thanks', vars) + (seller ? '\n' + seller : ''));
+    return lines.join('\n\n');
+  }
+  async function remindModal(id) {
+    var inv;
+    try { inv = (await api('/' + id)).invoice; } catch (e) { toast(e.message, 'error'); return; }
+    var host = root.UI.modal({
+      title: tx('remind.title', { number: inv.number }),
+      body: '<p class="inv-confirm-text">' + esc(tx('remind.text')) + '</p>' +
+        '<textarea class="form-control inv-remind-text" rows="9" id="inv-remind-ta">' + esc(reminderText(inv)) + '</textarea>' +
+        (inv.link ? '' : '<p class="inv-hint">' + esc(tx('remind.noLink')) + '</p>'),
+      footer: (inv.link ? '' : '<button type="button" class="btn" data-inv-rm="link"><i class="fas fa-link" aria-hidden="true"></i> ' + esc(tx('link.create')) + '</button>') +
+        '<button type="button" class="btn btn-primary" data-inv-rm="copy"><i class="fas fa-copy" aria-hidden="true"></i> ' + esc(tx('remind.copy')) + '</button>'
+    });
+    if (!host) return;
+    host.addEventListener('click', async function (e) {
+      var b = e.target.closest('[data-inv-rm]');
+      if (!b) return;
+      var ta = host.querySelector('#inv-remind-ta');
+      if (b.getAttribute('data-inv-rm') === 'link') {
+        b.disabled = true;
+        try {
+          inv = (await api('/' + id + '/link', { method: 'POST' })).invoice;
+          ta.value = reminderText(inv); b.remove();
+          var h = host.querySelector('.inv-hint'); if (h) h.remove();
+        } catch (err) { b.disabled = false; toast(err.message, 'error'); }
+        return;
+      }
+      ta.select();
+      try { await navigator.clipboard.writeText(ta.value); } catch (x) { try { document.execCommand('copy'); } catch (y) { /* ignore */ } }
+      b.textContent = tx('link.copied');
+      try { root.fetchWithAuth('/api/t/me', { method: 'POST', body: JSON.stringify({ event: 'invoice_reminder_created' }) }); } catch (x) { /* ignore */ }
+    });
+  }
+
+  async function exportCsv() {
+    try {
+      var r = await api('/export.csv', { blob: true });
+      saveBlob(r.blob, filenameFrom(r.res, 'finman-invoices.csv'));
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function setRepeat(id, on) {
+    try {
+      var r = await api('/' + id + '/repeat', { method: 'PUT', body: { every: on ? 'month' : null } });
+      toast(on ? tx('repeat.on', { date: fmtDate(r.invoice.repeat.next_date) }) : tx('repeat.off'), 'success');
+      if (S.ed && String(S.ed.id) === String(id)) { S.ed = stateFromInvoice(r.invoice); renderEditor(); }
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   // ---------- client link (/i/<token>) ----------
   function linkBody(inv) {
     var l = inv.link;
@@ -1247,6 +1362,9 @@
       'inv:open': function (el) { return openInvoice(el.dataset.id); },
       'inv:pdf': function (el) { return downloadPdf(el.dataset.id); },
       'inv:link': function (el) { return clientLink(el.dataset.id); },
+      'inv:pay': function (el) { return paymentModal(el.dataset.id); },
+      'inv:remind': function (el) { return remindModal(el.dataset.id); },
+      'inv:export': function () { return exportCsv(); },
       'inv:duplicate': async function (el) {
         try {
           var d = await api('/' + el.dataset.id + '/duplicate', { method: 'POST' });

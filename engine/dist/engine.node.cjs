@@ -20339,6 +20339,7 @@ var require_service = __commonJS({
     var SHARE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
     var LINK_COLS = "(SELECT json_object('token', l.token, 'created_at', l.created_at, 'first_viewed_at', l.first_viewed_at, 'last_viewed_at', l.last_viewed_at, 'view_count', l.view_count) FROM invoice_links l WHERE l.invoice_id = invoices.id AND l.revoked_at IS NULL) AS link_json";
     var LINK_RE = /^[A-Za-z0-9_-]{22,64}$/;
+    var REPEAT_COLS = "(SELECT json_object('every', r.every, 'next_date', r.next_date, 'made', r.made) FROM invoice_repeats r WHERE r.invoice_id = invoices.id) AS repeat_json";
     var VIEW_GAP_MIN = 10;
     var InvoiceError = class extends Error {
       constructor(message, status = 400) {
@@ -20741,6 +20742,7 @@ var require_service = __commonJS({
         card_fee_pct: core.cardFeePct(snap.data),
         ...paidOf(row),
         link: linkOf(row),
+        repeat: parseJson(row.repeat_json, null),
         sent_at: row.sent_at,
         paid_at: row.paid_at,
         created_at: row.created_at,
@@ -20750,7 +20752,7 @@ var require_service = __commonJS({
       return out;
     }
     async function invoiceRow(userId, id) {
-      const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
+      const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS}, ${REPEAT_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
       if (!row) throw notFound("Invoice not found");
       return row;
     }
@@ -20859,6 +20861,8 @@ var require_service = __commonJS({
       return { ok: true };
     }
     async function listInvoices(userId, { status, q } = {}) {
+      await runRepeats({ userId }).catch(() => {
+      });
       const where = ["user_id = ?"];
       const args = [userId];
       if (status === "overdue") {
@@ -20879,7 +20883,7 @@ var require_service = __commonJS({
             json_object('name', json_extract(snapshot, '$.name'), 'layout', json_extract(snapshot, '$.layout'),
                         'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'), 'card_fee', json_extract(snapshot, '$.data.card_fee'))) AS snapshot,
             sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum,
-            ${LINK_COLS}
+            ${LINK_COLS}, ${REPEAT_COLS}
        FROM invoices WHERE ${where.join(" AND ")} ORDER BY issue_date DESC, id DESC LIMIT 500`,
         args
       );
@@ -20991,6 +20995,102 @@ var require_service = __commonJS({
       const p = await publicByToken(token);
       if (!p || p.gone) return null;
       return { buffer: await renderPdf(p.view, p.user_id), filename: p.filename };
+    }
+    function addMonth(ymdStr, n = 1) {
+      const d = core.parseYmd(ymdStr);
+      const day = d.getUTCDate();
+      const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1));
+      const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+      t.setUTCDate(Math.min(day, last));
+      return core.ymd(t);
+    }
+    async function setRepeat(userId, id, every) {
+      const inv = await invoiceRow(userId, id);
+      if (!every) {
+        await run("DELETE FROM invoice_repeats WHERE invoice_id = ? AND user_id = ?", [id, userId]);
+      } else {
+        if (every !== "month") throw bad("Only monthly repeat is supported");
+        if (inv.status === "void") throw bad("A void invoice cannot repeat");
+        let next = addMonth(inv.issue_date, 1);
+        while (next < core.today()) next = addMonth(next, 1);
+        await run(`INSERT INTO invoice_repeats (user_id, invoice_id, every, next_date) VALUES (?, ?, 'month', ?)
+               ON CONFLICT(invoice_id) DO UPDATE SET every = 'month', next_date = excluded.next_date`, [userId, id, next]);
+      }
+      return { invoice: publicInvoice(await invoiceRow(userId, id)) };
+    }
+    async function runRepeats({ userId = null } = {}) {
+      const today = core.today();
+      const rules = await query(
+        `SELECT r.* FROM invoice_repeats r JOIN invoices i ON i.id = r.invoice_id
+      WHERE r.next_date <= ? AND i.status != 'void' ${userId ? "AND r.user_id = ?" : ""} ORDER BY r.id LIMIT 500`,
+        userId ? [today, userId] : [today]
+      );
+      let made = 0;
+      for (const r of rules) {
+        let next = r.next_date;
+        let guard = 0;
+        while (next <= today && guard < 3) {
+          try {
+            const src = await invoiceRow(r.user_id, r.invoice_id);
+            let profile = src.profile_id ? await get("SELECT * FROM invoice_profiles WHERE id = ? AND user_id = ?", [src.profile_id, r.user_id]) : null;
+            if (!profile) profile = await get("SELECT * FROM invoice_profiles WHERE user_id = ? ORDER BY is_default DESC, id LIMIT 1", [r.user_id]);
+            if (!profile) break;
+            const dueDays = src.due_date ? core.daysBetween(src.issue_date, src.due_date) : profile.due_days;
+            const inv = await createInvoice(r.user_id, {
+              profile_id: profile.id,
+              issue_date: next,
+              due_date: core.addDays(next, dueDays),
+              currency: src.currency,
+              client_name: src.client_name,
+              client_details: src.client_details,
+              items: parseJson(src.items, []).map((it) => ({ description: it.description, detail: it.detail, note: it.note, qty: it.qty, price_cents: it.price_cents })),
+              tax_rate: src.tax_rate,
+              tax_label: src.tax_label,
+              tax_sub: src.tax_sub,
+              tax_text: src.tax_text,
+              terms: src.terms,
+              notes: src.notes
+            });
+            await run("UPDATE invoice_repeats SET made = made + 1, last_invoice_id = ? WHERE id = ?", [inv.id, r.id]);
+            made++;
+          } catch (e) {
+            require_logger().warn({ err: e.message, rule: r.id }, "[invoices] repeat failed");
+            break;
+          }
+          next = addMonth(next, 1);
+          guard++;
+        }
+        while (next <= today) next = addMonth(next, 1);
+        await run("UPDATE invoice_repeats SET next_date = ? WHERE id = ?", [next, r.id]);
+      }
+      return { made };
+    }
+    function csvCell(v) {
+      const s = v === null || v === void 0 ? "" : String(v);
+      const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+      return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    }
+    async function exportCsv(userId) {
+      const { invoices } = await listInvoices(userId, {});
+      const head = ["number", "status", "issue_date", "due_date", "client", "currency", "subtotal", "tax", "total", "paid", "balance", "sent_at", "paid_at", "client_views"];
+      const money = (c) => ((Number(c) || 0) / 100).toFixed(2);
+      const rows = invoices.slice().reverse().map((i) => [
+        i.number,
+        i.status === "sent" && i.due_date && i.due_date < core.today() ? "overdue" : i.status,
+        i.issue_date,
+        i.due_date || "",
+        i.client_name,
+        i.currency,
+        money(i.subtotal_cents),
+        money(i.tax_cents),
+        money(i.total_cents),
+        money(i.paid_cents),
+        money(i.balance_cents),
+        i.sent_at || "",
+        i.paid_at || "",
+        i.link ? i.link.view_count : ""
+      ]);
+      return "\uFEFF" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
     }
     async function footerFor(userId) {
       const code = await inviteCodeFor(userId);
@@ -21162,7 +21262,11 @@ var require_service = __commonJS({
       publicByToken,
       recordView,
       publicPdf,
-      linkUrl
+      linkUrl,
+      setRepeat,
+      runRepeats,
+      addMonth,
+      exportCsv
     };
   }
 });
@@ -27579,6 +27683,11 @@ Stop these emails: ${unsub}`
           logger.error({ err: e.message }, "[lifecycle] nudges failed");
         }
         try {
+          await require_service().runRepeats();
+        } catch (e) {
+          logger.error({ err: e.message }, "[lifecycle] invoice repeats failed");
+        }
+        try {
           await require_tips().runTips();
         } catch (e) {
           logger.error({ err: e.message }, "[lifecycle] tips failed");
@@ -28975,7 +29084,7 @@ var require_routes = __commonJS({
 var require_schema = __commonJS({
   "engine/schema.sql"(exports2, module2) {
     module2.exports = `-- engine/schema.sql \u2014 GENERATED by engine/build.js from db/database.js initDatabase() + migrations/.
--- Do not edit. 73 tables, 31 migrations.
+-- Do not edit. 74 tables, 32 migrations.
 CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
@@ -29976,6 +30085,17 @@ CREATE TABLE IF NOT EXISTS invoice_links (
         view_count INTEGER NOT NULL DEFAULT 0
       );
 ;;
+CREATE TABLE IF NOT EXISTS invoice_repeats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        every TEXT NOT NULL DEFAULT 'month',
+        next_date TEXT NOT NULL,
+        made INTEGER NOT NULL DEFAULT 0,
+        last_invoice_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+;;
 CREATE TABLE IF NOT EXISTS onboarding_progress (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -30089,6 +30209,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_invoice ON invoice_links (in
 ;;
 CREATE INDEX IF NOT EXISTS idx_invoice_links_user ON invoice_links (user_id);
 ;;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_repeats_invoice ON invoice_repeats (invoice_id);
+;;
+CREATE INDEX IF NOT EXISTS idx_invoice_repeats_next ON invoice_repeats (next_date);
+;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('001_users_subscription');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('002_ai_conversations');
@@ -30150,6 +30274,8 @@ INSERT OR IGNORE INTO schema_migrations (name) VALUES ('031_account_scope');
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('032_weekly_note');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('033_invoice_links');
+;;
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('034_invoice_repeat');
 `;
   }
 });
@@ -31209,6 +31335,32 @@ var require_invoice_links = __commonJS({
   }
 });
 
+// migrations/034_invoice_repeat.js
+var require_invoice_repeat = __commonJS({
+  "migrations/034_invoice_repeat.js"(exports2, module2) {
+    init_globals();
+    module2.exports = {
+      name: "034_invoice_repeat",
+      async up(db2) {
+        await db2.run(`
+      CREATE TABLE IF NOT EXISTS invoice_repeats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        every TEXT NOT NULL DEFAULT 'month',
+        next_date TEXT NOT NULL,
+        made INTEGER NOT NULL DEFAULT 0,
+        last_invoice_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+        await db2.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_repeats_invoice ON invoice_repeats (invoice_id)");
+        await db2.run("CREATE INDEX IF NOT EXISTS idx_invoice_repeats_next ON invoice_repeats (next_date)");
+      }
+    };
+  }
+});
+
 // finman-virtual:migrations
 var require_migrations = __commonJS({
   "finman-virtual:migrations"(exports2, module2) {
@@ -31244,7 +31396,8 @@ var require_migrations = __commonJS({
       { file: "030_feedback.js", mod: require_feedback() },
       { file: "031_account_scope.js", mod: require_account_scope() },
       { file: "032_weekly_note.js", mod: require_weekly_note() },
-      { file: "033_invoice_links.js", mod: require_invoice_links() }
+      { file: "033_invoice_links.js", mod: require_invoice_links() },
+      { file: "034_invoice_repeat.js", mod: require_invoice_repeat() }
     ];
   }
 });

@@ -217,6 +217,8 @@ function start() {
   task = cron.schedule(process.env.LIFECYCLE_CRON || '0 13 * * *', async () => {
     try { await runDigest(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] digest failed'); }
     try { await runNudges(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] nudges failed'); }
+    // Repeating invoices: today's drafts (services/invoice/service.js runRepeats).
+    try { await require('./invoice/service').runRepeats(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] invoice repeats failed'); }
     // New users' tips: first invoice, statement import, what next (services/tips.js).
     try { await require('./tips').runTips(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] tips failed'); }
     // Journey sweep + "Your week/month in money" (ENGAGEMENT_EMAILS=1) + push.

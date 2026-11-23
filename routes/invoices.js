@@ -64,6 +64,15 @@ router.post('/shared/:code/import', wrap(async (req, res) => {
 
 // ---- invoices ----
 router.get('/', wrap(async (req, res) => res.json(await svc.listInvoices(req.user.id, { status: req.query.status, q: req.query.q }))));
+// CSV of all invoices for the accountant (status, totals, paid, balance, client views).
+router.get('/export.csv', wrap(async (req, res) => {
+  const csv = await svc.exportCsv(req.user.id);
+  track(req, 'invoices_exported', {});
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="finman-invoices-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(csv);
+}));
 router.get('/next-number', wrap(async (req, res) => {
   res.json({ number: await svc.nextNumber(req.user.id, parseInt(req.query.profile_id, 10), req.query.date) });
 }));
@@ -83,6 +92,21 @@ router.post('/:id/link', wrap(async (req, res) => {
   const r = await svc.createLink(req.user.id, id(req));
   if (r.created) track(req, 'invoice_link_created', {});
   res.status(r.created ? 201 : 200).json({ invoice: r.invoice });
+}));
+// Payments against an invoice: full, part, or a deposit in percent.
+router.get('/:id/payments', wrap(async (req, res) => res.json({ payments: await svc.listPayments(req.user.id, id(req)) })));
+router.post('/:id/payments', wrap(async (req, res) => {
+  const r = await svc.recordPayment(req.user.id, id(req), req.body);
+  track(req, 'invoice_payment_recorded', { full: r.invoice.status === 'paid' ? 1 : 0 });
+  res.status(201).json(r);
+}));
+router.delete('/:id/payments/:pid', wrap(async (req, res) => res.json(await svc.deletePayment(req.user.id, id(req), parseInt(req.params.pid, 10)))));
+// Repeat monthly: { every: 'month' } or { every: null } to stop.
+router.put('/:id/repeat', wrap(async (req, res) => {
+  const every = req.body && req.body.every ? String(req.body.every) : null;
+  const r = await svc.setRepeat(req.user.id, id(req), every);
+  if (every) track(req, 'invoice_repeat_on', {});
+  res.json(r);
 }));
 router.delete('/:id/link', wrap(async (req, res) => res.json(await svc.revokeLink(req.user.id, id(req)))));
 router.get('/:id/pdf', wrap(async (req, res) => {

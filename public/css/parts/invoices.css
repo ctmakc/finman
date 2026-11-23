@@ -359,3 +359,8 @@
 :root .inv-link-btns { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-3) 0; }
 :root .inv-link-warn { color: var(--fm-warning); }
 :root .inv-ed-seen { margin-top: var(--space-2); }
+:root .inv-row-part, :root .inv-row-rep { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--fm-ink-2); }
+:root .inv-row-part { color: var(--fm-positive); font-weight: 500; }
+:root .inv-export { white-space: nowrap; }
+:root .inv-repeat { margin-top: var(--space-2); }
+:root .inv-remind-text { font: inherit; line-height: 1.5; min-height: 12rem; }

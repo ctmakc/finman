@@ -20,6 +20,7 @@ const IMAGE_RE = /^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=\s]+)$/;
 const SHARE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const LINK_COLS = "(SELECT json_object('token', l.token, 'created_at', l.created_at, 'first_viewed_at', l.first_viewed_at, 'last_viewed_at', l.last_viewed_at, 'view_count', l.view_count) FROM invoice_links l WHERE l.invoice_id = invoices.id AND l.revoked_at IS NULL) AS link_json";
 const LINK_RE = /^[A-Za-z0-9_-]{22,64}$/;
+const REPEAT_COLS = "(SELECT json_object('every', r.every, 'next_date', r.next_date, 'made', r.made) FROM invoice_repeats r WHERE r.invoice_id = invoices.id) AS repeat_json";
 // A repeat view within this window is the same visit (reload, second tab).
 const VIEW_GAP_MIN = 10;
 
@@ -423,6 +424,7 @@ function publicInvoice(row, { withSnapshot = false } = {}) {
     card_fee_pct: core.cardFeePct(snap.data),
     ...paidOf(row),
     link: linkOf(row),
+    repeat: parseJson(row.repeat_json, null),
     sent_at: row.sent_at,
     paid_at: row.paid_at,
     created_at: row.created_at,
@@ -433,7 +435,7 @@ function publicInvoice(row, { withSnapshot = false } = {}) {
 }
 
 async function invoiceRow(userId, id) {
-  const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
+  const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS}, ${REPEAT_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
   if (!row) throw notFound('Invoice not found');
   return row;
 }
@@ -547,6 +549,7 @@ async function deleteInvoice(userId, id) {
 }
 
 async function listInvoices(userId, { status, q } = {}) {
+  await runRepeats({ userId }).catch(() => {});
   const where = ['user_id = ?'];
   const args = [userId];
   if (status === 'overdue') { where.push("status = 'sent' AND due_date IS NOT NULL AND due_date < ?"); args.push(core.today()); }
@@ -562,7 +565,7 @@ async function listInvoices(userId, { status, q } = {}) {
             json_object('name', json_extract(snapshot, '$.name'), 'layout', json_extract(snapshot, '$.layout'),
                         'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'), 'card_fee', json_extract(snapshot, '$.data.card_fee'))) AS snapshot,
             sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum,
-            ${LINK_COLS}
+            ${LINK_COLS}, ${REPEAT_COLS}
        FROM invoices WHERE ${where.join(' AND ')} ORDER BY issue_date DESC, id DESC LIMIT 500`,
     args,
   );
@@ -679,6 +682,92 @@ async function publicPdf(token) {
   const p = await publicByToken(token);
   if (!p || p.gone) return null;
   return { buffer: await renderPdf(p.view, p.user_id), filename: p.filename };
+}
+
+// ---------- repeating invoices ----------
+function addMonth(ymdStr, n = 1) {
+  const d = core.parseYmd(ymdStr);
+  const day = d.getUTCDate();
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(day, last));
+  return core.ymd(t);
+}
+
+// every: 'month' | null (stop). The first new draft comes a month after the invoice's issue date.
+async function setRepeat(userId, id, every) {
+  const inv = await invoiceRow(userId, id);
+  if (!every) {
+    await run('DELETE FROM invoice_repeats WHERE invoice_id = ? AND user_id = ?', [id, userId]);
+  } else {
+    if (every !== 'month') throw bad('Only monthly repeat is supported');
+    if (inv.status === 'void') throw bad('A void invoice cannot repeat');
+    let next = addMonth(inv.issue_date, 1);
+    while (next < core.today()) next = addMonth(next, 1);
+    await run(`INSERT INTO invoice_repeats (user_id, invoice_id, every, next_date) VALUES (?, ?, 'month', ?)
+               ON CONFLICT(invoice_id) DO UPDATE SET every = 'month', next_date = excluded.next_date`, [userId, id, next]);
+  }
+  return { invoice: publicInvoice(await invoiceRow(userId, id)) };
+}
+
+// Makes the drafts that are due (next_date <= today). Called from the daily lifecycle run and,
+// for one user, when their invoice list loads (so the draft is there on the day).
+async function runRepeats({ userId = null } = {}) {
+  const today = core.today();
+  const rules = await query(
+    `SELECT r.* FROM invoice_repeats r JOIN invoices i ON i.id = r.invoice_id
+      WHERE r.next_date <= ? AND i.status != 'void' ${userId ? 'AND r.user_id = ?' : ''} ORDER BY r.id LIMIT 500`,
+    userId ? [today, userId] : [today]);
+  let made = 0;
+  for (const r of rules) {
+    let next = r.next_date;
+    // Catch up at most 3 missed months, one draft each; older gaps just move the date on.
+    let guard = 0;
+    while (next <= today && guard < 3) {
+      try {
+        const src = await invoiceRow(r.user_id, r.invoice_id);
+        let profile = src.profile_id ? await get('SELECT * FROM invoice_profiles WHERE id = ? AND user_id = ?', [src.profile_id, r.user_id]) : null;
+        if (!profile) profile = await get('SELECT * FROM invoice_profiles WHERE user_id = ? ORDER BY is_default DESC, id LIMIT 1', [r.user_id]);
+        if (!profile) break;
+        const dueDays = src.due_date ? core.daysBetween(src.issue_date, src.due_date) : profile.due_days;
+        const inv = await createInvoice(r.user_id, {
+          profile_id: profile.id, issue_date: next, due_date: core.addDays(next, dueDays), currency: src.currency,
+          client_name: src.client_name, client_details: src.client_details,
+          items: parseJson(src.items, []).map((it) => ({ description: it.description, detail: it.detail, note: it.note, qty: it.qty, price_cents: it.price_cents })),
+          tax_rate: src.tax_rate, tax_label: src.tax_label, tax_sub: src.tax_sub, tax_text: src.tax_text, terms: src.terms, notes: src.notes,
+        });
+        await run('UPDATE invoice_repeats SET made = made + 1, last_invoice_id = ? WHERE id = ?', [inv.id, r.id]);
+        made++;
+      } catch (e) {
+        require('../../lib/logger').warn({ err: e.message, rule: r.id }, '[invoices] repeat failed');
+        break;
+      }
+      next = addMonth(next, 1);
+      guard++;
+    }
+    while (next <= today) next = addMonth(next, 1);
+    await run('UPDATE invoice_repeats SET next_date = ? WHERE id = ?', [next, r.id]);
+  }
+  return { made };
+}
+
+// ---------- payment reminder (the user sends it; Finman never emails the client) ----------
+// ---------- CSV for the accountant ----------
+function csvCell(v) {
+  const s = v === null || v === undefined ? '' : String(v);
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; // no formulas in spreadsheets
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+async function exportCsv(userId) {
+  const { invoices } = await listInvoices(userId, {});
+  const head = ['number', 'status', 'issue_date', 'due_date', 'client', 'currency', 'subtotal', 'tax', 'total', 'paid', 'balance', 'sent_at', 'paid_at', 'client_views'];
+  const money = (c) => ((Number(c) || 0) / 100).toFixed(2);
+  const rows = invoices.slice().reverse().map((i) => [
+    i.number, i.status === 'sent' && i.due_date && i.due_date < core.today() ? 'overdue' : i.status, i.issue_date, i.due_date || '', i.client_name,
+    i.currency, money(i.subtotal_cents), money(i.tax_cents), money(i.total_cents), money(i.paid_cents), money(i.balance_cents),
+    i.sent_at || '', i.paid_at || '', i.link ? i.link.view_count : '',
+  ]);
+  return '\uFEFF' + [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
 // ---------- PDF ----------
@@ -841,4 +930,5 @@ module.exports = {
   listInvoices, getInvoice, invoicePdf, previewPdf,
   listPayments, recordPayment, deletePayment, listClients,
   createLink, revokeLink, publicByToken, recordView, publicPdf, linkUrl,
+  setRepeat, runRepeats, addMonth, exportCsv,
 };

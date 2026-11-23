@@ -163,3 +163,69 @@ describe('invoice client link', () => {
     expect(l).toBeTruthy();
   });
 });
+
+describe('invoice quick wins: payments, repeat, CSV', () => {
+  let ctx;
+  beforeEach(async () => { ctx = await makeApp(); });
+  afterEach(async () => { await ctx.close(); });
+  const H = () => auth(ctx.token);
+  async function setup() {
+    const p = (await ctx.request.post('/api/invoices/profiles').set(H()).send({ name: 'S', layout: 'classic', currency: 'CAD', number_format: 'R-{SEQ}', due_days: 10, data: {} })).body.profile;
+    const inv = (await ctx.request.post('/api/invoices').set(H()).send({ profile_id: p.id, issue_date: '2026-09-30', client_name: 'Acme, "North"', items: [{ description: 'Retainer', qty: 1, price: '1,000.00' }] })).body.invoice;
+    return { p, inv };
+  }
+
+  test('deposit 30 % then the rest: partial keeps it open, the rest marks it paid', async () => {
+    const { inv } = await setup();
+    const a = await ctx.request.post(`/api/invoices/${inv.id}/payments`).set(H()).send({ amount: '300.00', method: 'e-Transfer' });
+    expect(a.status).toBe(201);
+    expect(a.body.invoice.status).toBe('sent');
+    expect(a.body.invoice.paid_cents).toBe(30000);
+    expect(a.body.invoice.balance_cents).toBe(70000);
+    const over = await ctx.request.post(`/api/invoices/${inv.id}/payments`).set(H()).send({ amount: '800' });
+    expect(over.status).toBe(400);
+    const b = await ctx.request.post(`/api/invoices/${inv.id}/payments`).set(H()).send({});
+    expect(b.body.invoice.status).toBe('paid');
+    expect((await ctx.request.get(`/api/invoices/${inv.id}/payments`).set(H())).body.payments).toHaveLength(2);
+    const del = await ctx.request.delete(`/api/invoices/${inv.id}/payments/${b.body.payments[1].id}`).set(H());
+    expect(del.body.invoice.status).toBe('sent');
+  });
+
+  test('repeat monthly: catches up drafts up to today, keeps lines and due days, stops on request', async () => {
+    const { inv } = await setup();
+    const r = await ctx.request.put(`/api/invoices/${inv.id}/repeat`).set(H()).send({ every: 'month' });
+    expect(r.status).toBe(200);
+    expect(r.body.invoice.repeat.every).toBe('month');
+    expect(r.body.invoice.repeat.next_date >= '2026-10-30').toBe(true);
+    // Pretend the rule was set long ago: next draft due on 2026-10-30.
+    await new Promise((res, rej) => ctx.db.run("UPDATE invoice_repeats SET next_date = '2026-10-30'", (e) => (e ? rej(e) : res())));
+    const list = (await ctx.request.get('/api/invoices').set(H())).body.invoices;
+    const drafts = list.filter((x) => x.id !== inv.id);
+    expect(drafts.length).toBeGreaterThanOrEqual(1);
+    expect(drafts.every((d) => d.status === 'draft' && d.total_cents === 100000 && d.client_name === 'Acme, "North"')).toBe(true);
+    expect(drafts.map((d) => d.issue_date)).toContain('2026-10-30');
+    const oct = drafts.find((d) => d.issue_date === '2026-10-30');
+    expect(oct.due_date).toBe('2026-11-09');
+    const again = (await ctx.request.get('/api/invoices').set(H())).body.invoices;
+    expect(again.length).toBe(list.length); // no duplicates on the next load
+    const stop = await ctx.request.put(`/api/invoices/${inv.id}/repeat`).set(H()).send({ every: null });
+    expect(stop.body.invoice.repeat).toBeNull();
+  });
+
+  test('CSV export: header, quoting, no formulas, only my invoices', async () => {
+    const { inv } = await setup();
+    await ctx.request.post(`/api/invoices/${inv.id}/payments`).set(H()).send({ amount: '250' });
+    const r = await ctx.request.get('/api/invoices/export.csv').set(H());
+    expect(r.status).toBe(200);
+    expect(r.headers['content-type']).toMatch(/text\/csv/);
+    const lines = r.text.replace(/^﻿/, '').trim().split('\r\n');
+    expect(lines[0]).toBe('number,status,issue_date,due_date,client,currency,subtotal,tax,total,paid,balance,sent_at,paid_at,client_views');
+    expect(lines[1]).toContain('"Acme, ""North"""');
+    expect(lines[1]).toContain(',1000.00,250.00,750.00,');
+    const p2 = (await ctx.request.post('/api/invoices/profiles').set(H()).send({ name: 'T', currency: 'CAD', data: {} })).body.profile;
+    await ctx.request.post('/api/invoices').set(H()).send({ profile_id: p2.id, client_name: '=HYPERLINK("x")', items: [] });
+    const r2 = await ctx.request.get('/api/invoices/export.csv').set(H());
+    expect(r2.text).toContain("'=HYPERLINK");
+    expect((await ctx.request.get('/api/invoices/export.csv')).status).toBe(401);
+  });
+});
