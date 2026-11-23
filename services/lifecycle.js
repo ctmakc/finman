@@ -11,6 +11,7 @@
 //      nudge_import_abandoned  an import failed or stopped at preview, no import since
 //    Finman Vault users (services/vault.isVaultUser) never get nudge_not_activated:
 //    their transactions are encrypted. Their activity = events (vault_sync, app_open, login).
+//    Tips for new users (services/tips.js): tip_invoice / tip_import / tip_next, ≤ 1 per 2 days.
 //    Sender: LIFECYCLE_FROM (a verified Resend domain). Each email carries a
 //    one-click unsubscribe link (routes/track.js).
 'use strict';
@@ -216,6 +217,8 @@ function start() {
   task = cron.schedule(process.env.LIFECYCLE_CRON || '0 13 * * *', async () => {
     try { await runDigest(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] digest failed'); }
     try { await runNudges(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] nudges failed'); }
+    // New users' tips: first invoice, statement import, what next (services/tips.js).
+    try { await require('./tips').runTips(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] tips failed'); }
     // Journey sweep + "Your week/month in money" (ENGAGEMENT_EMAILS=1) + push.
     try { await require('./engagementMail').runDaily(); } catch (e) { logger.error({ err: e.message }, '[lifecycle] engagement failed'); }
     // Mondays: the team's week in numbers (aggregates only, services/growthMetrics.js).
