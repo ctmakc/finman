@@ -13,10 +13,19 @@ const DB = process.env.DB;
 const SHOTS = process.env.SHOTS || '';
 const PW = 'Invoice-Vault-1123!';
 const EMAIL = process.env.EMAIL || `inv-vault-${Date.now()}@e2e.test`;
-const sqlite = (sql, params = []) => new Promise((res, rej) => {
-  const s = require('sqlite3'); const d = new s.Database(DB);
-  d.all(sql, params, (e, r) => { d.close(); if (e) rej(e); else res(r); });
-});
+// DB=<file> on a stand; REMOTE=<ssh host> on prod (the query runs inside the finman container).
+const REMOTE = process.env.REMOTE || '';
+const sqlite = (sql, params = []) => {
+  if (REMOTE) {
+    const js = `const s=require('sqlite3');const d=new s.Database('/app/data/finman.db');d.all(${JSON.stringify(sql)},${JSON.stringify(params)},(e,r)=>{if(e){console.error(e.message);process.exit(1)}process.stdout.write(JSON.stringify(r,(k,v)=>v&&v.type==='Buffer'?Buffer.from(v.data).toString('latin1'):v));d.close()})`;
+    const out = require('child_process').execFileSync('ssh', [REMOTE, `docker exec -e NODE_PATH=/app/node_modules -w /app finman node -e ${JSON.stringify(js).replace(/\$/g, '\\$')}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    return Promise.resolve(JSON.parse(out));
+  }
+  return new Promise((res, rej) => {
+    const s = require('sqlite3'); const d = new s.Database(DB);
+    d.all(sql, params, (e, r) => { d.close(); if (e) rej(e); else res(r); });
+  });
+};
 
 (async () => {
   const b = await chromium.launch();
@@ -61,7 +70,7 @@ const sqlite = (sql, params = []) => new Promise((res, rej) => {
   await g.close();
   // Vault blob on the server: ciphertext, the client name is not readable.
   const vb = await sqlite('SELECT blob FROM user_vaults WHERE user_id = ?', [uid]);
-  assert.ok(!Buffer.from(vb[0].blob).toString('latin1').includes(SECRET));
+  assert.ok(!(typeof vb[0].blob === 'string' ? vb[0].blob : Buffer.from(vb[0].blob).toString('latin1')).includes(SECRET));
 
   // 2. Late import: rows the server still has for this account.
   await sqlite("INSERT INTO invoice_profiles (user_id, name, layout, currency, number_format, next_seq, due_days, data) VALUES (?, 'Old server template', 'classic', 'EUR', 'OLD-{SEQ}', 4, 14, '{}')", [uid]);
