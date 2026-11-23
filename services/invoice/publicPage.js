@@ -207,6 +207,7 @@ function invoicePage(lang, p, { pdfUrl, signupUrl }) {
       ${v.due_date ? `<p class="ip-k">${esc(fill(t.dueOn, { date: dateText(v.due_date, lang) }))}</p>` : ''}
     </div>
     ${state}
+    <a class="ip-sheet" href="${esc(pdfUrl)}" target="_blank" rel="noopener" aria-label="${esc(t.pdf)}"><canvas data-pdf-src="${esc(pdfUrl)}" aria-hidden="true"></canvas></a>
     <div class="ip-actions">
       ${primaryPay ? `<a class="ip-btn ip-btn-primary" href="#pay">${esc(t.payTitle)}</a>` : ''}
       <a class="ip-btn ip-btn-soft" href="${esc(pdfUrl)}?download=1" data-pdf>${esc(t.pdf)}</a>

@@ -30,14 +30,29 @@
     else { var r = document.createRange(); r.selectNodeContents(v); var s = getSelection(); s.removeAllRanges(); s.addRange(r); try { document.execCommand('copy'); done(); } catch (x) { /* ignore */ } }
   });
 
+  // First page of the PDF as the picture on the first screen (pdf.js from our own origin).
+  var canvas = document.querySelector('.ip-sheet canvas');
+  if (canvas) {
+    var box = canvas.parentNode;
+    import('/vendor/pdfjs/pdf.min.mjs').then(function (lib) {
+      lib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
+      return lib.getDocument({ url: canvas.getAttribute('data-pdf-src'), isEvalSupported: false }).promise;
+    }).then(function (doc) { return doc.getPage(1); }).then(function (page) {
+      var w = box.clientWidth || 300;
+      var base = page.getViewport({ scale: 1 });
+      var vp = page.getViewport({ scale: (w / base.width) * Math.min(window.devicePixelRatio || 1, 2) });
+      canvas.width = vp.width; canvas.height = vp.height;
+      return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+    }).then(function () { box.classList.add('is-ready'); }, function () { box.classList.add('is-failed'); });
+  }
+
   var bar = document.querySelector('.ip-sticky');
   var pay = document.getElementById('pay');
   if (bar && pay && 'IntersectionObserver' in window) {
     bar.hidden = false;
-    var pastFirst = false, payVisible = false;
-    var paint = function () { bar.classList.toggle('is-off', !pastFirst || payVisible); };
+    // From the second screen on, the pay button stays at the bottom of the screen.
+    var paint = function () { bar.classList.toggle('is-off', window.scrollY < window.innerHeight * 0.6); };
     paint();
-    window.addEventListener('scroll', function () { pastFirst = window.scrollY > window.innerHeight * 0.6; paint(); }, { passive: true });
-    new IntersectionObserver(function (es) { payVisible = es[0].isIntersecting; paint(); }, { threshold: 0.15 }).observe(pay);
+    window.addEventListener('scroll', paint, { passive: true });
   }
 })();

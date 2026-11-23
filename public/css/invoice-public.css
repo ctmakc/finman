@@ -35,16 +35,22 @@ a { color: var(--accent); }
 .ip-strong { font-weight: 600; }
 .ip-small { color: var(--ink-2); font-size: .875rem; margin-top: 12px; }
 
-.ip-head { display: grid; gap: 16px; grid-template-columns: 1fr auto; align-items: end; animation: ipRise 520ms var(--ease) both; }
-.ip-seller { grid-column: 1 / -1; display: flex; gap: 14px; align-items: center; }
+.ip-head { display: grid; gap: 16px; grid-template-columns: 1fr minmax(260px, 340px); grid-template-areas: "seller sheet" "title sheet" "due sheet" "state sheet" "actions sheet"; align-items: start; animation: ipRise 520ms var(--ease) both; }
+.ip-seller { grid-area: seller; } .ip-head h1 { grid-area: title; } .ip-due { grid-area: due; } .ip-state { grid-area: state; } .ip-actions { grid-area: actions; }
+.ip-sheet { grid-area: sheet; display: block; border-radius: 12px; overflow: hidden; background: #FEFEFF; box-shadow: 0 0 0 1px var(--rule), 0 18px 40px -18px rgba(30, 50, 110, .35);
+  aspect-ratio: 1 / 1.414; transform: rotate(1.2deg); transition: transform 300ms var(--ease); }
+.ip-sheet:hover { transform: rotate(0) translateY(-3px); }
+.ip-sheet canvas { display: block; width: 100%; height: auto; opacity: 0; transition: opacity 400ms var(--ease-out); }
+.ip-sheet.is-ready canvas { opacity: 1; }
+.ip-sheet.is-failed { display: none; }
+.ip-seller { display: flex; gap: 14px; align-items: center; }
 .ip-logo { max-height: 56px; max-width: 160px; object-fit: contain; border-radius: 8px; }
 .ip-seller-name { font-weight: 600; font-size: 1.05rem; }
-.ip-head h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.1rem); font-weight: 650; letter-spacing: -.02em; grid-column: 1 / -1; }
-.ip-due { grid-column: 1; }
+.ip-head h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.1rem); font-weight: 650; letter-spacing: -.02em; }
 .ip-amount { font-size: clamp(2.6rem, 1.6rem + 4vw, 4.2rem); font-weight: 600; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .ip-amount span { font-size: .42em; color: var(--ink-2); font-weight: 500; letter-spacing: 0; }
-.ip-actions { grid-column: 2; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.ip-state { grid-column: 1 / -1; padding: 10px 14px; border-radius: var(--r-sm); font-weight: 500; }
+.ip-actions { display: flex; gap: 10px; flex-wrap: wrap; align-self: end; }
+.ip-state { padding: 10px 14px; border-radius: var(--r-sm); font-weight: 500; }
 .ip-state-paid { background: var(--ok-tint); color: var(--ok); }
 .ip-state-late { background: var(--late-tint); color: var(--late); }
 .ip-state-void { background: var(--well); color: var(--ink-2); }
@@ -102,8 +108,10 @@ a { color: var(--accent); }
 @media (max-width: 820px) {
   .ip-grid { grid-template-columns: 1fr; }
   .ip-pay { position: static; order: -1; }
-  .ip-head { grid-template-columns: 1fr; }
-  .ip-actions { grid-column: 1; justify-content: stretch; }
+  .ip-head { grid-template-columns: 1fr; grid-template-areas: "sheet" "seller" "title" "due" "state" "actions"; gap: 12px; }
+  .ip-sheet { aspect-ratio: auto; height: 190px; transform: none; margin: -8px -8px 4px; border-radius: 16px; position: relative; }
+  .ip-sheet::after { content: ''; position: absolute; inset: auto 0 0; height: 56px; background: linear-gradient(transparent, var(--plate)); }
+  .ip-actions { justify-content: stretch; }
   .ip-actions .ip-btn { flex: 1; }
   .ip-parties { grid-template-columns: 1fr; }
   .ip-items, .ip-items tbody, .ip-items tfoot { display: block; }

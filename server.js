@@ -341,6 +341,10 @@ app.use('/api/v1', apiV1Routes);
 app.use('/api/invoices', invoicesRoutes);
 // Public client page of a published invoice (no auth; one token = one invoice).
 app.use('/i', require('./routes/invoicePublic'));
+// pdf.js for the PDF preview on that page (same origin: the worker must be same-origin).
+app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'build'), {
+  index: false, maxAge: '7d', setHeaders: (res, f) => { if (f.endsWith('.mjs')) res.setHeader('Content-Type', 'text/javascript'); },
+}));
 // In-app feedback (rating, surveys, bug reports, exit survey) + the team's admin list.
 app.use('/api/feedback', require('./routes/feedback'));
 // MCP connector: OAuth 2.1 (discovery, registration, consent, tokens) and the /mcp endpoint.
