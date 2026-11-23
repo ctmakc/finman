@@ -1730,7 +1730,7 @@ function renderSettingsPage() {
           <label class="fm-switch-row"><input type="checkbox" id="pref-weekly" disabled>
             <span><strong>Weekly email</strong><small>On Mondays, when your week in money is ready. Encrypted accounts get a reminder without amounts; the numbers stay in the app.</small></span></label>
           <label class="fm-switch-row"><input type="checkbox" id="pref-tips" disabled>
-            <span><strong>Tips and reminders</strong><small>A few emails in your first weeks: how to import a statement, what to try next.</small></span></label>
+            <span><strong>Tips and reminders</strong><small>A few emails in your first two weeks, at most one in two days: your first invoice, importing a statement, what to try next.</small></span></label>
           <p class="form-hint" id="pref-status" role="status"></p>
         </div>
       </div>

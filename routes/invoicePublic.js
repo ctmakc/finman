@@ -76,7 +76,10 @@ router.post('/:token/seen', async (req, res) => {
     const r = await svc.recordView(req.params.token);
     if (r.ok) {
       const p = await svc.publicByToken(req.params.token);
-      if (p && !p.gone) tracker.track('invoice_link_viewed', { userId: p.user_id, props: {} });
+      if (p && !p.gone) {
+        const u = await require('../db/database').get('SELECT email FROM users WHERE id = ?', [p.user_id]).catch(() => null);
+        tracker.track('invoice_link_viewed', { userId: p.user_id, props: {}, test: tracker.isTestEmail(u && u.email) });
+      }
     }
   } catch (e) {
     logger.warn({ err: e.message }, '[invoice-link] beacon failed');
