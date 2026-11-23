@@ -87,12 +87,6 @@ router.post('/:id/status', wrap(async (req, res) => {
 }));
 router.post('/:id/duplicate', wrap(async (req, res) => res.status(201).json({ invoice: await svc.duplicateInvoice(req.user.id, id(req)) })));
 router.delete('/:id', wrap(async (req, res) => res.json(await svc.deleteInvoice(req.user.id, id(req)))));
-// Client link: publish THIS invoice at /i/<token> (the issuer's explicit choice), or turn it off.
-router.post('/:id/link', wrap(async (req, res) => {
-  const r = await svc.createLink(req.user.id, id(req));
-  if (r.created) track(req, 'invoice_link_created', {});
-  res.status(r.created ? 201 : 200).json({ invoice: r.invoice });
-}));
 // Payments against an invoice: full, part, or a deposit in percent.
 router.get('/:id/payments', wrap(async (req, res) => res.json({ payments: await svc.listPayments(req.user.id, id(req)) })));
 router.post('/:id/payments', wrap(async (req, res) => {
@@ -108,7 +102,8 @@ router.put('/:id/repeat', wrap(async (req, res) => {
   if (every) track(req, 'invoice_repeat_on', {});
   res.json(r);
 }));
-router.delete('/:id/link', wrap(async (req, res) => res.json(await svc.revokeLink(req.user.id, id(req)))));
+// What a client link publishes for this invoice (the browser sends it to /api/invoice-links).
+router.get('/:id/snapshot', wrap(async (req, res) => res.json({ snapshot: await svc.publishSnapshot(req.user.id, id(req)) })));
 router.get('/:id/pdf', wrap(async (req, res) => {
   const pdf = await svc.invoicePdf(req.user.id, id(req));
   if (req.query.download) track(req, 'invoice_pdf_downloaded', {});

@@ -24,7 +24,7 @@ const SITE = 'https://finman.money';
 const GAP_HOURS = 44;
 
 const TIPS = [
-  { kind: 'tip_invoice', fromH: 24, toH: 5 * 24, done: ['invoice_link_created'], doneInvoices: true },
+  { kind: 'tip_invoice', fromH: 24, toH: 5 * 24, done: ['invoice_created', 'invoice_link_created'], doneInvoices: true },
   { kind: 'tip_import', fromH: 3 * 24, toH: 9 * 24, done: ['import_done', 'vault_import_done', 'statement_read'] },
   { kind: 'tip_next', fromH: 7 * 24, toH: 16 * 24, done: [] },
 ];

@@ -20337,10 +20337,7 @@ var require_service = __commonJS({
     var MAX_ITEMS = 200;
     var IMAGE_RE = /^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=\s]+)$/;
     var SHARE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-    var LINK_COLS = "(SELECT json_object('token', l.token, 'created_at', l.created_at, 'first_viewed_at', l.first_viewed_at, 'last_viewed_at', l.last_viewed_at, 'view_count', l.view_count) FROM invoice_links l WHERE l.invoice_id = invoices.id AND l.revoked_at IS NULL) AS link_json";
-    var LINK_RE = /^[A-Za-z0-9_-]{22,64}$/;
     var REPEAT_COLS = "(SELECT json_object('every', r.every, 'next_date', r.next_date, 'made', r.made) FROM invoice_repeats r WHERE r.invoice_id = invoices.id) AS repeat_json";
-    var VIEW_GAP_MIN = 10;
     var InvoiceError = class extends Error {
       constructor(message, status = 400) {
         super(message);
@@ -20741,7 +20738,6 @@ var require_service = __commonJS({
         pay_url: core.payUrl(snap.data && snap.data.pay_online, row.number, cardTotals(snap.data, row.total_cents).card_total_cents, row.currency),
         card_fee_pct: core.cardFeePct(snap.data),
         ...paidOf(row),
-        link: linkOf(row),
         repeat: parseJson(row.repeat_json, null),
         sent_at: row.sent_at,
         paid_at: row.paid_at,
@@ -20752,7 +20748,7 @@ var require_service = __commonJS({
       return out;
     }
     async function invoiceRow(userId, id) {
-      const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS}, ${REPEAT_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
+      const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${REPEAT_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
       if (!row) throw notFound("Invoice not found");
       return row;
     }
@@ -20883,7 +20879,7 @@ var require_service = __commonJS({
             json_object('name', json_extract(snapshot, '$.name'), 'layout', json_extract(snapshot, '$.layout'),
                         'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'), 'card_fee', json_extract(snapshot, '$.data.card_fee'))) AS snapshot,
             sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum,
-            ${LINK_COLS}, ${REPEAT_COLS}
+            ${REPEAT_COLS}
        FROM invoices WHERE ${where.join(" AND ")} ORDER BY issue_date DESC, id DESC LIMIT 500`,
         args
       );
@@ -20907,94 +20903,11 @@ var require_service = __commonJS({
     async function getInvoice(userId, id) {
       return publicInvoice(await invoiceRow(userId, id));
     }
-    function linkUrl(token) {
-      return `${baseUrl()}/i/${token}`;
-    }
-    function linkOf(row) {
-      const l = parseJson(row && row.link_json, null);
-      if (!l || !l.token) return null;
-      return {
-        url: linkUrl(l.token),
-        created_at: l.created_at,
-        first_viewed_at: l.first_viewed_at || null,
-        last_viewed_at: l.last_viewed_at || null,
-        view_count: Number(l.view_count) || 0
-      };
-    }
-    async function createLink(userId, id) {
-      const inv = await invoiceRow(userId, id);
-      if (inv.status === "void") throw bad("A void invoice cannot be shared");
-      const live = await get("SELECT token, revoked_at FROM invoice_links WHERE invoice_id = ?", [id]);
-      if (live && !live.revoked_at) return { invoice: publicInvoice(await invoiceRow(userId, id)), created: false };
-      const token = crypto.randomBytes(18).toString("base64url");
-      if (live) {
-        await run(`UPDATE invoice_links SET token = ?, revoked_at = NULL, created_at = CURRENT_TIMESTAMP,
-                 first_viewed_at = NULL, last_viewed_at = NULL, view_count = 0 WHERE invoice_id = ?`, [token, id]);
-      } else {
-        await run("INSERT INTO invoice_links (token, invoice_id, user_id) VALUES (?, ?, ?)", [token, id, userId]);
-      }
-      if (inv.status === "draft") {
-        await run(`UPDATE invoices SET status = 'sent', sent_at = COALESCE(sent_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [id, userId]);
-      }
-      return { invoice: publicInvoice(await invoiceRow(userId, id)), created: true };
-    }
-    async function revokeLink(userId, id) {
-      await invoiceRow(userId, id);
-      await run("UPDATE invoice_links SET revoked_at = CURRENT_TIMESTAMP WHERE invoice_id = ? AND user_id = ? AND revoked_at IS NULL", [id, userId]);
-      return { invoice: publicInvoice(await invoiceRow(userId, id)) };
-    }
-    async function linkRow(token) {
-      if (!LINK_RE.test(String(token || ""))) return null;
-      return get(`SELECT l.token, l.revoked_at, l.user_id, i.*, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = i.id) AS paid_sum
-                FROM invoice_links l JOIN invoices i ON i.id = l.invoice_id AND i.user_id = l.user_id WHERE l.token = ?`, [String(token)]);
-    }
-    async function publicByToken(token) {
-      const row = await linkRow(token);
-      if (!row) return null;
-      if (row.revoked_at) return { gone: true };
-      const snap = parseJson(row.snapshot, {});
-      const view = viewOf(row, snap);
-      const d = view.data || {};
-      const { paid_cents: paid, balance_cents: balance } = paidOf(row);
-      const status = row.status === "sent" && row.due_date && row.due_date < core.today() ? "overdue" : row.status;
-      const due = balance > 0 ? balance : 0;
-      const fee = core.cardFeeCents(due, view.card_fee_pct);
-      return {
-        token: row.token,
-        user_id: row.user_id,
-        status,
-        view,
-        paid_cents: paid,
-        balance_cents: due,
-        pay: {
-          card_url: due > 0 ? core.payUrl(d.pay_online, row.number, due + fee, row.currency) : null,
-          card_label: d.pay_online && d.pay_online.label || "",
-          paypal_url: due > 0 ? core.paypalUrl(d.pay_paypal, due + fee, row.currency) : null,
-          etransfer: core.etransferEmail(d.pay_etransfer),
-          bank: d.bank && (Array.isArray(d.bank.key) || Array.isArray(d.bank.rest)) ? d.bank : null,
-          reference: core.fill(d.payment_reference || "", { number: row.number }).trim() || row.number,
-          fee_pct: view.card_fee_pct,
-          fee_cents: fee,
-          card_total_cents: due + fee
-        },
-        filename: fileName(view)
-      };
-    }
-    async function recordView(token) {
-      if (!LINK_RE.test(String(token || ""))) return { ok: false };
-      const r = await run(
-        `UPDATE invoice_links SET first_viewed_at = COALESCE(first_viewed_at, CURRENT_TIMESTAMP),
-            view_count = view_count + CASE WHEN last_viewed_at IS NULL OR last_viewed_at < datetime('now', ?) THEN 1 ELSE 0 END,
-            last_viewed_at = CURRENT_TIMESTAMP
-      WHERE token = ? AND revoked_at IS NULL`,
-        [`-${VIEW_GAP_MIN} minutes`, String(token)]
-      );
-      return { ok: r.changes > 0 };
-    }
-    async function publicPdf(token) {
-      const p = await publicByToken(token);
-      if (!p || p.gone) return null;
-      return { buffer: await renderPdf(p.view, p.user_id), filename: p.filename };
+    async function publishSnapshot(userId, id) {
+      const row = await invoiceRow(userId, id);
+      const view = viewOf(row, parseJson(row.snapshot, {}));
+      const { paid_cents: paid } = paidOf(row);
+      return { invoice_id: row.id, status: row.status, paid_cents: paid, view };
     }
     function addMonth(ymdStr, n = 1) {
       const d = core.parseYmd(ymdStr);
@@ -21072,7 +20985,7 @@ var require_service = __commonJS({
     }
     async function exportCsv(userId) {
       const { invoices } = await listInvoices(userId, {});
-      const head = ["number", "status", "issue_date", "due_date", "client", "currency", "subtotal", "tax", "total", "paid", "balance", "sent_at", "paid_at", "client_views"];
+      const head = ["number", "status", "issue_date", "due_date", "client", "currency", "subtotal", "tax", "total", "paid", "balance", "sent_at", "paid_at"];
       const money = (c) => ((Number(c) || 0) / 100).toFixed(2);
       const rows = invoices.slice().reverse().map((i) => [
         i.number,
@@ -21087,8 +21000,7 @@ var require_service = __commonJS({
         money(i.paid_cents),
         money(i.balance_cents),
         i.sent_at || "",
-        i.paid_at || "",
-        i.link ? i.link.view_count : ""
+        i.paid_at || ""
       ]);
       return "\uFEFF" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
     }
@@ -21257,12 +21169,11 @@ var require_service = __commonJS({
       recordPayment,
       deletePayment,
       listClients,
-      createLink,
-      revokeLink,
-      publicByToken,
-      recordView,
-      publicPdf,
-      linkUrl,
+      publishSnapshot,
+      viewOf,
+      fileName,
+      renderPdf,
+      paidOf,
       setRepeat,
       runRepeats,
       addMonth,
@@ -27078,7 +26989,7 @@ var require_tips = __commonJS({
     var SITE = "https://finman.money";
     var GAP_HOURS = 44;
     var TIPS = [
-      { kind: "tip_invoice", fromH: 24, toH: 5 * 24, done: ["invoice_link_created"], doneInvoices: true },
+      { kind: "tip_invoice", fromH: 24, toH: 5 * 24, done: ["invoice_created", "invoice_link_created"], doneInvoices: true },
       { kind: "tip_import", fromH: 3 * 24, toH: 9 * 24, done: ["import_done", "vault_import_done", "statement_read"] },
       { kind: "tip_next", fromH: 7 * 24, toH: 16 * 24, done: [] }
     ];
@@ -30076,9 +29987,11 @@ CREATE TABLE IF NOT EXISTS feedback (
 ;;
 CREATE TABLE IF NOT EXISTS invoice_links (
         token TEXT PRIMARY KEY,
-        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invoice_id INTEGER NOT NULL,
+        snapshot TEXT NOT NULL DEFAULT '{}',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         revoked_at DATETIME,
         first_viewed_at DATETIME,
         last_viewed_at DATETIME,
@@ -30205,9 +30118,7 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
 ;;
 CREATE INDEX IF NOT EXISTS idx_feedback_user_trigger ON feedback (user_id, trigger);
 ;;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_invoice ON invoice_links (invoice_id);
-;;
-CREATE INDEX IF NOT EXISTS idx_invoice_links_user ON invoice_links (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_user_invoice ON invoice_links (user_id, invoice_id);
 ;;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_repeats_invoice ON invoice_repeats (invoice_id);
 ;;
@@ -31319,17 +31230,18 @@ var require_invoice_links = __commonJS({
         await db2.run(`
       CREATE TABLE IF NOT EXISTS invoice_links (
         token TEXT PRIMARY KEY,
-        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invoice_id INTEGER NOT NULL,
+        snapshot TEXT NOT NULL DEFAULT '{}',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         revoked_at DATETIME,
         first_viewed_at DATETIME,
         last_viewed_at DATETIME,
         view_count INTEGER NOT NULL DEFAULT 0
       )
     `);
-        await db2.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_invoice ON invoice_links (invoice_id)");
-        await db2.run("CREATE INDEX IF NOT EXISTS idx_invoice_links_user ON invoice_links (user_id)");
+        await db2.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_user_invoice ON invoice_links (user_id, invoice_id)");
       }
     };
   }

@@ -17,6 +17,15 @@ async function makeUser(ctx, username) {
 }
 const auth = (t) => ({ Authorization: `Bearer ${t}` });
 const binaryParser = (res, cb) => { const c = []; res.on('data', (x) => c.push(x)); res.on('end', () => cb(null, Buffer.concat(c))); };
+// What the browser does on "Client link": draft -> sent, snapshot from wherever the invoice lives, publish.
+async function linkUp(ctx, H, id, { keepDraft = false } = {}) {
+  const inv = (await ctx.request.get(`/api/invoices/${id}`).set(H())).body.invoice;
+  if (inv && inv.status === 'draft' && !keepDraft) await ctx.request.post(`/api/invoices/${id}/status`).set(H()).send({ status: 'sent' });
+  const snap = await ctx.request.get(`/api/invoices/${id}/snapshot`).set(H());
+  if (snap.status !== 200) return snap;
+  return ctx.request.put(`/api/invoice-links/${id}`).set(H()).send({ snapshot: snap.body.snapshot });
+}
+const linkOf = async (ctx, H, id) => ((await ctx.request.get('/api/invoice-links').set(H())).body.links || []).find((l) => l.invoice_id === id) || null;
 const BROWSER = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
 describe('invoice core: card fee and payment methods', () => {
@@ -60,15 +69,15 @@ describe('invoice client link', () => {
     const inv = await invoice(p);
     expect(inv.card_fee_pct).toBe(3);
     expect(inv.pay_url).toContain('amount=1030');
-    const r = await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H());
+    const r = await linkUp(ctx, H, inv.id);
     expect(r.status).toBe(201);
-    expect(r.body.invoice.status).toBe('sent');
-    const url = r.body.invoice.link.url;
+    expect((await ctx.request.get(`/api/invoices/${inv.id}`).set(H())).body.invoice.status).toBe('sent');
+    const url = r.body.link.url;
     const token = url.split('/i/')[1];
     expect(token.length).toBeGreaterThanOrEqual(22);
-    const again = await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H());
+    const again = await linkUp(ctx, H, inv.id);
     expect(again.status).toBe(200);
-    expect(again.body.invoice.link.url).toBe(url);
+    expect(again.body.link.url).toBe(url);
 
     const pageRes = await ctx.request.get(`/i/${token}`).set('Accept-Language', 'en');
     expect(pageRes.status).toBe(200);
@@ -94,16 +103,15 @@ describe('invoice client link', () => {
   test('views: the beacon counts a browser, not a link preview bot, reloads within 10 min count once', async () => {
     const p = await template();
     const inv = await invoice(p);
-    const token = (await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H())).body.invoice.link.url.split('/i/')[1];
-    let l = (await ctx.request.get(`/api/invoices/${inv.id}`).set(H())).body.invoice.link;
+    const token = (await linkUp(ctx, H, inv.id)).body.link.url.split('/i/')[1];
+    let l = await linkOf(ctx, H, inv.id);
     expect(l.view_count).toBe(0);
     await ctx.request.post(`/i/${token}/seen`).set('User-Agent', 'TelegramBot (like TwitterBot)');
-    l = (await ctx.request.get(`/api/invoices/${inv.id}`).set(H())).body.invoice.link;
+    l = await linkOf(ctx, H, inv.id);
     expect(l.view_count).toBe(0);
     expect((await ctx.request.post(`/i/${token}/seen`).set('User-Agent', BROWSER)).status).toBe(204);
     await ctx.request.post(`/i/${token}/seen`).set('User-Agent', BROWSER);
-    const list = (await ctx.request.get('/api/invoices').set(H())).body.invoices;
-    l = list.find((x) => x.id === inv.id).link;
+    l = await linkOf(ctx, H, inv.id);
     expect(l.view_count).toBe(1);
     expect(l.first_viewed_at).toBeTruthy();
     expect(l.last_viewed_at).toBeTruthy();
@@ -112,11 +120,12 @@ describe('invoice client link', () => {
   test('turning the link off: the page answers 410, a new link has a new address', async () => {
     const p = await template();
     const inv = await invoice(p);
-    const url1 = (await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H())).body.invoice.link.url;
-    const off = await ctx.request.delete(`/api/invoices/${inv.id}/link`).set(H());
-    expect(off.body.invoice.link).toBeNull();
+    const url1 = (await linkUp(ctx, H, inv.id)).body.link.url;
+    const off = await ctx.request.delete(`/api/invoice-links/${inv.id}`).set(H());
+    expect(off.body.ok).toBe(true);
+    expect(await linkOf(ctx, H, inv.id)).toBeNull();
     expect((await ctx.request.get(`/i/${url1.split('/i/')[1]}`)).status).toBe(410);
-    const url2 = (await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H())).body.invoice.link.url;
+    const url2 = (await linkUp(ctx, H, inv.id)).body.link.url;
     expect(url2).not.toBe(url1);
     expect((await ctx.request.get(`/i/${url2.split('/i/')[1]}`)).status).toBe(200);
     expect((await ctx.request.get('/i/not-a-real-token-at-all-xxxxx')).status).toBe(404);
@@ -125,17 +134,18 @@ describe('invoice client link', () => {
   test('paid invoice: no pay buttons; void invoice cannot be shared; fee off = plain total', async () => {
     const p = await template({ card_fee: null });
     const inv = await invoice(p);
-    const token = (await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H())).body.invoice.link.url.split('/i/')[1];
+    const token = (await linkUp(ctx, H, inv.id)).body.link.url.split('/i/')[1];
     let html = (await ctx.request.get(`/i/${token}`)).text;
     expect(html).toContain('Pay by card · 1,000.00 CAD');
     expect(html).not.toContain('card fee');
     await ctx.request.post(`/api/invoices/${inv.id}/status`).set(H()).send({ status: 'paid' });
+    await linkUp(ctx, H, inv.id); // the browser re-publishes after a change
     html = (await ctx.request.get(`/i/${token}`)).text;
     expect(html).toContain('This invoice is paid');
     expect(html).not.toContain('Pay by card');
     const v = await invoice(p);
     await ctx.request.post(`/api/invoices/${v.id}/status`).set(H()).send({ status: 'void' });
-    expect((await ctx.request.post(`/api/invoices/${v.id}/link`).set(H())).status).toBe(400);
+    expect((await linkUp(ctx, H, v.id)).status).toBe(400);
   });
 
   test('overdue: filter, totals and the page banner', async () => {
@@ -148,20 +158,30 @@ describe('invoice client link', () => {
     expect(r.body.invoices.map((x) => x.id)).toEqual([late.id]);
     expect(r.body.totals.CAD.overdue_cents).toBe(100000);
     expect(r.body.totals.CAD.overdue_count).toBe(1);
-    const token = (await ctx.request.post(`/api/invoices/${late.id}/link`).set(H())).body.invoice.link.url.split('/i/')[1];
+    const token = (await linkUp(ctx, H, late.id)).body.link.url.split('/i/')[1];
     expect((await ctx.request.get(`/i/${token}`)).text).toContain('Payment is overdue');
   });
 
-  test('ownership: another user cannot create or turn off my link', async () => {
+  test('ownership: another user cannot read my snapshot, links are per user, a crafted snapshot gets no javascript: link', async () => {
     const p = await template();
     const inv = await invoice(p);
     const other = await makeUser(ctx, 'mallory');
-    expect((await ctx.request.post(`/api/invoices/${inv.id}/link`).set(auth(other.token))).status).toBe(404);
-    await ctx.request.post(`/api/invoices/${inv.id}/link`).set(H());
-    expect((await ctx.request.delete(`/api/invoices/${inv.id}/link`).set(auth(other.token))).status).toBe(404);
-    const l = (await ctx.request.get(`/api/invoices/${inv.id}`).set(H())).body.invoice.link;
-    expect(l).toBeTruthy();
+    const O = () => auth(other.token);
+    expect((await ctx.request.get(`/api/invoices/${inv.id}/snapshot`).set(O())).status).toBe(404);
+    const mine = await linkUp(ctx, H, inv.id);
+    expect((await ctx.request.delete(`/api/invoice-links/${inv.id}`).set(O())).status).toBe(200);
+    expect(await linkOf(ctx, H, inv.id)).toBeTruthy(); // their DELETE touched only their own rows
+    const snap = (await ctx.request.get(`/api/invoices/${inv.id}/snapshot`).set(H())).body.snapshot;
+    snap.view.data.pay_online = { url: 'javascript:alert(1)//{ref}' };
+    snap.view.data.pay_paypal = 'javascript:alert(1)';
+    const evil = await ctx.request.put('/api/invoice-links/999').set(O()).send({ snapshot: snap });
+    expect(evil.status).toBe(201);
+    const html = (await ctx.request.get(evil.body.link.url.replace(/^https?:\/\/[^/]+/, ''))).text;
+    expect(html).not.toMatch(/javascript:/);
+    expect(mine.body.link.url).not.toBe(evil.body.link.url);
+    expect((await ctx.request.put('/api/invoice-links/1').send({ snapshot: snap })).status).toBe(401);
   });
+;
 });
 
 describe('invoice quick wins: payments, repeat, CSV', () => {
@@ -219,7 +239,7 @@ describe('invoice quick wins: payments, repeat, CSV', () => {
     expect(r.status).toBe(200);
     expect(r.headers['content-type']).toMatch(/text\/csv/);
     const lines = r.text.replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('number,status,issue_date,due_date,client,currency,subtotal,tax,total,paid,balance,sent_at,paid_at,client_views');
+    expect(lines[0]).toBe('number,status,issue_date,due_date,client,currency,subtotal,tax,total,paid,balance,sent_at,paid_at');
     expect(lines[1]).toContain('"Acme, ""North"""');
     expect(lines[1]).toContain(',1000.00,250.00,750.00,');
     const p2 = (await ctx.request.post('/api/invoices/profiles').set(H()).send({ name: 'T', currency: 'CAD', data: {} })).body.profile;

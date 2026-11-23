@@ -8,7 +8,7 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const svc = require('../services/invoice/service');
+const links = require('../services/invoice/links');
 const page = require('../services/invoice/publicPage');
 const tracker = require('../services/tracker');
 const logger = require('../lib/logger');
@@ -34,7 +34,7 @@ function signupUrl(userId, code) {
 router.get('/:token', async (req, res) => {
   const lang = page.langOf(req);
   try {
-    const p = await svc.publicByToken(req.params.token);
+    const p = await links.byToken(req.params.token);
     if (!p) return res.status(404).type('html').send(page.messagePage(lang, 'missing', signupUrl()));
     if (p.gone) return res.status(410).type('html').send(page.messagePage(lang, 'gone', signupUrl()));
     const code = await require('../services/referral').codeFor(p.user_id).catch(() => null);
@@ -47,7 +47,7 @@ router.get('/:token', async (req, res) => {
 
 router.get('/:token/pdf', async (req, res) => {
   try {
-    const pdf = await svc.publicPdf(req.params.token);
+    const pdf = await links.pdf(req.params.token);
     if (!pdf) return res.status(404).json({ error: true, message: 'Not found' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${pdf.filename}"`);
@@ -60,7 +60,7 @@ router.get('/:token/pdf', async (req, res) => {
 
 router.get('/:token/logo', async (req, res) => {
   try {
-    const p = await svc.publicByToken(req.params.token);
+    const p = await links.byToken(req.params.token);
     const m = p && !p.gone && /^data:(image\/(?:png|jpe?g));base64,(.+)$/.exec(String(p.view.logo || ''));
     if (!m) return res.status(404).end();
     res.setHeader('Content-Type', m[1]);
@@ -73,9 +73,9 @@ router.get('/:token/logo', async (req, res) => {
 router.post('/:token/seen', async (req, res) => {
   if (BOT_UA.test(String(req.headers['user-agent'] || ''))) return res.status(204).end();
   try {
-    const r = await svc.recordView(req.params.token);
+    const r = await links.recordView(req.params.token);
     if (r.ok) {
-      const p = await svc.publicByToken(req.params.token);
+      const p = await links.byToken(req.params.token);
       if (p && !p.gone) {
         const u = await require('../db/database').get('SELECT email FROM users WHERE id = ?', [p.user_id]).catch(() => null);
         tracker.track('invoice_link_viewed', { userId: p.user_id, props: {}, test: tracker.isTestEmail(u && u.email) });

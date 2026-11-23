@@ -340,6 +340,7 @@ app.use('/api/reconcile', reconcileRoutes);
 app.use('/api/v1', apiV1Routes);
 app.use('/api/invoices', invoicesRoutes);
 // Public client page of a published invoice (no auth; one token = one invoice).
+app.use('/api/invoice-links', require('./routes/invoiceLinks'));
 app.use('/i', require('./routes/invoicePublic'));
 // pdf.js for the PDF preview on that page (same origin: the worker must be same-origin).
 app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'build'), {

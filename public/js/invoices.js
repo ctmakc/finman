@@ -20,7 +20,7 @@
 
   var S = {
     view: 'list', status: 'all', q: '', invoices: [], totals: {}, profiles: [], presets: null,
-    ed: null, tpl: null, highlight: null, urls: []
+    ed: null, tpl: null, highlight: null, urls: [], links: {}
   };
 
   // ---------- helpers ----------
@@ -214,12 +214,50 @@
     S.presets = d.presets || [];
     return S.presets;
   }
+  // Client links live on the server (only what the user published); invoices live wherever the
+  // account keeps its data. The list joins them here.
+  async function loadLinks() {
+    try {
+      var r = await root.fetchWithAuth('/api/invoice-links');
+      if (!r.ok) return S.links;
+      var j = await r.json();
+      var m = {};
+      (j.links || []).forEach(function (l) { m[String(l.invoice_id)] = l; });
+      S.links = m;
+    } catch (e) { /* offline: keep the last known */ }
+    return S.links;
+  }
+  function withLink(inv) {
+    if (inv) inv.link = S.links[String(inv.id)] || null;
+    return inv;
+  }
+  async function linksApi(id, method, body) {
+    var init = { method: method };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    var res = await root.fetchWithAuth('/api/invoice-links/' + id, init);
+    if (!res.ok) throw await root.readApiError(res, tx('err.request'));
+    return res.json();
+  }
+  // Publish (or refresh) what the client link shows for this invoice.
+  async function publish(id) {
+    var snap = (await api('/' + id + '/snapshot')).snapshot;
+    var r = await linksApi(id, 'PUT', { snapshot: snap });
+    S.links[String(id)] = r.link;
+    return r.link;
+  }
+  // After any change to an invoice that has a live link: the client sees the current version.
+  function republish(id) {
+    if (!S.links[String(id)]) return Promise.resolve(null);
+    return publish(id).catch(function () { return null; });
+  }
+
   async function loadInvoices() {
     var qs = [];
     if (S.status !== 'all') qs.push('status=' + encodeURIComponent(S.status));
     if (S.q) qs.push('q=' + encodeURIComponent(S.q));
-    var d = await api('/' + (qs.length ? '?' + qs.join('&') : ''));
-    S.invoices = d.invoices || [];
+    var both = await Promise.all([api('/' + (qs.length ? '?' + qs.join('&') : '')), loadLinks()]);
+    var d = both[0];
+    S.invoices = (d.invoices || []).map(withLink);
     S.totals = d.totals || {};
   }
   function profileById(id) {
@@ -652,7 +690,8 @@
         ? await api('/' + ed.id, { method: 'PUT', body: bodyOf(ed) })
         : await api('/', { method: 'POST', body: bodyOf(ed) });
       var fresh = !ed.id;
-      S.ed = stateFromInvoice(d.invoice);
+      if (!fresh) await republish(d.invoice.id);
+      S.ed = stateFromInvoice(withLink(d.invoice));
       history.replaceState({}, '', '/invoices');
       renderEditor();
       toast(tx(fresh ? 'toast.created' : 'toast.saved', { number: d.invoice.number }), 'success');
@@ -678,7 +717,8 @@
   async function openInvoice(id) {
     try {
       var d = await api('/' + id);
-      S.ed = stateFromInvoice(d.invoice);
+      if (!Object.keys(S.links).length) await loadLinks();
+      S.ed = stateFromInvoice(withLink(d.invoice));
       renderEditor();
       root.scrollTo && root.scrollTo(0, 0);
     } catch (e) { toast(e.message, 'error'); }
@@ -1078,6 +1118,7 @@
           method: host.querySelector('#inv-pay-method').value
         } });
         root.UI.closeModal(host);
+        await republish(id); withLink(r.invoice);
         toast(r.invoice.status === 'paid' ? tx('pay.doneFull') : tx('pay.donePart', { balance: money(r.invoice.balance_cents, r.invoice.currency) }), 'success');
         if (S.view === 'list') await refreshList(); else if (S.ed && String(S.ed.id) === String(id)) { S.ed = stateFromInvoice(r.invoice); renderEditor(); }
         if (r.invoice.status === 'paid') offerIncome(r.invoice);
@@ -1098,7 +1139,7 @@
   }
   async function remindModal(id) {
     var inv;
-    try { inv = (await api('/' + id)).invoice; } catch (e) { toast(e.message, 'error'); return; }
+    try { inv = withLink((await api('/' + id)).invoice); } catch (e) { toast(e.message, 'error'); return; }
     var host = root.UI.modal({
       title: tx('remind.title', { number: inv.number }),
       body: '<p class="inv-confirm-text">' + esc(tx('remind.text')) + '</p>' +
@@ -1115,7 +1156,7 @@
       if (b.getAttribute('data-inv-rm') === 'link') {
         b.disabled = true;
         try {
-          inv = (await api('/' + id + '/link', { method: 'POST' })).invoice;
+          inv = await createLink(inv);
           ta.value = reminderText(inv); b.remove();
           var h = host.querySelector('.inv-hint'); if (h) h.remove();
         } catch (err) { b.disabled = false; toast(err.message, 'error'); }
@@ -1164,9 +1205,16 @@
     return out;
   }
 
+  // Draft -> sent first (the client has it now), then publish the snapshot.
+  async function createLink(inv) {
+    if (inv.status === 'draft') inv = (await api('/' + inv.id + '/status', { method: 'POST', body: { status: 'sent' } })).invoice;
+    await publish(inv.id);
+    return withLink(inv);
+  }
+
   async function clientLink(id) {
     var inv;
-    try { inv = (await api('/' + id)).invoice; } catch (e) { toast(e.message, 'error'); return; }
+    try { await loadLinks(); inv = withLink((await api('/' + id)).invoice); } catch (e) { toast(e.message, 'error'); return; }
     var host = root.UI.modal({ title: tx('link.title', { number: inv.number }), body: linkBody(inv) });
     if (!host) return;
     var paint = function () {
@@ -1187,11 +1235,13 @@
       b.disabled = true;
       try {
         if (what === 'create') {
-          inv = (await api('/' + id + '/link', { method: 'POST' })).invoice;
+          inv = await createLink(inv);
           try { if (navigator.clipboard && inv.link) await navigator.clipboard.writeText(inv.link.url); } catch (x) { /* ignore */ }
           toast(tx('link.created'), 'success');
         } else if (what === 'off') {
-          inv = (await api('/' + id + '/link', { method: 'DELETE' })).invoice;
+          await linksApi(id, 'DELETE');
+          delete S.links[String(id)];
+          inv = withLink(inv);
           toast(tx('link.offDone'), 'success');
         }
         paint();
@@ -1264,6 +1314,8 @@
   async function setStatus(id, status) {
     try {
       var d = await api('/' + id + '/status', { method: 'POST', body: { status: status } });
+      await republish(id);
+      withLink(d.invoice);
       toast(tx('toast.status', { number: d.invoice.number, status: tx('status.' + status) }), 'success');
       return d.invoice;
     } catch (e) { toast(e.message, 'error'); return null; }
@@ -1387,6 +1439,7 @@
         if (!(await confirmBox(tx('delete.title'), tx('delete.text', { number: inv.number || '' }), tx('act.delete'), true))) return;
         try {
           await api('/' + el.dataset.id, { method: 'DELETE' });
+          if (S.links[String(el.dataset.id)]) { await linksApi(el.dataset.id, 'DELETE').catch(function () {}); delete S.links[String(el.dataset.id)]; }
           toast(tx('toast.deleted', { number: inv.number || '' }), 'success');
           await refreshList();
         } catch (e) { toast(e.message, 'error'); }

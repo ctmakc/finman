@@ -991,9 +991,11 @@ CREATE TABLE IF NOT EXISTS feedback (
 ;;
 CREATE TABLE IF NOT EXISTS invoice_links (
         token TEXT PRIMARY KEY,
-        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invoice_id INTEGER NOT NULL,
+        snapshot TEXT NOT NULL DEFAULT '{}',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         revoked_at DATETIME,
         first_viewed_at DATETIME,
         last_viewed_at DATETIME,
@@ -1120,9 +1122,7 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
 ;;
 CREATE INDEX IF NOT EXISTS idx_feedback_user_trigger ON feedback (user_id, trigger);
 ;;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_invoice ON invoice_links (invoice_id);
-;;
-CREATE INDEX IF NOT EXISTS idx_invoice_links_user ON invoice_links (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_user_invoice ON invoice_links (user_id, invoice_id);
 ;;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_repeats_invoice ON invoice_repeats (invoice_id);
 ;;
