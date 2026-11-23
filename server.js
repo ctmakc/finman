@@ -339,6 +339,8 @@ app.use('/api/rules', rulesRoutes);
 app.use('/api/reconcile', reconcileRoutes);
 app.use('/api/v1', apiV1Routes);
 app.use('/api/invoices', invoicesRoutes);
+// Public client page of a published invoice (no auth; one token = one invoice).
+app.use('/i', require('./routes/invoicePublic'));
 // In-app feedback (rating, surveys, bug reports, exit survey) + the team's admin list.
 app.use('/api/feedback', require('./routes/feedback'));
 // MCP connector: OAuth 2.1 (discovery, registration, consent, tokens) and the /mcp endpoint.

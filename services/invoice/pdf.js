@@ -15,7 +15,7 @@ const FONT_DIR = path.join(__dirname, '..', '..', 'assets', 'fonts');
 const PX = 0.75; // CSS px -> pt
 const MM = 72 / 25.4;
 
-const FOOTER_TEXT = 'Made with Finman Online — free invoicing and money app. Sign up free: app.finman.money';
+const FOOTER_TEXT = 'Made with Finman Online — invoicing and money app. Sign up: app.finman.money';
 
 function registerFonts(doc) {
   doc.registerFont('Sans', path.join(FONT_DIR, 'LiberationSans-Regular.ttf'));
@@ -25,6 +25,21 @@ function registerFonts(doc) {
   doc.registerFont('Mont', path.join(FONT_DIR, 'Montserrat-Regular.ttf'));
   doc.registerFont('Mont-Medium', path.join(FONT_DIR, 'Montserrat-Medium.ttf'));
   doc.registerFont('Mont-Semi', path.join(FONT_DIR, 'Montserrat-SemiBold.ttf'));
+}
+
+// Card fee (paid by the payer), PayPal.me and Interac e-Transfer lines of the payment block.
+function payExtras(view, money) {
+  const d = view.data || {};
+  const out = [];
+  const cur = String(view.currency || '').toUpperCase();
+  if (view.card_fee_cents > 0 && (view.pay_url || core.paypalName(d.pay_paypal))) {
+    out.push(`**Card / PayPal: ${money(view.card_total_cents)}** — includes ${core.fmtQty(view.card_fee_pct)}% card fee, paid by the payer`);
+  }
+  const pp = core.paypalUrl(d.pay_paypal, view.card_total_cents || view.total_cents, cur);
+  if (pp) out.push(`**PayPal:** ${stripScheme(pp)}`);
+  const et = core.etransferEmail(d.pay_etransfer);
+  if (et) out.push(`**Interac e-Transfer:** ${et}`);
+  return out;
 }
 
 function dataUrlToBuffer(v) {
@@ -346,6 +361,7 @@ async function renderClassic(doc, view) {
     if (ref) lines.push({ rich: `**Payment reference:** ${ref}` });
     lines.push({ rich: `**Or pay online** ${d.pay_online.label || ''}`.trim() });
     lines.push({ url: view.pay_url });
+    payExtras(view, money).forEach((t) => lines.push({ rich: t }));
     const th = lines.reduce((a, l) => a + (l.url
       ? W_.height(stripScheme(l.url), { font: 'Mono', size: 9.5, width: tw })
       : W_.height(l.rich.replace(/\*\*/g, ''), { font: S, size: 10.5, width: tw })), 0);
@@ -362,13 +378,15 @@ async function renderClassic(doc, view) {
       } else yy += W_.rich(l.rich, tx, yy, { font: S, bold: SB, size: 10.5, width: tw });
     });
     y += boxH;
-  } else if (ref) {
+  } else if (ref || payExtras(view, money).length) {
     const pX = 12 * PX, pY = 8 * PX;
-    const th = W_.height(`Payment reference: ${ref}`, { font: S, size: 10.5, width: W - 2 * pX });
+    const rows = (ref ? [`**Payment reference:** ${ref}`] : []).concat(payExtras(view, money));
+    const th = rows.reduce((a, r) => a + W_.height(r.replace(/\*\*/g, ''), { font: S, size: 10.5, width: W - 2 * pX }), 0);
     y += 12 * PX;
     ensure(th + 2 * pY);
     W_.rect(ML, y, W, th + 2 * pY);
-    W_.rich(`**Payment reference:** ${ref}`, ML + pX, y + pY, { font: S, bold: SB, size: 10.5, width: W - 2 * pX });
+    let yy = y + pY;
+    rows.forEach((r) => { yy += W_.rich(r, ML + pX, yy, { font: S, bold: SB, size: 10.5, width: W - 2 * pX }); });
     y += th + 2 * pY;
   }
 
@@ -507,7 +525,7 @@ async function renderLight(doc, view) {
   // Payment: reference, online link with QR, terms
   const ref = core.fill(d.payment_reference || '', ph).trim();
   const terms = core.fill(view.terms || '', ph).trim();
-  if (view.pay_url || ref || terms || view.notes) {
+  if (view.pay_url || ref || terms || view.notes || payExtras(view, money).length) {
     y += 34;
     const qrS = view.pay_url ? 56 : 0;
     const txX = ML + (qrS ? qrS + 14 : 0);
@@ -515,6 +533,7 @@ async function renderLight(doc, view) {
     const parts = [];
     if (view.pay_url) parts.push({ t: d.pay_online.label || 'Pay online:', font: M, color: '#000' }, { t: stripScheme(view.pay_url), font: R, color: '#000', link: view.pay_url });
     if (ref) parts.push({ t: ref, font: R, color: GREY });
+    payExtras(view, money).forEach((t) => parts.push({ t: t.replace(/\*\*/g, ''), font: M, color: '#000' }));
     if (terms) parts.push({ t: terms, font: R, color: GREY });
     if (view.notes) parts.push({ t: view.notes, font: R, color: GREY });
     const th = parts.reduce((a, p) => a + W_.height(p.t, { font: p.font, size: 8.6, lh: 1.45, width: txW }), 0);

@@ -348,3 +348,14 @@
 
 /* paid invoice -> income dialog (22.11) */
 :root .inv-inc-date-l { display: block; margin-top: .7rem; }
+
+/* ---- client link, views, overdue (22.11) ---- */
+:root .inv-row.is-overdue { background: color-mix(in srgb, var(--fm-negative-tint) 55%, transparent); }
+:root .inv-row.is-overdue::after { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--fm-negative); }
+:root .inv-row-seen { display: inline-flex; align-items: center; gap: 5px; color: var(--fm-primary); font-size: 0.8rem; font-weight: 500; }
+:root .inv-row-seen.is-not { color: var(--fm-ink-3); font-weight: 400; }
+:root .inv-row-actions .btn-icon.is-on { color: var(--fm-primary); background: var(--fm-primary-tint); }
+:root .inv-sum-late dt, :root .inv-sum-late dd { color: var(--fm-negative); }
+:root .inv-link-btns { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-3) 0; }
+:root .inv-link-warn { color: var(--fm-warning); }
+:root .inv-ed-seen { margin-top: var(--space-2); }

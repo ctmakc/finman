@@ -185,6 +185,38 @@ function payUrl(payOnline, number, cents, currency) {
   return /^https:\/\/[^\s]+$/i.test(url) ? url : null;
 }
 
+// ---------- card fee paid by the payer + the issuer's own payment methods ----------
+// Template data: card_fee {pct} (null = off; the UI suggests 3 %), pay_paypal (a PayPal.me
+// name or link), pay_etransfer (Interac e-Transfer e-mail). Finman never handles the money:
+// every button leads to the issuer's own Stripe/PayPal/bank.
+function cardFeePct(data) {
+  const f = data && data.card_fee;
+  if (!f || typeof f !== 'object') return 0;
+  const n = typeof f.pct === 'number' ? f.pct : parseFloat(String(f.pct || '').replace(',', '.'));
+  return Number.isFinite(n) && n > 0 && n <= 10 ? Math.round(n * 100) / 100 : 0;
+}
+function cardFeeCents(totalCents, pct) {
+  return pct > 0 ? Math.round((Number(totalCents) || 0) * pct / 100) : 0;
+}
+// "jane", "@jane", "paypal.me/jane", "https://www.paypal.com/paypalme/jane" -> "jane"
+function paypalName(v) {
+  const s = String(v || '').trim().replace(/^@/, '');
+  const m = /^(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/([A-Za-z0-9_.-]{1,40})\/?$/i.exec(s);
+  const name = m ? m[1] : s;
+  return /^[A-Za-z0-9_.-]{1,40}$/.test(name) ? name : null;
+}
+// https://paypal.me/<name>/<amount><CUR> opens PayPal with the amount and currency filled in.
+function paypalUrl(v, cents, currency) {
+  const name = paypalName(v);
+  if (!name || !(cents >= 100)) return null;
+  return `https://paypal.me/${encodeURIComponent(name)}/${payAmount(cents)}${String(currency || '').toUpperCase()}`;
+}
+const EMAIL_RE = /^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[A-Za-z]{2,24}$/;
+function etransferEmail(v) {
+  const s = String(v || '').trim();
+  return EMAIL_RE.test(s) ? s : null;
+}
+
 // ---------- placeholders in template texts ----------
 function fill(text, ctx) {
   return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (ctx[k] !== undefined && ctx[k] !== null ? String(ctx[k]) : m));
@@ -196,4 +228,5 @@ module.exports = {
   renderNumber, suggestNumber, seqFromNumber,
   numberToWords, amountInWords, CURRENCY_WORDS,
   REF_RE, payAmount, payUrl, fill,
+  cardFeePct, cardFeeCents, paypalName, paypalUrl, etransferEmail,
 };

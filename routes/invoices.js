@@ -78,6 +78,13 @@ router.post('/:id/status', wrap(async (req, res) => {
 }));
 router.post('/:id/duplicate', wrap(async (req, res) => res.status(201).json({ invoice: await svc.duplicateInvoice(req.user.id, id(req)) })));
 router.delete('/:id', wrap(async (req, res) => res.json(await svc.deleteInvoice(req.user.id, id(req)))));
+// Client link: publish THIS invoice at /i/<token> (the issuer's explicit choice), or turn it off.
+router.post('/:id/link', wrap(async (req, res) => {
+  const r = await svc.createLink(req.user.id, id(req));
+  if (r.created) track(req, 'invoice_link_created', {});
+  res.status(r.created ? 201 : 200).json({ invoice: r.invoice });
+}));
+router.delete('/:id/link', wrap(async (req, res) => res.json(await svc.revokeLink(req.user.id, id(req)))));
 router.get('/:id/pdf', wrap(async (req, res) => {
   const pdf = await svc.invoicePdf(req.user.id, id(req));
   if (req.query.download) track(req, 'invoice_pdf_downloaded', {});

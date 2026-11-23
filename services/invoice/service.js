@@ -18,6 +18,10 @@ const MAX_DATA_JSON = 64 * 1024;
 const MAX_ITEMS = 200;
 const IMAGE_RE = /^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=\s]+)$/;
 const SHARE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+const LINK_COLS = "(SELECT json_object('token', l.token, 'created_at', l.created_at, 'first_viewed_at', l.first_viewed_at, 'last_viewed_at', l.last_viewed_at, 'view_count', l.view_count) FROM invoice_links l WHERE l.invoice_id = invoices.id AND l.revoked_at IS NULL) AS link_json";
+const LINK_RE = /^[A-Za-z0-9_-]{22,64}$/;
+// A repeat view within this window is the same visit (reload, second tab).
+const VIEW_GAP_MIN = 10;
 
 class InvoiceError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -415,8 +419,10 @@ function publicInvoice(row, { withSnapshot = false } = {}) {
     total_cents: row.total_cents,
     terms: row.terms,
     notes: row.notes,
-    pay_url: core.payUrl(snap.data && snap.data.pay_online, row.number, row.total_cents, row.currency),
+    pay_url: core.payUrl(snap.data && snap.data.pay_online, row.number, cardTotals(snap.data, row.total_cents).card_total_cents, row.currency),
+    card_fee_pct: core.cardFeePct(snap.data),
     ...paidOf(row),
+    link: linkOf(row),
     sent_at: row.sent_at,
     paid_at: row.paid_at,
     created_at: row.created_at,
@@ -427,7 +433,7 @@ function publicInvoice(row, { withSnapshot = false } = {}) {
 }
 
 async function invoiceRow(userId, id) {
-  const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
+  const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
   if (!row) throw notFound('Invoice not found');
   return row;
 }
@@ -543,7 +549,8 @@ async function deleteInvoice(userId, id) {
 async function listInvoices(userId, { status, q } = {}) {
   const where = ['user_id = ?'];
   const args = [userId];
-  if (status && STATUSES.includes(status)) { where.push('status = ?'); args.push(status); }
+  if (status === 'overdue') { where.push("status = 'sent' AND due_date IS NOT NULL AND due_date < ?"); args.push(core.today()); }
+  else if (status && STATUSES.includes(status)) { where.push('status = ?'); args.push(status); }
   if (q) {
     where.push('(number LIKE ? OR client_name LIKE ?)');
     const like = `%${String(q).slice(0, 100).replace(/[%_]/g, '')}%`;
@@ -553,23 +560,126 @@ async function listInvoices(userId, { status, q } = {}) {
     `SELECT id, user_id, profile_id, number, status, issue_date, due_date, currency, client_name, client_details, items,
             tax_rate, tax_label, tax_sub, tax_text, subtotal_cents, tax_cents, total_cents, terms, notes,
             json_object('name', json_extract(snapshot, '$.name'), 'layout', json_extract(snapshot, '$.layout'),
-                        'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'))) AS snapshot,
-            sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum
+                        'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'), 'card_fee', json_extract(snapshot, '$.data.card_fee'))) AS snapshot,
+            sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum,
+            ${LINK_COLS}
        FROM invoices WHERE ${where.join(' AND ')} ORDER BY issue_date DESC, id DESC LIMIT 500`,
     args,
   );
-  const all = await query(`SELECT status, currency, total_cents, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE user_id = ?`, [userId]);
+  const all = await query(`SELECT status, currency, total_cents, due_date, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE user_id = ?`, [userId]);
   const totals = {};
   for (const r of all) {
     const t = totals[r.currency] || (totals[r.currency] = { outstanding_cents: 0, paid_cents: 0 });
     const p = paidOf(r);
-    if (r.status === 'sent') { t.outstanding_cents += p.balance_cents; t.paid_cents += p.paid_cents; }
+    if (r.status === 'sent') {
+      t.outstanding_cents += p.balance_cents; t.paid_cents += p.paid_cents;
+      if (r.due_date && r.due_date < core.today()) { t.overdue_cents = (t.overdue_cents || 0) + p.balance_cents; t.overdue_count = (t.overdue_count || 0) + 1; }
+    }
     if (r.status === 'paid') t.paid_cents += r.total_cents;
   }
   return { invoices: rows.map((r) => publicInvoice(r)), totals };
 }
 
 async function getInvoice(userId, id) { return publicInvoice(await invoiceRow(userId, id)); }
+
+// ---------- public client link (/i/<token>) ----------
+// Publishing is the issuer's explicit choice for ONE invoice: the page shows exactly what the
+// PDF shows (seller, client, lines, totals, the issuer's payment details). Nothing else of the
+// account is reachable from the token.
+function linkUrl(token) { return `${baseUrl()}/i/${token}`; }
+
+function linkOf(row) {
+  const l = parseJson(row && row.link_json, null);
+  if (!l || !l.token) return null;
+  return {
+    url: linkUrl(l.token), created_at: l.created_at,
+    first_viewed_at: l.first_viewed_at || null, last_viewed_at: l.last_viewed_at || null,
+    view_count: Number(l.view_count) || 0,
+  };
+}
+
+// Creates the link (or returns the live one). A draft becomes 'sent': the client has it now.
+async function createLink(userId, id) {
+  const inv = await invoiceRow(userId, id);
+  if (inv.status === 'void') throw bad('A void invoice cannot be shared');
+  const live = await get('SELECT token, revoked_at FROM invoice_links WHERE invoice_id = ?', [id]);
+  if (live && !live.revoked_at) return { invoice: publicInvoice(await invoiceRow(userId, id)), created: false };
+  const token = crypto.randomBytes(18).toString('base64url');
+  if (live) {
+    // A link turned off earlier: a new token, the old one stays dead; views start again.
+    await run(`UPDATE invoice_links SET token = ?, revoked_at = NULL, created_at = CURRENT_TIMESTAMP,
+                 first_viewed_at = NULL, last_viewed_at = NULL, view_count = 0 WHERE invoice_id = ?`, [token, id]);
+  } else {
+    await run('INSERT INTO invoice_links (token, invoice_id, user_id) VALUES (?, ?, ?)', [token, id, userId]);
+  }
+  if (inv.status === 'draft') {
+    await run(`UPDATE invoices SET status = 'sent', sent_at = COALESCE(sent_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [id, userId]);
+  }
+  return { invoice: publicInvoice(await invoiceRow(userId, id)), created: true };
+}
+
+async function revokeLink(userId, id) {
+  await invoiceRow(userId, id);
+  await run('UPDATE invoice_links SET revoked_at = CURRENT_TIMESTAMP WHERE invoice_id = ? AND user_id = ? AND revoked_at IS NULL', [id, userId]);
+  return { invoice: publicInvoice(await invoiceRow(userId, id)) };
+}
+
+async function linkRow(token) {
+  if (!LINK_RE.test(String(token || ''))) return null;
+  return get(`SELECT l.token, l.revoked_at, l.user_id, i.*, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = i.id) AS paid_sum
+                FROM invoice_links l JOIN invoices i ON i.id = l.invoice_id AND i.user_id = l.user_id WHERE l.token = ?`, [String(token)]);
+}
+
+// What the client page needs. null = no such link; { gone: true } = turned off.
+async function publicByToken(token) {
+  const row = await linkRow(token);
+  if (!row) return null;
+  if (row.revoked_at) return { gone: true };
+  const snap = parseJson(row.snapshot, {});
+  const view = viewOf(row, snap);
+  const d = view.data || {};
+  const { paid_cents: paid, balance_cents: balance } = paidOf(row);
+  const status = row.status === 'sent' && row.due_date && row.due_date < core.today() ? 'overdue' : row.status;
+  const due = balance > 0 ? balance : 0;
+  const fee = core.cardFeeCents(due, view.card_fee_pct);
+  return {
+    token: row.token,
+    user_id: row.user_id,
+    status,
+    view,
+    paid_cents: paid,
+    balance_cents: due,
+    pay: {
+      card_url: due > 0 ? core.payUrl(d.pay_online, row.number, due + fee, row.currency) : null,
+      card_label: (d.pay_online && d.pay_online.label) || '',
+      paypal_url: due > 0 ? core.paypalUrl(d.pay_paypal, due + fee, row.currency) : null,
+      etransfer: core.etransferEmail(d.pay_etransfer),
+      bank: d.bank && (Array.isArray(d.bank.key) || Array.isArray(d.bank.rest)) ? d.bank : null,
+      reference: core.fill(d.payment_reference || '', { number: row.number }).trim() || row.number,
+      fee_pct: view.card_fee_pct,
+      fee_cents: fee,
+      card_total_cents: due + fee,
+    },
+    filename: fileName(view),
+  };
+}
+
+// The page's beacon: counts a visit (not a reload within VIEW_GAP_MIN minutes).
+async function recordView(token) {
+  if (!LINK_RE.test(String(token || ''))) return { ok: false };
+  const r = await run(
+    `UPDATE invoice_links SET first_viewed_at = COALESCE(first_viewed_at, CURRENT_TIMESTAMP),
+            view_count = view_count + CASE WHEN last_viewed_at IS NULL OR last_viewed_at < datetime('now', ?) THEN 1 ELSE 0 END,
+            last_viewed_at = CURRENT_TIMESTAMP
+      WHERE token = ? AND revoked_at IS NULL`, [`-${VIEW_GAP_MIN} minutes`, String(token)]);
+  return { ok: r.changes > 0 };
+}
+
+async function publicPdf(token) {
+  const p = await publicByToken(token);
+  if (!p || p.gone) return null;
+  return { buffer: await renderPdf(p.view, p.user_id), filename: p.filename };
+}
 
 // ---------- PDF ----------
 async function footerFor(userId) {
@@ -602,8 +712,17 @@ function viewOf(row, snap) {
     logo: snap.logo || null,
     signature: snap.signature || null,
     seller_name: (data.seller && data.seller.name) || '',
-    pay_url: core.payUrl(data.pay_online, row.number, row.total_cents, row.currency),
+    ...cardTotals(data, row.total_cents),
+    pay_url: core.payUrl(data.pay_online, row.number, cardTotals(data, row.total_cents).card_total_cents, row.currency),
   };
+}
+
+// The card fee the payer covers (template option, off by default): the card/PayPal buttons and
+// the PDF's pay line ask for total + fee; bank transfer and e-Transfer stay at the total.
+function cardTotals(data, totalCents) {
+  const pct = core.cardFeePct(data);
+  const fee = core.cardFeeCents(totalCents, pct);
+  return { card_fee_pct: pct, card_fee_cents: fee, card_total_cents: (Number(totalCents) || 0) + fee };
 }
 
 function fileName(view) {
@@ -721,4 +840,5 @@ module.exports = {
   nextNumber, createInvoice, updateInvoice, setStatus, duplicateInvoice, deleteInvoice,
   listInvoices, getInvoice, invoicePdf, previewPdf,
   listPayments, recordPayment, deletePayment, listClients,
+  createLink, revokeLink, publicByToken, recordView, publicPdf, linkUrl,
 };

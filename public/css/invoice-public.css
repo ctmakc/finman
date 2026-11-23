@@ -1,0 +1,114 @@
+/* invoice-public.css — the client's page of a published invoice (/i/<token>).
+   CLEAR DAY (DESIGN.md): cool ground, white plates on soft shadow, one cobalt accent,
+   Rubik, tabular money. No app shell. */
+@font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-cyrillic-wght-normal.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-latin-ext-wght-normal.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Rubik'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/vendor/fonts/rubik-latin-wght-normal.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+:root {
+  color-scheme: light dark;
+  --ground: light-dark(#F1F4F9, #0B101B);
+  --plate: light-dark(#FEFEFF, #151C2B);
+  --well: light-dark(#EEF1F7, #1C2436);
+  --ink: light-dark(#121A2E, #EEF2FA);
+  --ink-2: light-dark(#4A5570, #AEB8CD);
+  --accent: light-dark(#2B50F0, #8098FF);
+  --accent-strong: light-dark(#1E3CD0, #A7B8FF);
+  --accent-tint: light-dark(#E8EDFF, #1C2650);
+  --on-accent: light-dark(#FEFEFF, #0B101B);
+  --ok: light-dark(#0A7752, #5FD3A4);
+  --ok-tint: light-dark(#DDF3EA, #12322A);
+  --late: light-dark(#B3261E, #FF9C94);
+  --late-tint: light-dark(#FCE4E1, #3A1A1A);
+  --rule: light-dark(rgba(18, 26, 46, .09), rgba(238, 242, 250, .1));
+  --shadow: light-dark(0 1px 2px rgba(18, 26, 46, .05), 0 1px 2px rgba(0, 0, 0, .3)), light-dark(0 12px 32px -12px rgba(30, 50, 110, .18), 0 12px 32px -12px rgba(0, 0, 0, .5));
+  --r: 24px; --r-sm: 14px;
+  --ease: cubic-bezier(.3, 1.3, .5, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 400 16px/1.5 Rubik, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+.ip-wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 120px; }
+.ip-plate { background: var(--plate); border-radius: var(--r); box-shadow: var(--shadow); padding: 24px; }
+.ip-k { color: var(--ink-2); font-size: .875rem; }
+.ip-strong { font-weight: 600; }
+.ip-small { color: var(--ink-2); font-size: .875rem; margin-top: 12px; }
+
+.ip-head { display: grid; gap: 16px; grid-template-columns: 1fr auto; align-items: end; animation: ipRise 520ms var(--ease) both; }
+.ip-seller { grid-column: 1 / -1; display: flex; gap: 14px; align-items: center; }
+.ip-logo { max-height: 56px; max-width: 160px; object-fit: contain; border-radius: 8px; }
+.ip-seller-name { font-weight: 600; font-size: 1.05rem; }
+.ip-head h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.1rem); font-weight: 650; letter-spacing: -.02em; grid-column: 1 / -1; }
+.ip-due { grid-column: 1; }
+.ip-amount { font-size: clamp(2.6rem, 1.6rem + 4vw, 4.2rem); font-weight: 600; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.ip-amount span { font-size: .42em; color: var(--ink-2); font-weight: 500; letter-spacing: 0; }
+.ip-actions { grid-column: 2; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.ip-state { grid-column: 1 / -1; padding: 10px 14px; border-radius: var(--r-sm); font-weight: 500; }
+.ip-state-paid { background: var(--ok-tint); color: var(--ok); }
+.ip-state-late { background: var(--late-tint); color: var(--late); }
+.ip-state-void { background: var(--well); color: var(--ink-2); }
+
+.ip-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 999px; border: 0;
+  font: 600 1rem/1 Rubik, system-ui, sans-serif; text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: transform 220ms var(--ease), background-color 160ms var(--ease-out), box-shadow 200ms var(--ease-out); }
+.ip-btn:hover { transform: translateY(-2px); }
+.ip-btn:active { transform: translateY(0) scale(.98); }
+.ip-btn:focus-visible { outline: 3px solid var(--accent-tint); outline-offset: 2px; }
+.ip-btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.ip-btn-primary:hover { background: var(--accent-strong); }
+.ip-btn-soft { background: var(--accent-tint); color: var(--accent-strong); }
+.ip-btn-ghost { background: var(--well); color: var(--ink); min-height: 36px; padding: 0 14px; font-size: .875rem; }
+
+.ip-grid { display: grid; gap: 16px; margin-top: 16px; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: start; }
+.ip-doc { animation: ipRise 520ms 80ms var(--ease) both; }
+.ip-pay { animation: ipRise 520ms 160ms var(--ease) both; display: grid; gap: 12px; position: sticky; top: 16px; }
+.ip-pay h2 { font-size: 1.15rem; font-weight: 600; }
+.ip-pay > .ip-btn { width: 100%; }
+.ip-fee { color: var(--ink-2); font-size: .8rem; text-align: center; margin-top: -6px; }
+.ip-way { background: var(--well); border-radius: 18px; padding: 14px; display: grid; gap: 8px; }
+.ip-way h3 { font-size: .95rem; font-weight: 600; }
+.ip-copy { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "k b" "v b"; column-gap: 10px; align-items: center; }
+.ip-copy-k { grid-area: k; color: var(--ink-2); font-size: .8rem; }
+.ip-copy-v { grid-area: v; font-weight: 500; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.ip-copy .ip-btn { grid-area: b; }
+
+.ip-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
+.ip-lines { display: grid; color: var(--ink-2); font-size: .9rem; }
+.ip-dates { grid-column: 1 / -1; display: flex; gap: 24px; flex-wrap: wrap; }
+.ip-items { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.ip-items th, .ip-items td { text-align: left; padding: 12px 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.ip-items thead th { color: var(--ink-2); font-weight: 500; font-size: .8rem; }
+.ip-items tfoot th { font-weight: 500; color: var(--ink-2); text-align: right; }
+.ip-items tfoot tr:last-child th, .ip-items tfoot tr:last-child td { border-bottom: 0; }
+.ip-grand th, .ip-grand td { font-weight: 650 !important; color: var(--ink) !important; font-size: 1.1rem; }
+.ip-desc b { font-weight: 500; display: block; }
+.ip-desc small { color: var(--ink-2); }
+.ip-num { text-align: right !important; white-space: nowrap; }
+.ip-terms { white-space: pre-line; }
+.ip-note { color: var(--ink-2); font-size: .875rem; margin: 20px 4px 0; max-width: 60ch; }
+.ip-made { margin: 12px 4px 0; font-size: .875rem; color: var(--ink-2); }
+.ip-msg { max-width: 560px; padding-top: 12vh; }
+.ip-msg h1 { font-size: 1.6rem; font-weight: 650; margin-bottom: 8px; }
+
+.ip-sticky { position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  background: var(--plate); border-radius: 999px; box-shadow: var(--shadow); padding: 8px 8px 8px 22px; z-index: 10; transform: translateY(0); transition: transform 300ms var(--ease-out), opacity 200ms; }
+.ip-sticky small { display: block; color: var(--ink-2); font-size: .75rem; }
+.ip-sticky b { font-variant-numeric: tabular-nums; }
+.ip-sticky.is-off { transform: translateY(140%); opacity: 0; pointer-events: none; }
+
+@keyframes ipRise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 820px) {
+  .ip-grid { grid-template-columns: 1fr; }
+  .ip-pay { position: static; order: -1; }
+  .ip-head { grid-template-columns: 1fr; }
+  .ip-actions { grid-column: 1; justify-content: stretch; }
+  .ip-actions .ip-btn { flex: 1; }
+  .ip-parties { grid-template-columns: 1fr; }
+  .ip-items thead { display: none; }
+  .ip-items tbody td:nth-child(2), .ip-items tbody td:nth-child(3) { display: none; }
+  .ip-items tfoot th[colspan] { text-align: left; }
+}
+@media (min-width: 821px) { .ip-sticky { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media print { .ip-pay, .ip-actions, .ip-sticky, .ip-made { display: none !important; } body { background: #FEFEFF; } .ip-plate { box-shadow: none; } }

@@ -7,7 +7,7 @@
 
   var API = '/api/invoices';
   var TPL_KEY = 'fm_tpl';
-  var STATUSES = ['all', 'draft', 'sent', 'paid', 'void'];
+  var STATUSES = ['all', 'draft', 'sent', 'overdue', 'paid', 'void'];
   var IMG_MAX = 1.5 * 1024 * 1024;
 
   // ---- shared template link: remember ?tpl=<code> before sign-up / sign-in ----
@@ -140,6 +140,24 @@
     if (inv.status === 'sent' && inv.due_date && inv.due_date < today()) return { key: 'overdue', text: tx('status.overdue') };
     return { key: inv.status, text: tx('status.' + inv.status) };
   }
+  function daysLate(inv) {
+    if (statusLabel(inv).key !== 'overdue') return 0;
+    var a = Date.parse(inv.due_date + 'T00:00:00Z'), b = Date.parse(today() + 'T00:00:00Z');
+    return Math.max(1, Math.round((b - a) / 86400000));
+  }
+  function fmtStamp(ts) {
+    if (!ts) return '';
+    var d = new Date(String(ts).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(ts) ? '' : 'Z'));
+    if (isNaN(d)) return ts;
+    try { return d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ts; }
+  }
+  function viewedHtml(inv) {
+    var l = inv.link;
+    if (!l) return '';
+    if (!l.view_count) return '<span class="inv-row-seen is-not"><i class="fas fa-link" aria-hidden="true"></i> ' + esc(tx('row.notViewed')) + '</span>';
+    var t = l.view_count > 1 ? tx('row.viewedMany', { count: l.view_count, date: fmtStamp(l.last_viewed_at) }) : tx('row.viewed', { date: fmtStamp(l.last_viewed_at) });
+    return '<span class="inv-row-seen"><i class="fas fa-eye" aria-hidden="true"></i> ' + esc(t) + '</span>';
+  }
   function chip(inv) {
     var s = statusLabel(inv);
     return '<span class="inv-chip inv-chip-' + s.key + '">' + esc(s.text) + '</span>';
@@ -248,7 +266,8 @@
       return '<div class="inv-sum">' +
         '<span class="inv-sum-cur">' + esc(c) + '</span>' +
         '<dl><div><dt>' + esc(tx('sum.outstanding')) + '</dt><dd class="fm-money">' + money(t.outstanding_cents, c) + '</dd></div>' +
-        '<div><dt>' + esc(tx('sum.paid')) + '</dt><dd class="fm-money inv-sum-paid">' + money(t.paid_cents, c) + '</dd></div></dl>' +
+        '<div><dt>' + esc(tx('sum.paid')) + '</dt><dd class="fm-money inv-sum-paid">' + money(t.paid_cents, c) + '</dd></div>' +
+        (t.overdue_cents ? '<div class="inv-sum-late"><dt>' + esc(tx('sum.overdue')) + '</dt><dd class="fm-money">' + money(t.overdue_cents, c) + '</dd></div>' : '') + '</dl>' +
         '</div>';
     }).join('') + '</div>';
   }
@@ -256,23 +275,27 @@
   function rowHtml(inv) {
     var s = statusLabel(inv);
     var menu = [];
+    if (inv.status !== 'void') menu.push(['inv:link', 'fa-link', tx('act.link')]);
     menu.push(['inv:duplicate', 'fa-copy', tx('act.duplicate')]);
     if (inv.status === 'draft') menu.push(['inv:mark', 'fa-paper-plane', tx('act.markSent'), 'sent']);
     if (inv.status === 'draft' || inv.status === 'sent') menu.push(['inv:mark', 'fa-check', tx('act.markPaid'), 'paid']);
     if (inv.status === 'paid') menu.push(['inv:mark', 'fa-undo', tx('act.markUnpaid'), 'sent']);
     if (inv.status !== 'void') menu.push(['inv:void', 'fa-ban', tx('act.void')]);
     menu.push(['inv:delete', 'fa-trash-alt', tx('act.delete'), null, true]);
-    return '<li class="inv-row' + (inv.status === 'void' ? ' is-void' : '') + '" data-id="' + inv.id + '">' +
+    var late = daysLate(inv);
+    return '<li class="inv-row' + (inv.status === 'void' ? ' is-void' : '') + (late ? ' is-overdue' : '') + '" data-id="' + inv.id + '">' +
       '<button type="button" class="inv-row-main" data-action="inv:open" data-id="' + inv.id + '">' +
         '<span class="inv-row-id"><span class="inv-row-num">' + esc(tx('row.no', { number: inv.number })) + '</span>' +
         '<span class="inv-row-client">' + esc(inv.client_name || tx('row.noClient')) + '</span></span>' +
         '<span class="inv-row-dates">' + esc(fmtDate(inv.issue_date)) +
-          (inv.due_date ? '<span class="inv-row-due' + (s.key === 'overdue' ? ' is-late' : '') + '">' + esc(tx('row.due', { date: fmtDate(inv.due_date) })) + '</span>' : '') +
+          (inv.due_date ? '<span class="inv-row-due' + (s.key === 'overdue' ? ' is-late' : '') + '">' + esc(late ? tx('row.daysLate', { n: late }) : tx('row.due', { date: fmtDate(inv.due_date) })) + '</span>' : '') +
+          viewedHtml(inv) +
         '</span>' +
         '<span class="inv-row-total fm-money">' + money(inv.total_cents, inv.currency) + '</span>' +
         '<span class="inv-row-status">' + chip(inv) + '</span>' +
       '</button>' +
       '<div class="inv-row-actions">' +
+        (inv.status !== 'void' ? '<button type="button" class="btn btn-icon' + (inv.link ? ' is-on' : '') + '" data-action="inv:link" data-id="' + inv.id + '" aria-label="' + esc(tx('act.link')) + '" title="' + esc(tx('act.link')) + '"><i class="fas fa-link" aria-hidden="true"></i></button>' : '') +
         '<button type="button" class="btn btn-icon" data-action="inv:pdf" data-id="' + inv.id + '" aria-label="' + esc(tx('act.download')) + '" title="' + esc(tx('act.download')) + '"><i class="fas fa-file-download" aria-hidden="true"></i></button>' +
         '<details class="inv-menu"><summary class="btn btn-icon" aria-label="' + esc(tx('act.more')) + '" title="' + esc(tx('act.more')) + '"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></summary>' +
           '<div class="inv-menu-pop" role="menu">' + menu.map(function (m) {
@@ -484,6 +507,8 @@
             (ro ? '' : '<button type="submit" class="btn btn-primary"><i class="fas fa-save" aria-hidden="true"></i> ' + esc(tx(saved ? 'ed.save' : 'ed.saveDraft')) + '</button>') +
             '<button type="button" class="btn" data-action="inv:preview"><i class="fas fa-eye" aria-hidden="true"></i> ' + esc(tx('ed.preview')) + '</button>' +
             (saved ? '<button type="button" class="btn" data-action="inv:pdf" data-id="' + ed.id + '"><i class="fas fa-file-download" aria-hidden="true"></i> ' + esc(tx('act.download')) + '</button>' : '') +
+            (saved && !ro ? '<button type="button" class="btn" data-action="inv:link" data-id="' + ed.id + '"><i class="fas fa-link" aria-hidden="true"></i> ' + esc(tx('act.link')) + '</button>' : '') +
+            (saved && ed.invoice && ed.invoice.link ? '<p class="inv-hint inv-ed-seen">' + viewedHtml(ed.invoice) + '</p>' : '') +
             statusBtns +
           '</div>' +
           '<p class="inv-footnote"><i class="fas fa-info-circle" aria-hidden="true"></i> ' + esc(tx('footerNote')) + '</p>' +
@@ -805,6 +830,13 @@
             f(tx('tpl.payLabel'), 'pay_label', pay && pay.label, '', 'inv-span-2') +
             f(tx('tpl.payCurrencies'), 'pay_currencies', pay && pay.currencies ? pay.currencies.join(', ') : p.currency, ' spellcheck="false"') +
           '</div>', tx('tpl.payHint')) +
+        '<section class="inv-plate inv-sec"><h2 class="inv-sec-title">' + esc(tx('tpl.payWays')) + '</h2><p class="inv-sub">' + esc(tx('tpl.payWaysHint')) + '</p><div class="inv-grid inv-grid-3">' +
+          f(tx('tpl.paypal'), 'pay_paypal', d.pay_paypal, ' spellcheck="false" autocomplete="off" placeholder="paypal.me/yourname"', '', esc(tx('tpl.paypalHint'))) +
+          f(tx('tpl.etransfer'), 'pay_etransfer', d.pay_etransfer, ' type="email" spellcheck="false" autocomplete="off"', 'inv-span-2', esc(tx('tpl.etransferHint'))) +
+          '<label class="inv-check inv-span-2"><input type="checkbox" name="card_fee_on"' + (d.card_fee && d.card_fee.pct ? ' checked' : '') + '> <span>' + esc(tx('tpl.cardFee')) + '</span></label>' +
+          f(tx('tpl.cardFeePct'), 'card_fee_pct', d.card_fee && d.card_fee.pct ? d.card_fee.pct : 3, ' type="number" min="0.1" max="10" step="0.1" inputmode="decimal"') +
+          '<p class="inv-hint inv-span-3">' + esc(tx('tpl.cardFeeHint')) + '</p>' +
+        '</div></section>' +
         toggleSec('signer', !!signer, tx('tpl.signer'),
           '<div class="inv-grid">' + f(tx('tpl.signerTitle'), 'signer_title', signer && signer.title) +
           ta(tx('tpl.signerLines'), 'signer_lines', signer && signer.lines ? signer.lines.join('\n') : '', 2, '', esc(tx('tpl.linesHint'))) + '</div>') +
@@ -877,6 +909,10 @@
         currencies: String(v('pay_currencies') || '').toUpperCase().split(/[\s,;]+/).filter(function (c) { return /^[A-Z]{3}$/.test(c); })
       };
     } else d.pay_online = null;
+    d.pay_paypal = String(v('pay_paypal') || '').trim() || null;
+    d.pay_etransfer = String(v('pay_etransfer') || '').trim() || null;
+    var feePct = parseFloat(String(v('card_fee_pct') || '').replace(',', '.'));
+    d.card_fee = el.card_fee_on && el.card_fee_on.checked && feePct > 0 && feePct <= 10 ? { pct: Math.round(feePct * 100) / 100 } : null;
     if (el.opt_signer.checked) d.signer = { title: v('signer_title'), lines: lines(v('signer_lines')) };
     else d.signer = null;
     ['title', 'heading', 'due_line', 'date_line', 'item_header', 'qty_header', 'price_header', 'amount_header', 'money_style', 'symbol'].forEach(function (k) {
@@ -989,6 +1025,64 @@
       releaseUrls();
       renderTemplates();
     } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ---------- client link (/i/<token>) ----------
+  function linkBody(inv) {
+    var l = inv.link;
+    var p = profileById(inv.profile_id);
+    var d = (p && p.data) || {};
+    var hasPay = !!(inv.pay_url || d.pay_paypal || d.pay_etransfer || (d.bank && ((d.bank.key || []).length || (d.bank.rest || []).length)));
+    var out = '<p class="inv-confirm-text">' + esc(tx('link.text')) + '</p>';
+    if (l) {
+      out += '<div class="inv-share"><input class="form-control" readonly value="' + esc(l.url) + '" aria-label="' + esc(tx('act.link')) + '">' +
+        '<button type="button" class="btn btn-primary" data-inv-link="copy">' + esc(tx('link.copy')) + '</button></div>' +
+        '<p class="inv-hint">' + esc(l.view_count ? tx('link.views', { first: fmtStamp(l.first_viewed_at), last: fmtStamp(l.last_viewed_at), count: l.view_count }) : tx('link.viewsNone')) + '</p>' +
+        '<div class="inv-link-btns"><a class="btn" href="' + esc(l.url) + '#own" target="_blank" rel="noopener"><i class="fas fa-external-link-alt" aria-hidden="true"></i> ' + esc(tx('link.open')) + '</a>' +
+        '<button type="button" class="btn" data-inv-link="off"><i class="fas fa-unlink" aria-hidden="true"></i> ' + esc(tx('link.off')) + '</button></div>';
+    } else {
+      out += '<div class="inv-link-btns"><button type="button" class="btn btn-primary" data-inv-link="create"><i class="fas fa-link" aria-hidden="true"></i> ' + esc(tx('link.create')) + '</button></div>';
+    }
+    if (!hasPay && p) out += '<p class="inv-hint inv-link-warn">' + esc(tx('link.noPay')) + '</p>';
+    out += '<p class="inv-hint">' + esc(tx('link.privacy')) + '</p>';
+    return out;
+  }
+
+  async function clientLink(id) {
+    var inv;
+    try { inv = (await api('/' + id)).invoice; } catch (e) { toast(e.message, 'error'); return; }
+    var host = root.UI.modal({ title: tx('link.title', { number: inv.number }), body: linkBody(inv) });
+    if (!host) return;
+    var paint = function () {
+      var b = host.querySelector('.inv-link-body') || host.querySelector('.modal-body') || null;
+      if (b) b.innerHTML = linkBody(inv);
+    };
+    host.addEventListener('click', async function (e) {
+      var b = e.target.closest('[data-inv-link]');
+      if (!b) return;
+      var what = b.getAttribute('data-inv-link');
+      if (what === 'copy') {
+        var input = host.querySelector('.inv-share input');
+        input.select();
+        try { await navigator.clipboard.writeText(input.value); } catch (x) { try { document.execCommand('copy'); } catch (y) { /* ignore */ } }
+        b.textContent = tx('link.copied');
+        return;
+      }
+      b.disabled = true;
+      try {
+        if (what === 'create') {
+          inv = (await api('/' + id + '/link', { method: 'POST' })).invoice;
+          try { if (navigator.clipboard && inv.link) await navigator.clipboard.writeText(inv.link.url); } catch (x) { /* ignore */ }
+          toast(tx('link.created'), 'success');
+        } else if (what === 'off') {
+          inv = (await api('/' + id + '/link', { method: 'DELETE' })).invoice;
+          toast(tx('link.offDone'), 'success');
+        }
+        paint();
+        if (S.view === 'list') refreshList().catch(function () {});
+        else if (S.ed && String(S.ed.id) === String(id)) { S.ed = stateFromInvoice(inv); }
+      } catch (err) { b.disabled = false; toast(err.message, 'error'); }
+    });
   }
 
   async function shareTemplate(id) {
@@ -1151,6 +1245,7 @@
       },
       'inv:open': function (el) { return openInvoice(el.dataset.id); },
       'inv:pdf': function (el) { return downloadPdf(el.dataset.id); },
+      'inv:link': function (el) { return clientLink(el.dataset.id); },
       'inv:duplicate': async function (el) {
         try {
           var d = await api('/' + el.dataset.id + '/duplicate', { method: 'POST' });
