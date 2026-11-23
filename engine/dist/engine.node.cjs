@@ -19039,6 +19039,31 @@ var require_core = __commonJS({
       const url = String(payOnline.url).replace(/\{ref\}/g, formEncode(number)).replace(/\{amount\}/g, formEncode(payAmount(cents))).replace(/\{currency\}/g, formEncode(cur));
       return /^https:\/\/[^\s]+$/i.test(url) ? url : null;
     }
+    function cardFeePct(data) {
+      const f = data && data.card_fee;
+      if (!f || typeof f !== "object") return 0;
+      const n = typeof f.pct === "number" ? f.pct : parseFloat(String(f.pct || "").replace(",", "."));
+      return Number.isFinite(n) && n > 0 && n <= 10 ? Math.round(n * 100) / 100 : 0;
+    }
+    function cardFeeCents(totalCents, pct) {
+      return pct > 0 ? Math.round((Number(totalCents) || 0) * pct / 100) : 0;
+    }
+    function paypalName(v) {
+      const s = String(v || "").trim().replace(/^@/, "");
+      const m = /^(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/([A-Za-z0-9_.-]{1,40})\/?$/i.exec(s);
+      const name = m ? m[1] : s;
+      return /^[A-Za-z0-9_.-]{1,40}$/.test(name) ? name : null;
+    }
+    function paypalUrl(v, cents, currency) {
+      const name = paypalName(v);
+      if (!name || !(cents >= 100)) return null;
+      return `https://paypal.me/${encodeURIComponent(name)}/${payAmount(cents)}${String(currency || "").toUpperCase()}`;
+    }
+    var EMAIL_RE = /^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[A-Za-z]{2,24}$/;
+    function etransferEmail(v) {
+      const s = String(v || "").trim();
+      return EMAIL_RE.test(s) ? s : null;
+    }
     function fill(text, ctx2) {
       return String(text || "").replace(/\{(\w+)\}/g, (m, k) => ctx2[k] !== void 0 && ctx2[k] !== null ? String(ctx2[k]) : m);
     }
@@ -19065,7 +19090,12 @@ var require_core = __commonJS({
       REF_RE,
       payAmount,
       payUrl,
-      fill
+      fill,
+      cardFeePct,
+      cardFeeCents,
+      paypalName,
+      paypalUrl,
+      etransferEmail
     };
   }
 });
@@ -19731,7 +19761,7 @@ var require_pdf = __commonJS({
     var FONT_DIR = path.join("/vault", "..", "..", "assets", "fonts");
     var PX = 0.75;
     var MM = 72 / 25.4;
-    var FOOTER_TEXT = "Made with Finman Online \u2014 free invoicing and money app. Sign up free: app.finman.money";
+    var FOOTER_TEXT = "Made with Finman Online \u2014 invoicing and money app. Sign up: app.finman.money";
     function registerFonts(doc) {
       doc.registerFont("Sans", path.join(FONT_DIR, "LiberationSans-Regular.ttf"));
       doc.registerFont("Sans-Bold", path.join(FONT_DIR, "LiberationSans-Bold.ttf"));
@@ -19740,6 +19770,19 @@ var require_pdf = __commonJS({
       doc.registerFont("Mont", path.join(FONT_DIR, "Montserrat-Regular.ttf"));
       doc.registerFont("Mont-Medium", path.join(FONT_DIR, "Montserrat-Medium.ttf"));
       doc.registerFont("Mont-Semi", path.join(FONT_DIR, "Montserrat-SemiBold.ttf"));
+    }
+    function payExtras(view, money) {
+      const d = view.data || {};
+      const out = [];
+      const cur = String(view.currency || "").toUpperCase();
+      if (view.card_fee_cents > 0 && (view.pay_url || core.paypalName(d.pay_paypal))) {
+        out.push(`**Card / PayPal: ${money(view.card_total_cents)}** \u2014 includes ${core.fmtQty(view.card_fee_pct)}% card fee, paid by the payer`);
+      }
+      const pp = core.paypalUrl(d.pay_paypal, view.card_total_cents || view.total_cents, cur);
+      if (pp) out.push(`**PayPal:** ${stripScheme(pp)}`);
+      const et = core.etransferEmail(d.pay_etransfer);
+      if (et) out.push(`**Interac e-Transfer:** ${et}`);
+      return out;
     }
     function dataUrlToBuffer(v) {
       if (!v) return null;
@@ -20042,6 +20085,7 @@ var require_pdf = __commonJS({
         if (ref) lines.push({ rich: `**Payment reference:** ${ref}` });
         lines.push({ rich: `**Or pay online** ${d.pay_online.label || ""}`.trim() });
         lines.push({ url: view.pay_url });
+        payExtras(view, money).forEach((t) => lines.push({ rich: t }));
         const th = lines.reduce((a, l) => a + (l.url ? W_.height(stripScheme(l.url), { font: "Mono", size: 9.5, width: tw }) : W_.height(l.rich.replace(/\*\*/g, ""), { font: S, size: 10.5, width: tw })), 0);
         const boxH = Math.max(qrS, th) + 2 * pY;
         y += 12 * PX;
@@ -20056,13 +20100,17 @@ var require_pdf = __commonJS({
           } else yy += W_.rich(l.rich, tx, yy, { font: S, bold: SB, size: 10.5, width: tw });
         });
         y += boxH;
-      } else if (ref) {
+      } else if (ref || payExtras(view, money).length) {
         const pX = 12 * PX, pY = 8 * PX;
-        const th = W_.height(`Payment reference: ${ref}`, { font: S, size: 10.5, width: W - 2 * pX });
+        const rows = (ref ? [`**Payment reference:** ${ref}`] : []).concat(payExtras(view, money));
+        const th = rows.reduce((a, r) => a + W_.height(r.replace(/\*\*/g, ""), { font: S, size: 10.5, width: W - 2 * pX }), 0);
         y += 12 * PX;
         ensure(th + 2 * pY);
         W_.rect(ML, y, W, th + 2 * pY);
-        W_.rich(`**Payment reference:** ${ref}`, ML + pX, y + pY, { font: S, bold: SB, size: 10.5, width: W - 2 * pX });
+        let yy = y + pY;
+        rows.forEach((r) => {
+          yy += W_.rich(r, ML + pX, yy, { font: S, bold: SB, size: 10.5, width: W - 2 * pX });
+        });
         y += th + 2 * pY;
       }
       const terms = core.fill(view.terms || "", ph).trim();
@@ -20197,7 +20245,7 @@ var require_pdf = __commonJS({
       trow("Total", "", money(view.total_cents), true);
       const ref = core.fill(d.payment_reference || "", ph).trim();
       const terms = core.fill(view.terms || "", ph).trim();
-      if (view.pay_url || ref || terms || view.notes) {
+      if (view.pay_url || ref || terms || view.notes || payExtras(view, money).length) {
         y += 34;
         const qrS = view.pay_url ? 56 : 0;
         const txX = ML + (qrS ? qrS + 14 : 0);
@@ -20205,6 +20253,7 @@ var require_pdf = __commonJS({
         const parts = [];
         if (view.pay_url) parts.push({ t: d.pay_online.label || "Pay online:", font: M, color: "#000" }, { t: stripScheme(view.pay_url), font: R, color: "#000", link: view.pay_url });
         if (ref) parts.push({ t: ref, font: R, color: GREY });
+        payExtras(view, money).forEach((t) => parts.push({ t: t.replace(/\*\*/g, ""), font: M, color: "#000" }));
         if (terms) parts.push({ t: terms, font: R, color: GREY });
         if (view.notes) parts.push({ t: view.notes, font: R, color: GREY });
         const th = parts.reduce((a, p) => a + W_.height(p.t, { font: p.font, size: 8.6, lh: 1.45, width: txW }), 0);
@@ -20288,6 +20337,9 @@ var require_service = __commonJS({
     var MAX_ITEMS = 200;
     var IMAGE_RE = /^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=\s]+)$/;
     var SHARE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+    var LINK_COLS = "(SELECT json_object('token', l.token, 'created_at', l.created_at, 'first_viewed_at', l.first_viewed_at, 'last_viewed_at', l.last_viewed_at, 'view_count', l.view_count) FROM invoice_links l WHERE l.invoice_id = invoices.id AND l.revoked_at IS NULL) AS link_json";
+    var LINK_RE = /^[A-Za-z0-9_-]{22,64}$/;
+    var VIEW_GAP_MIN = 10;
     var InvoiceError = class extends Error {
       constructor(message, status = 400) {
         super(message);
@@ -20685,8 +20737,10 @@ var require_service = __commonJS({
         total_cents: row.total_cents,
         terms: row.terms,
         notes: row.notes,
-        pay_url: core.payUrl(snap.data && snap.data.pay_online, row.number, row.total_cents, row.currency),
+        pay_url: core.payUrl(snap.data && snap.data.pay_online, row.number, cardTotals(snap.data, row.total_cents).card_total_cents, row.currency),
+        card_fee_pct: core.cardFeePct(snap.data),
         ...paidOf(row),
+        link: linkOf(row),
         sent_at: row.sent_at,
         paid_at: row.paid_at,
         created_at: row.created_at,
@@ -20696,7 +20750,7 @@ var require_service = __commonJS({
       return out;
     }
     async function invoiceRow(userId, id) {
-      const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
+      const row = await get(`SELECT *, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum, ${LINK_COLS} FROM invoices WHERE id = ? AND user_id = ?`, [id, userId]);
       if (!row) throw notFound("Invoice not found");
       return row;
     }
@@ -20807,7 +20861,10 @@ var require_service = __commonJS({
     async function listInvoices(userId, { status, q } = {}) {
       const where = ["user_id = ?"];
       const args = [userId];
-      if (status && STATUSES.includes(status)) {
+      if (status === "overdue") {
+        where.push("status = 'sent' AND due_date IS NOT NULL AND due_date < ?");
+        args.push(core.today());
+      } else if (status && STATUSES.includes(status)) {
         where.push("status = ?");
         args.push(status);
       }
@@ -20820,12 +20877,13 @@ var require_service = __commonJS({
         `SELECT id, user_id, profile_id, number, status, issue_date, due_date, currency, client_name, client_details, items,
             tax_rate, tax_label, tax_sub, tax_text, subtotal_cents, tax_cents, total_cents, terms, notes,
             json_object('name', json_extract(snapshot, '$.name'), 'layout', json_extract(snapshot, '$.layout'),
-                        'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'))) AS snapshot,
-            sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum
+                        'data', json_object('pay_online', json_extract(snapshot, '$.data.pay_online'), 'card_fee', json_extract(snapshot, '$.data.card_fee'))) AS snapshot,
+            sent_at, paid_at, created_at, updated_at, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum,
+            ${LINK_COLS}
        FROM invoices WHERE ${where.join(" AND ")} ORDER BY issue_date DESC, id DESC LIMIT 500`,
         args
       );
-      const all = await query(`SELECT status, currency, total_cents, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE user_id = ?`, [userId]);
+      const all = await query(`SELECT status, currency, total_cents, due_date, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = invoices.id) AS paid_sum FROM invoices WHERE user_id = ?`, [userId]);
       const totals = {};
       for (const r of all) {
         const t = totals[r.currency] || (totals[r.currency] = { outstanding_cents: 0, paid_cents: 0 });
@@ -20833,6 +20891,10 @@ var require_service = __commonJS({
         if (r.status === "sent") {
           t.outstanding_cents += p.balance_cents;
           t.paid_cents += p.paid_cents;
+          if (r.due_date && r.due_date < core.today()) {
+            t.overdue_cents = (t.overdue_cents || 0) + p.balance_cents;
+            t.overdue_count = (t.overdue_count || 0) + 1;
+          }
         }
         if (r.status === "paid") t.paid_cents += r.total_cents;
       }
@@ -20840,6 +20902,95 @@ var require_service = __commonJS({
     }
     async function getInvoice(userId, id) {
       return publicInvoice(await invoiceRow(userId, id));
+    }
+    function linkUrl(token) {
+      return `${baseUrl()}/i/${token}`;
+    }
+    function linkOf(row) {
+      const l = parseJson(row && row.link_json, null);
+      if (!l || !l.token) return null;
+      return {
+        url: linkUrl(l.token),
+        created_at: l.created_at,
+        first_viewed_at: l.first_viewed_at || null,
+        last_viewed_at: l.last_viewed_at || null,
+        view_count: Number(l.view_count) || 0
+      };
+    }
+    async function createLink(userId, id) {
+      const inv = await invoiceRow(userId, id);
+      if (inv.status === "void") throw bad("A void invoice cannot be shared");
+      const live = await get("SELECT token, revoked_at FROM invoice_links WHERE invoice_id = ?", [id]);
+      if (live && !live.revoked_at) return { invoice: publicInvoice(await invoiceRow(userId, id)), created: false };
+      const token = crypto.randomBytes(18).toString("base64url");
+      if (live) {
+        await run(`UPDATE invoice_links SET token = ?, revoked_at = NULL, created_at = CURRENT_TIMESTAMP,
+                 first_viewed_at = NULL, last_viewed_at = NULL, view_count = 0 WHERE invoice_id = ?`, [token, id]);
+      } else {
+        await run("INSERT INTO invoice_links (token, invoice_id, user_id) VALUES (?, ?, ?)", [token, id, userId]);
+      }
+      if (inv.status === "draft") {
+        await run(`UPDATE invoices SET status = 'sent', sent_at = COALESCE(sent_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [id, userId]);
+      }
+      return { invoice: publicInvoice(await invoiceRow(userId, id)), created: true };
+    }
+    async function revokeLink(userId, id) {
+      await invoiceRow(userId, id);
+      await run("UPDATE invoice_links SET revoked_at = CURRENT_TIMESTAMP WHERE invoice_id = ? AND user_id = ? AND revoked_at IS NULL", [id, userId]);
+      return { invoice: publicInvoice(await invoiceRow(userId, id)) };
+    }
+    async function linkRow(token) {
+      if (!LINK_RE.test(String(token || ""))) return null;
+      return get(`SELECT l.token, l.revoked_at, l.user_id, i.*, (SELECT COALESCE(SUM(amount_cents), 0) FROM invoice_payments p WHERE p.invoice_id = i.id) AS paid_sum
+                FROM invoice_links l JOIN invoices i ON i.id = l.invoice_id AND i.user_id = l.user_id WHERE l.token = ?`, [String(token)]);
+    }
+    async function publicByToken(token) {
+      const row = await linkRow(token);
+      if (!row) return null;
+      if (row.revoked_at) return { gone: true };
+      const snap = parseJson(row.snapshot, {});
+      const view = viewOf(row, snap);
+      const d = view.data || {};
+      const { paid_cents: paid, balance_cents: balance } = paidOf(row);
+      const status = row.status === "sent" && row.due_date && row.due_date < core.today() ? "overdue" : row.status;
+      const due = balance > 0 ? balance : 0;
+      const fee = core.cardFeeCents(due, view.card_fee_pct);
+      return {
+        token: row.token,
+        user_id: row.user_id,
+        status,
+        view,
+        paid_cents: paid,
+        balance_cents: due,
+        pay: {
+          card_url: due > 0 ? core.payUrl(d.pay_online, row.number, due + fee, row.currency) : null,
+          card_label: d.pay_online && d.pay_online.label || "",
+          paypal_url: due > 0 ? core.paypalUrl(d.pay_paypal, due + fee, row.currency) : null,
+          etransfer: core.etransferEmail(d.pay_etransfer),
+          bank: d.bank && (Array.isArray(d.bank.key) || Array.isArray(d.bank.rest)) ? d.bank : null,
+          reference: core.fill(d.payment_reference || "", { number: row.number }).trim() || row.number,
+          fee_pct: view.card_fee_pct,
+          fee_cents: fee,
+          card_total_cents: due + fee
+        },
+        filename: fileName(view)
+      };
+    }
+    async function recordView(token) {
+      if (!LINK_RE.test(String(token || ""))) return { ok: false };
+      const r = await run(
+        `UPDATE invoice_links SET first_viewed_at = COALESCE(first_viewed_at, CURRENT_TIMESTAMP),
+            view_count = view_count + CASE WHEN last_viewed_at IS NULL OR last_viewed_at < datetime('now', ?) THEN 1 ELSE 0 END,
+            last_viewed_at = CURRENT_TIMESTAMP
+      WHERE token = ? AND revoked_at IS NULL`,
+        [`-${VIEW_GAP_MIN} minutes`, String(token)]
+      );
+      return { ok: r.changes > 0 };
+    }
+    async function publicPdf(token) {
+      const p = await publicByToken(token);
+      if (!p || p.gone) return null;
+      return { buffer: await renderPdf(p.view, p.user_id), filename: p.filename };
     }
     async function footerFor(userId) {
       const code = await inviteCodeFor(userId);
@@ -20870,8 +21021,14 @@ var require_service = __commonJS({
         logo: snap.logo || null,
         signature: snap.signature || null,
         seller_name: data.seller && data.seller.name || "",
-        pay_url: core.payUrl(data.pay_online, row.number, row.total_cents, row.currency)
+        ...cardTotals(data, row.total_cents),
+        pay_url: core.payUrl(data.pay_online, row.number, cardTotals(data, row.total_cents).card_total_cents, row.currency)
       };
+    }
+    function cardTotals(data, totalCents) {
+      const pct = core.cardFeePct(data);
+      const fee = core.cardFeeCents(totalCents, pct);
+      return { card_fee_pct: pct, card_fee_cents: fee, card_total_cents: (Number(totalCents) || 0) + fee };
     }
     function fileName(view) {
       const clean = (s) => String(s || "").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
@@ -20999,7 +21156,13 @@ var require_service = __commonJS({
       listPayments,
       recordPayment,
       deletePayment,
-      listClients
+      listClients,
+      createLink,
+      revokeLink,
+      publicByToken,
+      recordView,
+      publicPdf,
+      linkUrl
     };
   }
 });
@@ -26798,6 +26961,233 @@ var require_track = __commonJS({
   }
 });
 
+// services/tips.js
+var require_tips = __commonJS({
+  "services/tips.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var { query, get, run } = require_database();
+    var emailService = require_emailService();
+    var tracker = require_tracker();
+    var logger = require_logger();
+    var APP_URL = () => (proc.env.APP_PUBLIC_URL || "https://app.finman.money").replace(/\/+$/, "");
+    var SITE = "https://finman.money";
+    var GAP_HOURS = 44;
+    var TIPS = [
+      { kind: "tip_invoice", fromH: 24, toH: 5 * 24, done: ["invoice_link_created"], doneInvoices: true },
+      { kind: "tip_import", fromH: 3 * 24, toH: 9 * 24, done: ["import_done", "vault_import_done", "statement_read"] },
+      { kind: "tip_next", fromH: 7 * 24, toH: 16 * 24, done: [] }
+    ];
+    var TEXT = {
+      en: {
+        hi: (n) => `Hi ${n},`,
+        hiAnon: "Hi,",
+        tip_invoice: {
+          subject: "Send your first invoice from Finman in 3 minutes",
+          body: (app2) => [
+            "Finman makes invoices as clean PDFs from your own template: your company, bank details, tax line and logo.",
+            `1. Open Invoices and pick a layout: ${app2}/invoices
+2. Fill in your details once; every next invoice takes them.
+3. Add the client and the lines, save, and press "Client link".`,
+            "The client opens the invoice in a browser, downloads the PDF and pays with your own card link, PayPal.me, e-Transfer or bank details. You see when they open it, and late invoices turn red in your list."
+          ]
+        },
+        tip_import: {
+          subject: "Your bank statement in Finman: about a minute",
+          body: (app2) => [
+            "The fastest way to see where the money goes is one statement from your bank.",
+            `1. In online banking, download the last 2\u20133 months as CSV or OFX (a PDF works too).
+2. Drop the file into Finman: ${app2}/transactions
+3. Categories fill in by themselves; fix one and Finman remembers the rule.`,
+            `Step-by-step for your bank: ${SITE}/banks/`
+          ]
+        },
+        tip_next: {
+          subject: "Three things to try in Finman this week",
+          body: (app2) => [
+            `Money map: where each dollar went last month, on one screen. ${app2}/money-map`,
+            `Budgets: set a limit for the 2\u20133 categories that surprise you most; Finman shows the rest of the month as you spend. ${app2}/budgets`,
+            `Your own AI: connect ChatGPT, Claude or Gemini and ask questions about your money in plain words. ${app2}/my-ai`
+          ]
+        },
+        sign: "Finman",
+        reply: "Questions? Reply to this email.",
+        stop: "Stop tips and reminders"
+      },
+      ru: {
+        hi: (n) => `\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435, ${n}!`,
+        hiAnon: "\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435!",
+        tip_invoice: {
+          subject: "\u041F\u0435\u0440\u0432\u044B\u0439 \u0441\u0447\u0451\u0442 \u0438\u0437 Finman \u0437\u0430 3 \u043C\u0438\u043D\u0443\u0442\u044B",
+          body: (app2) => [
+            "Finman \u0434\u0435\u043B\u0430\u0435\u0442 \u0441\u0447\u0435\u0442\u0430 \u0430\u043A\u043A\u0443\u0440\u0430\u0442\u043D\u044B\u043C PDF \u043F\u043E \u0432\u0430\u0448\u0435\u043C\u0443 \u0448\u0430\u0431\u043B\u043E\u043D\u0443: \u043A\u043E\u043C\u043F\u0430\u043D\u0438\u044F, \u0440\u0435\u043A\u0432\u0438\u0437\u0438\u0442\u044B, \u043D\u0430\u043B\u043E\u0433 \u0438 \u043B\u043E\u0433\u043E\u0442\u0438\u043F.",
+            `1. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \xAB\u0421\u0447\u0435\u0442\u0430\xBB \u0438 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0438\u0434: ${app2}/invoices
+2. \u041E\u0434\u0438\u043D \u0440\u0430\u0437 \u0437\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0441\u0432\u043E\u0438 \u0434\u0430\u043D\u043D\u044B\u0435 \u2014 \u0434\u0430\u043B\u044C\u0448\u0435 \u043A\u0430\u0436\u0434\u044B\u0439 \u0441\u0447\u0451\u0442 \u0431\u0435\u0440\u0451\u0442 \u0438\u0445 \u0441\u0430\u043C.
+3. \u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043A\u043B\u0438\u0435\u043D\u0442\u0430 \u0438 \u0441\u0442\u0440\u043E\u043A\u0438, \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u0435 \u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0421\u0441\u044B\u043B\u043A\u0430 \u0434\u043B\u044F \u043A\u043B\u0438\u0435\u043D\u0442\u0430\xBB.`,
+            "\u041A\u043B\u0438\u0435\u043D\u0442 \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u0441\u0447\u0451\u0442 \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435, \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u0435\u0442 PDF \u0438 \u043F\u043B\u0430\u0442\u0438\u0442 \u043F\u043E \u0432\u0430\u0448\u0435\u0439 \u0441\u0441\u044B\u043B\u043A\u0435 \u043D\u0430 \u043E\u043F\u043B\u0430\u0442\u0443 \u043A\u0430\u0440\u0442\u043E\u0439, PayPal.me, e-Transfer \u0438\u043B\u0438 \u0431\u0430\u043D\u043A\u043E\u0432\u0441\u043A\u0438\u043C \u0440\u0435\u043A\u0432\u0438\u0437\u0438\u0442\u0430\u043C. \u0412\u044B \u0432\u0438\u0434\u0438\u0442\u0435, \u043A\u043E\u0433\u0434\u0430 \u043E\u043D \u043E\u0442\u043A\u0440\u044B\u043B \u0441\u0447\u0451\u0442, \u0430 \u043F\u0440\u043E\u0441\u0440\u043E\u0447\u0435\u043D\u043D\u044B\u0435 \u0441\u0447\u0435\u0442\u0430 \u043F\u043E\u0434\u0441\u0432\u0435\u0447\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u043A\u0440\u0430\u0441\u043D\u044B\u043C."
+          ]
+        },
+        tip_import: {
+          subject: "\u0412\u044B\u043F\u0438\u0441\u043A\u0430 \u0431\u0430\u043D\u043A\u0430 \u0432 Finman: \u043E\u043A\u043E\u043B\u043E \u043C\u0438\u043D\u0443\u0442\u044B",
+          body: (app2) => [
+            "\u0411\u044B\u0441\u0442\u0440\u0435\u0435 \u0432\u0441\u0435\u0433\u043E \u0443\u0432\u0438\u0434\u0435\u0442\u044C, \u043A\u0443\u0434\u0430 \u0443\u0445\u043E\u0434\u044F\u0442 \u0434\u0435\u043D\u044C\u0433\u0438, \u043F\u043E \u043E\u0434\u043D\u043E\u0439 \u0432\u044B\u043F\u0438\u0441\u043A\u0435 \u0438\u0437 \u0431\u0430\u043D\u043A\u0430.",
+            `1. \u0412 \u0438\u043D\u0442\u0435\u0440\u043D\u0435\u0442-\u0431\u0430\u043D\u043A\u0435 \u0441\u043A\u0430\u0447\u0430\u0439\u0442\u0435 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 2\u20133 \u043C\u0435\u0441\u044F\u0446\u0430 \u0432 CSV \u0438\u043B\u0438 OFX (PDF \u0442\u043E\u0436\u0435 \u043F\u043E\u0434\u043E\u0439\u0434\u0451\u0442).
+2. \u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0432 Finman: ${app2}/transactions
+3. \u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438 \u0440\u0430\u0441\u0441\u0442\u0430\u0432\u044F\u0442\u0441\u044F \u0441\u0430\u043C\u0438; \u043F\u043E\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043E\u0434\u043D\u0443 \u2014 Finman \u0437\u0430\u043F\u043E\u043C\u043D\u0438\u0442 \u043F\u0440\u0430\u0432\u0438\u043B\u043E.`,
+            `\u041F\u043E\u0448\u0430\u0433\u043E\u0432\u043E \u0434\u043B\u044F \u0432\u0430\u0448\u0435\u0433\u043E \u0431\u0430\u043D\u043A\u0430: ${SITE}/banks/`
+          ]
+        },
+        tip_next: {
+          subject: "\u0422\u0440\u0438 \u0432\u0435\u0449\u0438, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0441\u0442\u043E\u0438\u0442 \u043F\u043E\u043F\u0440\u043E\u0431\u043E\u0432\u0430\u0442\u044C \u0432 Finman \u043D\u0430 \u044D\u0442\u043E\u0439 \u043D\u0435\u0434\u0435\u043B\u0435",
+          body: (app2) => [
+            `\u041A\u0430\u0440\u0442\u0430 \u0434\u0435\u043D\u0435\u0433: \u043A\u0443\u0434\u0430 \u0443\u0448\u0451\u043B \u043A\u0430\u0436\u0434\u044B\u0439 \u0434\u043E\u043B\u043B\u0430\u0440 \u0432 \u043F\u0440\u043E\u0448\u043B\u043E\u043C \u043C\u0435\u0441\u044F\u0446\u0435, \u043D\u0430 \u043E\u0434\u043D\u043E\u043C \u044D\u043A\u0440\u0430\u043D\u0435. ${app2}/money-map`,
+            `\u0411\u044E\u0434\u0436\u0435\u0442\u044B: \u043F\u043E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043B\u0438\u043C\u0438\u0442 \u043D\u0430 2\u20133 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0443\u0434\u0438\u0432\u043B\u044F\u044E\u0442 \u0441\u0438\u043B\u044C\u043D\u0435\u0435 \u0432\u0441\u0435\u0433\u043E; Finman \u043F\u043E\u043A\u0430\u0436\u0435\u0442 \u043E\u0441\u0442\u0430\u0442\u043E\u043A \u043C\u0435\u0441\u044F\u0446\u0430 \u043F\u043E \u0445\u043E\u0434\u0443 \u0442\u0440\u0430\u0442. ${app2}/budgets`,
+            `\u0421\u0432\u043E\u0439 \u0418\u0418: \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0435 ChatGPT, Claude \u0438\u043B\u0438 Gemini \u0438 \u0441\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u0439\u0442\u0435 \u043E \u0441\u0432\u043E\u0438\u0445 \u0434\u0435\u043D\u044C\u0433\u0430\u0445 \u043E\u0431\u044B\u0447\u043D\u044B\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438. ${app2}/my-ai`
+          ]
+        },
+        sign: "Finman",
+        reply: "\u0412\u043E\u043F\u0440\u043E\u0441\u044B? \u041E\u0442\u0432\u0435\u0442\u044C\u0442\u0435 \u043D\u0430 \u044D\u0442\u043E \u043F\u0438\u0441\u044C\u043C\u043E.",
+        stop: "\u041E\u0442\u043F\u0438\u0441\u0430\u0442\u044C\u0441\u044F \u043E\u0442 \u043F\u043E\u0434\u0441\u043A\u0430\u0437\u043E\u043A \u0438 \u043D\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439"
+      },
+      uk: {
+        hi: (n) => `\u0412\u0456\u0442\u0430\u0454\u043C\u043E, ${n}!`,
+        hiAnon: "\u0412\u0456\u0442\u0430\u0454\u043C\u043E!",
+        tip_invoice: {
+          subject: "\u041F\u0435\u0440\u0448\u0438\u0439 \u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0456\u0437 Finman \u0437\u0430 3 \u0445\u0432\u0438\u043B\u0438\u043D\u0438",
+          body: (app2) => [
+            "Finman \u0440\u043E\u0431\u0438\u0442\u044C \u0440\u0430\u0445\u0443\u043D\u043A\u0438 \u043E\u0445\u0430\u0439\u043D\u0438\u043C PDF \u0437\u0430 \u0432\u0430\u0448\u0438\u043C \u0448\u0430\u0431\u043B\u043E\u043D\u043E\u043C: \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F, \u0440\u0435\u043A\u0432\u0456\u0437\u0438\u0442\u0438, \u043F\u043E\u0434\u0430\u0442\u043E\u043A \u0456 \u043B\u043E\u0433\u043E\u0442\u0438\u043F.",
+            `1. \u0412\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \xAB\u0420\u0430\u0445\u0443\u043D\u043A\u0438\xBB \u0439 \u043E\u0431\u0435\u0440\u0456\u0442\u044C \u0432\u0438\u0433\u043B\u044F\u0434: ${app2}/invoices
+2. \u041E\u0434\u0438\u043D \u0440\u0430\u0437 \u0437\u0430\u043F\u043E\u0432\u043D\u0456\u0442\u044C \u0441\u0432\u043E\u0457 \u0434\u0430\u043D\u0456 \u2014 \u0434\u0430\u043B\u0456 \u043A\u043E\u0436\u0435\u043D \u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0431\u0435\u0440\u0435 \u0457\u0445 \u0441\u0430\u043C.
+3. \u0412\u043A\u0430\u0436\u0456\u0442\u044C \u043A\u043B\u0456\u0454\u043D\u0442\u0430 \u0439 \u0440\u044F\u0434\u043A\u0438, \u0437\u0431\u0435\u0440\u0435\u0436\u0456\u0442\u044C \u0456 \u043D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \xAB\u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0434\u043B\u044F \u043A\u043B\u0456\u0454\u043D\u0442\u0430\xBB.`,
+            "\u041A\u043B\u0456\u0454\u043D\u0442 \u0432\u0456\u0434\u043A\u0440\u0438\u0432\u0430\u0454 \u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0443 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456, \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454 PDF \u0456 \u043F\u043B\u0430\u0442\u0438\u0442\u044C \u0437\u0430 \u0432\u0430\u0448\u0438\u043C \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C \u043D\u0430 \u043E\u043F\u043B\u0430\u0442\u0443 \u043A\u0430\u0440\u0442\u043A\u043E\u044E, PayPal.me, e-Transfer \u0430\u0431\u043E \u0431\u0430\u043D\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u043C\u0438 \u0440\u0435\u043A\u0432\u0456\u0437\u0438\u0442\u0430\u043C\u0438. \u0412\u0438 \u0431\u0430\u0447\u0438\u0442\u0435, \u043A\u043E\u043B\u0438 \u0432\u0456\u043D \u0432\u0456\u0434\u043A\u0440\u0438\u0432 \u0440\u0430\u0445\u0443\u043D\u043E\u043A, \u0430 \u043F\u0440\u043E\u0441\u0442\u0440\u043E\u0447\u0435\u043D\u0456 \u0440\u0430\u0445\u0443\u043D\u043A\u0438 \u043F\u0456\u0434\u0441\u0432\u0456\u0447\u0443\u044E\u0442\u044C\u0441\u044F \u0447\u0435\u0440\u0432\u043E\u043D\u0438\u043C."
+          ]
+        },
+        tip_import: {
+          subject: "\u0412\u0438\u043F\u0438\u0441\u043A\u0430 \u0431\u0430\u043D\u043A\u0443 \u0443 Finman: \u0431\u043B\u0438\u0437\u044C\u043A\u043E \u0445\u0432\u0438\u043B\u0438\u043D\u0438",
+          body: (app2) => [
+            "\u041D\u0430\u0439\u0448\u0432\u0438\u0434\u0448\u0435 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438, \u043A\u0443\u0434\u0438 \u0439\u0434\u0443\u0442\u044C \u0433\u0440\u043E\u0448\u0456, \u2014 \u0437\u0430 \u043E\u0434\u043D\u0456\u0454\u044E \u0432\u0438\u043F\u0438\u0441\u043A\u043E\u044E \u0437 \u0431\u0430\u043D\u043A\u0443.",
+            `1. \u0412 \u0456\u043D\u0442\u0435\u0440\u043D\u0435\u0442-\u0431\u0430\u043D\u043A\u0443 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0442\u0435 \u043E\u0441\u0442\u0430\u043D\u043D\u0456 2\u20133 \u043C\u0456\u0441\u044F\u0446\u0456 \u0443 CSV \u0430\u0431\u043E OFX (PDF \u0442\u0435\u0436 \u043F\u0456\u0434\u0456\u0439\u0434\u0435).
+2. \u041F\u0435\u0440\u0435\u0442\u044F\u0433\u043D\u0456\u0442\u044C \u0444\u0430\u0439\u043B \u0443 Finman: ${app2}/transactions
+3. \u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0456\u0457 \u0440\u043E\u0437\u0441\u0442\u0430\u0432\u043B\u044F\u0442\u044C\u0441\u044F \u0441\u0430\u043C\u0456; \u0432\u0438\u043F\u0440\u0430\u0432\u0442\u0435 \u043E\u0434\u043D\u0443 \u2014 Finman \u0437\u0430\u043F\u0430\u043C\u2019\u044F\u0442\u0430\u0454 \u043F\u0440\u0430\u0432\u0438\u043B\u043E.`,
+            `\u041F\u043E\u043A\u0440\u043E\u043A\u043E\u0432\u043E \u0434\u043B\u044F \u0432\u0430\u0448\u043E\u0433\u043E \u0431\u0430\u043D\u043A\u0443: ${SITE}/banks/`
+          ]
+        },
+        tip_next: {
+          subject: "\u0422\u0440\u0438 \u0440\u0435\u0447\u0456, \u044F\u043A\u0456 \u0432\u0430\u0440\u0442\u043E \u0441\u043F\u0440\u043E\u0431\u0443\u0432\u0430\u0442\u0438 \u0443 Finman \u0446\u044C\u043E\u0433\u043E \u0442\u0438\u0436\u043D\u044F",
+          body: (app2) => [
+            `\u041A\u0430\u0440\u0442\u0430 \u0433\u0440\u043E\u0448\u0435\u0439: \u043A\u0443\u0434\u0438 \u043F\u0456\u0448\u043E\u0432 \u043A\u043E\u0436\u0435\u043D \u0434\u043E\u043B\u0430\u0440 \u043C\u0438\u043D\u0443\u043B\u043E\u0433\u043E \u043C\u0456\u0441\u044F\u0446\u044F, \u043D\u0430 \u043E\u0434\u043D\u043E\u043C\u0443 \u0435\u043A\u0440\u0430\u043D\u0456. ${app2}/money-map`,
+            `\u0411\u044E\u0434\u0436\u0435\u0442\u0438: \u043F\u043E\u0441\u0442\u0430\u0432\u0442\u0435 \u043B\u0456\u043C\u0456\u0442 \u043D\u0430 2\u20133 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0456\u0457, \u044F\u043A\u0456 \u0434\u0438\u0432\u0443\u044E\u0442\u044C \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0435; Finman \u043F\u043E\u043A\u0430\u0436\u0435 \u0437\u0430\u043B\u0438\u0448\u043E\u043A \u043C\u0456\u0441\u044F\u0446\u044F \u043F\u043E \u0445\u043E\u0434\u0443 \u0432\u0438\u0442\u0440\u0430\u0442. ${app2}/budgets`,
+            `\u0421\u0432\u0456\u0439 \u0428\u0406: \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0456\u0442\u044C ChatGPT, Claude \u0430\u0431\u043E Gemini \u0456 \u043F\u0438\u0442\u0430\u0439\u0442\u0435 \u043F\u0440\u043E \u0441\u0432\u043E\u0457 \u0433\u0440\u043E\u0448\u0456 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438. ${app2}/my-ai`
+          ]
+        },
+        sign: "Finman",
+        reply: "\u041F\u0438\u0442\u0430\u043D\u043D\u044F? \u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0439\u0442\u0435 \u043D\u0430 \u0446\u0435\u0439 \u043B\u0438\u0441\u0442.",
+        stop: "\u0412\u0456\u0434\u043F\u0438\u0441\u0430\u0442\u0438\u0441\u044F \u0432\u0456\u0434 \u043F\u0456\u0434\u043A\u0430\u0437\u043E\u043A \u0456 \u043D\u0430\u0433\u0430\u0434\u0443\u0432\u0430\u043D\u044C"
+      }
+    };
+    function langOf(raw) {
+      const s = String(raw || "").toLowerCase();
+      if (s.startsWith("uk")) return "uk";
+      if (s.startsWith("ru")) return "ru";
+      return "en";
+    }
+    var esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    function render(kind, u, unsubUrl) {
+      const L = TEXT[langOf(u.lang)];
+      const t = L[kind];
+      const first = String(u.full_name || "").trim().split(/\s+/)[0];
+      const hi = first ? L.hi(first) : L.hiAnon;
+      const paras = [hi, ...t.body(APP_URL()), L.reply, L.sign];
+      const text = `${paras.join("\n\n")}
+
+${L.stop}: ${unsubUrl}`;
+      const link = (p) => esc(p).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#2B50F0">$1</a>').replace(/\n/g, "<br>");
+      const html = '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;line-height:1.55;color:#121A2E">' + paras.map((p) => `<p>${link(p)}</p>`).join("") + `<p style="font-size:12px;color:#6b7390"><a href="${esc(unsubUrl)}" style="color:#6b7390">${esc(L.stop)}</a></p></div>`;
+      return { subject: t.subject, text, html };
+    }
+    async function eventsOf(userId) {
+      const rows = await query("SELECT event, COUNT(*) AS n FROM analytics_events WHERE user_id = ? GROUP BY event", [userId]).catch(() => []);
+      const by = {};
+      for (const r of rows) by[r.event] = r.n;
+      return by;
+    }
+    async function alreadyDone(tip, userId) {
+      const ev = await eventsOf(userId);
+      if (tip.done.some((e) => ev[e])) return true;
+      if (tip.doneInvoices) {
+        const r = await get("SELECT COUNT(*) AS n FROM invoices WHERE user_id = ?", [userId]).catch(() => ({ n: 0 }));
+        if (r && r.n > 0) return true;
+      }
+      return false;
+    }
+    async function recentEmail(userId) {
+      const r = await get(
+        `SELECT 1 AS x FROM lifecycle_emails WHERE user_id = ? AND kind NOT LIKE '%:skip' AND sent_at > datetime('now', ?) LIMIT 1`,
+        [userId, `-${GAP_HOURS} hours`]
+      ).catch(() => null);
+      return !!r;
+    }
+    async function candidates(tip) {
+      return query(
+        `SELECT u.id, u.email, u.full_name, u.lifecycle_opt_out, a.backfilled, a.lang
+       FROM users u JOIN user_acquisition a ON a.user_id = u.id
+      WHERE u.created_at <= datetime('now', ?) AND u.created_at > datetime('now', ?)
+        AND COALESCE(u.lifecycle_opt_out, 0) = 0 AND a.backfilled = 0
+        AND NOT EXISTS (SELECT 1 FROM lifecycle_emails l WHERE l.user_id = u.id AND (l.kind = ? OR l.kind = ?))
+      ORDER BY u.id`,
+        [`-${tip.fromH} hours`, `-${tip.toH} hours`, tip.kind, `${tip.kind}:skip`]
+      );
+    }
+    async function runTips({ dryRun = false } = {}) {
+      if (proc.env.LIFECYCLE_EMAILS !== "1" && !dryRun) return { skipped: true };
+      const from = proc.env.LIFECYCLE_FROM;
+      if (!from && !dryRun) return { skipped: true, reason: "NO_LIFECYCLE_FROM" };
+      const { unsubscribeUrl } = require_lifecycle();
+      const touched = /* @__PURE__ */ new Set();
+      const out = { sent: 0, skipped_done: 0, waiting: 0, planned: [] };
+      for (const tip of TIPS) {
+        for (const u of await candidates(tip)) {
+          if (touched.has(u.id)) continue;
+          if (tracker.isTestEmail(u.email)) continue;
+          if (await alreadyDone(tip, u.id)) {
+            if (!dryRun) await run("INSERT OR IGNORE INTO lifecycle_emails (user_id, kind) VALUES (?, ?)", [u.id, `${tip.kind}:skip`]);
+            out.skipped_done++;
+            continue;
+          }
+          if (await recentEmail(u.id)) {
+            out.waiting++;
+            continue;
+          }
+          touched.add(u.id);
+          if (dryRun) {
+            out.planned.push({ user_id: u.id, kind: tip.kind, lang: langOf(u.lang) });
+            continue;
+          }
+          const unsub = unsubscribeUrl(u.id);
+          const m = render(tip.kind, u, unsub);
+          const r = await emailService.sendEmail({
+            to: [u.email],
+            from,
+            subject: m.subject,
+            text: m.text,
+            html: m.html,
+            replyTo: proc.env.LIFECYCLE_REPLY_TO || void 0,
+            headers: { "List-Unsubscribe": `<${unsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
+          });
+          if (r && r.sent) {
+            await run("INSERT OR IGNORE INTO lifecycle_emails (user_id, kind) VALUES (?, ?)", [u.id, tip.kind]);
+            tracker.track("email_sent", { userId: u.id, props: { kind: tip.kind } });
+            out.sent++;
+          }
+        }
+      }
+      logger.info({ sent: out.sent, skipped_done: out.skipped_done, waiting: out.waiting }, "[tips] run");
+      return out;
+    }
+    module2.exports = { runTips, render, TIPS, TEXT, langOf };
+  }
+});
+
 // services/growthMetrics.js
 var require_growthMetrics = __commonJS({
   "services/growthMetrics.js"(exports2, module2) {
@@ -27187,6 +27577,11 @@ Stop these emails: ${unsub}`
           await runNudges();
         } catch (e) {
           logger.error({ err: e.message }, "[lifecycle] nudges failed");
+        }
+        try {
+          await require_tips().runTips();
+        } catch (e) {
+          logger.error({ err: e.message }, "[lifecycle] tips failed");
         }
         try {
           await require_engagementMail().runDaily();
@@ -28580,7 +28975,7 @@ var require_routes = __commonJS({
 var require_schema = __commonJS({
   "engine/schema.sql"(exports2, module2) {
     module2.exports = `-- engine/schema.sql \u2014 GENERATED by engine/build.js from db/database.js initDatabase() + migrations/.
--- Do not edit. 72 tables, 30 migrations.
+-- Do not edit. 73 tables, 31 migrations.
 CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
@@ -29570,6 +29965,17 @@ CREATE TABLE IF NOT EXISTS feedback (
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 ;;
+CREATE TABLE IF NOT EXISTS invoice_links (
+        token TEXT PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        revoked_at DATETIME,
+        first_viewed_at DATETIME,
+        last_viewed_at DATETIME,
+        view_count INTEGER NOT NULL DEFAULT 0
+      );
+;;
 CREATE TABLE IF NOT EXISTS onboarding_progress (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -29679,6 +30085,10 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
 ;;
 CREATE INDEX IF NOT EXISTS idx_feedback_user_trigger ON feedback (user_id, trigger);
 ;;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_invoice ON invoice_links (invoice_id);
+;;
+CREATE INDEX IF NOT EXISTS idx_invoice_links_user ON invoice_links (user_id);
+;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('001_users_subscription');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('002_ai_conversations');
@@ -29738,6 +30148,8 @@ INSERT OR IGNORE INTO schema_migrations (name) VALUES ('030_feedback');
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('031_account_scope');
 ;;
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('032_weekly_note');
+;;
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('033_invoice_links');
 `;
   }
 });
@@ -30771,6 +31183,32 @@ var require_weekly_note = __commonJS({
   }
 });
 
+// migrations/033_invoice_links.js
+var require_invoice_links = __commonJS({
+  "migrations/033_invoice_links.js"(exports2, module2) {
+    init_globals();
+    module2.exports = {
+      name: "033_invoice_links",
+      async up(db2) {
+        await db2.run(`
+      CREATE TABLE IF NOT EXISTS invoice_links (
+        token TEXT PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        revoked_at DATETIME,
+        first_viewed_at DATETIME,
+        last_viewed_at DATETIME,
+        view_count INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+        await db2.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_links_invoice ON invoice_links (invoice_id)");
+        await db2.run("CREATE INDEX IF NOT EXISTS idx_invoice_links_user ON invoice_links (user_id)");
+      }
+    };
+  }
+});
+
 // finman-virtual:migrations
 var require_migrations = __commonJS({
   "finman-virtual:migrations"(exports2, module2) {
@@ -30805,7 +31243,8 @@ var require_migrations = __commonJS({
       { file: "029_vault.js", mod: require_vault2() },
       { file: "030_feedback.js", mod: require_feedback() },
       { file: "031_account_scope.js", mod: require_account_scope() },
-      { file: "032_weekly_note.js", mod: require_weekly_note() }
+      { file: "032_weekly_note.js", mod: require_weekly_note() },
+      { file: "033_invoice_links.js", mod: require_invoice_links() }
     ];
   }
 });
