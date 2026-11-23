@@ -76,6 +76,8 @@ function hashRows(rows) {
 
   for (const u of users) {
     if (only && u.id !== only) continue;
+    // Accounts that already have a vault: see scripts/vault-rehearsal-late.js.
+    if (process.argv.includes('--legacy-only') && (await get('SELECT vault_state FROM users WHERE id = ?', [u.id])).vault_state === 'active') continue;
     const row = { id: u.id, email: String(u.email).replace(/^(.{3}).*(@.*)$/, '$1…$2'), rows: 0, ok: false, note: '' };
     try {
       const pre = await snapshot(u.id);
