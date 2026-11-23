@@ -58,7 +58,7 @@ a { color: var(--accent); }
 .ip-btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
 .ip-btn-primary:hover { background: var(--accent-strong); }
 .ip-btn-soft { background: var(--accent-tint); color: var(--accent-strong); }
-.ip-btn-ghost { background: var(--well); color: var(--ink); min-height: 36px; padding: 0 14px; font-size: .875rem; }
+.ip-btn-ghost { background: var(--plate); color: var(--ink); min-height: 36px; padding: 0 14px; font-size: .875rem; }
 
 .ip-grid { display: grid; gap: 16px; margin-top: 16px; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: start; }
 .ip-doc { animation: ipRise 520ms 80ms var(--ease) both; }
@@ -83,7 +83,8 @@ a { color: var(--accent); }
 .ip-items tfoot tr:last-child th, .ip-items tfoot tr:last-child td { border-bottom: 0; }
 .ip-grand th, .ip-grand td { font-weight: 650 !important; color: var(--ink) !important; font-size: 1.1rem; }
 .ip-desc b { font-weight: 500; display: block; }
-.ip-desc small { color: var(--ink-2); }
+.ip-desc small { color: var(--ink-2); display: block; }
+.ip-qp { display: none !important; }
 .ip-num { text-align: right !important; white-space: nowrap; }
 .ip-terms { white-space: pre-line; }
 .ip-note { color: var(--ink-2); font-size: .875rem; margin: 20px 4px 0; max-width: 60ch; }
@@ -105,9 +106,14 @@ a { color: var(--accent); }
   .ip-actions { grid-column: 1; justify-content: stretch; }
   .ip-actions .ip-btn { flex: 1; }
   .ip-parties { grid-template-columns: 1fr; }
+  .ip-items, .ip-items tbody, .ip-items tfoot { display: block; }
   .ip-items thead { display: none; }
+  .ip-items tr { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--rule); }
+  .ip-items tfoot tr:last-child { border-bottom: 0; }
+  .ip-items th, .ip-items td { border-bottom: 0; padding: 12px 0; }
   .ip-items tbody td:nth-child(2), .ip-items tbody td:nth-child(3) { display: none; }
   .ip-items tfoot th[colspan] { text-align: left; }
+  .ip-qp { display: block !important; }
 }
 @media (min-width: 821px) { .ip-sticky { display: none !important; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

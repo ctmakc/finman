@@ -120,14 +120,20 @@ function linesBlock(lines) {
   return (lines || []).filter(Boolean).map((l) => `<span>${esc(strip(l))}</span>`).join('');
 }
 
+// "HST 13%" stays as written; "HST" becomes "HST 13%".
+function taxName(view) {
+  const label = strip(core.fill(view.tax_label || 'Tax', {})).trim();
+  return /%/.test(label) ? label : `${label} ${core.fmtQty(view.tax_rate)}%`;
+}
+
 function itemsTable(view, t) {
   const cur = view.currency;
   const rows = (view.items || []).map((it) => `
-      <tr><td class="ip-desc"><b>${esc(it.description)}</b>${it.detail ? `<small>${esc(it.detail)}</small>` : ''}</td>
+      <tr><td class="ip-desc"><b>${esc(it.description)}</b>${it.detail ? `<small>${esc(it.detail)}</small>` : ''}<small class="ip-qp">${esc(core.fmtQty(it.qty))} × ${esc(core.fmtCents(it.price_cents))}</small></td>
       <td class="ip-num">${esc(core.fmtQty(it.qty))}</td><td class="ip-num">${esc(core.fmtCents(it.price_cents))}</td>
       <td class="ip-num">${esc(core.fmtCents(it.amount_cents != null ? it.amount_cents : Math.round((it.qty || 0) * (it.price_cents || 0))))}</td></tr>`).join('');
   const taxRow = view.tax_rate != null
-    ? `<tr><th colspan="3">${esc(strip(core.fill(view.tax_label || 'Tax', {})))} ${esc(core.fmtQty(view.tax_rate))}%</th><td class="ip-num">${esc(core.fmtCents(view.tax_cents))}</td></tr>`
+    ? `<tr><th colspan="3">${esc(taxName(view))}</th><td class="ip-num">${esc(core.fmtCents(view.tax_cents))}</td></tr>`
     : (view.tax_text ? `<tr><th colspan="3">${esc(strip(view.tax_label || 'Tax'))}</th><td class="ip-num">${esc(view.tax_text)}</td></tr>` : '');
   return `<table class="ip-items">
     <thead><tr><th>${esc(t.item)}</th><th class="ip-num">${esc(t.qty)}</th><th class="ip-num">${esc(t.price)}</th><th class="ip-num">${esc(t.amount)}</th></tr></thead>
@@ -222,7 +228,7 @@ function invoicePage(lang, p, { pdfUrl, signupUrl }) {
   </div>
   <p class="ip-note">${esc(fill(t.note, { seller: sellerName || '—' }))}</p>
   ${footer(t, signupUrl)}
-  ${primaryPay ? `<div class="ip-sticky" hidden><span><small>${esc(t.amountDue)}</small><b>${esc(moneyText(p.pay.card_url || p.pay.paypal_url ? p.pay.card_total_cents : p.balance_cents, cur))}</b></span><a class="ip-btn ip-btn-primary" href="#pay">${esc(t.payTitle)}</a></div>` : ''}
+  ${primaryPay ? `<div class="ip-sticky" hidden><span><small>${esc(t.amountDue)}</small><b>${esc(moneyText(p.balance_cents, cur))}</b></span><a class="ip-btn ip-btn-primary" href="#pay">${esc(t.payTitle)}</a></div>` : ''}
 </main>`;
   return shell(lang, sellerName ? `${title} · ${sellerName}` : title, body);
 }

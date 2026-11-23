@@ -149,7 +149,8 @@
     if (!ts) return '';
     var d = new Date(String(ts).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(ts) ? '' : 'Z'));
     if (isNaN(d)) return ts;
-    try { return d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ts; }
+    var lang = root.i18n && typeof root.i18n.getLanguage === 'function' ? root.i18n.getLanguage() : undefined;
+    try { return d.toLocaleString(lang === 'en' ? 'en-CA' : lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ts; }
   }
   function viewedHtml(inv) {
     var l = inv.link;

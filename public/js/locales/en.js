@@ -1427,7 +1427,7 @@
     'invoice.link.off': 'Turn link off',
     'invoice.link.offDone': 'Link turned off. The old address no longer opens the invoice.',
     'invoice.link.created': 'Link created and copied. The invoice is marked as sent.',
-    'invoice.link.viewsNone': 'Not opened by the client yet.',
+    'invoice.link.viewsNone': 'Waiting for the client to open it.',
     'invoice.link.views': 'Opened by the client: first {first}, last {last} ({count}×).',
     'invoice.link.noPay': 'This template has no payment details for the client page yet: add a card link, PayPal.me, e-Transfer or bank details in the template.',
     'invoice.tpl.paypal': 'PayPal.me name',
