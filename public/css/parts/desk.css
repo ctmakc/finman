@@ -448,3 +448,5 @@ html:root { font-size: 15px; }
 :root body.sd-shell .fm-bug-fab { display: none; }
 :root body.sd-shell .sd-rail { padding-bottom: 0; }
 :root .fm-drawer-body .fm-bug-item { width: 100%; min-height: 44px; justify-content: center; margin: 0 0 12px; display: inline-flex; align-items: center; gap: 8px; }
+/* Sign-in screen: a fixed button would sit on the form fields while scrolling — top right of the page instead, scrolls away. */
+:root body:not(.sd-shell) .fm-bug-fab { position: absolute; top: 12px; right: 12px; bottom: auto; }
