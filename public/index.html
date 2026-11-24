@@ -47,10 +47,10 @@
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-  <!-- Vendor assets are self-hosted (CSP 'self', works offline). Type is CLEAR DAY: Rubik variable (latin + cyrillic) for UI and figures.
+  <!-- Vendor assets are self-hosted (CSP 'self', works offline). Type is STATEMENT DESK: Geologica variable (latin + cyrillic) for UI and figures.
   -->
-  <link rel="preload" href="/vendor/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/vendor/fonts/rubik-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/vendor/fonts/geologica-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/vendor/fonts/geologica-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/vendor/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/vendor/fa.min.css">
   <link rel="stylesheet" href="/css/style.css">
@@ -61,6 +61,8 @@
   <link rel="stylesheet" href="/css/parts/vault.css">
   <link rel="stylesheet" href="/css/parts/feedback.css">
   <link rel="stylesheet" href="/css/parts/money-map.css">
+  <!-- STATEMENT DESK (24.11): tokens, shell, Home — loaded last so it wins -->
+  <link rel="stylesheet" href="/css/parts/desk.css">
   <!-- MMIX Review Kit: bug reports pinned to the screen go straight to the review inbox -->
   <meta name="mmix-review-endpoint" content="https://review.mmix.biz/api/review">
 </head>
@@ -115,6 +117,7 @@
   <script src="/js/widgets.js"></script>
   <script src="/js/onboarding.js"></script>
   <script src="/js/firstrun.js"></script>
+  <script src="/js/steps.js"></script>
   <script src="/js/engage.js"></script>
   <script src="/js/offline.js"></script>
   <script src="/js/data-export.js"></script>

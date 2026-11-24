@@ -50,7 +50,7 @@ if (typeof window !== 'undefined') window.appState = appState;
 // Navigation information architecture
 // ---------------------------------------------------------------------------
 const NAV_PRIMARY = [
-  { page: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line' },
+  { page: 'dashboard', label: 'Home', icon: 'fa-house' },
   { page: 'money-map', label: 'Money map', icon: 'fa-route' },
   { page: 'transactions', label: 'Transactions', icon: 'fa-exchange-alt' },
   { page: 'accounts', label: 'Accounts', icon: 'fa-wallet' },
@@ -314,7 +314,19 @@ function renderAuthenticatedUI() {
   const app = document.getElementById('app');
   const userName = escapeHtmlShell(appState.user && (appState.user.username || appState.user.email) || '');
 
+  document.body.classList.add('sd-shell');
   app.innerHTML = `
+    <aside class="sd-rail" aria-label="Sections">
+      <a href="/" class="sd-rail-brand" id="sd-rail-brand" data-page="dashboard">Finman</a>
+      <nav aria-label="All sections">
+        ${navGroupHtml({ title: 'Main', items: NAV_PRIMARY }, 'sd-rail-link', 'sd-rail-group-title')}
+        ${NAV_GROUPS.map((g) => navGroupHtml(g, 'sd-rail-link', 'sd-rail-group-title')).join('')}
+      </nav>
+      <div class="sd-rail-foot">
+        <button type="button" class="sd-rail-link" id="sd-rail-fb"><i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span></button>
+        <div class="sd-rail-user" title="${userName}">${userName}</div>
+      </div>
+    </aside>
     <header class="header">
       <div class="container header-content">
         <button class="fm-menu-btn" id="mobile-menu-toggle" type="button"
@@ -324,6 +336,7 @@ function renderAuthenticatedUI() {
         <div class="logo">
           <a href="/" id="logo-link" aria-label="Finman home">Finman</a>
         </div>
+        <span class="sd-page-title" id="sd-page-title" aria-live="polite"></span>
         <nav class="fm-nav" aria-label="Primary">
           <ul class="fm-nav-list" id="nav-list">
             ${NAV_PRIMARY.map((item) => `<li>${navLinkHtml(item, 'fm-nav-link')}</li>`).join('')}
@@ -380,17 +393,32 @@ function renderAuthenticatedUI() {
     <main class="main">
       <div class="container" id="main-content">${LOADING_HTML}</div>
     </main>
+
+    <nav class="sd-tabbar" aria-label="Main sections">
+      <a href="/dashboard" class="sd-tab" data-page="dashboard"><i class="fas fa-house" aria-hidden="true"></i><span>Home</span></a>
+      <a href="/transactions" class="sd-tab" data-page="transactions"><i class="fas fa-list-ul" aria-hidden="true"></i><span>Transactions</span></a>
+      <button type="button" class="sd-tab sd-tab-add" id="sd-tab-add" aria-label="Add a transaction"><i class="fas fa-plus" aria-hidden="true"></i><span>Add</span></button>
+      <a href="/money-map" class="sd-tab" data-page="money-map"><i class="fas fa-route" aria-hidden="true"></i><span>Money map</span></a>
+      <button type="button" class="sd-tab" id="sd-tab-more" aria-controls="app-drawer" aria-haspopup="dialog"><i class="fas fa-bars" aria-hidden="true"></i><span>More</span></button>
+    </nav>
   `;
 
   // Navigation: one delegated handler for header, popover and drawer links.
   const onNavClick = (e) => {
     const link = e.target.closest('[data-page]');
-    if (!link || !link.closest('.fm-nav, .fm-drawer')) return;
+    if (!link || !link.closest('.fm-nav, .fm-drawer, .sd-rail, .sd-tabbar')) return;
     e.preventDefault();
     navigateTo(link.dataset.page);
   };
   app.querySelector('.header').addEventListener('click', onNavClick);
   document.getElementById('app-drawer').addEventListener('click', onNavClick);
+  app.querySelector('.sd-rail').addEventListener('click', onNavClick);
+  app.querySelector('.sd-tabbar').addEventListener('click', onNavClick);
+  document.getElementById('sd-tab-more').addEventListener('click', () => openDrawer());
+  document.getElementById('sd-tab-add').addEventListener('click', () => {
+    if (typeof showAddTransactionModal === 'function') showAddTransactionModal();
+  });
+  document.getElementById('sd-rail-fb').addEventListener('click', () => { if (window.FMFeedback) window.FMFeedback.open('rate', 'menu'); });
 
   // Feedback: one tap from the header (desktop) or the drawer foot (phone).
   const openFeedback = () => { if (window.FMFeedback) window.FMFeedback.open('rate', 'menu'); };
@@ -547,7 +575,7 @@ function navigateTo(page, options = {}) {
     renderAuthenticatedUI();
   }
 
-  document.querySelectorAll('.fm-nav-link[data-page], .fm-drawer-link[data-page]').forEach((link) => {
+  document.querySelectorAll('.fm-nav-link[data-page], .fm-drawer-link[data-page], .sd-rail-link[data-page], .sd-tab[data-page]').forEach((link) => {
     const on = link.dataset.page === page;
     link.classList.toggle('active', on);
     if (on) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
@@ -567,6 +595,9 @@ function navigateTo(page, options = {}) {
 
   const title = findNavLabel(page);
   document.title = title ? `${title} · Finman` : 'Finman';
+  if (window.FMSteps && typeof window.FMSteps.visited === 'function') window.FMSteps.visited(page);
+  const pageTitle = document.getElementById('sd-page-title');
+  if (pageTitle) pageTitle.textContent = page === 'dashboard' ? 'Home' : (title || '');
 
   try {
     const result = PAGE_RENDERERS[page]();
@@ -856,7 +887,7 @@ function renderLoginPage() {
           </ul>
         </div>
         <figure class="auth-visual-shot">
-          <img src="/img/auth-hero.webp" width="1168" height="649" alt="Finman summary of an imported bank statement: spending by category and recurring charges" fetchpriority="high" decoding="async">
+          <img src="/img/auth-hero.webp" width="1168" height="649" alt="Finman Home: what is left this month, money in and out, recent transactions and the first steps" fetchpriority="high" decoding="async">
         </figure>
       </aside>
       <div class="auth-card">
@@ -1228,126 +1259,114 @@ async function renderDashboard() {
         : 'Spending exceeded income this month. Check the categories to get back on track.');
   const symbol = currencySymbol(balanceCurrency);
 
-  const heroHtml = `
-    <section class="fm-hero" aria-label="Your finances">
-      <div class="fm-hero-grid">
-        <div class="fm-hero-main">
-          <span class="fm-hero-eyebrow"><i class="fas fa-sparkles"></i> Your money, clarified</span>
-          <h1 class="fm-hero-title">Total balance</h1>
-          ${hasTotal ? `<div class="fm-hero-figure" id="hero-networth"
-               data-countup="${totalBalance}" data-currency="${escapeHtmlShell(symbol)}">
-            <span class="fm-hero-currency">${escapeHtmlShell(symbol)}</span><span class="fm-hero-amount">${formatPlainNumber(totalBalance)}</span>
-          </div>` : `<div class="fm-hero-figure"><span class="fm-hero-amount">${escapeHtmlShell(balanceText)}</span></div>`}
-          <span class="fm-hero-delta ${flowUp ? 'up' : 'down'}">
-            <i class="fas fa-arrow-${flowUp ? 'up' : 'down'}"></i>
-            ${escapeHtmlShell(netText)} this month
-          </span>
-          <div class="fm-hero-cashflow">
-            <div class="fm-cashflow-item">
-              <span class="fm-cashflow-label">Income</span>
-              <span class="fm-cashflow-value in">${escapeHtmlShell(incomeText)}</span>
-            </div>
-            <div class="fm-cashflow-item">
-              <span class="fm-cashflow-label">Expenses</span>
-              <span class="fm-cashflow-value out">${escapeHtmlShell(expenseText)}</span>
-            </div>
+  // ---- STATEMENT DESK Home (24.11): Month strip, ruled rows, First steps rail ----
+  const frState = (window.FirstRun && window.FirstRun.state) || {};
+  const isExample = Boolean(frState.demo);
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthName = now.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+  const outShare = monthIn > 0 ? Math.min(100, Math.round(monthOut / monthIn * 100)) : (monthOut > 0 ? 100 : 0);
+  const todayShare = Math.round(now.getDate() / daysInMonth * 100);
+  const leftText = statsData.mixedCurrencies ? netText : fmFormatCurrency(netFlow, flowCurrency);
+  const flowSymbol = currencySymbol(flowCurrency);
+  const legend = noActivity
+    ? 'Nothing recorded this month yet. Add one entry and this line starts filling.'
+    : (monthIn > 0
+      ? `${outShare}% of what came in has gone out · day ${now.getDate()} of ${daysInMonth}`
+      : `Money went out with nothing recorded coming in · day ${now.getDate()} of ${daysInMonth}`);
+
+  const rowsTx = recentTransactions.length > 0
+    ? `<ul class="sd-rows">${recentTransactions.map((tx) => `
+        <li class="sd-row">
+          <span class="sd-row-main">${escapeHtmlShell(tx.description || tx.category || 'Transaction')}</span>
+          <span class="sd-row-amt ${tx.type === 'income' ? 'in' : 'out'}">${escapeHtmlShell(fmFormatCurrency(tx.amount, typeof transactionCurrency === 'function' ? transactionCurrency(tx) : tx.currency))}</span>
+          <span class="sd-row-sub">${escapeHtmlShell(formatDate(tx.date))}${tx.category ? ' · ' + escapeHtmlShell(tx.category) : ''}</span>
+        </li>`).join('')}</ul>`
+    : transactionsHtml;
+  const rowsAcc = appState.accounts.length
+    ? `<ul class="sd-rows">${appState.accounts.map((account) => `
+        <li class="sd-row">
+          <span class="sd-row-main"><i class="fas ${getAccountIcon(account.account_type)}" aria-hidden="true" style="color:var(--sd-ink-3);margin-right:8px"></i>${escapeHtmlShell(account.name)}</span>
+          <span class="sd-row-amt">${escapeHtmlShell(fmFormatCurrency(account.balance, account.currency))}</span>
+          <span class="sd-row-sub">${escapeHtmlShell(account.bank_name || account.account_number || (account.is_demo ? 'Example account' : ''))}</span>
+        </li>`).join('')}</ul>`
+    : accountsHtml;
+
+  mainContent.innerHTML = `
+    <header class="sd-head">
+      <div>
+        <p class="sd-head-kicker">${escapeHtmlShell(monthName)}</p>
+        <h1>Home</h1>
+      </div>
+      ${isExample ? '<span class="sd-chip sd-chip-example" title="A sample household, not your money"><i class="fas fa-flask" aria-hidden="true"></i> Example</span>' : ''}
+      <div class="sd-head-actions">
+        <button type="button" class="btn btn-outline" id="sd-head-import"><i class="fas fa-file-arrow-up" aria-hidden="true"></i> Import statement</button>
+        <button type="button" class="btn btn-primary" id="add-transaction-btn"><i class="fas fa-plus" aria-hidden="true"></i> Add</button>
+      </div>
+    </header>
+
+    <section class="sd-card sd-strip fm-hero" aria-label="This month">
+      <div>
+        <p class="sd-strip-label">Left this month</p>
+        ${statsData.mixedCurrencies
+          ? `<div class="sd-big">${escapeHtmlShell(leftText)}</div>`
+          : `<div class="sd-big fm-hero-figure${netFlow < 0 ? ' is-neg' : ''}" id="hero-networth" data-countup="${netFlow}"><span class="fm-hero-currency">${escapeHtmlShell(flowSymbol)}</span><span class="fm-hero-amount">${formatPlainNumber(netFlow)}</span></div>`}
+      </div>
+      <dl class="sd-figs">
+        <div><dt>Came in</dt><dd class="in">${escapeHtmlShell(incomeText)}</dd></div>
+        <div><dt>Went out</dt><dd class="out">${escapeHtmlShell(expenseText)}</dd></div>
+        <div><dt>All accounts</dt><dd>${escapeHtmlShell(balanceText)}</dd></div>
+      </dl>
+      <div class="sd-ruler" role="img" aria-label="${escapeHtmlShell(legend)}">
+        <span class="sd-ruler-out" style="--w:${outShare}%"></span>
+        <span class="sd-ruler-today" style="--d:${todayShare}%" data-label="today"></span>
+      </div>
+      <p class="sd-ruler-legend">${escapeHtmlShell(legend)}</p>
+    </section>
+
+    <div class="sd-home">
+      <div class="sd-main">
+        <section class="sd-card" aria-labelledby="sd-tx-h">
+          <div class="sd-card-head"><h2 id="sd-tx-h">Recent transactions</h2><a href="/transactions" class="sd-more" id="view-all-transactions">See all</a></div>
+          ${rowsTx}
+        </section>
+        <section class="sd-card" aria-labelledby="sd-acc-h">
+          <div class="sd-card-head"><h2 id="sd-acc-h">Accounts</h2><button type="button" class="sd-more" id="add-account-btn">Add account</button></div>
+          ${rowsAcc}
+        </section>
+        <div class="dashboard-charts">
+          <div class="chart-container">
+            <h2>Income and expenses</h2>
+            <div class="fm-chart-canvas"><canvas id="income-expense-chart"></canvas></div>
           </div>
-          <a class="fm-hero-mm" href="/money-map" data-page="money-map">
-            <i class="fas fa-route" aria-hidden="true"></i><span>Money map: what came in and where it went, personal and business</span><i class="fas fa-arrow-right" aria-hidden="true"></i>
-          </a>
+          <div class="chart-container">
+            <h2>Where it went</h2>
+            <div class="fm-chart-canvas"><canvas id="expense-categories-chart"></canvas></div>
+          </div>
         </div>
-        <aside class="fm-insight-card" aria-label="AI insight">
+      </div>
+      <aside class="sd-aside" id="sd-aside" aria-label="Next steps and tips">
+        <div id="sd-steps-holder"></div>
+        <section class="fm-insight-card" aria-label="AI CFO">
           <span class="fm-insight-label"><span class="fm-insight-dot"></span> AI CFO</span>
           <p class="fm-insight-text">${aiInsight}</p>
           <div class="fm-insight-foot">
             <button class="btn btn-sm" id="hero-ai-more" type="button">Ask the AI CFO</button>
+            <a class="btn btn-sm fm-hero-mm" href="/money-map" data-page="money-map">Money map</a>
           </div>
-        </aside>
-      </div>
-    </section>
-  `;
-
-  mainContent.innerHTML = `
-    ${heroHtml}
-
-    <div class="dashboard-summary">
-      <div class="summary-card income">
-        <div class="summary-icon">
-          <i class="fas fa-arrow-down"></i>
-        </div>
-        <div class="summary-data">
-          <h3>Income this month</h3>
-          <div class="summary-amount">${escapeHtmlShell(incomeText)}</div>
-        </div>
-      </div>
-
-      <div class="summary-card expense">
-        <div class="summary-icon">
-          <i class="fas fa-arrow-up"></i>
-        </div>
-        <div class="summary-data">
-          <h3>Expenses this month</h3>
-          <div class="summary-amount">${escapeHtmlShell(expenseText)}</div>
-        </div>
-      </div>
-
-      <div class="summary-card balance">
-        <div class="summary-icon">
-          <i class="fas fa-wallet"></i>
-        </div>
-        <div class="summary-data">
-          <h3>Total balance</h3>
-          <div class="summary-amount">${escapeHtmlShell(balanceText)}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="dashboard-content">
-      <div class="dashboard-section">
-        <div class="section-header">
-          <h2>Your accounts</h2>
-          <button id="add-account-btn" class="btn btn-sm btn-primary">
-            <i class="fas fa-plus"></i> Add account
-          </button>
-        </div>
-
-        <div class="accounts-list">
-          ${accountsHtml}
-        </div>
-      </div>
-
-      <div class="dashboard-section">
-        <div class="section-header">
-          <h2>Recent transactions</h2>
-          <button id="add-transaction-btn" class="btn btn-sm btn-primary">
-            <i class="fas fa-plus"></i> Add transaction
-          </button>
-        </div>
-
-        <div class="transactions-list">
-          ${transactionsHtml}
-        </div>
-
-        <div class="section-footer">
-          <a href="#" class="btn btn-sm btn-outline" id="view-all-transactions">
-            View all transactions
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <div class="dashboard-charts">
-      <div class="chart-container">
-        <h2>Income and expenses</h2>
-        <div class="fm-chart-canvas"><canvas id="income-expense-chart"></canvas></div>
-      </div>
-
-      <div class="chart-container">
-        <h2>Expenses by category</h2>
-        <div class="fm-chart-canvas"><canvas id="expense-categories-chart"></canvas></div>
-      </div>
+        </section>
+      </aside>
     </div>
   `;
+
+  if (window.FMSteps && typeof window.FMSteps.render === 'function') {
+    try { await window.FMSteps.render(document.getElementById('sd-steps-holder'), frState); } catch (error) { console.error('First steps failed:', error); }
+  }
+  const headImport = document.getElementById('sd-head-import');
+  if (headImport) headImport.addEventListener('click', () => {
+    if (typeof showImportWizard === 'function') showImportWizard({});
+    else navigateTo('transactions');
+  });
 
   if (typeof initCharts === 'function') {
     try { initCharts(statsData); } catch (error) { console.error('Charts failed to render:', error); }
