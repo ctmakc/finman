@@ -958,3 +958,14 @@
 :root .ai-msg-text .ai-msg-list { margin: 4px 0 8px; padding-left: 1.3em; }
 :root .ai-msg-text .ai-msg-list li { margin: 2px 0; }
 :root .ai-msg-text strong { font-weight: 600; }
+
+/* 1123 walk: starter questions under the input, so the page is never a blank field. */
+.ai-starter { margin: 18px 0 8px; }
+.ai-starter-lead { margin: 0 0 10px; color: var(--fm-ink-2); font-size: 0.95rem; }
+.ai-starter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-starter-chip {
+  border: 0; border-radius: var(--radius-pill, 999px); padding: 10px 16px; min-height: 44px;
+  background: var(--fm-accent-soft, #e9edff); color: var(--fm-accent, #2546e8);
+  font: 600 0.92rem var(--fm-font-ui, inherit); cursor: pointer; text-align: left;
+}
+.ai-starter-chip:hover { filter: brightness(0.97); }

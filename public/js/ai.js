@@ -181,6 +181,8 @@ const AiCfoModule = {
     if (!message) return;
 
     input.value = '';
+    const starter = document.getElementById('ai-starter');
+    if (starter) starter.remove();
     this.appendMessage('user', message);
     this.setLoading(true);
 
@@ -635,6 +637,12 @@ const AiCfoModule = {
     return this.escape(`${value} ${cur}`.trim());
   },
 
+  // t() with an English fallback for keys a locale does not have yet.
+  tr(key, fallback) {
+    try { const v = t(key); if (v && v !== key) return v; } catch (e) { /* fall back */ }
+    return fallback;
+  },
+
   render() {
     const container = document.getElementById('ai-cfo-content');
     if (!container) return;
@@ -657,6 +665,17 @@ const AiCfoModule = {
         <div id="ai-insights" class="ai-insights"></div>
         <div id="ai-categorize" class="ai-categorize"></div>
         <div id="ai-summary" class="ai-summary"></div>
+        <div id="ai-starter" class="ai-starter">
+          <p class="ai-starter-lead">${this.escape(this.tr('ai.starter.lead', 'Ask in your own words, or start with one of these. The answers use your own transactions.'))}</p>
+          <div class="ai-starter-chips">
+            ${[
+              ['ai.starter.q1', 'Where did most of my money go last month?'],
+              ['ai.starter.q2', 'Which recurring charges could I cancel?'],
+              ['ai.starter.q3', 'How much can I safely save each month?'],
+              ['ai.starter.q4', 'Where can I cut $200 a month?'],
+            ].map(([k, f]) => `<button type="button" class="ai-starter-chip" data-ai-ask="${this.escape(this.tr(k, f))}">${this.escape(this.tr(k, f))}</button>`).join('')}
+          </div>
+        </div>
         <div id="ai-messages" class="ai-messages" aria-live="polite" aria-atomic="false"></div>
         <div class="ai-input-row">
           <input id="ai-input" class="form-control" type="text"
@@ -667,6 +686,13 @@ const AiCfoModule = {
         </div>
       </div>
     `;
+    // Starter questions: one tap asks; the block goes once the conversation starts.
+    container.querySelectorAll('[data-ai-ask]').forEach((b) => b.addEventListener('click', () => {
+      const input = document.getElementById('ai-input');
+      if (!input) return;
+      input.value = b.dataset.aiAsk;
+      this.handleSend();
+    }));
   },
 
   // --- Dashboard "Insights" block (PORT_PLAN A8/A15) ------------------------

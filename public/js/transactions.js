@@ -380,7 +380,7 @@ async function fetchTransactions(filters = {}) {
               <select id="${modalId}-account" class="form-control" required>
                 <option value="">${t('transactions.selectAccount')}</option>
                 ${appState.accounts.map(account => `
-                  <option value="${escapeHtml(account.id)}" ${isEditing && transactionData.account_id == account.id ? 'selected' : ''}>
+                  <option value="${escapeHtml(account.id)}" ${(isEditing && transactionData.account_id == account.id) || (!isEditing && appState.accounts.length === 1) ? 'selected' : ''}>
                     ${escapeHtml(account.name)} (${escapeHtml(formatCurrency(account.balance, account.currency))})
                   </option>
                 `).join('')}
@@ -447,14 +447,20 @@ async function fetchTransactions(filters = {}) {
     });
     
     // Функция закрытия модального окна
+    const onEsc = (e) => { if (e.key === 'Escape') closeModal(); };
     const closeModal = () => {
+      document.removeEventListener('keydown', onEsc);
+      if (!modalBackdrop.isConnected || modalBackdrop.classList.contains('closing')) return;
       modalBackdrop.classList.add('closing');
       
       // Удаление модального окна после завершения анимации
       setTimeout(() => {
-        document.body.removeChild(modalBackdrop);
+        if (modalBackdrop.isConnected) document.body.removeChild(modalBackdrop);
       }, 300);
     };
+    // Escape closes the form; a new entry starts on the amount (the only account is preselected).
+    document.addEventListener('keydown', onEsc);
+    if (!isEditing) setTimeout(() => { if (amountInput && amountInput.isConnected) amountInput.focus(); }, 60);
     
     // Обработчики событий
     modalClose.addEventListener('click', closeModal);
@@ -611,14 +617,20 @@ async function fetchTransactions(filters = {}) {
     });
     
     // Функция закрытия модального окна
+    const onEsc = (e) => { if (e.key === 'Escape') closeModal(); };
     const closeModal = () => {
+      document.removeEventListener('keydown', onEsc);
+      if (!modalBackdrop.isConnected || modalBackdrop.classList.contains('closing')) return;
       modalBackdrop.classList.add('closing');
       
       // Удаление модального окна после завершения анимации
       setTimeout(() => {
-        document.body.removeChild(modalBackdrop);
+        if (modalBackdrop.isConnected) document.body.removeChild(modalBackdrop);
       }, 300);
     };
+    // Escape closes the form; a new entry starts on the amount (the only account is preselected).
+    document.addEventListener('keydown', onEsc);
+    if (!isEditing) setTimeout(() => { if (amountInput && amountInput.isConnected) amountInput.focus(); }, 60);
     
     // Обработчики событий
     modalClose.addEventListener('click', closeModal);
