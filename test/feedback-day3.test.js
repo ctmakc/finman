@@ -99,3 +99,14 @@ test('digest goes out for new feedback alone', async () => {
   expect(mail.subject).toMatch(/feedback 1/);
   expect(mail.text).toMatch(/Love the money map/);
 });
+
+test('behavior report: people, steps and feedback, no emails, tests left out', async () => {
+  const { build, markdown } = require('../scripts/behavior-report');
+  const r = await build(db.query);
+  const md = markdown(r);
+  expect(md).toMatch(/# Finman: last 7 days/);
+  expect(md).toMatch(/\| #? ?\d+ \|/);
+  expect(md).toMatch(/saw|first_screen|picked_a_path/);
+  expect(md).not.toMatch(/@example\.com|finman-smoke\.test/);
+  expect(md).not.toMatch(/hidden test/);
+});
