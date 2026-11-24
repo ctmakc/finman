@@ -21,7 +21,7 @@ const router = express.Router();
 const authenticate = passport.authenticate('jwt', { session: false });
 
 const KINDS = ['rating', 'survey', 'bug', 'idea', 'exit'];
-const TRIGGERS = ['menu', 'settings', 'import_done', 'insight_shown', 'day7', 'account_delete'];
+const TRIGGERS = ['menu', 'settings', 'import_done', 'insight_shown', 'day3', 'day7', 'account_delete'];
 const STATUSES = ['new', 'seen', 'done'];
 const REVIEW_URL = process.env.FEEDBACK_FORWARD_URL || 'https://review.mmix.biz/api/bug-report';
 

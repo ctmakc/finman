@@ -341,6 +341,9 @@ function renderAuthenticatedUI() {
         </nav>
         <div class="user-info">
           <span class="user-name" title="${userName}">${userName}</span>
+          <button id="fb-header-btn" class="fm-fb-btn" type="button" aria-label="${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}" title="${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}">
+            <i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span>
+          </button>
           ${themeToggleHtml()}
           <button id="logout-btn" class="btn btn-sm btn-outline fm-logout" type="button">
             <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Log out</span>
@@ -364,6 +367,9 @@ function renderAuthenticatedUI() {
         </div>
         <div class="fm-drawer-foot">
           <div class="fm-drawer-user"><i class="fas fa-user-circle" aria-hidden="true"></i><span>${userName}</span></div>
+          <button id="drawer-fb-btn" class="btn btn-primary fm-fb-btn" type="button">
+            <i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span>
+          </button>
           <button id="drawer-logout-btn" class="btn btn-outline" type="button">
             <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Log out</span>
           </button>
@@ -385,6 +391,11 @@ function renderAuthenticatedUI() {
   };
   app.querySelector('.header').addEventListener('click', onNavClick);
   document.getElementById('app-drawer').addEventListener('click', onNavClick);
+
+  // Feedback: one tap from the header (desktop) or the drawer foot (phone).
+  const openFeedback = () => { if (window.FMFeedback) window.FMFeedback.open('rate', 'menu'); };
+  document.getElementById('fb-header-btn').addEventListener('click', openFeedback);
+  document.getElementById('drawer-fb-btn').addEventListener('click', () => { if (isDrawerOpen()) closeDrawer(); openFeedback(); });
 
   document.getElementById('logo-link').addEventListener('click', (e) => {
     e.preventDefault();

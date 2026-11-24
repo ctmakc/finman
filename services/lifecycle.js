@@ -84,7 +84,81 @@ function describe(s) {
 
 // ---------- 1. operator digest ----------
 
-async function runDigest() {
+// What one person did, from the event journal only (no ledger contents):
+// funnel steps reached, days with own activity, back on day 2 / within week 1, where it stopped.
+const STEP_TEXT = {
+  vault_ready: 'saved the recovery key', first_screen: 'saw the first screen', picked_a_path: 'picked a way in',
+  first_account: 'made an account', own_data_in: 'put own data in', first_report: 'opened a report',
+};
+function journey(events, createdAt, now = new Date()) {
+  const gm = require('./growthMetrics');
+  const day = (x) => String(x).slice(0, 10);
+  const dd = (a, b) => Math.round((Date.parse(day(b)) - Date.parse(day(a))) / 864e5);
+  const names = new Set(events.map((e) => e.event));
+  const steps = gm.FUNNEL.filter(([k, evs]) => evs && evs.some((n) => names.has(n))).map(([k]) => k);
+  const own = events.filter((e) => gm.VISIT.includes(e.event) || !gm.SERVER_ONLY.has(e.event));
+  const activeDays = [...new Set(own.map((e) => day(e.created_at)))].sort();
+  const later = activeDays.map((d) => dd(createdAt, d)).filter((k) => k >= 1);
+  const age = dd(createdAt, now.toISOString());
+  const last = own.length ? own.reduce((a, b) => (a.created_at > b.created_at ? a : b)) : null;
+  return {
+    steps,
+    stoppedAt: steps.length ? steps[steps.length - 1] : 'signed_up',
+    activeDays: activeDays.length,
+    returned: later.length > 0,
+    back2: age >= 1 ? later.includes(1) : null,
+    back7: age >= 7 ? later.some((k) => k <= 7) : null,
+    lastEvent: last ? last.event : null,
+    lastAt: last ? last.created_at : null,
+  };
+}
+const yesNo = (v) => (v == null ? 'too early' : v ? 'yes' : 'no');
+function journeyText(j) {
+  const did = j.steps.length ? j.steps.map((k) => STEP_TEXT[k]).join(' → ') : 'only signed up';
+  return `did: ${did} · active days ${j.activeDays} · back day 2: ${yesNo(j.back2)} · back in week 1: ${yesNo(j.back7)}`
+    + (j.lastEvent ? ` · last: ${j.lastEvent} ${String(j.lastAt).slice(0, 16)} UTC` : '');
+}
+
+// "What new users did": everyone who signed up in the last `days` days, aggregates only.
+async function newUsersLine({ days = 7, now = new Date() } = {}) {
+  const gm = require('./growthMetrics');
+  const since = new Date(now.getTime() - days * 864e5).toISOString().slice(0, 19).replace('T', ' ');
+  const users = await query(
+    `SELECT u.id, u.email, u.created_at FROM users u WHERE u.created_at >= ?`, [since]).catch(() => []);
+  const admins = String(process.env.ADMIN_EMAILS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const live = users.filter((u) => !gm.isTest(u.email) && !admins.includes(String(u.email || '').toLowerCase()));
+  if (!live.length) return `No new users in the last ${days} days.`;
+  const ev = await query(
+    `SELECT user_id, event, created_at FROM analytics_events WHERE user_id IN (${live.map(() => '?').join(',')})`,
+    live.map((u) => u.id)).catch(() => []);
+  const count = Object.fromEntries(Object.keys(STEP_TEXT).map((k) => [k, 0]));
+  const stops = {};
+  let back = 0;
+  for (const u of live) {
+    const j = journey(ev.filter((e) => e.user_id === u.id), u.created_at, now);
+    for (const k of j.steps) count[k]++;
+    stops[j.stoppedAt] = (stops[j.stoppedAt] || 0) + 1;
+    if (j.returned) back++;
+  }
+  const top = Object.entries(stops).sort((a, b) => b[1] - a[1])[0];
+  const stopText = top[0] === 'signed_up' ? 'right after signing up' : `after "${STEP_TEXT[top[0]]}"`;
+  return `What new users did (last ${days} days, ${live.length} people): saw the first screen ${count.first_screen}, `
+    + `picked a way in ${count.picked_a_path}, put own data in ${count.own_data_in}, opened a report ${count.first_report}, `
+    + `came back on another day ${back}. Most stop ${stopText} (${top[1]}).`;
+}
+
+// New feedback since the last digest that carried feedback (cursor = lifecycle_emails user 0 'digest_fb:<id>').
+async function newFeedback() {
+  const cur = await query(`SELECT kind FROM lifecycle_emails WHERE user_id = 0 AND kind LIKE 'digest_fb:%'`).catch(() => []);
+  const after = cur.reduce((m, r) => Math.max(m, Number(String(r.kind).split(':')[1]) || 0), 0);
+  return query(
+    `SELECT id, user_id, kind, trigger, rating, answer, comment, device, created_at FROM feedback
+      WHERE id > ? AND is_test = 0 ORDER BY id`, [after]).catch(() => []);
+}
+const fbText = (f) => `#${f.user_id || 'deleted'} · ${f.kind}/${f.trigger}${f.rating ? ' · ' + f.rating + '/5' : ''}`
+  + `${f.answer ? ' · ' + f.answer : ''}${f.comment ? ' · "' + String(f.comment).slice(0, 400) + '"' : ''}`;
+
+async function runDigest({ now = new Date() } = {}) {
   const to = (process.env.ACTIVITY_DIGEST_TO || process.env.LEAD_NOTIFY_TO || 'ctmakc@gmail.com')
     .split(',').map((s) => s.trim()).filter(Boolean);
   const groups = [
@@ -96,35 +170,46 @@ async function runDigest() {
     for (const u of users) {
       if (tracker.isTestEmail(u.email)) { await markSent(u.id, kind); continue; }
       const s = await activitySummary(u.id);
-      rows.push({ kind, label, u, s });
+      const ev = await query('SELECT event, created_at FROM analytics_events WHERE user_id = ? ORDER BY created_at', [u.id]).catch(() => []);
+      const j = journey(ev, u.created_at, now);
+      rows.push({ kind, label, u, s, j });
     }
   }
-  if (!rows.length) return { sent: false, users: 0 };
+  const fb = await newFeedback();
+  if (!rows.length && !fb.length) return { sent: false, users: 0 };
+  const did = await newUsersLine({ days: 7, now }).catch(() => '');
 
-  const text = rows.map(({ label, u, s }) =>
-    `${label} · #${u.id} ${u.email} · ${u.method || '?'} · ${u.source || 'source unknown'}${u.country ? ' · ' + u.country : ''}\n  ${describe(s)}${s.lastSeen ? ' · last activity ' + s.lastSeen + ' UTC' : ''}`).join('\n\n');
+  const text = (did ? did + '\n\n' : '') + rows.map(({ label, u, s, j }) =>
+    `${label} · #${u.id} ${u.email} · ${u.method || '?'} · ${u.source || 'source unknown'}${u.country ? ' · ' + u.country : ''}\n  ${journeyText(j)}\n  ${describe(s)}${s.lastSeen ? ' · last activity ' + s.lastSeen + ' UTC' : ''}`).join('\n\n')
+    + (fb.length ? `\n\nFeedback from users (${fb.length}):\n` + fb.map((f) => '  ' + fbText(f)).join('\n') : '')
+    + '\n\nAll feedback: https://app.finman.money/admin';
   const html = '<div style="font-family:sans-serif">'
-    + '<p>New Finman users at day 1 and day 7: where they came from and what they did.</p>'
+    + (did ? `<p style="background:#f3f6f4;padding:10px 12px;border-radius:8px"><b>${esc(did)}</b></p>` : '')
+    + (rows.length ? '<p>New Finman users at day 1 and day 7: where they came from and what they did.</p>' : '')
     + '<table style="border-collapse:collapse">'
     + '<tr style="color:#666;text-align:left"><th style="padding:4px 10px 4px 0">Mark</th><th style="padding:4px 10px 4px 0">User</th><th style="padding:4px 10px 4px 0">Source</th><th style="padding:4px 0">Activity</th></tr>'
-    + rows.map(({ label, u, s }) => `<tr><td style="padding:6px 10px 6px 0;vertical-align:top">${esc(label)}</td>`
+    + rows.map(({ label, u, s, j }) => `<tr><td style="padding:6px 10px 6px 0;vertical-align:top">${esc(label)}</td>`
       + `<td style="padding:6px 10px 6px 0;vertical-align:top">#${esc(u.id)} ${esc(u.email)}<br><span style="color:#666">${esc(u.method || '')}</span></td>`
       + `<td style="padding:6px 10px 6px 0;vertical-align:top">${esc(u.source || 'unknown')}${u.country ? '<br><span style="color:#666">' + esc(u.country) + '</span>' : ''}</td>`
-      + `<td style="padding:6px 0;vertical-align:top">${esc(describe(s))}${s.lastSeen ? '<br><span style="color:#666">last activity ' + esc(s.lastSeen) + ' UTC</span>' : ''}</td></tr>`).join('')
-    + '</table></div>';
+      + `<td style="padding:6px 0;vertical-align:top">${esc(journeyText(j))}<br><span style="color:#666">${esc(describe(s))}</span>${s.lastSeen ? '<br><span style="color:#666">last activity ' + esc(s.lastSeen) + ' UTC</span>' : ''}</td></tr>`).join('')
+    + '</table>'
+    + (fb.length ? `<p style="margin-top:16px"><b>Feedback from users (${fb.length})</b></p><ul>`
+      + fb.map((f) => `<li>${esc(fbText(f))}</li>`).join('') + '</ul>' : '')
+    + '<p><a href="https://app.finman.money/admin">All feedback and numbers on /admin</a></p></div>';
 
   const r = await emailService.sendEmail({
     to,
     from: process.env.LEAD_NOTIFY_FROM || 'INNOVA Leads <leads@finman.money>',
-    subject: `Finman users · day 1 / day 7 · ${rows.length}`,
+    subject: `Finman users · day 1 / day 7 · ${rows.length}${fb.length ? ` · feedback ${fb.length}` : ''}`,
     text,
     html,
   });
   if (r && (r.sent || r.skipped)) {
     for (const { kind, u } of rows) await markSent(u.id, kind);
+    if (fb.length) await markSent(0, `digest_fb:${fb[fb.length - 1].id}`);
   }
   logger.info({ users: rows.length, sent: r && r.sent }, '[lifecycle] digest');
-  return { sent: !!(r && r.sent), users: rows.length };
+  return { sent: !!(r && r.sent), users: rows.length, feedback: fb.length, did };
 }
 
 // ---------- 2. user nudges ----------
@@ -229,4 +314,4 @@ function start() {
   return task;
 }
 
-module.exports = { runDigest, runNudges, start, activitySummary, nudgeMessage, unsubscribeUrl };
+module.exports = { runDigest, runNudges, start, activitySummary, nudgeMessage, unsubscribeUrl, journey, journeyText, newUsersLine };

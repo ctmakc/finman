@@ -26258,6 +26258,197 @@ var require_vault = __commonJS({
   }
 });
 
+// services/growthMetrics.js
+var require_growthMetrics = __commonJS({
+  "services/growthMetrics.js"(exports2, module2) {
+    "use strict";
+    init_globals();
+    var VISIT = ["app_open", "login"];
+    var ACTIVATE = ["activated", "import_done", "transaction_added", "transfer_added", "receipt_scanned", "vault_import_done", "vault_transaction_added", "onboarding_import_done"];
+    var SERVER_ONLY = /* @__PURE__ */ new Set([
+      "email_sent",
+      "weekly_email_sent",
+      "weekly_note_sent",
+      "monthly_email_sent",
+      "badge_earned",
+      "journey_step_done",
+      "activated",
+      "sign_up",
+      "account_deleted",
+      "vault_purged",
+      "push_sent",
+      "email_unsubscribe"
+    ]);
+    var FUNNEL = [
+      ["signed_up", null],
+      ["vault_ready", ["vault_setup", "vault_key_saved"]],
+      ["first_screen", ["onboarding_firstrun_shown"]],
+      ["picked_a_path", ["onboarding_import_started", "onboarding_demo_loaded", "onboarding_scratch_started", "onboarding_bank_picked", "onboarding_example_opened", "import_preview", "import_failed", "statement_read"]],
+      ["first_account", ["account_created", "onboarding_quickstart", "import_done", "onboarding_import_done"]],
+      ["own_data_in", ACTIVATE],
+      ["first_report", ["report_viewed", "onboarding_insight_shown"]]
+    ];
+    var isTest = (e) => /@[^@]+\.test$/i.test(e || "") || /\+smoke[^@]*@/i.test(e || "");
+    var day = (s) => String(s).slice(0, 10);
+    var days = (a, b) => (Date.parse(day(b)) - Date.parse(day(a))) / 864e5;
+    function weekOf(s) {
+      const d = /* @__PURE__ */ new Date(day(s) + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+      return d.toISOString().slice(0, 10);
+    }
+    function sourceClass(a) {
+      const s = `${a && a.utm_source || ""} ${a && a.source || ""} ${a && a.referrer || ""} ${a && a.site_referrer || ""}`.toLowerCase();
+      if (/chatgpt|openai/.test(s)) return "chatgpt";
+      if (/perplexity|claude\.ai|gemini|copilot/.test(s)) return "other_ai";
+      if (/google/.test(s)) return "google";
+      if (/bing|duckduckgo|yahoo/.test(s)) return "other_search";
+      if (/finman\.money/.test(s)) return "site_no_referrer";
+      return "direct_app";
+    }
+    function compute({ users, events, deletedCount = 0, admins = [], now = (/* @__PURE__ */ new Date()).toISOString(), since }) {
+      const byUser = /* @__PURE__ */ new Map();
+      for (const e of events) {
+        if (!byUser.has(e.user_id)) byUser.set(e.user_id, []);
+        byUser.get(e.user_id).push(e);
+      }
+      const adminSet = new Set(admins.map((a) => String(a).toLowerCase()));
+      const out = {
+        since,
+        generated_at: now,
+        users_alive: 0,
+        excluded: { test: 0, team: 0 },
+        deleted_accounts: deletedCount,
+        funnel: Object.fromEntries(FUNNEL.map(([k]) => [k, 0])),
+        import_failed_codes: {},
+        statements_read: 0,
+        by_source: {},
+        by_week: {},
+        by_country_ca: 0,
+        activated: 0,
+        activated_by: {},
+        week1: { eligible: 0, returned: 0 },
+        week4: { eligible: 0, returned: 0 }
+      };
+      for (const u of users) {
+        if (isTest(u.email)) {
+          out.excluded.test++;
+          continue;
+        }
+        if (adminSet.has(String(u.email || "").toLowerCase())) {
+          out.excluded.team++;
+          continue;
+        }
+        out.users_alive++;
+        const src = sourceClass(u);
+        out.by_source[src] = (out.by_source[src] || 0) + 1;
+        if (u.country === "CA") out.by_country_ca++;
+        const wk = weekOf(u.created_at);
+        const W = out.by_week[wk] = out.by_week[wk] || { signups: 0, activated: 0, week1_eligible: 0, week1_returned: 0, week4_eligible: 0, week4_returned: 0 };
+        W.signups++;
+        const list = byUser.get(u.id) || [];
+        const names = new Set(list.map((e) => e.event));
+        for (const [k, evs] of FUNNEL) if (!evs || evs.some((n) => names.has(n))) out.funnel[k]++;
+        for (const e of list) {
+          if (e.event === "statement_read") out.statements_read++;
+          if (e.event !== "import_failed") continue;
+          let code = "unknown";
+          try {
+            code = JSON.parse(e.props || "{}").code || "unknown";
+          } catch (_) {
+          }
+          out.import_failed_codes[code] = (out.import_failed_codes[code] || 0) + 1;
+        }
+        const act = list.filter((e) => ACTIVATE.includes(e.event)).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+        if (act.length) {
+          out.activated++;
+          W.activated++;
+          out.activated_by[act[0].event] = (out.activated_by[act[0].event] || 0) + 1;
+        }
+        const activeDays = new Set(list.filter((e) => VISIT.includes(e.event) || !SERVER_ONLY.has(e.event)).map((e) => day(e.created_at)));
+        const age = days(u.created_at, now);
+        const back = (from, to) => [...activeDays].some((d) => {
+          const k = days(u.created_at, d);
+          return k >= from && k <= to;
+        });
+        if (age >= 7) {
+          out.week1.eligible++;
+          W.week1_eligible++;
+          if (back(1, 7)) {
+            out.week1.returned++;
+            W.week1_returned++;
+          }
+        }
+        if (age >= 28) {
+          out.week4.eligible++;
+          W.week4_eligible++;
+          if (back(22, 28)) {
+            out.week4.returned++;
+            W.week4_returned++;
+          }
+        }
+      }
+      return out;
+    }
+    async function load({ query, since = "2026-11-03", now = /* @__PURE__ */ new Date() } = {}) {
+      const users = await query(
+        `SELECT u.id, u.email, u.created_at, a.utm_source, a.source, a.referrer, a.site_referrer, a.country
+       FROM users u LEFT JOIN user_acquisition a ON a.user_id = u.id WHERE u.created_at >= ?`,
+        [since]
+      );
+      const events = await query(
+        `SELECT e.user_id, e.event, e.created_at, e.props FROM analytics_events e
+       JOIN users u ON u.id = e.user_id WHERE u.created_at >= ?`,
+        [since]
+      );
+      const del = await query(`SELECT COUNT(*) AS n FROM analytics_events WHERE event = 'account_deleted' AND created_at >= ?`, [since]);
+      const admins = String(proc.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return compute({ users, events, deletedCount: Number(del[0] && del[0].n) || 0, admins, now: now.toISOString(), since });
+    }
+    var pct = (a, b) => b ? `${Math.round(a / b * 100)}%` : "\u2014";
+    function describe(m) {
+      const f = m.funnel;
+      const weeks = Object.keys(m.by_week).sort().slice(-6);
+      const lines = [
+        `Live accounts since ${m.since}: ${m.users_alive} (${m.deleted_accounts} deleted themselves; test ${m.excluded.test}, team ${m.excluded.team} left out)`,
+        `Path: signed up ${f.signed_up} \u2192 vault ready ${f.vault_ready} \u2192 first screen ${f.first_screen} \u2192 picked a path ${f.picked_a_path} \u2192 first account ${f.first_account} \u2192 own data ${f.own_data_in} \u2192 first report ${f.first_report}`,
+        `Activated: ${m.activated} of ${m.users_alive} (${pct(m.activated, m.users_alive)})`,
+        `Came back in week 1: ${m.week1.returned} of ${m.week1.eligible} (${pct(m.week1.returned, m.week1.eligible)}) \xB7 week 4: ${m.week4.returned} of ${m.week4.eligible} (${pct(m.week4.returned, m.week4.eligible)})`,
+        `Sources: ${Object.entries(m.by_source).map(([k, v]) => `${k} ${v}`).join(", ") || "\u2014"} \xB7 Canada ${m.by_country_ca}`,
+        `PDF statements read: ${m.statements_read} \xB7 import failures: ${Object.entries(m.import_failed_codes).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}`,
+        "By sign-up week (sign-ups / activated / back in week 1 / back in week 4):",
+        ...weeks.map((w) => {
+          const x = m.by_week[w];
+          return `  ${w}: ${x.signups} / ${x.activated} / ${x.week1_eligible ? `${x.week1_returned} of ${x.week1_eligible}` : "too early"} / ${x.week4_eligible ? `${x.week4_returned} of ${x.week4_eligible}` : "too early"}`;
+        })
+      ];
+      return lines;
+    }
+    async function runWeekly({ now = /* @__PURE__ */ new Date(), dryRun = false } = {}) {
+      const { query, get, run } = require_database();
+      const dates = require_dates();
+      const today = dates.todayISO("America/Toronto", now);
+      if ((/* @__PURE__ */ new Date(`${today}T00:00:00Z`)).getUTCDay() !== 1) return { skipped: "not monday" };
+      const kind = `metrics:${today}`;
+      if (await get("SELECT 1 AS x FROM lifecycle_emails WHERE user_id = 0 AND kind = ?", [kind]).catch(() => null)) return { skipped: "already sent" };
+      const m = await load({ query, now });
+      const lines = describe(m);
+      if (dryRun) return { lines };
+      const to = (proc.env.ACTIVITY_DIGEST_TO || proc.env.LEAD_NOTIFY_TO || "ctmakc@gmail.com").split(",").map((s) => s.trim()).filter(Boolean);
+      const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const r = await require_emailService().sendEmail({
+        to,
+        from: proc.env.LEAD_NOTIFY_FROM || "INNOVA Leads <leads@finman.money>",
+        subject: `Finman week ${today}: ${m.funnel.signed_up} sign-ups, ${m.activated} activated, week-1 return ${pct(m.week1.returned, m.week1.eligible)}`,
+        text: lines.join("\n") + "\n\nLive numbers any time: https://app.finman.money/admin",
+        html: `<div style="font-family:sans-serif;line-height:1.5"><p>${lines.map(esc).join("<br>")}</p><p><a href="https://app.finman.money/admin">Live numbers on /admin</a></p></div>`
+      });
+      if (r && (r.sent || r.skipped)) await run("INSERT OR IGNORE INTO lifecycle_emails (user_id, kind) VALUES (0, ?)", [kind]);
+      return { sent: !!(r && r.sent), lines };
+    }
+    module2.exports = { compute, load, describe, runWeekly, FUNNEL, ACTIVATE, VISIT, SERVER_ONLY, sourceClass, weekOf, isTest };
+  }
+});
+
 // lib/activityRules.js
 var require_activityRules = __commonJS({
   "lib/activityRules.js"(exports2, module2) {
@@ -26709,197 +26900,6 @@ ${L.stop}: ${unsubUrl}`;
   }
 });
 
-// services/growthMetrics.js
-var require_growthMetrics = __commonJS({
-  "services/growthMetrics.js"(exports2, module2) {
-    "use strict";
-    init_globals();
-    var VISIT = ["app_open", "login"];
-    var ACTIVATE = ["activated", "import_done", "transaction_added", "transfer_added", "receipt_scanned", "vault_import_done", "vault_transaction_added", "onboarding_import_done"];
-    var SERVER_ONLY = /* @__PURE__ */ new Set([
-      "email_sent",
-      "weekly_email_sent",
-      "weekly_note_sent",
-      "monthly_email_sent",
-      "badge_earned",
-      "journey_step_done",
-      "activated",
-      "sign_up",
-      "account_deleted",
-      "vault_purged",
-      "push_sent",
-      "email_unsubscribe"
-    ]);
-    var FUNNEL = [
-      ["signed_up", null],
-      ["vault_ready", ["vault_setup", "vault_key_saved"]],
-      ["first_screen", ["onboarding_firstrun_shown"]],
-      ["picked_a_path", ["onboarding_import_started", "onboarding_demo_loaded", "onboarding_scratch_started", "onboarding_bank_picked", "onboarding_example_opened", "import_preview", "import_failed", "statement_read"]],
-      ["first_account", ["account_created", "onboarding_quickstart", "import_done", "onboarding_import_done"]],
-      ["own_data_in", ACTIVATE],
-      ["first_report", ["report_viewed", "onboarding_insight_shown"]]
-    ];
-    var isTest = (e) => /@[^@]+\.test$/i.test(e || "") || /\+smoke[^@]*@/i.test(e || "");
-    var day = (s) => String(s).slice(0, 10);
-    var days = (a, b) => (Date.parse(day(b)) - Date.parse(day(a))) / 864e5;
-    function weekOf(s) {
-      const d = /* @__PURE__ */ new Date(day(s) + "T00:00:00Z");
-      d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
-      return d.toISOString().slice(0, 10);
-    }
-    function sourceClass(a) {
-      const s = `${a && a.utm_source || ""} ${a && a.source || ""} ${a && a.referrer || ""} ${a && a.site_referrer || ""}`.toLowerCase();
-      if (/chatgpt|openai/.test(s)) return "chatgpt";
-      if (/perplexity|claude\.ai|gemini|copilot/.test(s)) return "other_ai";
-      if (/google/.test(s)) return "google";
-      if (/bing|duckduckgo|yahoo/.test(s)) return "other_search";
-      if (/finman\.money/.test(s)) return "site_no_referrer";
-      return "direct_app";
-    }
-    function compute({ users, events, deletedCount = 0, admins = [], now = (/* @__PURE__ */ new Date()).toISOString(), since }) {
-      const byUser = /* @__PURE__ */ new Map();
-      for (const e of events) {
-        if (!byUser.has(e.user_id)) byUser.set(e.user_id, []);
-        byUser.get(e.user_id).push(e);
-      }
-      const adminSet = new Set(admins.map((a) => String(a).toLowerCase()));
-      const out = {
-        since,
-        generated_at: now,
-        users_alive: 0,
-        excluded: { test: 0, team: 0 },
-        deleted_accounts: deletedCount,
-        funnel: Object.fromEntries(FUNNEL.map(([k]) => [k, 0])),
-        import_failed_codes: {},
-        statements_read: 0,
-        by_source: {},
-        by_week: {},
-        by_country_ca: 0,
-        activated: 0,
-        activated_by: {},
-        week1: { eligible: 0, returned: 0 },
-        week4: { eligible: 0, returned: 0 }
-      };
-      for (const u of users) {
-        if (isTest(u.email)) {
-          out.excluded.test++;
-          continue;
-        }
-        if (adminSet.has(String(u.email || "").toLowerCase())) {
-          out.excluded.team++;
-          continue;
-        }
-        out.users_alive++;
-        const src = sourceClass(u);
-        out.by_source[src] = (out.by_source[src] || 0) + 1;
-        if (u.country === "CA") out.by_country_ca++;
-        const wk = weekOf(u.created_at);
-        const W = out.by_week[wk] = out.by_week[wk] || { signups: 0, activated: 0, week1_eligible: 0, week1_returned: 0, week4_eligible: 0, week4_returned: 0 };
-        W.signups++;
-        const list = byUser.get(u.id) || [];
-        const names = new Set(list.map((e) => e.event));
-        for (const [k, evs] of FUNNEL) if (!evs || evs.some((n) => names.has(n))) out.funnel[k]++;
-        for (const e of list) {
-          if (e.event === "statement_read") out.statements_read++;
-          if (e.event !== "import_failed") continue;
-          let code = "unknown";
-          try {
-            code = JSON.parse(e.props || "{}").code || "unknown";
-          } catch (_) {
-          }
-          out.import_failed_codes[code] = (out.import_failed_codes[code] || 0) + 1;
-        }
-        const act = list.filter((e) => ACTIVATE.includes(e.event)).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
-        if (act.length) {
-          out.activated++;
-          W.activated++;
-          out.activated_by[act[0].event] = (out.activated_by[act[0].event] || 0) + 1;
-        }
-        const activeDays = new Set(list.filter((e) => VISIT.includes(e.event) || !SERVER_ONLY.has(e.event)).map((e) => day(e.created_at)));
-        const age = days(u.created_at, now);
-        const back = (from, to) => [...activeDays].some((d) => {
-          const k = days(u.created_at, d);
-          return k >= from && k <= to;
-        });
-        if (age >= 7) {
-          out.week1.eligible++;
-          W.week1_eligible++;
-          if (back(1, 7)) {
-            out.week1.returned++;
-            W.week1_returned++;
-          }
-        }
-        if (age >= 28) {
-          out.week4.eligible++;
-          W.week4_eligible++;
-          if (back(22, 28)) {
-            out.week4.returned++;
-            W.week4_returned++;
-          }
-        }
-      }
-      return out;
-    }
-    async function load({ query, since = "2026-11-03", now = /* @__PURE__ */ new Date() } = {}) {
-      const users = await query(
-        `SELECT u.id, u.email, u.created_at, a.utm_source, a.source, a.referrer, a.site_referrer, a.country
-       FROM users u LEFT JOIN user_acquisition a ON a.user_id = u.id WHERE u.created_at >= ?`,
-        [since]
-      );
-      const events = await query(
-        `SELECT e.user_id, e.event, e.created_at, e.props FROM analytics_events e
-       JOIN users u ON u.id = e.user_id WHERE u.created_at >= ?`,
-        [since]
-      );
-      const del = await query(`SELECT COUNT(*) AS n FROM analytics_events WHERE event = 'account_deleted' AND created_at >= ?`, [since]);
-      const admins = String(proc.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean);
-      return compute({ users, events, deletedCount: Number(del[0] && del[0].n) || 0, admins, now: now.toISOString(), since });
-    }
-    var pct = (a, b) => b ? `${Math.round(a / b * 100)}%` : "\u2014";
-    function describe(m) {
-      const f = m.funnel;
-      const weeks = Object.keys(m.by_week).sort().slice(-6);
-      const lines = [
-        `Live accounts since ${m.since}: ${m.users_alive} (${m.deleted_accounts} deleted themselves; test ${m.excluded.test}, team ${m.excluded.team} left out)`,
-        `Path: signed up ${f.signed_up} \u2192 vault ready ${f.vault_ready} \u2192 first screen ${f.first_screen} \u2192 picked a path ${f.picked_a_path} \u2192 first account ${f.first_account} \u2192 own data ${f.own_data_in} \u2192 first report ${f.first_report}`,
-        `Activated: ${m.activated} of ${m.users_alive} (${pct(m.activated, m.users_alive)})`,
-        `Came back in week 1: ${m.week1.returned} of ${m.week1.eligible} (${pct(m.week1.returned, m.week1.eligible)}) \xB7 week 4: ${m.week4.returned} of ${m.week4.eligible} (${pct(m.week4.returned, m.week4.eligible)})`,
-        `Sources: ${Object.entries(m.by_source).map(([k, v]) => `${k} ${v}`).join(", ") || "\u2014"} \xB7 Canada ${m.by_country_ca}`,
-        `PDF statements read: ${m.statements_read} \xB7 import failures: ${Object.entries(m.import_failed_codes).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}`,
-        "By sign-up week (sign-ups / activated / back in week 1 / back in week 4):",
-        ...weeks.map((w) => {
-          const x = m.by_week[w];
-          return `  ${w}: ${x.signups} / ${x.activated} / ${x.week1_eligible ? `${x.week1_returned} of ${x.week1_eligible}` : "too early"} / ${x.week4_eligible ? `${x.week4_returned} of ${x.week4_eligible}` : "too early"}`;
-        })
-      ];
-      return lines;
-    }
-    async function runWeekly({ now = /* @__PURE__ */ new Date(), dryRun = false } = {}) {
-      const { query, get, run } = require_database();
-      const dates = require_dates();
-      const today = dates.todayISO("America/Toronto", now);
-      if ((/* @__PURE__ */ new Date(`${today}T00:00:00Z`)).getUTCDay() !== 1) return { skipped: "not monday" };
-      const kind = `metrics:${today}`;
-      if (await get("SELECT 1 AS x FROM lifecycle_emails WHERE user_id = 0 AND kind = ?", [kind]).catch(() => null)) return { skipped: "already sent" };
-      const m = await load({ query, now });
-      const lines = describe(m);
-      if (dryRun) return { lines };
-      const to = (proc.env.ACTIVITY_DIGEST_TO || proc.env.LEAD_NOTIFY_TO || "ctmakc@gmail.com").split(",").map((s) => s.trim()).filter(Boolean);
-      const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const r = await require_emailService().sendEmail({
-        to,
-        from: proc.env.LEAD_NOTIFY_FROM || "INNOVA Leads <leads@finman.money>",
-        subject: `Finman week ${today}: ${m.funnel.signed_up} sign-ups, ${m.activated} activated, week-1 return ${pct(m.week1.returned, m.week1.eligible)}`,
-        text: lines.join("\n") + "\n\nLive numbers any time: https://app.finman.money/admin",
-        html: `<div style="font-family:sans-serif;line-height:1.5"><p>${lines.map(esc).join("<br>")}</p><p><a href="https://app.finman.money/admin">Live numbers on /admin</a></p></div>`
-      });
-      if (r && (r.sent || r.skipped)) await run("INSERT OR IGNORE INTO lifecycle_emails (user_id, kind) VALUES (0, ?)", [kind]);
-      return { sent: !!(r && r.sent), lines };
-    }
-    module2.exports = { compute, load, describe, runWeekly, FUNNEL, ACTIVATE, VISIT, sourceClass, weekOf };
-  }
-});
-
 // services/lifecycle.js
 var require_lifecycle = __commonJS({
   "services/lifecycle.js"(exports2, module2) {
@@ -26958,7 +26958,79 @@ var require_lifecycle = __commonJS({
       if (ev.app_open) parts.push(`app opens ${ev.app_open}`);
       return parts.join(" \xB7 ");
     }
-    async function runDigest() {
+    var STEP_TEXT = {
+      vault_ready: "saved the recovery key",
+      first_screen: "saw the first screen",
+      picked_a_path: "picked a way in",
+      first_account: "made an account",
+      own_data_in: "put own data in",
+      first_report: "opened a report"
+    };
+    function journey(events, createdAt, now = /* @__PURE__ */ new Date()) {
+      const gm = require_growthMetrics();
+      const day = (x) => String(x).slice(0, 10);
+      const dd = (a, b) => Math.round((Date.parse(day(b)) - Date.parse(day(a))) / 864e5);
+      const names = new Set(events.map((e) => e.event));
+      const steps = gm.FUNNEL.filter(([k, evs]) => evs && evs.some((n) => names.has(n))).map(([k]) => k);
+      const own = events.filter((e) => gm.VISIT.includes(e.event) || !gm.SERVER_ONLY.has(e.event));
+      const activeDays = [...new Set(own.map((e) => day(e.created_at)))].sort();
+      const later = activeDays.map((d) => dd(createdAt, d)).filter((k) => k >= 1);
+      const age = dd(createdAt, now.toISOString());
+      const last = own.length ? own.reduce((a, b) => a.created_at > b.created_at ? a : b) : null;
+      return {
+        steps,
+        stoppedAt: steps.length ? steps[steps.length - 1] : "signed_up",
+        activeDays: activeDays.length,
+        returned: later.length > 0,
+        back2: age >= 1 ? later.includes(1) : null,
+        back7: age >= 7 ? later.some((k) => k <= 7) : null,
+        lastEvent: last ? last.event : null,
+        lastAt: last ? last.created_at : null
+      };
+    }
+    var yesNo = (v) => v == null ? "too early" : v ? "yes" : "no";
+    function journeyText(j) {
+      const did = j.steps.length ? j.steps.map((k) => STEP_TEXT[k]).join(" \u2192 ") : "only signed up";
+      return `did: ${did} \xB7 active days ${j.activeDays} \xB7 back day 2: ${yesNo(j.back2)} \xB7 back in week 1: ${yesNo(j.back7)}` + (j.lastEvent ? ` \xB7 last: ${j.lastEvent} ${String(j.lastAt).slice(0, 16)} UTC` : "");
+    }
+    async function newUsersLine({ days = 7, now = /* @__PURE__ */ new Date() } = {}) {
+      const gm = require_growthMetrics();
+      const since = new Date(now.getTime() - days * 864e5).toISOString().slice(0, 19).replace("T", " ");
+      const users = await query(
+        `SELECT u.id, u.email, u.created_at FROM users u WHERE u.created_at >= ?`,
+        [since]
+      ).catch(() => []);
+      const admins = String(proc.env.ADMIN_EMAILS || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+      const live = users.filter((u) => !gm.isTest(u.email) && !admins.includes(String(u.email || "").toLowerCase()));
+      if (!live.length) return `No new users in the last ${days} days.`;
+      const ev = await query(
+        `SELECT user_id, event, created_at FROM analytics_events WHERE user_id IN (${live.map(() => "?").join(",")})`,
+        live.map((u) => u.id)
+      ).catch(() => []);
+      const count = Object.fromEntries(Object.keys(STEP_TEXT).map((k) => [k, 0]));
+      const stops = {};
+      let back = 0;
+      for (const u of live) {
+        const j = journey(ev.filter((e) => e.user_id === u.id), u.created_at, now);
+        for (const k of j.steps) count[k]++;
+        stops[j.stoppedAt] = (stops[j.stoppedAt] || 0) + 1;
+        if (j.returned) back++;
+      }
+      const top = Object.entries(stops).sort((a, b) => b[1] - a[1])[0];
+      const stopText = top[0] === "signed_up" ? "right after signing up" : `after "${STEP_TEXT[top[0]]}"`;
+      return `What new users did (last ${days} days, ${live.length} people): saw the first screen ${count.first_screen}, picked a way in ${count.picked_a_path}, put own data in ${count.own_data_in}, opened a report ${count.first_report}, came back on another day ${back}. Most stop ${stopText} (${top[1]}).`;
+    }
+    async function newFeedback() {
+      const cur = await query(`SELECT kind FROM lifecycle_emails WHERE user_id = 0 AND kind LIKE 'digest_fb:%'`).catch(() => []);
+      const after = cur.reduce((m, r) => Math.max(m, Number(String(r.kind).split(":")[1]) || 0), 0);
+      return query(
+        `SELECT id, user_id, kind, trigger, rating, answer, comment, device, created_at FROM feedback
+      WHERE id > ? AND is_test = 0 ORDER BY id`,
+        [after]
+      ).catch(() => []);
+    }
+    var fbText = (f) => `#${f.user_id || "deleted"} \xB7 ${f.kind}/${f.trigger}${f.rating ? " \xB7 " + f.rating + "/5" : ""}${f.answer ? " \xB7 " + f.answer : ""}${f.comment ? ' \xB7 "' + String(f.comment).slice(0, 400) + '"' : ""}`;
+    async function runDigest({ now = /* @__PURE__ */ new Date() } = {}) {
       const to = (proc.env.ACTIVITY_DIGEST_TO || proc.env.LEAD_NOTIFY_TO || "ctmakc@gmail.com").split(",").map((s) => s.trim()).filter(Boolean);
       const groups = [
         ["digest_1d", "Day 1", await dueUsers("digest_1d", 24, 72)],
@@ -26972,25 +27044,34 @@ var require_lifecycle = __commonJS({
             continue;
           }
           const s = await activitySummary(u.id);
-          rows.push({ kind, label, u, s });
+          const ev = await query("SELECT event, created_at FROM analytics_events WHERE user_id = ? ORDER BY created_at", [u.id]).catch(() => []);
+          const j = journey(ev, u.created_at, now);
+          rows.push({ kind, label, u, s, j });
         }
       }
-      if (!rows.length) return { sent: false, users: 0 };
-      const text = rows.map(({ label, u, s }) => `${label} \xB7 #${u.id} ${u.email} \xB7 ${u.method || "?"} \xB7 ${u.source || "source unknown"}${u.country ? " \xB7 " + u.country : ""}
-  ${describe(s)}${s.lastSeen ? " \xB7 last activity " + s.lastSeen + " UTC" : ""}`).join("\n\n");
-      const html = '<div style="font-family:sans-serif"><p>New Finman users at day 1 and day 7: where they came from and what they did.</p><table style="border-collapse:collapse"><tr style="color:#666;text-align:left"><th style="padding:4px 10px 4px 0">Mark</th><th style="padding:4px 10px 4px 0">User</th><th style="padding:4px 10px 4px 0">Source</th><th style="padding:4px 0">Activity</th></tr>' + rows.map(({ label, u, s }) => `<tr><td style="padding:6px 10px 6px 0;vertical-align:top">${esc(label)}</td><td style="padding:6px 10px 6px 0;vertical-align:top">#${esc(u.id)} ${esc(u.email)}<br><span style="color:#666">${esc(u.method || "")}</span></td><td style="padding:6px 10px 6px 0;vertical-align:top">${esc(u.source || "unknown")}${u.country ? '<br><span style="color:#666">' + esc(u.country) + "</span>" : ""}</td><td style="padding:6px 0;vertical-align:top">${esc(describe(s))}${s.lastSeen ? '<br><span style="color:#666">last activity ' + esc(s.lastSeen) + " UTC</span>" : ""}</td></tr>`).join("") + "</table></div>";
+      const fb = await newFeedback();
+      if (!rows.length && !fb.length) return { sent: false, users: 0 };
+      const did = await newUsersLine({ days: 7, now }).catch(() => "");
+      const text = (did ? did + "\n\n" : "") + rows.map(({ label, u, s, j }) => `${label} \xB7 #${u.id} ${u.email} \xB7 ${u.method || "?"} \xB7 ${u.source || "source unknown"}${u.country ? " \xB7 " + u.country : ""}
+  ${journeyText(j)}
+  ${describe(s)}${s.lastSeen ? " \xB7 last activity " + s.lastSeen + " UTC" : ""}`).join("\n\n") + (fb.length ? `
+
+Feedback from users (${fb.length}):
+` + fb.map((f) => "  " + fbText(f)).join("\n") : "") + "\n\nAll feedback: https://app.finman.money/admin";
+      const html = '<div style="font-family:sans-serif">' + (did ? `<p style="background:#f3f6f4;padding:10px 12px;border-radius:8px"><b>${esc(did)}</b></p>` : "") + (rows.length ? "<p>New Finman users at day 1 and day 7: where they came from and what they did.</p>" : "") + '<table style="border-collapse:collapse"><tr style="color:#666;text-align:left"><th style="padding:4px 10px 4px 0">Mark</th><th style="padding:4px 10px 4px 0">User</th><th style="padding:4px 10px 4px 0">Source</th><th style="padding:4px 0">Activity</th></tr>' + rows.map(({ label, u, s, j }) => `<tr><td style="padding:6px 10px 6px 0;vertical-align:top">${esc(label)}</td><td style="padding:6px 10px 6px 0;vertical-align:top">#${esc(u.id)} ${esc(u.email)}<br><span style="color:#666">${esc(u.method || "")}</span></td><td style="padding:6px 10px 6px 0;vertical-align:top">${esc(u.source || "unknown")}${u.country ? '<br><span style="color:#666">' + esc(u.country) + "</span>" : ""}</td><td style="padding:6px 0;vertical-align:top">${esc(journeyText(j))}<br><span style="color:#666">${esc(describe(s))}</span>${s.lastSeen ? '<br><span style="color:#666">last activity ' + esc(s.lastSeen) + " UTC</span>" : ""}</td></tr>`).join("") + "</table>" + (fb.length ? `<p style="margin-top:16px"><b>Feedback from users (${fb.length})</b></p><ul>` + fb.map((f) => `<li>${esc(fbText(f))}</li>`).join("") + "</ul>" : "") + '<p><a href="https://app.finman.money/admin">All feedback and numbers on /admin</a></p></div>';
       const r = await emailService.sendEmail({
         to,
         from: proc.env.LEAD_NOTIFY_FROM || "INNOVA Leads <leads@finman.money>",
-        subject: `Finman users \xB7 day 1 / day 7 \xB7 ${rows.length}`,
+        subject: `Finman users \xB7 day 1 / day 7 \xB7 ${rows.length}${fb.length ? ` \xB7 feedback ${fb.length}` : ""}`,
         text,
         html
       });
       if (r && (r.sent || r.skipped)) {
         for (const { kind, u } of rows) await markSent(u.id, kind);
+        if (fb.length) await markSent(0, `digest_fb:${fb[fb.length - 1].id}`);
       }
       logger.info({ users: rows.length, sent: r && r.sent }, "[lifecycle] digest");
-      return { sent: !!(r && r.sent), users: rows.length };
+      return { sent: !!(r && r.sent), users: rows.length, feedback: fb.length, did };
     }
     function unsubscribeUrl(userId) {
       const { unsubToken } = require_track();
@@ -27122,7 +27203,7 @@ Stop these emails: ${unsub}`
       }, { timezone: "UTC" });
       return task;
     }
-    module2.exports = { runDigest, runNudges, start, activitySummary, nudgeMessage, unsubscribeUrl };
+    module2.exports = { runDigest, runNudges, start, activitySummary, nudgeMessage, unsubscribeUrl, journey, journeyText, newUsersLine };
   }
 });
 

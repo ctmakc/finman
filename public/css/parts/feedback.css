@@ -164,3 +164,18 @@
 :root .fba-funnel b { text-align: right; font-variant-numeric: tabular-nums; }
 :root .fba-weeks td:not(:first-child), :root .fba-weeks th:not(:first-child) { text-align: right; }
 @media (max-width: 560px) { :root .fba-funnel li { grid-template-columns: minmax(0, 1fr) 2.5rem; } :root .fba-bar { grid-column: 1 / -1; grid-row: 2; } }
+
+/* day3 survey: the "what gets in the way" field is open from the start (1123) */
+:root .fb-card-label { font-size: 0.86rem; font-weight: 600; color: var(--fm-ink-2, inherit); }
+/* Feedback button in the header (desktop) and the drawer foot (phone) */
+:root .user-info .fm-fb-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 44px; min-height: 44px; padding: 0 12px; white-space: nowrap;
+  border: 0; border-radius: var(--radius-pill); background: var(--fresh-plate, var(--fm-surface));
+  box-shadow: var(--shadow-sm), 0 2px 8px var(--fm-shadow-ink, rgba(0,0,0,.08));
+  color: var(--fm-ink); font-family: var(--fm-font-ui); font-weight: 600; font-size: 0.85rem; cursor: pointer;
+}
+:root .user-info .fm-fb-btn:hover { background: var(--fm-surface-2); }
+:root .user-info .fm-fb-btn span { display: none; }
+@media (min-width: 1280px) { :root .user-info .fm-fb-btn span { display: inline; } }
+:root .fm-drawer-foot .fm-fb-btn { width: 100%; justify-content: center; margin-bottom: 8px; display: inline-flex; align-items: center; gap: 8px; }

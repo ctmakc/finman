@@ -6,7 +6,7 @@
 //           not part of their ledger). user_id goes NULL when the account is deleted
 //           (services/accountDeletion.js) — the exit survey survives anonymised.
 //   kind     rating | survey | bug | idea | exit
-//   trigger  menu | settings | import_done | insight_shown | day7 | account_delete
+//   trigger  menu | settings | import_done | insight_shown | day3 | day7 | account_delete
 //   answer   chosen option key of a survey (e.g. bank_sync, privacy)
 //   is_test  comment starts with "test" — kept out of Telegram / review inbox
 //   status   new | seen | done

@@ -150,4 +150,4 @@ async function runWeekly({ now = new Date(), dryRun = false } = {}) {
   return { sent: !!(r && r.sent), lines };
 }
 
-module.exports = { compute, load, describe, runWeekly, FUNNEL, ACTIVATE, VISIT, sourceClass, weekOf };
+module.exports = { compute, load, describe, runWeekly, FUNNEL, ACTIVATE, VISIT, SERVER_ONLY, sourceClass, weekOf, isTest };

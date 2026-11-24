@@ -2,7 +2,9 @@
 //
 //   FMFeedback.open(tab, trigger)  dialog: Rate Finman | Report a bug | Idea  (menu, settings)
 //   FMFeedback.afterImport()       one-question card after the first successful import
-//   FMFeedback.maybeDay7(user)     one-question card on an app open 7+ days after sign-up
+//   FMFeedback.maybeDay7(user)     on an app open: day3 card (score 1–5 + "what gets in the way")
+//                                  3+ days after sign-up, then the day7 card 7+ days after sign-up.
+//                                  QA: ?fm_qa_survey=day3 (or day7) shows the card at once.
 //   FMFeedback.exitHtml() / sendExit()   "Why are you leaving?" inside the delete-account modal
 //   FMFeedback.renderAdmin()       /admin page (ADMIN_EMAILS only; the server checks too)
 //
@@ -12,7 +14,7 @@
   'use strict';
 
   var LS = 'fm_fb_';
-  var APP_VERSION = 'web-1121';
+  var APP_VERSION = 'web-1123';
 
   function t(key, fallback, vars) {
     try {
@@ -181,6 +183,14 @@
 
   // ------------------------------------------------- one-question survey card
   var SURVEYS = {
+    day3: {
+      q: ['fb.s.day3.q', 'How is Finman working for you so far?'],
+      type: 'stars',
+      ends: [['fb.s.day3.low', 'Not useful'], ['fb.s.day3.high', 'Very useful']],
+      // The text field shows right away: this survey is the place to say what is missing.
+      more: ['fb.s.day3.more', 'What gets in the way, or what is missing?'],
+      open: true,
+    },
     import_done: {
       q: ['fb.s.import.q', 'How easy was it to get your data in?'],
       type: 'stars',
@@ -212,14 +222,17 @@
     if (s.type === 'stars') {
       inner += '<div class="fb-card-scale">' + [1, 2, 3, 4, 5].map(function (n) {
         return '<button type="button" class="fb-pick" data-rating="' + n + '">' + n + '</button>';
-      }).join('') + '</div><div class="fb-card-ends"><span>' + esc(t('fb.s.hard', 'Hard')) + '</span><span>' + esc(t('fb.s.easy', 'Easy')) + '</span></div>';
+      }).join('') + '</div><div class="fb-card-ends"><span>' + esc(s.ends ? t(s.ends[0][0], s.ends[0][1]) : t('fb.s.hard', 'Hard')) +
+        '</span><span>' + esc(s.ends ? t(s.ends[1][0], s.ends[1][1]) : t('fb.s.easy', 'Easy')) + '</span></div>';
     } else {
       inner += '<div class="fb-card-opts">' + s.options.map(function (o) {
         return '<button type="button" class="fb-opt" data-answer="' + o[0] + '">' + esc(t(o[1], o[2])) + '</button>';
       }).join('') + '</div>';
     }
-    inner += '<div class="fb-card-more" hidden><textarea class="form-control" rows="2" maxlength="2000" placeholder="' +
-      esc(t('fb.card.more', 'Anything to add? (optional)')) + '"></textarea>' +
+    var moreText = s.more ? t(s.more[0], s.more[1]) : t('fb.card.more', 'Anything to add? (optional)');
+    inner += '<div class="fb-card-more"' + (s.open ? '' : ' hidden') + '>' +
+      (s.open ? '<label class="fb-card-label" for="fb-card-text">' + esc(moreText) + '</label>' : '') +
+      '<textarea id="fb-card-text" class="form-control" rows="2" maxlength="2000"' + (s.open ? '' : ' placeholder="' + esc(moreText) + '"') + '></textarea>' +
       '<button type="button" class="btn btn-primary btn-sm fb-card-send">' + esc(t('fb.send', 'Send')) + '</button></div>';
     el.innerHTML = inner;
     document.body.appendChild(el);
@@ -234,6 +247,11 @@
     function submit() {
       var comment = (el.querySelector('textarea').value || '').trim();
       var btn = el.querySelector('.fb-card-send');
+      if (!picked.rating && !picked.answer && !comment) {
+        var first = el.querySelector('.fb-pick, .fb-opt');
+        if (first) first.focus();
+        return;
+      }
       btn.disabled = true;
       send({ kind: 'survey', trigger: trigger, rating: picked.rating || null, answer: picked.answer || null, comment: comment })
         .then(function () { close(); toast(t('fb.thanks', 'Thank you! We read every message.')); })
@@ -268,12 +286,30 @@
 
   function afterImport() { maybeCard('import_done', 4500); }
 
+  // QA: ?fm_qa_survey=day3 shows that card now, whatever the account age or earlier answers.
+  function qaSurvey() {
+    try {
+      var m = /[?&]fm_qa_survey=([a-z0-9_]+)/.exec(location.search);
+      return m && SURVEYS[m[1]] ? m[1] : null;
+    } catch (e) { return null; }
+  }
+
+  // One card per app open: day3 first (3+ days after sign-up), day7 on a later open.
   function maybeDay7(u) {
     u = u || user();
+    var qa = qaSurvey();
+    if (qa) {
+      try { localStorage.removeItem(key(qa)); } catch (e) { /* ignore */ }
+      setTimeout(function () { card(qa); }, 1500);
+      return;
+    }
     if (!u || !u.createdAt) return;
     var created = Date.parse(String(u.createdAt).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(u.createdAt) ? '' : 'Z'));
-    if (!created || Date.now() - created < 7 * 864e5) return;
-    maybeCard('day7', 8000);
+    if (!created) return;
+    var age = Date.now() - created;
+    if (age < 3 * 864e5) return;
+    if (!seen('day3')) return maybeCard('day3', 8000);
+    if (age >= 7 * 864e5) maybeCard('day7', 8000);
   }
 
   // ---------------------------------------------------------- exit survey
@@ -330,7 +366,7 @@
         '<h2 class="fba-h">Feedback</h2>' +
         '<div class="fb-admin-bar">' +
           '<select id="fba-kind" class="form-control"><option value="">All kinds</option>' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_LABEL[k] + '</option>'; }).join('') + '</select>' +
-          '<select id="fba-trigger" class="form-control"><option value="">All moments</option>' + ['menu', 'settings', 'import_done', 'day7', 'account_delete'].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join('') + '</select>' +
+          '<select id="fba-trigger" class="form-control"><option value="">All moments</option>' + ['menu', 'settings', 'import_done', 'day3', 'day7', 'account_delete'].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join('') + '</select>' +
           '<select id="fba-status" class="form-control"><option value="">Any status</option><option value="new">New</option><option value="seen">Seen</option><option value="done">Done</option></select>' +
           '<label class="fb-admin-tests"><input type="checkbox" id="fba-tests"> Show tests</label>' +
         '</div>' +
