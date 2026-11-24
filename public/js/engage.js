@@ -357,14 +357,17 @@
     if (!j || !document.body.contains(main) || appState.currentPage !== 'dashboard') return;
     // Nothing of their own yet: the first-run banners carry the page.
     var hasData = j.data && j.data.transactions > 0;
-    var showList = !j.complete && !j.dismissed;
+    // STATEMENT DESK: Home has its own «First steps» rail; the old setup list stays off there.
+    var aside = main.querySelector('#sd-aside');
+    var showList = !aside && !j.complete && !j.dismissed;
     var holder = document.createElement('div');
     holder.className = 'eg-panel' + (showList ? '' : ' is-compact');
     holder.innerHTML =
       (showList ? journeyHtml(j) : weekCardHtml(j)) +
       '<div class="eg-side">' + streakHtml(j) + inviteHtml(j.referral) + (hasData ? pushHtml(j.push) : '') + '</div>';
     var hero = main.querySelector('.fm-hero');
-    if (hero && hero.parentNode) hero.parentNode.insertBefore(holder, hero.nextSibling);
+    if (aside) aside.appendChild(holder);
+    else if (hero && hero.parentNode) hero.parentNode.insertBefore(holder, hero.nextSibling);
     else main.insertBefore(holder, main.firstChild);
     bindPanel(holder, j, main);
     if (hasData) heroTips(main, j.tips);

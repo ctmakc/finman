@@ -666,16 +666,41 @@
     },
 
     // Called first thing by renderDashboard(). true = the start screen took over.
+    // STATEMENT DESK (24.11): a brand-new account gets the example household loaded quietly and
+    // lands straight on Home (Month strip + First steps). The old start screen stays only as a
+    // fallback when the example cannot be loaded. The example loads once per account and browser:
+    // after «Hide the example» it does not come back.
     async beforeDashboard(main) {
       var st = await this.loadState();
       if (!st || !main) return false;
       var skipped = false;
       try { skipped = localStorage.getItem(userKey()) === '1'; } catch (_) {}
       if (st.firstRun && !skipped) {
+        var auto = false;
+        try { auto = localStorage.getItem(userKey() + '_auto') === '1'; } catch (_) {}
+        if (!auto && await this.quietDemo()) {
+          this.state = await this.loadState();
+          return false;
+        }
         renderStart(main);
         return true;
       }
       return false;
+    },
+
+    // Loads the example household without a screen of its own. true = loaded.
+    async quietDemo() {
+      try { localStorage.setItem(userKey() + '_auto', '1'); } catch (_) {}
+      try {
+        var cur = (typeof appState !== 'undefined' && appState.baseCurrency) || 'CAD';
+        var r = await api('/api/onboarding/demo', { method: 'POST', body: JSON.stringify({ currency: cur }) });
+        if (typeof fetchAccounts === 'function') await fetchAccounts();
+        track('demo_autoloaded', { rows: r && r.transactions });
+        return true;
+      } catch (err) {
+        console.warn('[firstrun] example', err && err.message);
+        return false;
+      }
     },
 
     // Called after the dashboard is painted: banners above the hero.
@@ -683,8 +708,11 @@
       var st = this.state;
       if (!st || !main) return;
       var html = verifyBannerHtml();
-      if (st.demo) html += demoBannerHtml();
-      else if (st.ownTransactions === 0) html += emptyBannerHtml();
+      // STATEMENT DESK: the example chip and First steps say it on Home; banners only elsewhere.
+      if (!main.querySelector('#sd-steps-holder')) {
+        if (st.demo) html += demoBannerHtml();
+        else if (st.ownTransactions === 0) html += emptyBannerHtml();
+      }
       if (!html) return;
       var holder = document.createElement('div');
       holder.className = 'fr-banners';
