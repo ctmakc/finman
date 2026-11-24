@@ -431,3 +431,22 @@ html:root { font-size: 15px; }
   :root .sd-shell .fm-bug-fab:hover { background: #26392F; color: #FFFFFF; }
   :root .sd-rail { padding-bottom: 60px; }
 }
+
+/* ---- Bug button (owner 23.11: «неприметный жучок справа внизу… а ещё лучше в бутерброд») ----
+   No menu on screen (sign-in): the studio's small bug — 40px dark circle, dim icon, bottom right.
+   Phone app: hidden, «Report a bug» lives in the menu (drawer). Desktop app: an item at the bottom of the rail. */
+:root .fm-bug-fab {
+  left: auto; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center;
+  border: 1px solid #30353C; border-radius: 999px; background: #16181B; color: #A3AAB2;
+  box-shadow: none; opacity: .8; font-size: 15px;
+}
+:root .fm-bug-fab span { display: none; }
+:root .fm-bug-fab:hover, :root .fm-bug-fab:focus-visible { opacity: 1; color: #FFC72C; border-color: #FFC72C; }
+@media (max-width: 760px) { :root .fm-bug-fab { right: 10px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); } }
+/* Inside the app the bug lives in the menu: the rail (desktop) or the drawer (phone). */
+:root body.sd-shell .fm-bug-fab { display: none; }
+:root body.sd-shell .sd-rail { padding-bottom: 0; }
+:root .fm-drawer-body .fm-bug-item { width: 100%; min-height: 44px; justify-content: center; margin: 0 0 12px; display: inline-flex; align-items: center; gap: 8px; }
+/* Sign-in screen: a fixed button would sit on the form fields while scrolling — top right of the page instead, scrolls away. */
+:root body:not(.sd-shell) .fm-bug-fab { position: absolute; top: 12px; right: 12px; bottom: auto; }

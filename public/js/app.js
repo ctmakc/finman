@@ -324,6 +324,7 @@ function renderAuthenticatedUI() {
       </nav>
       <div class="sd-rail-foot">
         <button type="button" class="sd-rail-link" id="sd-rail-fb"><i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span></button>
+        <button type="button" class="sd-rail-link" id="sd-rail-bug"><i class="fas fa-bug" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.bugfab', 'Report a bug'))}</span></button>
         <div class="sd-rail-user" title="${userName}">${userName}</div>
       </div>
     </aside>
@@ -378,6 +379,9 @@ function renderAuthenticatedUI() {
           <button id="drawer-fb-btn" class="btn btn-outline fm-fb-btn" type="button">
             <i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span>
           </button>
+          <button id="drawer-bug-btn" class="btn btn-outline fm-bug-item" type="button">
+            <i class="fas fa-bug" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.bugfab', 'Report a bug'))}</span>
+          </button>
           ${navGroupHtml({ title: 'Main', items: NAV_PRIMARY }, 'fm-drawer-link', 'fm-drawer-group-title')}
           ${NAV_GROUPS.map((g) => navGroupHtml(g, 'fm-drawer-link', 'fm-drawer-group-title')).join('')}
         </div>
@@ -419,11 +423,19 @@ function renderAuthenticatedUI() {
     if (typeof showAddTransactionModal === 'function') showAddTransactionModal();
   });
   document.getElementById('sd-rail-fb').addEventListener('click', () => { if (window.FMFeedback) window.FMFeedback.open('rate', 'menu'); });
+  document.getElementById('sd-rail-bug').addEventListener('click', () => {
+    if (typeof window.mmixReviewStart === 'function') window.mmixReviewStart(); else if (window.FMFeedback) window.FMFeedback.open('bug', 'menu');
+  });
 
   // Feedback: one tap from the header (desktop) or the drawer foot (phone).
   const openFeedback = () => { if (window.FMFeedback) window.FMFeedback.open('rate', 'menu'); };
   document.getElementById('fb-header-btn').addEventListener('click', openFeedback);
   document.getElementById('drawer-fb-btn').addEventListener('click', () => { if (isDrawerOpen()) closeDrawer(); openFeedback(); });
+  // Bug report from the menu: the MMIX Review Kit comment mode (same as the small bug on screens without a menu).
+  document.getElementById('drawer-bug-btn').addEventListener('click', () => {
+    if (isDrawerOpen()) closeDrawer();
+    if (typeof window.mmixReviewStart === 'function') window.mmixReviewStart(); else if (window.FMFeedback) window.FMFeedback.open('bug', 'menu');
+  });
 
   document.getElementById('logo-link').addEventListener('click', (e) => {
     e.preventDefault();
