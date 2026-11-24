@@ -424,3 +424,10 @@ html:root { font-size: 15px; }
 }
 :root .tx-amount-sign { margin-right: 1px; }
 @media (max-width: 639px) { :root .fm-bug-fab { left: auto; right: 12px; } }
+/* Desktop: the bug button docks at the bottom of the rail, styled as a rail item. */
+@media (min-width: 1024px) {
+  :root .sd-shell .fm-bug-fab { left: 12px; bottom: 14px; width: calc(var(--sd-rail-w) - 24px); justify-content: flex-start; padding: 0 10px; min-height: 36px;
+    border-radius: 7px; background: #1E2E29; color: var(--sd-rail-ink); box-shadow: 0 -10px 0 2px var(--sd-rail), 0 6px 0 8px var(--sd-rail); opacity: 1; font-weight: 500; font-size: 13.5px; z-index: 160; }
+  :root .sd-shell .fm-bug-fab:hover { background: #26392F; color: #FFFFFF; }
+  :root .sd-rail { padding-bottom: 60px; }
+}
