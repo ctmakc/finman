@@ -9,10 +9,10 @@ Replaces «CLEAR DAY» (cold `#F1F4F9`, Rubik, cobalt `#2B50F0`, oversized pill 
 
 ## Tokens (law — components use only these)
 - `--sd-canvas #F2F4F3` (stone with a green cast; never cream) · `--sd-surface #FCFDFC` · `--sd-sunk #E8ECEA`
-- `--sd-ink #10201B` (text) · `--sd-ink-2 #4A5A54` · `--sd-ink-3 #7A8882` · `--sd-line #DCE2DF` (hairline)
+- `--sd-ink #10201B` (text) · `--sd-ink-2 #4A5A54` · `--sd-ink-3 #5C6B65` · `--sd-line #DCE2DF` (hairline)
 - `--sd-rail #0F1A17` (desktop sidebar, dark) · `--sd-rail-ink #C9D6D0` · `--sd-rail-active #1E2E29`
-- `--sd-money #0E7A5A` (primary action, income, progress) · `--sd-money-soft #DDEFE7`
-- `--sd-spend #C9502F` (ONLY money going out) · `--sd-warn #B7791F` (only warnings)
+- `--sd-money #0C7254` (primary action, income, progress) · `--sd-money-soft #DDEFE7`
+- `--sd-spend #B84826` (ONLY money going out) · `--sd-warn #865510` (only warnings)
 - Dark theme: canvas `#0D1412`, surface `#141D1A`, line `#24302C`, ink `#E6EEEA`, money `#3FBF8F`, spend `#E7765A`.
 - Type: **Geologica** variable (self-host woff2, Latin+Cyrillic), UI 400/500, headings 600, numbers `font-variant-numeric: tabular-nums`.
   Scale: 12 / 13 / 14 (body) / 16 / 20 / 24 (page title) / 32 (the one big number per screen). Nothing above 32 inside the app.
@@ -38,3 +38,7 @@ Replaces «CLEAR DAY» (cold `#F1F4F9`, Rubik, cobalt `#2B50F0`, oversized pill 
 ## Bans
 No hero-size headlines in the app, no pill slabs, no cobalt, no purple, no centered marketing blocks, no emoji icons,
 no survey before day 3. Demo data is labelled «Example» in one small chip, never hidden.
+
+
+## Contrast (24.11, measured)
+ink-3 on canvas 5.07 · money on surface 5.6 · spend on surface 5.16 · warn on its chip 5.36 · rail-dim on rail 6.67; dark theme all ≥5.8.
