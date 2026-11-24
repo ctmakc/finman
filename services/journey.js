@@ -32,7 +32,9 @@ const DAY_MS = 86400000;
 // Events the server writes on the user's behalf: they are not the user showing up.
 const SYSTEM_EVENTS = ['activated', 'week1_active', 'week4_active', 'journey_step_done', 'badge_earned',
   'checklist_dismissed', 'weekly_email_sent', 'monthly_email_sent', 'push_sent', 'email_unsubscribe',
-  'referral_signup', 'friend_joined'];
+  'referral_signup', 'friend_joined',
+  // Written by the server, not by the person (emails we send, a client opening an invoice link): not a visit.
+  'email_sent', 'weekly_note_sent', 'vault_purged', 'invoice_link_viewed', 'sign_up', 'account_deleted'];
 const SYSTEM_SQL = SYSTEM_EVENTS.map((e) => `'${e}'`).join(', ');
 
 // ---------- pure helpers (unit-tested) ----------

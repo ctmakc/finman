@@ -14,7 +14,7 @@ const VISIT = ['app_open', 'login'];
 const ACTIVATE = ['activated', 'import_done', 'transaction_added', 'transfer_added', 'receipt_scanned', 'vault_import_done', 'vault_transaction_added', 'onboarding_import_done'];
 // Events the server writes on its own (emails, badges, journey ticks): not a visit.
 const SERVER_ONLY = new Set(['email_sent', 'weekly_email_sent', 'weekly_note_sent', 'monthly_email_sent', 'badge_earned', 'journey_step_done',
-  'activated', 'sign_up', 'account_deleted', 'vault_purged', 'push_sent', 'email_unsubscribe']);
+  'activated', 'sign_up', 'account_deleted', 'vault_purged', 'push_sent', 'email_unsubscribe', 'invoice_link_viewed']);
 const FUNNEL = [
   ['signed_up', null],
   ['vault_ready', ['vault_setup', 'vault_key_saved']],

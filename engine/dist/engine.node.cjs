@@ -19436,7 +19436,14 @@ var require_journey = __commonJS({
       "push_sent",
       "email_unsubscribe",
       "referral_signup",
-      "friend_joined"
+      "friend_joined",
+      // Written by the server, not by the person (emails we send, a client opening an invoice link): not a visit.
+      "email_sent",
+      "weekly_note_sent",
+      "vault_purged",
+      "invoice_link_viewed",
+      "sign_up",
+      "account_deleted"
     ];
     var SYSTEM_SQL = SYSTEM_EVENTS.map((e) => `'${e}'`).join(", ");
     function weekStart(iso) {
@@ -26277,7 +26284,8 @@ var require_growthMetrics = __commonJS({
       "account_deleted",
       "vault_purged",
       "push_sent",
-      "email_unsubscribe"
+      "email_unsubscribe",
+      "invoice_link_viewed"
     ]);
     var FUNNEL = [
       ["signed_up", null],
