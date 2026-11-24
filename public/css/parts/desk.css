@@ -450,3 +450,12 @@ html:root { font-size: 15px; }
 :root .fm-drawer-body .fm-bug-item { width: 100%; min-height: 44px; justify-content: center; margin: 0 0 12px; display: inline-flex; align-items: center; gap: 8px; }
 /* Sign-in screen: a fixed button would sit on the form fields while scrolling — top right of the page instead, scrolls away. */
 :root body:not(.sd-shell) .fm-bug-fab { position: absolute; top: 12px; right: 12px; bottom: auto; }
+/* First steps: records only in this browser until protected (owner 23.11) */
+:root .sd-deviceonly { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: start; margin: 12px 0 4px; padding: 10px 12px;
+  border: 1px solid var(--sd-line); border-left: 3px solid var(--sd-warn); border-radius: 8px; background: var(--sd-surface); font-size: 13px; color: var(--sd-ink-2); }
+:root .sd-deviceonly i { color: var(--sd-warn); margin-top: 2px; }
+:root .sd-deviceonly .btn { grid-column: 2; justify-self: start; }
+/* Vault «Protect your data» / passkey buttons: long labels wrap, stacked with air between them. */
+:root :is(.fmv-pk-new, .fmv-pw-new, .fmv-pk) { white-space: normal; height: auto; min-height: 44px; line-height: 1.3; padding: 10px 14px; text-align: center; }
+:root :is(.fmv-pk-new, .fmv-pw-new, .fmv-pk, .fmv-later) { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
+:root .fmv-later { background: none; border: 0; color: var(--sd-ink-2); }

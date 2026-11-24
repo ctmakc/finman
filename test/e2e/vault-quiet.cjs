@@ -82,6 +82,9 @@ const txCount = async (page) => { const r = await api(page, '/api/transactions?l
   await d2.ctx.close();
   // 3
   const p = d1.page.evaluate(() => window.FMVault.protect());
+  // A browser with WebAuthn first offers a passkey (test/e2e/vault-passkey.cjs); here: the vault password.
+  await d1.page.waitForSelector('.fmv-pw-new, #fmv-secret2', { timeout: 20000 });
+  if (await d1.page.locator('.fmv-pw-new').count()) await d1.page.click('.fmv-pw-new');
   await d1.page.waitForSelector('#fmv-secret2', { timeout: 20000 });
   await d1.page.fill('#fmv-secret', 'Quiet-pass-1124!'); await d1.page.fill('#fmv-secret2', 'Quiet-pass-1124!');
   await d1.page.click('.fmv-form button[type=submit]');

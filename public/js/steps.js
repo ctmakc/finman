@@ -65,13 +65,14 @@
     ];
     if (protect) {
       list.push({ key: 'protect', title: 'Protect your data', done: false,
-        body: 'Your records are encrypted on this device. Set a way back in so they open on your other devices and after clearing the browser.' });
+        body: 'Add a passkey (Face ID, fingerprint or your Google account) or a vault password, so your records open on your other devices and survive a cleared browser.' });
     }
     list.push({ key: 'map', title: 'See where it went', done: flag('map'),
       body: 'Money map lays out what came in and where it went, by category.' });
     list.push({ key: 'yours', title: 'Make it yours', done: own && !demo && (flag('budget') || flag('yours')),
       body: demo ? 'Hide the example so only your own money is on screen.' : 'Give your biggest category a monthly budget.' });
-    return { list: list, own: own, demo: demo };
+    // Owner 23.11: until protection is set, say plainly that the records live only in this browser.
+    return { list: list, own: own, demo: demo, deviceOnly: Boolean(protect && protect.password) };
   }
 
   function quickFormHtml() {
@@ -116,6 +117,9 @@
     return '<section class="sd-card sd-steps" id="sd-steps" aria-labelledby="sd-steps-h">' +
       '<div class="sd-steps-head"><h2 id="sd-steps-h">First steps</h2><span class="sd-steps-count">' + done + ' of ' + list.length + ' done</span></div>' +
       '<div class="sd-steps-bar" aria-hidden="true"><span style="--p:' + pct + '%"></span></div>' +
+      (ctx.deviceOnly ? '<div class="sd-deviceonly" role="note"><i class="fas fa-laptop" aria-hidden="true"></i><span>Your records are only in this browser for now. ' +
+        'Protect them to open Finman on another device and keep them if this browser is cleared.</span>' +
+        '<button type="button" class="btn btn-outline btn-sm" data-sd="protect">Protect now</button></div>' : '') +
       (mixed ? '<div class="sd-mix" role="status"><span>Your first entry is saved. The example household is still on screen next to it.</span>' +
         '<div><button type="button" class="btn btn-primary btn-sm" data-sd="hide-example">Hide the example</button>' +
         '<button type="button" class="btn btn-outline btn-sm" data-sd="keep-example">Keep it for now</button></div></div>' : '') +

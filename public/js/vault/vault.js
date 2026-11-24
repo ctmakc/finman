@@ -24,6 +24,7 @@
       rkCopy: 'Copy', rkDownload: 'Download as file', rkSaved: 'I saved my recovery key', rkContinue: 'Continue', rkCopied: 'Copied',
       unlockTitle: 'Unlock your data', unlockLead: 'Your data is encrypted. Enter your password to open it on this device.',
       unlockLeadSafe: 'Your data is encrypted. Enter your vault password to open it on this device. Never set one? Open Finman on the device where you started and choose «Protect your data», or use your recovery key.',
+      pkUse: "Use your passkey", pkTitle: "Protect your data", pkLead: "Right now your records open only in this browser. Add a way back in: then they open on your other devices and survive a cleared browser. Finman still never sees them.", pkCreate: "Use a passkey (Face ID, fingerprint or your Google account)", pkOrPw: "Set a vault password instead", pkFail: "The passkey did not open your vault. Try again, or use your vault password or recovery key.", pkNo: "This device cannot keep a passkey for Finman. Set a vault password instead.", later: "Later",
       pw: 'Password', vaultPw: 'Vault password', vaultPw2: 'Repeat the vault password', unlock: 'Unlock', useRk: 'Use recovery key instead', usePw: 'Use password instead',
       rk: 'Recovery key', remember: 'Keep unlocked on this device', wrongPw: 'That password does not open your vault.', wrongRk: 'That recovery key does not open your vault.',
       setTitle: 'Create a vault password', setLead: 'You sign in with Google or Apple, so Finman needs a separate password to encrypt your data. We never see it. Use at least 8 characters.',
@@ -43,6 +44,7 @@
       rkCopy: 'Скопировать', rkDownload: 'Скачать файлом', rkSaved: 'Я сохранил ключ восстановления', rkContinue: 'Продолжить', rkCopied: 'Скопировано',
       unlockTitle: 'Откройте свои данные', unlockLead: 'Ваши данные зашифрованы. Введите пароль, чтобы открыть их на этом устройстве.',
       unlockLeadSafe: 'Ваши данные зашифрованы. Введите пароль сейфа, чтобы открыть их на этом устройстве. Ещё не задавали? Откройте Finman там, где начинали, и нажмите «Защитить данные», или введите ключ восстановления.',
+      pkUse: "Войти по ключу доступа", pkTitle: "Защитите данные", pkLead: "Сейчас ваши записи открываются только в этом браузере. Добавьте способ входа: тогда они откроются на других устройствах и сохранятся, если браузер очистят. Finman их по-прежнему не видит.", pkCreate: "Ключ доступа (Face ID, отпечаток или аккаунт Google)", pkOrPw: "Лучше задать пароль сейфа", pkFail: "Ключ доступа не открыл сейф. Попробуйте ещё раз или введите пароль сейфа либо ключ восстановления.", pkNo: "Это устройство не может хранить ключ доступа для Finman. Задайте пароль сейфа.", later: "Позже",
       pw: 'Пароль', vaultPw: 'Пароль сейфа', vaultPw2: 'Пароль сейфа ещё раз', unlock: 'Открыть', useRk: 'Открыть ключом восстановления', usePw: 'Открыть паролем',
       rk: 'Ключ восстановления', remember: 'Держать открытым на этом устройстве', wrongPw: 'Этот пароль не открывает сейф.', wrongRk: 'Этот ключ не открывает сейф.',
       setTitle: 'Придумайте пароль сейфа', setLead: 'Вы входите через Google или Apple, поэтому для шифрования нужен отдельный пароль. Мы его не видим. Минимум 8 символов.',
@@ -62,6 +64,7 @@
       rkCopy: 'Скопіювати', rkDownload: 'Завантажити файлом', rkSaved: 'Я зберіг ключ відновлення', rkContinue: 'Продовжити', rkCopied: 'Скопійовано',
       unlockTitle: 'Відкрийте свої дані', unlockLead: 'Ваші дані зашифровані. Введіть пароль, щоб відкрити їх на цьому пристрої.',
       unlockLeadSafe: 'Ваші дані зашифровані. Введіть пароль сейфа, щоб відкрити їх на цьому пристрої. Ще не задавали? Відкрийте Finman там, де починали, і натисніть «Захистити дані», або введіть ключ відновлення.',
+      pkUse: "Увійти ключем доступу", pkTitle: "Захистіть дані", pkLead: "Зараз ваші записи відкриваються лише в цьому браузері. Додайте спосіб входу: тоді вони відкриються на інших пристроях і збережуться, якщо браузер очистять. Finman їх і далі не бачить.", pkCreate: "Ключ доступу (Face ID, відбиток або акаунт Google)", pkOrPw: "Краще задати пароль сейфа", pkFail: "Ключ доступу не відкрив сейф. Спробуйте ще раз або введіть пароль сейфа чи ключ відновлення.", pkNo: "Цей пристрій не може зберігати ключ доступу для Finman. Задайте пароль сейфа.", later: "Пізніше",
       pw: 'Пароль', vaultPw: 'Пароль сейфа', vaultPw2: 'Пароль сейфа ще раз', unlock: 'Відкрити', useRk: 'Відкрити ключем відновлення', usePw: 'Відкрити паролем',
       rk: 'Ключ відновлення', remember: 'Тримати відкритим на цьому пристрої', wrongPw: 'Цей пароль не відкриває сейф.', wrongRk: 'Цей ключ не відкриває сейф.',
       setTitle: 'Придумайте пароль сейфа', setLead: 'Ви входите через Google або Apple, тож для шифрування потрібен окремий пароль. Ми його не бачимо. Щонайменше 8 символів.',
@@ -317,6 +320,7 @@
           <label class="fmv-check"><input type="checkbox" id="fmv-remember" checked> ${esc(t('remember'))}</label>
           <p class="auth-error fmv-err" role="alert" ${error ? '' : 'hidden'}>${esc(error || '')}</p>
           <button type="submit" class="btn btn-primary fmv-wide">${esc(isSet ? t('create') : t('unlock'))}</button>
+          ${mode === 'unlock-safe' && hasPasskey() ? `<button type="button" class="btn btn-outline fmv-wide fmv-pk"><i class="fas fa-fingerprint" aria-hidden="true"></i> ${esc(t('pkUse'))}</button>` : ''}
           ${canRk ? `<button type="button" class="btn btn-link fmv-toggle">${esc(t('useRk'))}</button>` : ''}
           <button type="button" class="btn btn-link fmv-signout">${esc(t('signOut'))}</button>
         </form>`);
@@ -332,6 +336,8 @@
         (useRk ? host.querySelector('#fmv-rk') : host.querySelector('#fmv-secret')).focus();
       };
       host.querySelector('.fmv-signout').onclick = () => { resolve({ signOut: true }); };
+      const pk = host.querySelector('.fmv-pk');
+      if (pk) pk.onclick = () => resolve({ passkey: true, remember: host.querySelector('#fmv-remember').checked });
       form.onsubmit = (e) => {
         e.preventDefault();
         err.hidden = true;
@@ -418,7 +424,11 @@
       if (ans.signOut) { signOutNow(); return null; }
       try {
         let vk;
-        if (ans.recovery != null) {
+        if (ans.passkey) {
+          const secret = await passkeyGet([]);
+          if (!secret) throw new Error('no passkey secret');
+          vk = await C.unwrap(await kekFromSecret(secret), m.wrapped_pw, C.wrapAad(uid, 'pw'));
+        } else if (ans.recovery != null) {
           vk = await C.unwrap(await C.kekFromRecovery(C.parseRecoveryKey(ans.recovery)), m.wrapped_rc, C.wrapAad(uid, 'rc'));
           if (!m.hasPassword) await resetSafePassword(vk);
         } else {
@@ -427,7 +437,7 @@
         if (ans.remember) await rememberDevice(uid, vk);
         return vk;
       } catch (e) {
-        lastError = ans.recovery != null ? t('wrongRk') : t('wrongPw');
+        lastError = ans.passkey ? t('pkFail') : ans.recovery != null ? t('wrongRk') : t('wrongPw');
         await new Promise((r) => setTimeout(r, 400));
       }
     }
@@ -554,6 +564,52 @@
     return true;
   }
 
+  // ---------------------------------------------------------------- passkey (WebAuthn PRF)
+  // A passkey (Face ID, fingerprint, Google/Apple password manager) that supports the PRF
+  // extension gives the same 32 secret bytes for this account on every device it syncs to.
+  // Those bytes stand in for the vault password: KDF → KEK → wrapped_pw, nothing new on the server.
+  const hasPasskey = () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+  const hexOf = (b) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join('');
+  async function sha(text) { return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))); }
+  async function passkeyGet(ids) {
+    const salt = await sha('finman-vault-prf:v1:' + st.user.id);
+    const a = await navigator.credentials.get({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: location.hostname, userVerification: 'required', timeout: 120000,
+      allowCredentials: (ids || []).map((id) => ({ type: 'public-key', id })),
+      extensions: { prf: { eval: { first: salt } } } } });
+    const r = a && a.getClientExtensionResults && a.getClientExtensionResults().prf;
+    return r && r.results && r.results.first ? 'pk1:' + hexOf(r.results.first) : null;
+  }
+  async function passkeyCreate() {
+    const uid = st.user.id;
+    const salt = await sha('finman-vault-prf:v1:' + uid);
+    const name = (st.user && st.user.email) || ('finman-' + uid);
+    const cred = await navigator.credentials.create({ publicKey: {
+      rp: { name: 'Finman', id: location.hostname },
+      user: { id: (await sha('finman-user:' + uid)).slice(0, 16), name, displayName: name },
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      timeout: 120000, extensions: { prf: { eval: { first: salt } } } } });
+    const out = cred && cred.getClientExtensionResults && cred.getClientExtensionResults().prf;
+    if (out && out.results && out.results.first) return 'pk1:' + hexOf(out.results.first);
+    if (!out || !out.enabled) return null; // this authenticator has no PRF
+    return passkeyGet([cred.rawId]);
+  }
+  // «Protect your data»: passkey first (when the browser has WebAuthn), vault password otherwise.
+  function askProtectWay(note) {
+    return new Promise((resolve) => {
+      const host = overlay(`<h2>${esc(t('pkTitle'))}</h2><p>${esc(t('pkLead'))}</p>
+        ${note ? `<p class="auth-error fmv-err" role="alert">${esc(note)}</p>` : ''}
+        <button type="button" class="btn btn-primary fmv-wide fmv-pk-new"><i class="fas fa-fingerprint" aria-hidden="true"></i> ${esc(t('pkCreate'))}</button>
+        <button type="button" class="btn btn-outline fmv-wide fmv-pw-new">${esc(t('pkOrPw'))}</button>
+        <button type="button" class="btn btn-link fmv-later">${esc(t('later'))}</button>`);
+      host.querySelector('.fmv-pk-new').onclick = () => resolve('passkey');
+      host.querySelector('.fmv-pw-new').onclick = () => resolve('password');
+      host.querySelector('.fmv-later').onclick = () => resolve(null);
+    });
+  }
+
   // ---------------------------------------------------------------- protect later
   async function protectionPending() {
     if (!st.user || st.mode !== 'vault') return null;
@@ -568,11 +624,21 @@
     const uid = st.user.id;
     const p = (await idbGet('protect:' + uid)) || { password: false, recovery: true };
     if (p.password) {
-      const ans = await askSecret({ title: t('setTitle'), lead: t('setLead'), mode: 'set-safe' });
-      if (!ans || ans.signOut || !ans.secret) { closeOverlay(); return false; }
+      let secret = null;
+      let way = hasPasskey() ? await askProtectWay() : 'password';
+      while (way === 'passkey' && !secret) {
+        try { secret = await passkeyCreate(); } catch (e) { secret = null; }
+        if (!secret) way = await askProtectWay(t('pkNo'));
+      }
+      if (!secret && way === 'password') {
+        const ans = await askSecret({ title: t('setTitle'), lead: t('setLead'), mode: 'set-safe' });
+        if (ans && !ans.signOut && ans.secret) secret = ans.secret;
+      }
+      if (!secret) { closeOverlay(); return false; }
       st.meta = await apiJson('/api/vault/meta'); // the salt saved at setup (this session may predate it)
       if (!st.meta.salt) throw new Error('Vault salt missing');
-      const wrapped = await C.wrap(await kekFromSecret(ans.secret), st.vaultKey, C.wrapAad(uid, 'pw'));
+      const wrapped = await C.wrap(await kekFromSecret(secret), st.vaultKey, C.wrapAad(uid, 'pw'));
+      p.way = secret.startsWith('pk1:') ? 'passkey' : 'password';
       await apiJson('/api/vault/rewrap', { method: 'POST', json: { wrapped_pw: wrapped } });
       st.meta.wrapped_pw = wrapped;
       p.password = false;
