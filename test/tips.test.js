@@ -74,4 +74,26 @@ describe('tips for new users', () => {
       }
     }
   });
+  test('day 20 still gets the next tip (window to day 30) with the feedback line; 3 unanswered emails = quiet', async () => {
+    const tips = require('../services/tips');
+    const g = await user('gus', 20 * 24);
+    const h = await user('hal', 20 * 24);
+    // hal: three Finman emails and no visit since -> left alone.
+    for (const k of ['nudge_not_activated', 'tip_invoice', 'week:2026-11-16']) {
+      await dbRun(ctx.db, "INSERT INTO lifecycle_emails (user_id, kind, sent_at) VALUES (?, ?, datetime('now', '-5 days'))", [h, k]);
+    }
+    // team digest rows are not emails to the person (neither for the 2-day gap nor for the quiet rule)
+    await dbRun(ctx.db, "INSERT INTO lifecycle_emails (user_id, kind, sent_at) VALUES (?, 'digest_1d', datetime('now', '-2 hours'))", [g]);
+    await dbRun(ctx.db, "INSERT INTO lifecycle_emails (user_id, kind, sent_at) VALUES (?, 'digest_7d', datetime('now', '-5 days'))", [g]);
+    const r = await tips.runTips();
+    expect(r.quiet).toBe(1);
+    const toG = sent.filter((m) => m.to[0] === 'gus@example.com');
+    expect(toG).toHaveLength(1);
+    expect(toG[0].text).toMatch(/\/feedback/);
+    expect(sent.find((m) => m.to[0] === 'hal@example.com')).toBeUndefined();
+    expect(await tips.unanswered(h)).toBe(3);
+    // A visit resets the count.
+    await dbRun(ctx.db, "INSERT INTO analytics_events (user_id, event, created_at) VALUES (?, 'app_open', datetime('now', '-1 days'))", [h]);
+    expect(await tips.unanswered(h)).toBe(0);
+  });
 });

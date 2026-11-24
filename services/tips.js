@@ -2,12 +2,16 @@
 // (services/lifecycle.js, LIFECYCLE_EMAILS=1).
 //
 //   tip_invoice  24 h – 5 days after sign-up   how to send the first invoice with a pay link
-//   tip_import   3 – 9 days                    how to bring a bank statement in
-//   tip_next     7 – 16 days                   what to look at next (money map, budgets, own AI)
+//   tip_import   3 – 14 days                   how to bring a bank statement in
+//   tip_next     7 – 30 days                   what to look at next (money map, budgets, own AI)
+//                                              + one line asking what is missing (-> /feedback)
+// Windows widened 23.11 (touch map): the 44 h gap pushed tips past their window, and nothing
+// reached people on day 14–30. Each tip is still sent once.
 //
 // Frequency: one email per user per run, never within 2 days of any other Finman email
 // (lifecycle_emails), each tip once. A tip whose step the user already took is skipped for
 // good (kind `<tip>:skip`): someone who imported a statement never hears "import a statement".
+// Never chased: no tip after 3 Finman emails in a row with no visit (app_open / login) after them.
 // Who: our own sign-ups only (acquisition tracked from sign-up), not test accounts, not opted
 // out (users.lifecycle_opt_out = Settings → Emails "Tips" and the one-click unsubscribe link).
 // No money figures in any tip: vault (encrypted) users get the same text.
@@ -22,11 +26,14 @@ const logger = require('../lib/logger');
 const APP_URL = () => (process.env.APP_PUBLIC_URL || 'https://app.finman.money').replace(/\/+$/, '');
 const SITE = 'https://finman.money';
 const GAP_HOURS = 44;
+const MAX_UNANSWERED = 3;
+// Emails to the person (not the team digest rows kept per user, not skip marks).
+const USER_EMAIL_KINDS = "kind NOT LIKE '%:skip' AND kind NOT LIKE 'digest_%' AND kind NOT LIKE 'metrics:%'";
 
 const TIPS = [
   { kind: 'tip_invoice', fromH: 24, toH: 5 * 24, done: ['invoice_created', 'invoice_link_created'], doneInvoices: true },
-  { kind: 'tip_import', fromH: 3 * 24, toH: 9 * 24, done: ['import_done', 'vault_import_done', 'statement_read'] },
-  { kind: 'tip_next', fromH: 7 * 24, toH: 16 * 24, done: [] },
+  { kind: 'tip_import', fromH: 3 * 24, toH: 14 * 24, done: ['import_done', 'vault_import_done', 'onboarding_import_done', 'statement_read'] },
+  { kind: 'tip_next', fromH: 7 * 24, toH: 30 * 24, done: [] },
 ];
 
 const TEXT = {
@@ -55,6 +62,7 @@ const TEXT = {
         `Money map: where each dollar went last month, on one screen. ${app}/money-map`,
         `Budgets: set a limit for the 2–3 categories that surprise you most; Finman shows the rest of the month as you spend. ${app}/budgets`,
         `Your own AI: connect ChatGPT, Claude or Gemini and ask questions about your money in plain words. ${app}/my-ai`,
+        `What is missing in Finman for you? Two clicks, and the people who build it read every answer: ${app}/feedback`,
       ],
     },
     sign: 'Finman',
@@ -86,6 +94,7 @@ const TEXT = {
         `Карта денег: куда ушёл каждый доллар в прошлом месяце, на одном экране. ${app}/money-map`,
         `Бюджеты: поставьте лимит на 2–3 категории, которые удивляют сильнее всего; Finman покажет остаток месяца по ходу трат. ${app}/budgets`,
         `Свой ИИ: подключите ChatGPT, Claude или Gemini и спрашивайте о своих деньгах обычными словами. ${app}/my-ai`,
+        `Чего вам не хватает в Finman? Два клика, и каждый ответ читают те, кто его делает: ${app}/feedback`,
       ],
     },
     sign: 'Finman',
@@ -117,6 +126,7 @@ const TEXT = {
         `Карта грошей: куди пішов кожен долар минулого місяця, на одному екрані. ${app}/money-map`,
         `Бюджети: поставте ліміт на 2–3 категорії, які дивують найбільше; Finman покаже залишок місяця по ходу витрат. ${app}/budgets`,
         `Свій ШІ: підключіть ChatGPT, Claude або Gemini і питайте про свої гроші звичайними словами. ${app}/my-ai`,
+        `Чого вам бракує у Finman? Два кліки, і кожну відповідь читають ті, хто його робить: ${app}/feedback`,
       ],
     },
     sign: 'Finman',
@@ -167,9 +177,21 @@ async function alreadyDone(tip, userId) {
 
 async function recentEmail(userId) {
   const r = await get(
-    `SELECT 1 AS x FROM lifecycle_emails WHERE user_id = ? AND kind NOT LIKE '%:skip' AND sent_at > datetime('now', ?) LIMIT 1`,
+    `SELECT 1 AS x FROM lifecycle_emails WHERE user_id = ? AND ${USER_EMAIL_KINDS} AND sent_at > datetime('now', ?) LIMIT 1`,
     [userId, `-${GAP_HOURS} hours`]).catch(() => null);
   return !!r;
+}
+
+// Finman emails sent to the person since they last opened Finman.
+async function unanswered(userId) {
+  const last = await get(
+    `SELECT MAX(created_at) AS at FROM analytics_events WHERE user_id = ? AND event IN ('app_open', 'login')`, [userId],
+  ).catch(() => null);
+  const r = await get(
+    `SELECT COUNT(*) AS n FROM lifecycle_emails WHERE user_id = ? AND ${USER_EMAIL_KINDS} AND sent_at > COALESCE(?, '1970-01-01')`,
+    [userId, last && last.at],
+  ).catch(() => ({ n: 0 }));
+  return Number(r && r.n) || 0;
 }
 
 async function candidates(tip) {
@@ -189,7 +211,7 @@ async function runTips({ dryRun = false } = {}) {
   if (!from && !dryRun) return { skipped: true, reason: 'NO_LIFECYCLE_FROM' };
   const { unsubscribeUrl } = require('./lifecycle');
   const touched = new Set();
-  const out = { sent: 0, skipped_done: 0, waiting: 0, planned: [] };
+  const out = { sent: 0, skipped_done: 0, waiting: 0, quiet: 0, planned: [] };
   for (const tip of TIPS) {
     for (const u of await candidates(tip)) {
       if (touched.has(u.id)) continue;
@@ -200,6 +222,7 @@ async function runTips({ dryRun = false } = {}) {
         continue;
       }
       if (await recentEmail(u.id)) { out.waiting++; continue; }
+      if (await unanswered(u.id) >= MAX_UNANSWERED) { out.quiet++; continue; }
       touched.add(u.id);
       if (dryRun) { out.planned.push({ user_id: u.id, kind: tip.kind, lang: langOf(u.lang) }); continue; }
       const unsub = unsubscribeUrl(u.id);
@@ -220,4 +243,4 @@ async function runTips({ dryRun = false } = {}) {
   return out;
 }
 
-module.exports = { runTips, render, TIPS, TEXT, langOf };
+module.exports = { runTips, render, unanswered, TIPS, TEXT, langOf, MAX_UNANSWERED };

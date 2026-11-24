@@ -26693,10 +26693,12 @@ var require_tips = __commonJS({
     var APP_URL = () => (proc.env.APP_PUBLIC_URL || "https://app.finman.money").replace(/\/+$/, "");
     var SITE = "https://finman.money";
     var GAP_HOURS = 44;
+    var MAX_UNANSWERED = 3;
+    var USER_EMAIL_KINDS = "kind NOT LIKE '%:skip' AND kind NOT LIKE 'digest_%' AND kind NOT LIKE 'metrics:%'";
     var TIPS = [
       { kind: "tip_invoice", fromH: 24, toH: 5 * 24, done: ["invoice_created", "invoice_link_created"], doneInvoices: true },
-      { kind: "tip_import", fromH: 3 * 24, toH: 9 * 24, done: ["import_done", "vault_import_done", "statement_read"] },
-      { kind: "tip_next", fromH: 7 * 24, toH: 16 * 24, done: [] }
+      { kind: "tip_import", fromH: 3 * 24, toH: 14 * 24, done: ["import_done", "vault_import_done", "onboarding_import_done", "statement_read"] },
+      { kind: "tip_next", fromH: 7 * 24, toH: 30 * 24, done: [] }
     ];
     var TEXT = {
       en: {
@@ -26727,7 +26729,8 @@ var require_tips = __commonJS({
           body: (app2) => [
             `Money map: where each dollar went last month, on one screen. ${app2}/money-map`,
             `Budgets: set a limit for the 2\u20133 categories that surprise you most; Finman shows the rest of the month as you spend. ${app2}/budgets`,
-            `Your own AI: connect ChatGPT, Claude or Gemini and ask questions about your money in plain words. ${app2}/my-ai`
+            `Your own AI: connect ChatGPT, Claude or Gemini and ask questions about your money in plain words. ${app2}/my-ai`,
+            `What is missing in Finman for you? Two clicks, and the people who build it read every answer: ${app2}/feedback`
           ]
         },
         sign: "Finman",
@@ -26762,7 +26765,8 @@ var require_tips = __commonJS({
           body: (app2) => [
             `\u041A\u0430\u0440\u0442\u0430 \u0434\u0435\u043D\u0435\u0433: \u043A\u0443\u0434\u0430 \u0443\u0448\u0451\u043B \u043A\u0430\u0436\u0434\u044B\u0439 \u0434\u043E\u043B\u043B\u0430\u0440 \u0432 \u043F\u0440\u043E\u0448\u043B\u043E\u043C \u043C\u0435\u0441\u044F\u0446\u0435, \u043D\u0430 \u043E\u0434\u043D\u043E\u043C \u044D\u043A\u0440\u0430\u043D\u0435. ${app2}/money-map`,
             `\u0411\u044E\u0434\u0436\u0435\u0442\u044B: \u043F\u043E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043B\u0438\u043C\u0438\u0442 \u043D\u0430 2\u20133 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0443\u0434\u0438\u0432\u043B\u044F\u044E\u0442 \u0441\u0438\u043B\u044C\u043D\u0435\u0435 \u0432\u0441\u0435\u0433\u043E; Finman \u043F\u043E\u043A\u0430\u0436\u0435\u0442 \u043E\u0441\u0442\u0430\u0442\u043E\u043A \u043C\u0435\u0441\u044F\u0446\u0430 \u043F\u043E \u0445\u043E\u0434\u0443 \u0442\u0440\u0430\u0442. ${app2}/budgets`,
-            `\u0421\u0432\u043E\u0439 \u0418\u0418: \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0435 ChatGPT, Claude \u0438\u043B\u0438 Gemini \u0438 \u0441\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u0439\u0442\u0435 \u043E \u0441\u0432\u043E\u0438\u0445 \u0434\u0435\u043D\u044C\u0433\u0430\u0445 \u043E\u0431\u044B\u0447\u043D\u044B\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438. ${app2}/my-ai`
+            `\u0421\u0432\u043E\u0439 \u0418\u0418: \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0435 ChatGPT, Claude \u0438\u043B\u0438 Gemini \u0438 \u0441\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u0439\u0442\u0435 \u043E \u0441\u0432\u043E\u0438\u0445 \u0434\u0435\u043D\u044C\u0433\u0430\u0445 \u043E\u0431\u044B\u0447\u043D\u044B\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438. ${app2}/my-ai`,
+            `\u0427\u0435\u0433\u043E \u0432\u0430\u043C \u043D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u0432 Finman? \u0414\u0432\u0430 \u043A\u043B\u0438\u043A\u0430, \u0438 \u043A\u0430\u0436\u0434\u044B\u0439 \u043E\u0442\u0432\u0435\u0442 \u0447\u0438\u0442\u0430\u044E\u0442 \u0442\u0435, \u043A\u0442\u043E \u0435\u0433\u043E \u0434\u0435\u043B\u0430\u0435\u0442: ${app2}/feedback`
           ]
         },
         sign: "Finman",
@@ -26797,7 +26801,8 @@ var require_tips = __commonJS({
           body: (app2) => [
             `\u041A\u0430\u0440\u0442\u0430 \u0433\u0440\u043E\u0448\u0435\u0439: \u043A\u0443\u0434\u0438 \u043F\u0456\u0448\u043E\u0432 \u043A\u043E\u0436\u0435\u043D \u0434\u043E\u043B\u0430\u0440 \u043C\u0438\u043D\u0443\u043B\u043E\u0433\u043E \u043C\u0456\u0441\u044F\u0446\u044F, \u043D\u0430 \u043E\u0434\u043D\u043E\u043C\u0443 \u0435\u043A\u0440\u0430\u043D\u0456. ${app2}/money-map`,
             `\u0411\u044E\u0434\u0436\u0435\u0442\u0438: \u043F\u043E\u0441\u0442\u0430\u0432\u0442\u0435 \u043B\u0456\u043C\u0456\u0442 \u043D\u0430 2\u20133 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0456\u0457, \u044F\u043A\u0456 \u0434\u0438\u0432\u0443\u044E\u0442\u044C \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0435; Finman \u043F\u043E\u043A\u0430\u0436\u0435 \u0437\u0430\u043B\u0438\u0448\u043E\u043A \u043C\u0456\u0441\u044F\u0446\u044F \u043F\u043E \u0445\u043E\u0434\u0443 \u0432\u0438\u0442\u0440\u0430\u0442. ${app2}/budgets`,
-            `\u0421\u0432\u0456\u0439 \u0428\u0406: \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0456\u0442\u044C ChatGPT, Claude \u0430\u0431\u043E Gemini \u0456 \u043F\u0438\u0442\u0430\u0439\u0442\u0435 \u043F\u0440\u043E \u0441\u0432\u043E\u0457 \u0433\u0440\u043E\u0448\u0456 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438. ${app2}/my-ai`
+            `\u0421\u0432\u0456\u0439 \u0428\u0406: \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0456\u0442\u044C ChatGPT, Claude \u0430\u0431\u043E Gemini \u0456 \u043F\u0438\u0442\u0430\u0439\u0442\u0435 \u043F\u0440\u043E \u0441\u0432\u043E\u0457 \u0433\u0440\u043E\u0448\u0456 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438. ${app2}/my-ai`,
+            `\u0427\u043E\u0433\u043E \u0432\u0430\u043C \u0431\u0440\u0430\u043A\u0443\u0454 \u0443 Finman? \u0414\u0432\u0430 \u043A\u043B\u0456\u043A\u0438, \u0456 \u043A\u043E\u0436\u043D\u0443 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u0447\u0438\u0442\u0430\u044E\u0442\u044C \u0442\u0456, \u0445\u0442\u043E \u0439\u043E\u0433\u043E \u0440\u043E\u0431\u0438\u0442\u044C: ${app2}/feedback`
           ]
         },
         sign: "Finman",
@@ -26842,10 +26847,21 @@ ${L.stop}: ${unsubUrl}`;
     }
     async function recentEmail(userId) {
       const r = await get(
-        `SELECT 1 AS x FROM lifecycle_emails WHERE user_id = ? AND kind NOT LIKE '%:skip' AND sent_at > datetime('now', ?) LIMIT 1`,
+        `SELECT 1 AS x FROM lifecycle_emails WHERE user_id = ? AND ${USER_EMAIL_KINDS} AND sent_at > datetime('now', ?) LIMIT 1`,
         [userId, `-${GAP_HOURS} hours`]
       ).catch(() => null);
       return !!r;
+    }
+    async function unanswered(userId) {
+      const last = await get(
+        `SELECT MAX(created_at) AS at FROM analytics_events WHERE user_id = ? AND event IN ('app_open', 'login')`,
+        [userId]
+      ).catch(() => null);
+      const r = await get(
+        `SELECT COUNT(*) AS n FROM lifecycle_emails WHERE user_id = ? AND ${USER_EMAIL_KINDS} AND sent_at > COALESCE(?, '1970-01-01')`,
+        [userId, last && last.at]
+      ).catch(() => ({ n: 0 }));
+      return Number(r && r.n) || 0;
     }
     async function candidates(tip) {
       return query(
@@ -26864,7 +26880,7 @@ ${L.stop}: ${unsubUrl}`;
       if (!from && !dryRun) return { skipped: true, reason: "NO_LIFECYCLE_FROM" };
       const { unsubscribeUrl } = require_lifecycle();
       const touched = /* @__PURE__ */ new Set();
-      const out = { sent: 0, skipped_done: 0, waiting: 0, planned: [] };
+      const out = { sent: 0, skipped_done: 0, waiting: 0, quiet: 0, planned: [] };
       for (const tip of TIPS) {
         for (const u of await candidates(tip)) {
           if (touched.has(u.id)) continue;
@@ -26876,6 +26892,10 @@ ${L.stop}: ${unsubUrl}`;
           }
           if (await recentEmail(u.id)) {
             out.waiting++;
+            continue;
+          }
+          if (await unanswered(u.id) >= MAX_UNANSWERED) {
+            out.quiet++;
             continue;
           }
           touched.add(u.id);
@@ -26904,7 +26924,7 @@ ${L.stop}: ${unsubUrl}`;
       logger.info({ sent: out.sent, skipped_done: out.skipped_done, waiting: out.waiting }, "[tips] run");
       return out;
     }
-    module2.exports = { runTips, render, TIPS, TEXT, langOf };
+    module2.exports = { runTips, render, unanswered, TIPS, TEXT, langOf, MAX_UNANSWERED };
   }
 });
 
@@ -27229,7 +27249,7 @@ var require_weeklyNote = __commonJS({
     var lifecycle = require_lifecycle();
     var { VAULT_USER_SQL } = require_vault();
     var TZ = "America/Toronto";
-    var ACTIVATE = ["import_done", "transaction_added", "transfer_added", "receipt_scanned", "activated", "onboarding_import_done"];
+    var ACTIVATE = require_growthMetrics().ACTIVATE;
     var VISIT = ["app_open", "login"];
     var MAX_UNANSWERED = 3;
     var APP_URL = () => (proc.env.APP_PUBLIC_URL || "https://app.finman.money").replace(/\/+$/, "");
