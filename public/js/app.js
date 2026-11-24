@@ -412,7 +412,7 @@ function renderAuthenticatedUI() {
     const link = e.target.closest('[data-page]');
     if (!link || !link.closest('.fm-nav, .fm-drawer, .sd-rail, .sd-tabbar')) return;
     e.preventDefault();
-    navigateTo(link.dataset.page);
+    openFromNav(link.dataset.page);
   };
   app.querySelector('.header').addEventListener('click', onNavClick);
   document.getElementById('app-drawer').addEventListener('click', onNavClick);
@@ -439,7 +439,7 @@ function renderAuthenticatedUI() {
 
   document.getElementById('logo-link').addEventListener('click', (e) => {
     e.preventDefault();
-    navigateTo('dashboard');
+    openFromNav('dashboard');
   });
 
   // "More" popover (desktop)
@@ -565,6 +565,24 @@ function detectIconFont() {
 // Routing
 // ---------------------------------------------------------------------------
 const REPORT_PAGES = new Set(['reports', 'analytics', 'money-map', 'week', 'forecast', 'networth']);
+
+// A tap on the menu item, tab or logo of the page that is already open scrolls it to the
+// top and closes the menus. It used to rebuild the whole page (6 API calls, panels, one more
+// "shown" event per tap): user #41 (17.11) tapped Home 9 times in 6 s and the journal got 9
+// checklist_shown. Code that must repaint the open page calls navigateTo itself.
+function openFromNav(page) {
+  const main = document.getElementById('main-content');
+  const settled = main && !main.querySelector('.loading');
+  if (page === appState.currentPage && settled && Object.prototype.hasOwnProperty.call(PAGE_RENDERERS, page)) {
+    if (typeof closeDrawer === 'function' && isDrawerOpen()) closeDrawer();
+    if (typeof setMoreMenu === 'function') setMoreMenu(false);
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    return false;
+  }
+  navigateTo(page);
+  return true;
+}
 
 function navigateTo(page, options = {}) {
   // A survey card belongs to the screen it was asked on: leaving hides it (not answered → asked on a later open).

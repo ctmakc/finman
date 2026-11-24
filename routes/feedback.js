@@ -121,12 +121,16 @@ router.post('/', postLimiter, optionalAuth, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [row.user_id, row.kind, row.trigger, row.rating, row.answer, row.comment, row.page, row.app_version, row.lang, row.device, row.is_test]
     );
-    tracker.track('feedback_sent', {
-      userId,
-      props: { kind, trigger, rating },
-      req,
-      test: Boolean(row.is_test),
-    });
+    // An anonymous test answer (e.g. an exit survey with a "test…" comment) would sit in the
+    // journal with nothing to mark it: on 21.11 one read as a lost real answer. Not journaled.
+    if (!(row.is_test && !userId)) {
+      tracker.track('feedback_sent', {
+        userId,
+        props: { kind, trigger, rating },
+        req,
+        test: Boolean(row.is_test),
+      });
+    }
     forward(row, { viewport: b.viewport, ua: req.headers['user-agent'] });
     res.status(201).json({ ok: true, id: r.id });
   } catch (error) {

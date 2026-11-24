@@ -244,6 +244,8 @@
     if (allDone) setFlag('steps_seen_done');
     bind(holder, ctx);
     var cur = ctx.list.filter(function (s) { return !s.done; })[0];
+    // STOPGAP until 2026-12-08 (law 862), same as checklist_shown in engage.js: the cause
+    // (a tap on Home while on Home repainted it) is fixed in openFromNav.
     if (Date.now() - (window.__sdStepsShownAt || 0) > 10 * 60 * 1000) {
       window.__sdStepsShownAt = Date.now();
       track('steps_shown', { done: ctx.list.length - ctx.list.filter(function (s) { return !s.done; }).length, total: ctx.list.length, current: cur ? cur.key : 'none' });

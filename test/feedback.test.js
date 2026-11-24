@@ -77,6 +77,20 @@ describe('POST /api/feedback — storing', () => {
     expect(row.user_id).toBeNull();
     expect(row.answer).toBe('privacy');
   });
+  test('an anonymous test answer leaves no journal event; a real one does (21.11 lost-exit scare)', async () => {
+    const tracker = require('../services/tracker');
+    const t = await post({ kind: 'exit', trigger: 'account_delete', answer: 'testing', comment: 'test exit survey 1124' });
+    const r = await post({ kind: 'exit', trigger: 'account_delete', answer: 'bank' });
+    expect(t.status).toBe(201);
+    expect(r.status).toBe(201);
+    if (tracker.flush) await tracker.flush();
+    await new Promise((ok) => setTimeout(ok, 50));
+    const rows = await db.query("SELECT props FROM analytics_events WHERE event = 'feedback_sent' AND user_id IS NULL");
+    const answers = rows.map((x) => JSON.parse(x.props).kind + ':' + (JSON.parse(x.props).trigger));
+    expect((await db.get('SELECT is_test FROM feedback WHERE id = ?', [t.body.id])).is_test).toBe(1);
+    // the anonymous test is not journaled, the two real anonymous exits are
+    expect(answers.filter((a) => a === 'exit:account_delete').length).toBe(2);
+  });
   test('a broken token is treated as anonymous', async () => {
     const r = await post({ kind: 'exit', trigger: 'account_delete', answer: 'other' }, 'nope');
     expect(r.status).toBe(201);

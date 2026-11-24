@@ -371,8 +371,9 @@
     else main.insertBefore(holder, main.firstChild);
     bindPanel(holder, j, main);
     if (hasData) heroTips(main, j.tips);
-    // Once per 10 minutes per tab: every return to Dashboard re-renders the list, and
-    // 7 "shows" in 6 seconds (user #41, 17.11) said more about clicks than about the list.
+    // Cause fixed in openFromNav (app.js): a tap on the open page no longer repaints it.
+    // STOPGAP until 2026-12-08 (law 862): once per 10 minutes per tab. Remove it when a week
+    // of the journal shows at most one checklist_shown/steps_shown per Home visit.
     if (showList && Date.now() - (window.__fmChecklistShownAt || 0) > 10 * 60 * 1000) {
       window.__fmChecklistShownAt = Date.now();
       ev('checklist_shown', { done: j.doneCount, next: j.next || '' });
