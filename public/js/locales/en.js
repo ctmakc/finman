@@ -1698,6 +1698,7 @@
     "fb.s.day3.low": "Not useful",
     "fb.s.day3.high": "Very useful",
     "fb.s.day3.more": "What gets in the way, or what is missing?",
+    "fb.bugfab": "Report a bug",
     "fb.menu": "Feedback",
     'fb.s.day7.q': "What would make you open Finman every week?",
     'fb.s.day7.bank': "Automatic bank sync",

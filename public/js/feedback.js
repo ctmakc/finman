@@ -277,9 +277,14 @@
     setTimeout(function () {
       if (seen(trigger)) return;
       var p = typeof fetchWithAuth === 'function' ? fetchWithAuth('/api/feedback/mine?trigger=' + trigger) : null;
-      if (!p) return card(trigger);
-      p.then(function (r) { return r.ok ? r.json() : { answered: false }; })
-        .then(function (b) { if (b && b.answered) markSeen(trigger); else card(trigger); })
+      if (!p) return;
+      // The server decides: 3+ days with own actions and not the first session after signing in.
+      p.then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (b) {
+          if (!b) return;
+          if (b.answered) return markSeen(trigger);
+          if (b.eligible) card(trigger);
+        })
         .catch(function () { /* offline: ask another time */ });
     }, delay || 0);
   }
@@ -314,10 +319,9 @@
     if (!u || !u.createdAt) return;
     var created = Date.parse(String(u.createdAt).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(u.createdAt) ? '' : 'Z'));
     if (!created) return;
-    var age = Date.now() - created;
-    if (age < 3 * 864e5) return;
-    if (!seen('day3')) return maybeCard('day3', 8000);
-    if (age >= 7 * 864e5) maybeCard('day7', 8000);
+    // The server also checks 3+ active days and "not the first session after signing in" (/api/feedback/mine).
+    if (!seen('day3')) return maybeCard('day3', 20000);
+    if (Date.now() - created >= 7 * 864e5) maybeCard('day7', 20000);
   }
 
   // ---------------------------------------------------------- exit survey
@@ -458,6 +462,26 @@
       })
       .catch(function (e) { box.innerHTML = '<p class="fb-admin-empty">' + esc(e.message) + '</p>'; });
   }
+
+  // ------------------------------------------------ bug button (MMIX Review Kit)
+  // A small fixed button on every screen: starts the kit's comment mode (click a spot, note,
+  // voice, photo, files, autosave, Send all) — reports go to review.mmix.biz.
+  function bugButton() {
+    if (document.getElementById('fm-bug-fab')) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'fm-bug-fab';
+    b.className = 'fm-bug-fab';
+    b.setAttribute('aria-label', t('fb.bugfab', 'Report a bug'));
+    b.title = t('fb.bugfab', 'Report a bug');
+    b.innerHTML = '<i class="fas fa-bug" aria-hidden="true"></i><span>' + esc(t('fb.bugfab', 'Report a bug')) + '</span>';
+    b.addEventListener('click', function () {
+      if (typeof window.mmixReviewStart === 'function') window.mmixReviewStart();
+      else open('bug', 'menu');
+    });
+    document.body.appendChild(b);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bugButton); else bugButton();
 
   window.FMFeedback = {
     open: open,

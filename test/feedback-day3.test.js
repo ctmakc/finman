@@ -110,3 +110,26 @@ test('behavior report: people, steps and feedback, no emails, tests left out', a
   expect(md).not.toMatch(/@example\.com|finman-smoke\.test/);
   expect(md).not.toMatch(/hidden test/);
 });
+
+test('survey gate: 3+ days with own actions and not right after signing in (owner 23.11)', async () => {
+  const u = await mkUser('gateuser', 'gateuser@example.com', 24 * 30);
+  const mine = () => ctx.request.get('/api/feedback/mine?trigger=day3').set('Authorization', 'Bearer ' + u.token);
+  // An old account with no use: age alone never qualifies.
+  let r = await mine();
+  expect(r.body).toMatchObject({ answered: false, activeDays: 0, eligible: false });
+  await ev(u.id, 'app_open', 24 * 5);
+  await ev(u.id, 'transaction_added', 24 * 3);
+  await ev(u.id, 'email_sent', 24 * 2); // our email is not their day
+  r = await mine();
+  expect(r.body.activeDays).toBe(2);
+  expect(r.body.eligible).toBe(false);
+  await ev(u.id, 'budget_created', 24 * 1);
+  r = await mine();
+  expect(r.body.activeDays).toBe(3);
+  expect(r.body.eligible).toBe(true);
+  // Just signed in: not this session.
+  await ev(u.id, 'login', 0.2);
+  r = await mine();
+  expect(r.body.freshLogin).toBe(true);
+  expect(r.body.eligible).toBe(false);
+});

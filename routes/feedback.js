@@ -135,11 +135,30 @@ router.post('/', postLimiter, optionalAuth, async (req, res) => {
   }
 });
 
+// Owner's rule 23.11: no survey in the first session after signing in, and none until the person
+// has used Finman on at least 3 different days (days with their own actions, not account age).
+const SURVEY_MIN_DAYS = 3;
+const FRESH_LOGIN_MIN = 120;
+async function surveyGate(userId) {
+  const gm = require('../services/growthMetrics');
+  const { SYSTEM_EVENTS } = require('../services/journey');
+  const skip = [...new Set([...gm.SERVER_ONLY, ...SYSTEM_EVENTS, 'feedback_sent'])];
+  const days = await get(
+    `SELECT COUNT(DISTINCT date(created_at)) AS n FROM analytics_events
+      WHERE user_id = ? AND event NOT IN (${skip.map(() => '?').join(',')})`, [userId, ...skip]).catch(() => ({ n: 0 }));
+  const fresh = await get(
+    `SELECT 1 AS x FROM analytics_events WHERE user_id = ? AND event IN ('login', 'sign_up')
+      AND created_at > datetime('now', ?) LIMIT 1`, [userId, `-${FRESH_LOGIN_MIN} minutes`]).catch(() => null);
+  const activeDays = Number(days && days.n) || 0;
+  return { activeDays, freshLogin: Boolean(fresh), eligible: activeDays >= SURVEY_MIN_DAYS && !fresh };
+}
+
 router.get('/mine', authenticate, async (req, res) => {
   const trigger = String(req.query.trigger || '');
   if (!TRIGGERS.includes(trigger)) return res.status(400).json({ error: true, message: 'Unknown trigger' });
   const row = await get('SELECT id, created_at FROM feedback WHERE user_id = ? AND trigger = ? LIMIT 1', [req.user.id, trigger]);
-  res.json({ answered: Boolean(row) });
+  const gate = await surveyGate(req.user.id);
+  res.json({ answered: Boolean(row), ...gate });
 });
 
 // Team: the path of new users and returns, aggregates only (services/growthMetrics.js).
@@ -198,3 +217,4 @@ router.delete('/admin/:id', authenticate, requireAdmin, async (req, res) => {
 
 module.exports = router;
 module.exports.isAdmin = isAdmin;
+module.exports.surveyGate = surveyGate;

@@ -187,3 +187,17 @@
 /* 1123 walk: empty dashboard charts say what fills them (public/js/charts.js fmChartEmpty). */
 :root .fm-chart-canvas.fm-chart-empty { display: flex; align-items: center; justify-content: center; min-height: 140px; height: auto; }
 :root .fm-chart-empty-text { margin: 0; max-width: 34ch; text-align: center; color: var(--fm-ink-2); font-size: 0.92rem; line-height: 1.5; }
+
+/* Bug button (MMIX Review Kit), every screen, bottom left (1123) */
+:root .fm-bug-fab {
+  position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 900;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--fm-ink, #121a2e); color: #fff; font: 600 0.85rem/1 var(--fm-font-ui, system-ui, sans-serif);
+  box-shadow: 0 6px 18px rgba(18, 26, 46, 0.22); opacity: 0.92;
+}
+:root .fm-bug-fab:hover, :root .fm-bug-fab:focus-visible { opacity: 1; }
+@media (max-width: 639px) {
+  :root .fm-bug-fab { left: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 44px; padding: 0; justify-content: center; }
+  :root .fm-bug-fab span { display: none; }
+}
