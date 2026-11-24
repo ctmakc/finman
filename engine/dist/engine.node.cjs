@@ -26544,7 +26544,9 @@ var require_track = __commonJS({
       const webId = proc.env.OPENPANEL_WEB_CLIENT_ID;
       res.set("Cache-Control", "public, max-age=300");
       res.json({
-        openpanel: webId && proc.env.OPENPANEL_API_URL ? { clientId: webId, apiUrl: "/op" } : null
+        openpanel: webId && proc.env.OPENPANEL_API_URL ? { clientId: webId, apiUrl: "/op" } : null,
+        // Microsoft Clarity (click / scroll maps): strict masking in the project, data-clarity-mask on <body>.
+        clarity: /^[a-z0-9]{6,16}$/.test(proc.env.CLARITY_PROJECT_ID || "") ? { id: proc.env.CLARITY_PROJECT_ID } : null
       });
     });
     router.post("/", beaconLimiter, (req, res) => {
