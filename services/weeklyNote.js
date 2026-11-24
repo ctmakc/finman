@@ -23,7 +23,8 @@ const lifecycle = require('./lifecycle');
 const { VAULT_USER_SQL } = require('./vault');
 
 const TZ = 'America/Toronto';
-const ACTIVATE = ['import_done', 'transaction_added', 'transfer_added', 'receipt_scanned', 'activated', 'onboarding_import_done'];
+// Same list as the team metrics (services/growthMetrics.js ACTIVATE): vault imports count too.
+const ACTIVATE = require('./growthMetrics').ACTIVATE;
 const VISIT = ['app_open', 'login'];
 const MAX_UNANSWERED = 3;
 const APP_URL = () => (process.env.APP_PUBLIC_URL || 'https://app.finman.money').replace(/\/+$/, '');
