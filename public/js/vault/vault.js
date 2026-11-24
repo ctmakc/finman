@@ -23,7 +23,7 @@
       rkLead: 'This key is the only way back to your data if you forget your password. We cannot reset it for you: we never see your password or your key. Save it somewhere safe — a password manager or on paper.',
       rkCopy: 'Copy', rkDownload: 'Download as file', rkSaved: 'I saved my recovery key', rkContinue: 'Continue', rkCopied: 'Copied',
       unlockTitle: 'Unlock your data', unlockLead: 'Your data is encrypted. Enter your password to open it on this device.',
-      unlockLeadSafe: 'Your data is encrypted. Enter your vault password to open it on this device.',
+      unlockLeadSafe: 'Your data is encrypted. Enter your vault password to open it on this device. Never set one? Open Finman on the device where you started and choose «Protect your data», or use your recovery key.',
       pw: 'Password', vaultPw: 'Vault password', vaultPw2: 'Repeat the vault password', unlock: 'Unlock', useRk: 'Use recovery key instead', usePw: 'Use password instead',
       rk: 'Recovery key', remember: 'Keep unlocked on this device', wrongPw: 'That password does not open your vault.', wrongRk: 'That recovery key does not open your vault.',
       setTitle: 'Create a vault password', setLead: 'You sign in with Google or Apple, so Finman needs a separate password to encrypt your data. We never see it. Use at least 8 characters.',
@@ -42,7 +42,7 @@
       rkLead: 'Этот ключ — единственный путь к данным, если вы забудете пароль. Восстановить его мы не сможем: ваш пароль и ключ к нам не попадают. Сохраните его в менеджер паролей или на бумаге.',
       rkCopy: 'Скопировать', rkDownload: 'Скачать файлом', rkSaved: 'Я сохранил ключ восстановления', rkContinue: 'Продолжить', rkCopied: 'Скопировано',
       unlockTitle: 'Откройте свои данные', unlockLead: 'Ваши данные зашифрованы. Введите пароль, чтобы открыть их на этом устройстве.',
-      unlockLeadSafe: 'Ваши данные зашифрованы. Введите пароль сейфа, чтобы открыть их на этом устройстве.',
+      unlockLeadSafe: 'Ваши данные зашифрованы. Введите пароль сейфа, чтобы открыть их на этом устройстве. Ещё не задавали? Откройте Finman там, где начинали, и нажмите «Защитить данные», или введите ключ восстановления.',
       pw: 'Пароль', vaultPw: 'Пароль сейфа', vaultPw2: 'Пароль сейфа ещё раз', unlock: 'Открыть', useRk: 'Открыть ключом восстановления', usePw: 'Открыть паролем',
       rk: 'Ключ восстановления', remember: 'Держать открытым на этом устройстве', wrongPw: 'Этот пароль не открывает сейф.', wrongRk: 'Этот ключ не открывает сейф.',
       setTitle: 'Придумайте пароль сейфа', setLead: 'Вы входите через Google или Apple, поэтому для шифрования нужен отдельный пароль. Мы его не видим. Минимум 8 символов.',
@@ -61,7 +61,7 @@
       rkLead: 'Цей ключ — єдиний шлях до даних, якщо ви забудете пароль. Відновити його ми не зможемо: ваш пароль і ключ до нас не потрапляють. Збережіть його в менеджері паролів або на папері.',
       rkCopy: 'Скопіювати', rkDownload: 'Завантажити файлом', rkSaved: 'Я зберіг ключ відновлення', rkContinue: 'Продовжити', rkCopied: 'Скопійовано',
       unlockTitle: 'Відкрийте свої дані', unlockLead: 'Ваші дані зашифровані. Введіть пароль, щоб відкрити їх на цьому пристрої.',
-      unlockLeadSafe: 'Ваші дані зашифровані. Введіть пароль сейфа, щоб відкрити їх на цьому пристрої.',
+      unlockLeadSafe: 'Ваші дані зашифровані. Введіть пароль сейфа, щоб відкрити їх на цьому пристрої. Ще не задавали? Відкрийте Finman там, де починали, і натисніть «Захистити дані», або введіть ключ відновлення.',
       pw: 'Пароль', vaultPw: 'Пароль сейфа', vaultPw2: 'Пароль сейфа ще раз', unlock: 'Відкрити', useRk: 'Відкрити ключем відновлення', usePw: 'Відкрити паролем',
       rk: 'Ключ відновлення', remember: 'Тримати відкритим на цьому пристрої', wrongPw: 'Цей пароль не відкриває сейф.', wrongRk: 'Цей ключ не відкриває сейф.',
       setTitle: 'Придумайте пароль сейфа', setLead: 'Ви входите через Google або Apple, тож для шифрування потрібен окремий пароль. Ми його не бачимо. Щонайменше 8 символів.',
@@ -479,6 +479,10 @@
     let salt = (st.loginCtx && st.loginCtx.salt) || (m.kdf === 'fm1' ? m.salt : null);
     let params = (st.loginCtx && st.loginCtx.params) || (m.kdf === 'fm1' ? m.params : C.DEFAULT_PARAMS);
     let currentPassword = raw || null;
+    let quiet = false;
+    // New accounts have nothing readable to move: no «Encrypting your data» screen for them.
+    const visible = Number(m.legacyRows) > 0;
+    const progress = (a, d) => { if (visible) showMigration(a, d); };
 
     if (!master) {
       if (m.hasPassword) {
@@ -498,9 +502,12 @@
           secret = currentPassword;
         }
       } else {
-        const ans = await askSecret({ title: t('setTitle'), lead: t('setLead'), mode: 'set-safe' });
-        if (ans.signOut) { signOutNow(); return false; }
-        secret = ans.secret;
+        // Quiet start (owner 23.11): Google/Apple sign-in asks nothing now. A random secret that
+        // only this device knows wraps the vault key; «Protect your data» later sets a real vault
+        // password and a fresh recovery key (protect()). The server still sees only ciphertext.
+        const r = new Uint8Array(32); crypto.getRandomValues(r);
+        secret = Array.from(r, (x) => x.toString(16).padStart(2, '0')).join('');
+        quiet = true;
       }
     } else if (raw) {
       currentPassword = raw;
@@ -511,16 +518,16 @@
       master = await C.deriveMaster(secret, salt, params);
     }
 
-    showMigration(0, 0);
+    progress(0, 0);
     const dump = await apiJson('/api/vault/legacy-export');
-    showMigration(1, 1);
+    progress(1, 1);
     const eng = await openEngine(null);
     await eng.importLegacy({ tables: dump.tables || {}, user: dump.user || st.user });
     const counts = eng.counts();
     const vk = C.newVaultKey();
     const rk = C.newRecoveryKey();
     const blob = await C.encryptVault(vk, eng.export(), uid);
-    showMigration(2, 2);
+    progress(2, 2);
     const body = {
       blob_b64: C.b64(blob),
       wrapped_pw: await C.wrap(await C.kekFromMaster(master), vk, C.wrapAad(uid, 'pw')),
@@ -538,9 +545,43 @@
     st.version = (setup && setup.version) || 1;
     await idbSet('blob:' + uid, { version: st.version, blob, dirty: false });
     await rememberDevice(uid, vk);
-    await showRecoveryKey(rk.text);
-    showMigration(3, 3);
+    // The recovery key (and, for Google/Apple, the vault password) come later, when the person
+    // chooses «Protect your data» in First steps — the key made here is never shown.
+    await idbSet('protect:' + uid, { password: quiet, recovery: true, at: Date.now() });
+    journal('vault_quiet_setup', { quiet: quiet ? 1 : 0 });
+    progress(3, 3);
     await purge(counts);
+    return true;
+  }
+
+  // ---------------------------------------------------------------- protect later
+  async function protectionPending() {
+    if (!st.user || st.mode !== 'vault') return null;
+    const p = await idbGet('protect:' + st.user.id);
+    return p && (p.password || p.recovery) ? { password: !!p.password, recovery: !!p.recovery } : null;
+  }
+
+  // «Protect your data»: a vault password (Google/Apple accounts that started quietly) and a
+  // recovery key. Until then the data opens only on this device.
+  async function protect() {
+    if (!st.vaultKey) throw new Error('Vault is locked');
+    const uid = st.user.id;
+    const p = (await idbGet('protect:' + uid)) || { password: false, recovery: true };
+    if (p.password) {
+      const ans = await askSecret({ title: t('setTitle'), lead: t('setLead'), mode: 'set-safe' });
+      if (!ans || ans.signOut || !ans.secret) { closeOverlay(); return false; }
+      st.meta = await apiJson('/api/vault/meta'); // the salt saved at setup (this session may predate it)
+      if (!st.meta.salt) throw new Error('Vault salt missing');
+      const wrapped = await C.wrap(await kekFromSecret(ans.secret), st.vaultKey, C.wrapAad(uid, 'pw'));
+      await apiJson('/api/vault/rewrap', { method: 'POST', json: { wrapped_pw: wrapped } });
+      st.meta.wrapped_pw = wrapped;
+      p.password = false;
+      await idbSet('protect:' + uid, p);
+    }
+    await newRecoveryKey();
+    p.recovery = false;
+    await idbSet('protect:' + uid, p);
+    journal('vault_protected', {});
     return true;
   }
 
@@ -882,6 +923,7 @@
 
   window.FMVault = {
     prepareLogin, prepareRegister, passwordFields, ensureReady, onLogout, syncNow, newRecoveryKey, status,
+    protectionPending, protect,
     afterPasswordChange(wrapped) { if (st.meta && wrapped) st.meta.wrapped_pw = wrapped; },
     lock: async () => { await onLogout(); location.reload(); },
     journal,
