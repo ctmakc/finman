@@ -178,4 +178,4 @@
 :root .user-info .fm-fb-btn:hover { background: var(--fm-surface-2); }
 :root .user-info .fm-fb-btn span { display: none; }
 @media (min-width: 1280px) { :root .user-info .fm-fb-btn span { display: inline; } }
-:root .fm-drawer-foot .fm-fb-btn { width: 100%; justify-content: center; margin-bottom: 8px; display: inline-flex; align-items: center; gap: 8px; }
+:root .fm-drawer-body .fm-fb-btn { width: 100%; min-height: 44px; justify-content: center; margin: 4px 0 12px; display: inline-flex; align-items: center; gap: 8px; }

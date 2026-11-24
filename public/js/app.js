@@ -362,14 +362,14 @@ function renderAuthenticatedUI() {
           </button>
         </div>
         <div class="fm-drawer-body">
+          <button id="drawer-fb-btn" class="btn btn-outline fm-fb-btn" type="button">
+            <i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span>
+          </button>
           ${navGroupHtml({ title: 'Main', items: NAV_PRIMARY }, 'fm-drawer-link', 'fm-drawer-group-title')}
           ${NAV_GROUPS.map((g) => navGroupHtml(g, 'fm-drawer-link', 'fm-drawer-group-title')).join('')}
         </div>
         <div class="fm-drawer-foot">
           <div class="fm-drawer-user"><i class="fas fa-user-circle" aria-hidden="true"></i><span>${userName}</span></div>
-          <button id="drawer-fb-btn" class="btn btn-primary fm-fb-btn" type="button">
-            <i class="fas fa-comment-dots" aria-hidden="true"></i><span>${escapeHtmlShell(trShell('fb.menu', 'Feedback'))}</span>
-          </button>
           <button id="drawer-logout-btn" class="btn btn-outline" type="button">
             <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Log out</span>
           </button>
