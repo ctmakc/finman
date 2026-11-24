@@ -83,7 +83,8 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "data:", "https://cdnjs.cloudflare.com"],
       // 'wasm-unsafe-eval': Finman Vault runs Argon2id (hash-wasm) and SQLite (sql.js) as
       // WebAssembly in the browser. It allows compiling wasm only, not eval() of JS.
-      scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://cdn.jsdelivr.net"],
+      // Microsoft Clarity (owner's word 23.11): tag from www.clarity.ms, script from scripts.clarity.ms.
+      scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://cdn.jsdelivr.net", "https://www.clarity.ms", "https://scripts.clarity.ms"],
       // Your AI in vault mode: the browser calls the user's own AI provider directly
       // (OpenAI, Anthropic, Gemini, OpenRouter, DeepSeek, Mistral, Groq, xAI or a custom
       // OpenAI-compatible https address), so any https origin. img-src already allows https:.
@@ -96,8 +97,8 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       // Invoice editor shows the PDF preview from a blob: URL in an iframe.
       frameSrc: ["'self'", "blob:"],
-      // MMIX Review Kit (bug reports with screenshots/voice) posts to review.mmix.biz.
-      connectSrc: ["'self'", "https://review.mmix.biz"],
+      // MMIX Review Kit (review.mmix.biz) and Clarity (*.clarity.ms) are covered by connectSrc "https:" above.
+      // (A second connectSrc key here used to override the first and block the user's own AI in vault mode.)
       mediaSrc: ["'self'", "blob:", "https://review.mmix.biz"],
     },
   },

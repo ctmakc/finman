@@ -38,6 +38,8 @@ router.get('/config', (req, res) => {
   res.set('Cache-Control', 'public, max-age=300');
   res.json({
     openpanel: webId && process.env.OPENPANEL_API_URL ? { clientId: webId, apiUrl: '/op' } : null,
+    // Microsoft Clarity (click / scroll maps): strict masking in the project, data-clarity-mask on <body>.
+    clarity: /^[a-z0-9]{6,16}$/.test(process.env.CLARITY_PROJECT_ID || '') ? { id: process.env.CLARITY_PROJECT_ID } : null,
   });
 });
 

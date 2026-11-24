@@ -163,11 +163,35 @@
     return false;
   }
 
+  // Microsoft Clarity: click and scroll maps. Everything on screen is masked (strict mode in
+  // the project + data-clarity-mask on <body>); no email or name is sent, only the account id.
+  // QA browsers and test accounts never load it; a test account found after login stops it.
+  var clarityOn = false;
+  function startClarity(cfg) {
+    if (!cfg || !cfg.clarity || !cfg.clarity.id || isQa() || window.Capacitor) return;
+    // The app has no consent banner: visitors in Europe (EEA / UK / CH time zones) do not load Clarity.
+    var tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* ignore */ }
+    if (/^Europe\//.test(tz) || /^Atlantic\/(Reykjavik|Canary|Madeira|Azores|Faroe)$/.test(tz)) return;
+    try { document.body && document.body.setAttribute('data-clarity-mask', 'true'); } catch (e) { /* ignore */ }
+    window.clarity = window.clarity || function () { (window.clarity.q = window.clarity.q || []).push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.clarity.ms/tag/' + encodeURIComponent(cfg.clarity.id);
+    document.head.appendChild(s);
+    clarityOn = true;
+  }
+  function clarity() {
+    if (!clarityOn || typeof window.clarity !== 'function') return;
+    try { window.clarity.apply(null, arguments); } catch (e) { /* ignore */ }
+  }
+
   function startOpenPanel() {
     if (isQa()) { opState = 'off'; opPending = []; return; }
     fetch('/api/t/config', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (cfg) {
+        startClarity(cfg);
         if (!cfg || !cfg.openpanel) { opState = 'off'; opPending = []; return; }
         opRaw('init', {
           clientId: cfg.openpanel.clientId,
@@ -196,7 +220,8 @@
 
   function identify(user) {
     if (!user || !user.id) return;
-    if (isQaEmail(user.email)) { markQa(); return; }
+    if (isQaEmail(user.email)) { markQa(); clarity('stop'); return; }
+    clarity('identify', String(user.id));
     var name = String(user.fullName || '').trim().split(/\s+/);
     op('identify', {
       profileId: String(user.id),
