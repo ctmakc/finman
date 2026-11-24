@@ -72,6 +72,14 @@ function fmMoney(value) {
 // Dashboard chart bootstrap
 let _lastChartStats = null;
 
+// An empty chart (axis $0…$1, a blank ring) reads like a broken screen: say what fills it.
+function fmChartEmpty(canvas, text) {
+  const box = canvas && canvas.closest ? canvas.closest('.fm-chart-canvas') : null;
+  if (!box) return;
+  box.classList.add('fm-chart-empty');
+  box.innerHTML = '<p class="fm-chart-empty-text">' + String(text).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + '</p>';
+}
+
 function initCharts(statsData) {
     _lastChartStats = statsData; // cached for the theme-change redraw
     initIncomeExpenseChart(statsData.transactionsByMonth);
@@ -93,6 +101,10 @@ function initCharts(statsData) {
     const locale = fmChartLocale();
 
     const sortedMonths = Object.keys(transactionsByMonth || {}).sort();
+    if (!sortedMonths.some((m) => (transactionsByMonth[m].income || 0) > 0 || (transactionsByMonth[m].expense || 0) > 0)) {
+      fmChartEmpty(canvas, 'Money in and out by month shows here after your first statement or a few entries.');
+      return;
+    }
 
     const labels = sortedMonths.map(month => {
       const [year, monthNum] = month.split('-');
@@ -182,6 +194,11 @@ function initCharts(statsData) {
     const expenseCategories = Object.entries(transactionsByCategory || {})
       .filter(([_, values]) => values.expense > 0)
       .sort((a, b) => b[1].expense - a[1].expense);
+
+    if (!expenseCategories.length) {
+      fmChartEmpty(canvas, 'No spending this month yet. Categories show here once this month has expenses.');
+      return;
+    }
 
     // Top 6 categories; the rest collapse into "Other"
     const topCategories = expenseCategories.slice(0, 6);

@@ -368,7 +368,12 @@
     else main.insertBefore(holder, main.firstChild);
     bindPanel(holder, j, main);
     if (hasData) heroTips(main, j.tips);
-    if (showList) ev('checklist_shown', { done: j.doneCount, next: j.next || '' });
+    // Once per 10 minutes per tab: every return to Dashboard re-renders the list, and
+    // 7 "shows" in 6 seconds (user #41, 17.11) said more about clicks than about the list.
+    if (showList && Date.now() - (window.__fmChecklistShownAt || 0) > 10 * 60 * 1000) {
+      window.__fmChecklistShownAt = Date.now();
+      ev('checklist_shown', { done: j.doneCount, next: j.next || '' });
+    }
   }
 
   // ---- /week ---------------------------------------------------------------

@@ -236,6 +236,7 @@
     var title = d.hasBusiness ? 'Money map: business and personal' : 'Money map';
     var head = (typeof root.pageHeaderHtml === 'function' ? root.pageHeaderHtml(title, periodTabs()) : '<h1>' + title + '</h1>' + periodTabs());
     var html = head;
+    if (S.note) html += '<p class="mm-note">' + esc(S.note) + '</p>';
     if (d.missingRates && d.missingRates.length) {
       html += '<p class="mm-note">No exchange rate yet for ' + esc(d.missingRates.join(', ')) + '; those amounts are counted 1:1.</p>';
     }
@@ -256,6 +257,7 @@
       b.addEventListener('click', function () {
         if (S.period === b.dataset.mmPeriod) return;
         S.period = b.dataset.mmPeriod;
+        S.note = '';
         refresh();
       });
     });
@@ -332,8 +334,38 @@
     render();
   }
 
+  // Nothing in "This month" yet, while the statement covered earlier months (the usual case
+  // right after the first import): open on the latest period that has money in it.
+  function quietThisMonth(d) {
+    var p = d.personal || {};
+    var biz = (d.businesses || []).some(function (b) { return b.income > 0 || b.expenses > 0; });
+    return !(p.income > 0) && !(p.expenses > 0) && !biz;
+  }
+  function latestPeriodWithData(d) {
+    var t = todayYMD();
+    var y = +t.slice(0, 4), m = +t.slice(5, 7);
+    var withData = (d.series || []).filter(function (x) {
+      return x.personalIncome || x.personalExpenses || x.businessIncome || x.businessExpenses;
+    }).map(function (x) { return x.month; }).sort();
+    if (!withData.length) return null;
+    var lastYm = withData[withData.length - 1];
+    var ago = (y * 12 + m) - (+lastYm.slice(0, 4) * 12 + +lastYm.slice(5, 7));
+    if (ago === 1) return 'last';
+    if (ago <= 2) return 'q';
+    return lastYm.slice(0, 4) === String(y) ? 'year' : null;
+  }
+
   async function renderMoneyMapPage() {
+    S.note = '';
     await load();
+    if (S.period === 'month' && S.data && quietThisMonth(S.data)) {
+      var pick = latestPeriodWithData(S.data);
+      if (pick) {
+        S.period = pick;
+        S.note = 'Nothing recorded this month yet, so this shows ' + (pick === 'last' ? 'last month' : pick === 'q' ? 'the last 3 months' : 'this year') + '.';
+        await load();
+      }
+    }
     render();
   }
 

@@ -179,3 +179,11 @@
 :root .user-info .fm-fb-btn span { display: none; }
 @media (min-width: 1280px) { :root .user-info .fm-fb-btn span { display: inline; } }
 :root .fm-drawer-body .fm-fb-btn { width: 100%; min-height: 44px; justify-content: center; margin: 4px 0 12px; display: inline-flex; align-items: center; gap: 8px; }
+
+/* 1123 walk: with the Feedback button the header at 1280–1599 px ran "More" into the
+   user name. The name is in the drawer and on Settings; show it in the header on wide screens only. */
+@media (max-width: 1599px) { :root .user-info .user-name { display: none; } }
+
+/* 1123 walk: empty dashboard charts say what fills them (public/js/charts.js fmChartEmpty). */
+:root .fm-chart-canvas.fm-chart-empty { display: flex; align-items: center; justify-content: center; min-height: 140px; height: auto; }
+:root .fm-chart-empty-text { margin: 0; max-width: 34ch; text-align: center; color: var(--fm-ink-2); font-size: 0.92rem; line-height: 1.5; }
