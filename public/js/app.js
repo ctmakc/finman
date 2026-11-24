@@ -527,6 +527,8 @@ function detectIconFont() {
 const REPORT_PAGES = new Set(['reports', 'analytics', 'money-map', 'week', 'forecast', 'networth']);
 
 function navigateTo(page, options = {}) {
+  // A survey card belongs to the screen it was asked on: leaving hides it (not answered → asked on a later open).
+  if (window.FMFeedback && window.FMFeedback.hideCard) window.FMFeedback.hideCard();
   if (page === 'feedback' && appState.isAuthenticated && document.getElementById('main-content') && window.FMFeedback) {
     if (typeof closeDrawer === 'function' && isDrawerOpen()) closeDrawer();
     if (typeof setMoreMenu === 'function') setMoreMenu(false);

@@ -286,6 +286,14 @@
 
   function afterImport() { maybeCard('import_done', 4500); }
 
+  // Navigation: take the card away without marking it answered.
+  function hideCard() {
+    var el = document.getElementById('fb-card');
+    if (!el) return;
+    el.classList.remove('in');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 200);
+  }
+
   // QA: ?fm_qa_survey=day3 shows that card now, whatever the account age or earlier answers.
   function qaSurvey() {
     try {
@@ -455,6 +463,7 @@
     open: open,
     afterImport: afterImport,
     maybeDay7: maybeDay7,
+    hideCard: hideCard,
     exitHtml: exitHtml,
     sendExit: sendExit,
     renderAdmin: renderAdmin,
