@@ -448,8 +448,11 @@ html:root { font-size: 15px; }
 :root body.sd-shell .fm-bug-fab { display: none; }
 :root body.sd-shell .sd-rail { padding-bottom: 0; }
 :root .fm-drawer-body .fm-bug-item { width: 100%; min-height: 44px; justify-content: center; margin: 0 0 12px; display: inline-flex; align-items: center; gap: 8px; }
-/* Sign-in screen: a fixed button would sit on the form fields while scrolling — top right of the page instead, scrolls away. */
-:root body:not(.sd-shell) .fm-bug-fab { position: absolute; top: 12px; right: 12px; bottom: auto; }
+/* Sign-in screen (law 24.11 «справа внизу, ничего не перекрывает»): bottom right of the page, under the form.
+   A fixed button sat on the Name field while scrolling at 390 (f3abc00), so it is pinned to the page end instead:
+   below «End-to-end encrypted» on the phone, the screen corner on desktop (body is at least one screen tall). */
+:root body:not(.sd-shell) { position: relative; min-height: 100vh; min-height: 100dvh; }
+:root body:not(.sd-shell) .fm-bug-fab { position: absolute; top: auto; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 /* First steps: records only in this browser until protected (owner 23.11) */
 :root .sd-deviceonly { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: start; margin: 12px 0 4px; padding: 10px 12px;
   border: 1px solid var(--sd-line); border-left: 3px solid var(--sd-warn); border-radius: 8px; background: var(--sd-surface); font-size: 13px; color: var(--sd-ink-2); }
